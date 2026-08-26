@@ -114,6 +114,9 @@ func generate_from_seed(
 	# the layout pipeline rather than failing every generate_from_seed caller.
 	if USE_WORLDGEN and ClassDB.class_exists("DerelictGenerator"):
 		return _generate_via_worldgen(seed_value, size, condition)
+	if USE_WORLDGEN:
+		push_error("SHIP GENERATOR FAIL DerelictGenerator class unavailable; native path is required")
+		return null
 	var blueprint = ShipBlueprintScript.new(size, condition, seed_value)
 	return generate(blueprint)
 

@@ -8317,12 +8317,46 @@
       "domain": "travel",
       "kind": "integrity-gate",
       "model_exists": true,
-      "smoke": "scripts/validation/procgen_manifest_smoke.gd",
+      "smoke": "scripts/validation/procgen_build_manifest_smoke.gd",
       "reachable": true,
       "driven": true,
       "driven_at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen",
       "input": {"live": true, "desc": "checked build/content manifests, native artifact, and DerelictGenerator version", "at": "scripts/procgen/procgen_manifest_validator.gd:validate"},
       "output": {"live": true, "desc": "stable result code; native generation stops on mismatch and cannot fall through to GDScript", "at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen"},
+      "confidence": "V",
+      "loops": ["travel"],
+      "integrations": []
+    },
+    {
+      "id": "worldgen_core",
+      "file": "native/worldgen/crates/derelict_core/src/lib.rs",
+      "name": "Authoritative Rust Worldgen Core",
+      "domain": "travel",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "native/worldgen/crates/derelict_core/tests/determinism.rs",
+      "reachable": false,
+      "driven": false,
+      "driven_at": "native/worldgen/crates/derelict_core/src/lib.rs",
+      "input": {"live": false, "desc": "Imported pure Rust generator; Gate 1 adapter wiring remains incomplete", "at": "native/worldgen/crates/derelict_core/src/pipeline.rs"},
+      "output": {"live": false, "desc": "Deterministic Rust ship output is tested but not yet consumed by the complete Godot bundle path", "at": "native/worldgen/crates/derelict_core/src/structural/export.rs"},
+      "confidence": "V",
+      "loops": [],
+      "integrations": []
+    },
+    {
+      "id": "worldgen_gdextension",
+      "file": "native/worldgen/crates/derelict_godot/src/generator.rs",
+      "name": "Worldgen GDExtension Adapter",
+      "domain": "travel",
+      "kind": "adapter",
+      "model_exists": true,
+      "smoke": "scripts/validation/procgen_build_manifest_smoke.gd",
+      "reachable": false,
+      "driven": false,
+      "driven_at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen",
+      "input": {"live": false, "desc": "Manifest-gated native adapter seam; complete bundle/lifecycle cutover is Gate 1", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
+      "output": {"live": false, "desc": "GDExtension generator class is not claimed as complete native/Web parity", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
       "confidence": "V",
       "loops": ["travel"],
       "integrations": []
@@ -8697,7 +8731,7 @@
         },
         {
           "system": "ship_generator",
-          "role": "orchestrator (configure_run_context -> generate)"
+          "role": "orchestrator (manifest-gated Rust preference; missing/mismatched native path fails closed; Gate 1 lifecycle/bundle cutover remains)"
         },
         {
           "system": "procgen_manifest_validator",

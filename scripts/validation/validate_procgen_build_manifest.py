@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Generate/check the deterministic Gate 0 procgen build manifest (stdlib only)."""
 from __future__ import annotations
-import argparse, hashlib, json, os, sys
+import argparse, hashlib, json, os, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTENT_MANIFEST = ROOT / "data/procgen/manifests/content_manifest.json"
 BUILD_MANIFEST = ROOT / "data/procgen/manifests/build/win64.json"
 ARTIFACT = ROOT / "addons/derelict/bin/win64/derelict_godot.dll"
-COMMIT = "b78fedf2624c2d54f0f42b6c0ad3c488fbd9e6a9"
 CONTENT_ROOTS = [
     ROOT / "native/worldgen/crates/derelict_core/assets",
     *(ROOT / "data/procgen" / name for name in ("archetypes", "biomes", "difficulty", "encounter_tables", "templates")),
@@ -35,9 +34,9 @@ def content_document(paths: list[Path]) -> dict:
     entries = [{"path": rel(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]
     return {"manifest_schema": "procgen-content-manifest-1", "files": entries, "content_manifest_hash": content_hash(paths)}
 
-def build_document(content_digest: str) -> dict:
+def build_document(content_digest: str, source_commit: str) -> dict:
     return {
-        "manifest_schema": "procgen-build-manifest-1", "rust_source_commit": COMMIT,
+        "manifest_schema": "procgen-build-manifest-1", "rust_source_commit": source_commit,
         "generator_version": 2, "content_manifest_path": "data/procgen/manifests/content_manifest.json",
         "content_manifest_hash": content_digest, "target": "x86_64-pc-windows-msvc",
         "artifact": {"kind": "gdextension", "path": "addons/derelict/bin/win64/derelict_godot.dll", "sha256": hashlib.sha256(ARTIFACT.read_bytes()).hexdigest()},
@@ -48,11 +47,20 @@ def canonical(value: dict) -> str:
     return json.dumps(value, indent=2, sort_keys=False) + "\n"
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); parser.add_argument("--source-commit"); args = parser.parse_args()
+    source_commit = args.source_commit
+    if source_commit is None and BUILD_MANIFEST.exists():
+        try: source_commit = json.loads(BUILD_MANIFEST.read_text(encoding="utf-8"))["rust_source_commit"]
+        except (OSError, KeyError, TypeError, json.JSONDecodeError): source_commit = ""
+    if not isinstance(source_commit, str) or len(source_commit) != 40 or any(c not in "0123456789abcdef" for c in source_commit):
+        print("source commit must be 40 lowercase hexadecimal characters", file=sys.stderr); return 1
+    commit_check = subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", f"{source_commit}^{{commit}}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if commit_check.returncode != 0:
+        print(f"source commit is not present in Git: {source_commit}", file=sys.stderr); return 1
     paths = files()
     if not ARTIFACT.exists():
         print(f"missing artifact: {rel(ARTIFACT)}", file=sys.stderr); return 1
-    content = content_document(paths); build = build_document(content["content_manifest_hash"])
+    content = content_document(paths); build = build_document(content["content_manifest_hash"], source_commit)
     expected = {CONTENT_MANIFEST: canonical(content), BUILD_MANIFEST: canonical(build)}
     failures = []
     for path, text in expected.items():

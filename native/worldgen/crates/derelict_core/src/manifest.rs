@@ -5,6 +5,7 @@ pub const MANIFEST_SCHEMA: &str = "procgen-build-manifest-1";
 pub const CONTENT_MANIFEST_SCHEMA: &str = "procgen-content-manifest-1";
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BuildManifest {
     pub manifest_schema: String,
     pub rust_source_commit: String,
@@ -17,9 +18,11 @@ pub struct BuildManifest {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Artifact { pub kind: String, pub path: String, pub sha256: String }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ExportSchemas {
     pub procgen_request: String,
     pub procgen_bundle: String,
@@ -30,6 +33,18 @@ pub struct ExportSchemas {
     pub generation_trace: String,
     pub adaptive_proposal: String,
 }
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ContentManifest {
+    pub manifest_schema: String,
+    pub files: Vec<ContentFile>,
+    pub content_manifest_hash: String,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ContentFile { pub path: String, pub sha256: String }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ManifestError {
@@ -72,6 +87,22 @@ impl BuildManifest {
         ];
         for (field, actual, expected) in schemas { if actual != expected { return Err(ManifestError::InvalidField(field)); } }
         Ok(())
+    }
+
+    pub fn content_from_json(json: &str) -> Result<ContentManifest, ManifestError> {
+        let content: ContentManifest = serde_json::from_str(json)?;
+        if content.manifest_schema != CONTENT_MANIFEST_SCHEMA || !is_sha256(&content.content_manifest_hash) {
+            return Err(ManifestError::InvalidField("content_manifest"));
+        }
+        let mut previous = None;
+        for file in &content.files {
+            if !file.path.is_ascii() || file.path.contains('\\') || file.path.starts_with('/') || !is_sha256(&file.sha256) {
+                return Err(ManifestError::InvalidField("content_manifest.files"));
+            }
+            if let Some(prev) = previous { if prev >= file.path.as_str() { return Err(ManifestError::InvalidField("content_manifest.files")); } }
+            previous = Some(file.path.as_str());
+        }
+        Ok(content)
     }
 }
 
