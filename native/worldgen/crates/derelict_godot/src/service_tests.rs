@@ -1,5 +1,5 @@
 //! Deterministic lifecycle tests. Gates are one-shot channels; no sleeps/barriers.
-use super::service::{Generator, Limits, MonotonicClock, Service};
+use super::service::{AdmissionOperation, Generator, Limits, MonotonicClock, Service};
 use derelict_core::lifecycle::{LifecycleEvent, LifecycleResult, LifecycleStatus};
 use derelict_core::model::GENERATOR_VERSION;
 use derelict_core::procgen::{
@@ -8,11 +8,11 @@ use derelict_core::procgen::{
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::time::Duration;
 const HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const WAIT: Duration = Duration::from_secs(2);
-type GateReceivers = Arc<Mutex<BTreeMap<u64, mpsc::Receiver<()>>>>;
+type GateReceivers = Arc<(Mutex<BTreeMap<u64, mpsc::Receiver<()>>>, Condvar)>;
 type GatedGenerator = (Generator, mpsc::Receiver<u64>, GateReceivers);
 #[derive(Default)]
 struct Clock(AtomicU64);
@@ -99,18 +99,16 @@ fn generated_failure(code: ProcgenFailureCode) -> ProcgenFailure {
     }
 }
 fn poll_terminal(s: &Service, id: i64) -> LifecycleResult {
-    let until = Instant::now() + WAIT;
-    loop {
-        let r = s.poll(id);
-        if matches!(
-            r.status,
-            LifecycleStatus::Completed | LifecycleStatus::Failed
-        ) {
-            return r;
-        }
-        assert!(Instant::now() < until, "terminal poll timed out");
-        std::thread::yield_now()
-    }
+    assert!(
+        s.wait_terminal_for_test(id, WAIT),
+        "terminal state handoff timed out"
+    );
+    let result = s.poll(id);
+    assert!(matches!(
+        result.status,
+        LifecycleStatus::Completed | LifecycleStatus::Failed
+    ));
+    result
 }
 fn recv<T>(r: &mpsc::Receiver<T>, what: &str) -> T {
     r.recv_timeout(WAIT)
@@ -118,18 +116,22 @@ fn recv<T>(r: &mpsc::Receiver<T>, what: &str) -> T {
 }
 fn gated(b: ProcgenBundle) -> GatedGenerator {
     let (tx, started_rx) = mpsc::channel();
-    let gates = Arc::new(Mutex::new(BTreeMap::new()));
+    let gates = Arc::new((Mutex::new(BTreeMap::new()), Condvar::new()));
     let map = gates.clone();
     let g = Arc::new(move |r: ProcgenRequest| {
         tx.send(r.world_seed).unwrap();
-        let until = Instant::now() + WAIT;
-        let gate = loop {
-            if let Some(rx) = map.lock().unwrap().remove(&r.world_seed) {
-                break rx;
-            }
-            assert!(Instant::now() < until, "gate was not installed");
-            std::thread::yield_now()
-        };
+        let (available, ready) = &*map;
+        let mut available = available.lock().unwrap();
+        while !available.contains_key(&r.world_seed) {
+            let (next, guard) = ready.wait_timeout(available, WAIT).unwrap();
+            available = next;
+            assert!(
+                !guard.timed_out() || available.contains_key(&r.world_seed),
+                "gate installation handoff timed out"
+            );
+        }
+        let gate = available.remove(&r.world_seed).unwrap();
+        drop(available);
         recv(&gate, "release");
         Ok(b.clone())
     }) as Generator;
@@ -137,8 +139,46 @@ fn gated(b: ProcgenBundle) -> GatedGenerator {
 }
 fn release(g: &GateReceivers, seed: u64) -> mpsc::Sender<()> {
     let (tx, rx) = mpsc::channel();
-    g.lock().unwrap().insert(seed, rx);
+    let (available, ready) = &**g;
+    available.lock().unwrap().insert(seed, rx);
+    ready.notify_all();
     tx
+}
+
+#[test]
+fn injected_limits_can_only_reduce_the_production_envelope() {
+    let production = Limits::default();
+    assert!(production.valid());
+
+    let mut oversized = Vec::new();
+    let mut limits = production.clone();
+    limits.workers += 1;
+    oversized.push(("workers", limits));
+    let mut limits = production.clone();
+    limits.queue_capacity += 1;
+    oversized.push(("queue_capacity", limits));
+    let mut limits = production.clone();
+    limits.retained_results += 1;
+    oversized.push(("retained_results", limits));
+    let mut limits = production.clone();
+    limits.max_request_bytes += 1;
+    oversized.push(("max_request_bytes", limits));
+    let mut limits = production.clone();
+    limits.max_entities += 1;
+    oversized.push(("max_entities", limits));
+    let mut limits = production.clone();
+    limits.max_trace_entries += 1;
+    oversized.push(("max_trace_entries", limits));
+    let mut limits = production.clone();
+    limits.max_events += 1;
+    oversized.push(("max_events", limits));
+    let mut limits = production;
+    limits.deadline_ms += 1;
+    oversized.push(("deadline_ms", limits));
+
+    for (field, limits) in oversized {
+        assert!(!limits.valid(), "oversized {field} was accepted");
+    }
 }
 
 #[test]
@@ -175,13 +215,35 @@ fn cancel_queued_and_running_are_idempotent() {
     let q = s.submit(req(2)).request_id.unwrap();
     let first_queued_cancel = s.cancel(q);
     assert_eq!(code(&first_queued_cancel), ProcgenFailureCode::Cancellation);
+    assert_eq!(
+        first_queued_cancel.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::CancelRequested,
+            LifecycleEvent::Cancelled,
+        ]
+    );
+    assert!(first_queued_cancel.validate().is_ok());
     let repeated_queued_cancel = s.cancel(q);
     assert_eq!(repeated_queued_cancel, first_queued_cancel);
+    let queued_terminal = poll_terminal(&s, q);
+    assert_eq!(code(&queued_terminal), ProcgenFailureCode::Cancellation);
     assert_eq!(
-        code(&poll_terminal(&s, q)),
-        ProcgenFailureCode::Cancellation
+        queued_terminal.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::CancelRequested,
+            LifecycleEvent::Cancelled,
+            LifecycleEvent::ResultConsumed,
+        ]
     );
-    assert_eq!(code(&s.poll(q)), ProcgenFailureCode::ResultConsumed);
+    assert!(queued_terminal.validate().is_ok());
+    let consumed_queued = s.poll(q);
+    assert_eq!(code(&consumed_queued), ProcgenFailureCode::ResultConsumed);
+    assert_eq!(consumed_queued.events, vec![LifecycleEvent::ResultConsumed]);
+    assert!(consumed_queued.validate().is_ok());
     assert_eq!(s.submit(req(3)).request_id, Some(3));
 
     let first_running_cancel = s.cancel(1);
@@ -189,13 +251,33 @@ fn cancel_queued_and_running_are_idempotent() {
         first_running_cancel.status,
         LifecycleStatus::CancelRequested
     );
+    assert_eq!(
+        first_running_cancel.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::Started,
+            LifecycleEvent::CancelRequested,
+        ]
+    );
+    assert!(first_running_cancel.validate().is_ok());
     let repeated_running_cancel = s.cancel(1);
     assert_eq!(repeated_running_cancel, first_running_cancel);
     release(&gates, 1).send(()).unwrap();
+    let running_terminal = poll_terminal(&s, 1);
+    assert_eq!(code(&running_terminal), ProcgenFailureCode::Cancellation);
     assert_eq!(
-        code(&poll_terminal(&s, 1)),
-        ProcgenFailureCode::Cancellation
+        running_terminal.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::Started,
+            LifecycleEvent::CancelRequested,
+            LifecycleEvent::Cancelled,
+            LifecycleEvent::ResultConsumed,
+        ]
     );
+    assert!(running_terminal.validate().is_ok());
     assert_eq!(recv(&started, "seed3 after queue recovery"), 3);
     release(&gates, 3).send(()).unwrap();
     assert_eq!(poll_terminal(&s, 3).status, LifecycleStatus::Completed);
@@ -231,8 +313,31 @@ fn fake_clock_prestart_postrun_and_sync_deadlines() {
     let q = s.submit(req(2)).request_id.unwrap();
     c.set(10);
     release(&gates, 1).send(()).unwrap();
-    assert_eq!(code(&poll_terminal(&s, 1)), ProcgenFailureCode::Timeout);
-    assert_eq!(code(&poll_terminal(&s, q)), ProcgenFailureCode::Timeout);
+    let postrun = poll_terminal(&s, 1);
+    assert_eq!(code(&postrun), ProcgenFailureCode::Timeout);
+    assert_eq!(
+        postrun.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::Started,
+            LifecycleEvent::TimedOut,
+            LifecycleEvent::ResultConsumed,
+        ]
+    );
+    assert!(postrun.validate().is_ok());
+    let prestart = poll_terminal(&s, q);
+    assert_eq!(code(&prestart), ProcgenFailureCode::Timeout);
+    assert_eq!(
+        prestart.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Queued,
+            LifecycleEvent::TimedOut,
+            LifecycleEvent::ResultConsumed,
+        ]
+    );
+    assert!(prestart.validate().is_ok());
     assert!(
         started.try_recv().is_err(),
         "pre-start timeout unexpectedly invoked the generator"
@@ -245,7 +350,17 @@ fn fake_clock_prestart_postrun_and_sync_deadlines() {
         Ok(b.clone())
     }) as Generator;
     let s = service(l, c, g);
-    assert_eq!(code(&s.generate_sync(req(3))), ProcgenFailureCode::Timeout);
+    let sync = s.generate_sync(req(3));
+    assert_eq!(code(&sync), ProcgenFailureCode::Timeout);
+    assert_eq!(
+        sync.events,
+        vec![
+            LifecycleEvent::Admitted,
+            LifecycleEvent::Started,
+            LifecycleEvent::TimedOut,
+        ]
+    );
+    assert!(sync.validate().is_ok());
     s.shutdown()
 }
 #[test]
@@ -342,12 +457,21 @@ fn consumed_tombstones_are_bounded_and_age_to_expired() {
 
     let first = s.submit(req(1)).request_id.unwrap();
     assert_eq!(poll_terminal(&s, first).status, LifecycleStatus::Completed);
-    assert_eq!(code(&s.poll(first)), ProcgenFailureCode::ResultConsumed);
+    let first_consumed = s.poll(first);
+    assert_eq!(code(&first_consumed), ProcgenFailureCode::ResultConsumed);
+    assert_eq!(first_consumed.events, vec![LifecycleEvent::ResultConsumed]);
+    assert!(first_consumed.validate().is_ok());
 
     let second = s.submit(req(2)).request_id.unwrap();
     assert_eq!(poll_terminal(&s, second).status, LifecycleStatus::Completed);
-    assert_eq!(code(&s.poll(second)), ProcgenFailureCode::ResultConsumed);
-    assert_eq!(code(&s.poll(first)), ProcgenFailureCode::ResultExpired);
+    let second_consumed = s.poll(second);
+    assert_eq!(code(&second_consumed), ProcgenFailureCode::ResultConsumed);
+    assert_eq!(second_consumed.events, vec![LifecycleEvent::ResultConsumed]);
+    assert!(second_consumed.validate().is_ok());
+    let first_expired = s.poll(first);
+    assert_eq!(code(&first_expired), ProcgenFailureCode::ResultExpired);
+    assert_eq!(first_expired.events, vec![LifecycleEvent::ResultExpired]);
+    assert!(first_expired.validate().is_ok());
     assert_eq!(code(&s.poll(0)), ProcgenFailureCode::UnknownRequest);
     assert_eq!(code(&s.poll(99)), ProcgenFailureCode::UnknownRequest);
     s.shutdown();
@@ -676,6 +800,208 @@ fn sync_deadline_precedes_generator_error_or_panic() {
         assert!(result.validate().is_ok());
         s.shutdown();
     }
+}
+
+#[test]
+fn async_failure_panic_and_deadline_precedence_have_exact_events_and_recover() {
+    let cases = [
+        (false, false, ProcgenFailureCode::GenerationFailure),
+        (false, true, ProcgenFailureCode::InternalFailure),
+        (true, false, ProcgenFailureCode::Timeout),
+        (true, true, ProcgenFailureCode::Timeout),
+    ];
+    for (late, panics, expected_code) in cases {
+        let clock = Arc::new(Clock::default());
+        let generator_clock = clock.clone();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let generator_calls = calls.clone();
+        let valid_bundle = bundle();
+        let generator = Arc::new(move |_| {
+            if generator_calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                if late {
+                    generator_clock.set(10);
+                }
+                if panics {
+                    panic!("async fixture panic");
+                }
+                return Err(generated_failure(ProcgenFailureCode::GenerationFailure));
+            }
+            Ok(valid_bundle.clone())
+        }) as Generator;
+        let mut limits = lim();
+        limits.deadline_ms = 10;
+        let s = service(limits, clock, generator);
+
+        let first_id = s.submit(req(1)).request_id.unwrap();
+        let first = poll_terminal(&s, first_id);
+        assert_eq!(code(&first), expected_code);
+        assert_eq!(
+            first.events,
+            vec![
+                LifecycleEvent::Admitted,
+                LifecycleEvent::Queued,
+                LifecycleEvent::Started,
+                if late {
+                    LifecycleEvent::TimedOut
+                } else {
+                    LifecycleEvent::Failed
+                },
+                LifecycleEvent::ResultConsumed,
+            ]
+        );
+        assert!(first.validate().is_ok());
+
+        let recovery_id = s.submit(req(2)).request_id.unwrap();
+        let recovery = poll_terminal(&s, recovery_id);
+        assert_eq!(recovery.status, LifecycleStatus::Completed);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        s.shutdown();
+    }
+}
+
+#[test]
+fn admission_and_shutdown_ordering_is_serialized_for_every_entry_path() {
+    let admission_operations = [
+        AdmissionOperation::Submit,
+        AdmissionOperation::SubmitJson,
+        AdmissionOperation::GenerateSync,
+        AdmissionOperation::GenerateSyncJson,
+    ];
+
+    for operation in admission_operations {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let generator_calls = calls.clone();
+        let valid_bundle = bundle();
+        let generator = Arc::new(move |_| {
+            generator_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(valid_bundle.clone())
+        }) as Generator;
+        let s = service(lim(), Arc::new(Clock::default()), generator);
+        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+        let (release_tx, release_rx) = mpsc::sync_channel(0);
+        let release_rx = Arc::new(Mutex::new(release_rx));
+        let armed = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let hook_armed = armed.clone();
+        s.set_admission_hook(Arc::new(move |observed| {
+            if observed == operation && hook_armed.swap(false, Ordering::SeqCst) {
+                entered_tx.send(()).unwrap();
+                recv(&release_rx.lock().unwrap(), "admission winner release");
+            }
+        }));
+
+        let request_json = serde_json::to_string(&req(1)).unwrap();
+        let service_for_operation = s.clone();
+        let (result_tx, result_rx) = mpsc::channel();
+        let operation_handle = std::thread::spawn(move || {
+            let result = match operation {
+                AdmissionOperation::Submit => service_for_operation.submit(req(1)),
+                AdmissionOperation::SubmitJson => service_for_operation.submit_json(&request_json),
+                AdmissionOperation::GenerateSync => service_for_operation.generate_sync(req(1)),
+                AdmissionOperation::GenerateSyncJson => {
+                    service_for_operation.generate_sync_json(&request_json)
+                }
+                AdmissionOperation::Shutdown => unreachable!(),
+            };
+            result_tx.send(result).unwrap();
+        });
+        recv(&entered_rx, "admission winner entered");
+
+        let service_for_shutdown = s.clone();
+        let (attempted_tx, attempted_rx) = mpsc::channel();
+        let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let shutdown_handle = std::thread::spawn(move || {
+            attempted_tx.send(()).unwrap();
+            service_for_shutdown.shutdown();
+            shutdown_tx.send(()).unwrap();
+        });
+        recv(&attempted_rx, "shutdown contender started");
+        release_tx.send(()).unwrap();
+
+        let admitted = recv(&result_rx, "admission winner result");
+        match operation {
+            AdmissionOperation::Submit | AdmissionOperation::SubmitJson => {
+                assert_eq!(admitted.status, LifecycleStatus::Accepted);
+                assert_eq!(admitted.request_id, Some(1));
+            }
+            AdmissionOperation::GenerateSync | AdmissionOperation::GenerateSyncJson => {
+                assert_eq!(admitted.status, LifecycleStatus::Completed);
+                assert_eq!(calls.load(Ordering::SeqCst), 1);
+            }
+            AdmissionOperation::Shutdown => unreachable!(),
+        }
+        recv(&shutdown_rx, "shutdown after admission");
+        operation_handle.join().unwrap();
+        shutdown_handle.join().unwrap();
+        let after_shutdown = s.submit(req(99));
+        assert_eq!(code(&after_shutdown), ProcgenFailureCode::Shutdown);
+        assert!(after_shutdown.request_id.is_none());
+    }
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let generator_calls = calls.clone();
+    let valid_bundle = bundle();
+    let generator = Arc::new(move |_| {
+        generator_calls.fetch_add(1, Ordering::SeqCst);
+        Ok(valid_bundle.clone())
+    }) as Generator;
+    let s = service(lim(), Arc::new(Clock::default()), generator);
+    let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+    let (release_tx, release_rx) = mpsc::sync_channel(0);
+    let release_rx = Arc::new(Mutex::new(release_rx));
+    let armed = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let hook_armed = armed.clone();
+    s.set_admission_hook(Arc::new(move |observed| {
+        if observed == AdmissionOperation::Shutdown && hook_armed.swap(false, Ordering::SeqCst) {
+            entered_tx.send(()).unwrap();
+            recv(&release_rx.lock().unwrap(), "shutdown winner release");
+        }
+    }));
+
+    let service_for_shutdown = s.clone();
+    let (shutdown_tx, shutdown_rx) = mpsc::channel();
+    let shutdown_handle = std::thread::spawn(move || {
+        service_for_shutdown.shutdown();
+        shutdown_tx.send(()).unwrap();
+    });
+    recv(&entered_rx, "shutdown winner entered");
+
+    let request_json = serde_json::to_string(&req(1)).unwrap();
+    let (attempted_tx, attempted_rx) = mpsc::channel();
+    let (result_tx, result_rx) = mpsc::channel();
+    let mut operation_handles = Vec::new();
+    for operation in admission_operations {
+        let service = s.clone();
+        let request_json = request_json.clone();
+        let attempted_tx = attempted_tx.clone();
+        let result_tx = result_tx.clone();
+        operation_handles.push(std::thread::spawn(move || {
+            attempted_tx.send(operation).unwrap();
+            let result = match operation {
+                AdmissionOperation::Submit => service.submit(req(1)),
+                AdmissionOperation::SubmitJson => service.submit_json(&request_json),
+                AdmissionOperation::GenerateSync => service.generate_sync(req(1)),
+                AdmissionOperation::GenerateSyncJson => service.generate_sync_json(&request_json),
+                AdmissionOperation::Shutdown => unreachable!(),
+            };
+            result_tx.send(result).unwrap();
+        }));
+    }
+    for _ in admission_operations {
+        recv(&attempted_rx, "blocked admission contender");
+    }
+    release_tx.send(()).unwrap();
+    recv(&shutdown_rx, "winning shutdown");
+    for _ in admission_operations {
+        let rejected = recv(&result_rx, "post-shutdown rejection");
+        assert_eq!(code(&rejected), ProcgenFailureCode::Shutdown);
+        assert!(rejected.request_id.is_none());
+        assert!(rejected.validate().is_ok());
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    for handle in operation_handles {
+        handle.join().unwrap();
+    }
+    shutdown_handle.join().unwrap();
 }
 
 #[test]

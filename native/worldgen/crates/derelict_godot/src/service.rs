@@ -7,6 +7,15 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
+const MAX_WORKERS: usize = 2;
+const MAX_QUEUE_CAPACITY: usize = 8;
+const MAX_RETAINED_RESULTS: usize = 16;
+const MAX_REQUEST_BYTES: usize = 64 * 1024;
+const MAX_ENTITIES: usize = 4096;
+const MAX_TRACE_ENTRIES: usize = 4096;
+const MAX_EVENTS: usize = 32;
+const MAX_DEADLINE_MS: u64 = 2000;
+
 pub trait MonotonicClock: Send + Sync {
     fn now_ms(&self) -> u64;
 }
@@ -47,21 +56,30 @@ impl Default for Limits {
     }
 }
 impl Limits {
-    fn valid(&self) -> bool {
-        self.workers > 0
-            && self.queue_capacity > 0
-            && self.retained_results > 0
-            && self.max_request_bytes > 0
-            && self.max_entities > 0
-            && self.max_trace_entries > 0
-            && self.max_events > 0
-            && self.max_events <= 32
-            && self.max_trace_entries <= 4096
-            && self.deadline_ms > 0
+    pub(crate) fn valid(&self) -> bool {
+        (1..=MAX_WORKERS).contains(&self.workers)
+            && (1..=MAX_QUEUE_CAPACITY).contains(&self.queue_capacity)
+            && (1..=MAX_RETAINED_RESULTS).contains(&self.retained_results)
+            && (1..=MAX_REQUEST_BYTES).contains(&self.max_request_bytes)
+            && (1..=MAX_ENTITIES).contains(&self.max_entities)
+            && (1..=MAX_TRACE_ENTRIES).contains(&self.max_trace_entries)
+            && (1..=MAX_EVENTS).contains(&self.max_events)
+            && (1..=MAX_DEADLINE_MS).contains(&self.deadline_ms)
     }
 }
 pub type Generator =
     Arc<dyn Fn(ProcgenRequest) -> Result<ProcgenBundle, ProcgenFailure> + Send + Sync + 'static>;
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AdmissionOperation {
+    SubmitJson,
+    Submit,
+    GenerateSyncJson,
+    GenerateSync,
+    Shutdown,
+}
+#[cfg(test)]
+type AdmissionHook = Arc<dyn Fn(AdmissionOperation) + Send + Sync>;
 #[derive(Clone)]
 struct Job {
     request: ProcgenRequest,
@@ -96,6 +114,8 @@ struct Shared {
 pub struct Service {
     shared: Arc<Shared>,
     admission: Mutex<()>,
+    #[cfg(test)]
+    admission_hook: Mutex<Option<AdmissionHook>>,
     limits: Limits,
     clock: Arc<dyn MonotonicClock>,
     expected_content_hash: String,
@@ -219,6 +239,8 @@ impl Service {
                 wake: Condvar::new(),
             }),
             admission: Mutex::new(()),
+            #[cfg(test)]
+            admission_hook: Mutex::new(None),
             limits,
             clock,
             expected_content_hash,
@@ -270,6 +292,29 @@ impl Service {
     fn is_shutdown(&self) -> bool {
         self.shared.state.lock().unwrap().shutdown
     }
+    #[cfg(test)]
+    fn run_admission_hook(&self, operation: AdmissionOperation) {
+        let hook = self.admission_hook.lock().unwrap().clone();
+        if let Some(hook) = hook {
+            hook(operation);
+        }
+    }
+    #[cfg(test)]
+    pub(crate) fn set_admission_hook(&self, hook: AdmissionHook) {
+        *self.admission_hook.lock().unwrap() = Some(hook);
+    }
+    #[cfg(test)]
+    pub(crate) fn wait_terminal_for_test(&self, id: i64, timeout: std::time::Duration) -> bool {
+        let state = self.shared.state.lock().unwrap();
+        let (state, _) = self
+            .shared
+            .wake
+            .wait_timeout_while(state, timeout, |state| {
+                !matches!(state.entries.get(&id), Some(Entry::Terminal(_)))
+            })
+            .unwrap();
+        matches!(state.entries.get(&id), Some(Entry::Terminal(_)))
+    }
     fn admit(&self, request: ProcgenRequest, raw_len: usize) -> LifecycleResult {
         let mut s = self.shared.state.lock().unwrap();
         if s.shutdown {
@@ -320,6 +365,8 @@ impl Service {
     }
     pub fn submit_json(&self, json: &str) -> LifecycleResult {
         let _admission = self.admission.lock().unwrap();
+        #[cfg(test)]
+        self.run_admission_hook(AdmissionOperation::SubmitJson);
         if self.is_shutdown() {
             return self.failed(
                 None,
@@ -345,6 +392,8 @@ impl Service {
     }
     pub(crate) fn submit(&self, request: ProcgenRequest) -> LifecycleResult {
         let _admission = self.admission.lock().unwrap();
+        #[cfg(test)]
+        self.run_admission_hook(AdmissionOperation::Submit);
         let raw_len = serde_json::to_vec(&request)
             .map(|v| v.len())
             .unwrap_or(usize::MAX);
@@ -352,6 +401,8 @@ impl Service {
     }
     pub fn generate_sync_json(&self, json: &str) -> LifecycleResult {
         let _admission = self.admission.lock().unwrap();
+        #[cfg(test)]
+        self.run_admission_hook(AdmissionOperation::GenerateSyncJson);
         if self.is_shutdown() {
             return self.failed(
                 None,
@@ -383,6 +434,8 @@ impl Service {
     }
     pub(crate) fn generate_sync(&self, request: ProcgenRequest) -> LifecycleResult {
         let admission = self.admission.lock().unwrap();
+        #[cfg(test)]
+        self.run_admission_hook(AdmissionOperation::GenerateSync);
         if self.is_shutdown() {
             return self.failed(
                 None,
@@ -590,6 +643,8 @@ impl Service {
     }
     pub fn shutdown(&self) {
         let admission = self.admission.lock().unwrap();
+        #[cfg(test)]
+        self.run_admission_hook(AdmissionOperation::Shutdown);
         let mut s = self.shared.state.lock().unwrap();
         if s.shutdown {
             drop(s);
@@ -655,6 +710,7 @@ fn worker(
                                 events(job.events, limits.max_events, LifecycleEvent::TimedOut),
                             ),
                         );
+                        shared.wake.notify_all();
                         continue;
                     }
                     job.events = events(job.events, limits.max_events, LifecycleEvent::Started);
@@ -733,6 +789,7 @@ fn worker(
             }
         };
         retain(&mut s, &limits, id, result);
+        shared.wake.notify_all();
     }
 }
 impl Drop for Service {
