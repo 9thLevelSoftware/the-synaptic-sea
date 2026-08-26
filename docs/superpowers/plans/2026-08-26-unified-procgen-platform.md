@@ -393,6 +393,9 @@ Task 3 lifecycle decisions (ADR-0060):
 
 ### Task 8: Gate 2 generated-world save identity and clean-break UX
 
+- Apply ADR-0062's closed generated-world envelope, two-phase target validation,
+  typed load result, preserved-file prompt seam, and generator-independent
+  portable settings store without reinterpreting legacy save files before Gate 6.
 - Persist world/site identity, generator/content/schema/semantic identity, and
   mutation deltas without duplicating generated authority.
 - Compatible saves regenerate then apply validated deltas. Incompatible worlds

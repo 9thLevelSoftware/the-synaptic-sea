@@ -98,7 +98,7 @@ Expected:
 ## Unified procedural-generation platform (REQ-PG-001..012)
 
 Feature: `docs/game/features/unified_procgen_platform.md`.
-Architecture: ADR-0057 through ADR-0061.
+Architecture: ADR-0057 through ADR-0062.
 
 No unified-platform gate is GREEN merely because a pass marker appears. Rust,
 Godot, target-export, semantic-parity, performance, and warning/error evidence
@@ -140,6 +140,8 @@ Gate 0..6 cards on `synaptic-sea-stage-gate`.
 - Bounded repair/fail-closed/authored-fallback corpus.
 - Compatible/incompatible save tests, including clear new-world prompt, no
   implicit file deletion, and portable profile/settings.
+- Two-phase delta validation tests prove an invalid target applies no earlier
+  mutation and leaves the original save bytes unchanged.
 
 ### Gate 3 focused evidence
 

@@ -1168,6 +1168,9 @@ and the Task 15 documentation-currency deliverable. They are validated by
     identity, and mutation deltas; incompatible pre-release worlds show a clear
     new-world prompt without deleting the old world, while profile/settings data
     remains portable.
+  - Compatible loads validate the complete envelope and every delta target
+    before applying any mutation; incompatible and corrupt results are distinct,
+    typed, and leave the original world recoverable.
   - Travel, starting scene, top-down mode, saves, captures, and debug tools use
     `ProcgenBundle`; fixed temporary filenames are replaced by in-memory data or
     request-scoped paths.

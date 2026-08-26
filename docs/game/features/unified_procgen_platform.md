@@ -236,13 +236,16 @@ promoted content-manifest entry.
 - Version axes: Gate 2 platform/bundle generation is version 3 while the proven
   structural ship compiler remains version 2; public JSON seeds stay within the
   shared Rust/Godot/JavaScript exact-integer range. See ADR-0061.
+- Save compatibility: a closed generated-world envelope regenerates then applies
+  fully validated deltas; typed incompatibility preserves the original file and
+  portable profile/settings data. See ADR-0062.
 
 ## Gate acceptance criteria
 
 ### Gate 0 — governance and source unification
 
 - Canonical spec, `REQ-PG-*`, risks, validation plan, systems inventory, and
-  ADR-0057..0061 agree.
+  ADR-0057..0062 agree.
 - `D:\world_gen` history is imported under `native/worldgen/` without importing
   external untracked tooling state.
 - Separate scoped board cards exist for Gates 0 through 6 with dependencies,
@@ -346,3 +349,4 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0059-deterministic-adaptive-proposals.md`
 - `docs/game/adr/0060-deterministic-bounded-procgen-lifecycle.md`
 - `docs/game/adr/0061-procgen-platform-structural-version-separation.md`
+- `docs/game/adr/0062-generated-world-save-envelope-and-clean-break.md`
