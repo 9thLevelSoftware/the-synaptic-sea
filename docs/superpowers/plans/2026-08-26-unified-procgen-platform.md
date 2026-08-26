@@ -177,6 +177,219 @@ requirements, ADRs, and gate evidence created by Gate 0.
   save-reset, export, and full gameplay regression gates pass. Retain only
   reusable loader/presentation code and archived migration evidence.
 
+## Execution tasks
+
+The gates above are acceptance boundaries. The numbered tasks below are the
+reviewable implementation units used by Subagent-Driven Development. They run
+sequentially; each task may consume earlier interfaces but must stay inside its
+owned files and gate card.
+
+### Task 1: Gate 0 manifest integrity and systems-map currency
+
+Prerequisites already completed by the primary agent: governing feature/ADRs/
+requirements/risks/validation plan, linked Gate 0..6 cards, and unsquashed
+history import at `native/worldgen/`.
+
+- Define `procgen-build-manifest-1` with `rust_source_commit`,
+  `generator_version`, `content_manifest_hash`, `target`, artifact path/hash,
+  and explicit request/bundle/trace/proposal plus layer schema versions.
+- Add a deterministic generator/checker. Hash canonical content by sorted
+  repository-relative path plus file bytes; never hash filesystem timestamps.
+- Add Rust parsing/validation and expose the manifest data required by adapters.
+- Add a typed Godot validator and startup seam. The production Rust path rejects
+  missing/malformed/mismatched manifests; it must not choose GDScript.
+- Update system inventory source JSON and regenerate derived map artifacts.
+- Tests first: valid manifest, each tampered field, missing artifact, artifact
+  hash mismatch, content mismatch, unknown manifest major, and Godot rejection.
+- Owned files: manifest/schema/check tooling; Rust manifest module/tests; typed
+  Godot manifest validator/smoke and minimal production startup hook; inventory
+  source/generated outputs. Do not redesign bundle APIs in this task.
+
+### Task 2: Gate 1 versioned contracts and single-pass core bundle
+
+- Add versioned Rust types for `ProcgenRequest`, `ProcgenBundle`, `WorldIR`,
+  `SiteIR`, `GameplayIR`, `PresentationIR`, `GenerationTrace`, metrics, version
+  envelope, result/failure codes, and `AdaptiveProposal`.
+- Canonicalize semantic hashing over mechanical IR while excluding timings,
+  locale, target paths, and presentation-only entropy.
+- Implement `generate_bundle` as one pipeline execution; migration exports may
+  derive both legacy documents from that one result.
+- Tests first: serde round trips, unknown-major rejection, one-execution proof,
+  stable semantic hash, map-order invariance, and presentation/locale isolation.
+- Owned files: Rust core contract/bundle/schema modules and focused tests. Do not
+  change async or Godot call sites.
+
+### Task 3: Gate 1 bounded native lifecycle and GDExtension surface
+
+- Replace thread-per-request with a fixed bounded worker pool, bounded queue,
+  bounded retained results, deterministic monotonic request ids, request/entity
+  caps, cancellation, and time budgets.
+- Expose native `generate_bundle`, `generate_bundle_async`, `poll`, `cancel`,
+  `capabilities`, and `generator_manifest` with stable result codes.
+- Tests first: saturation order, overload, cancel-before/start/done, timeout,
+  unknown/consumed id, retained-result eviction, shutdown, and cap rejection.
+- Owned files: native lifecycle/core queue and GDExtension adapter/tests. Preserve
+  migration API names but route them through the single-pass bundle.
+
+### Task 4: Gate 1 WebAssembly adapter and adapter parity
+
+- Add a WebAssembly package built from the same Rust core, with lifecycle
+  semantics matching native. Where workers are unavailable, async polling may
+  cooperatively complete without changing result semantics.
+- Add adapter-neutral contract vectors and compare canonical semantic hashes.
+- Add target capabilities and manifest reporting.
+- Tests first: request/result vectors, unsupported capability, cancel/poll,
+  manifest fields, and native/WASM semantic parity on representative cases.
+- Owned files: new WASM crate/package/build scripts and adapter parity fixtures.
+  Do not change domain algorithms.
+
+### Task 5: Gate 1 Godot bundle consumer and explicit migration oracle
+
+- Add typed Godot request/envelope/bundle consumer models. Validate manifest,
+  schemas, result code, and semantic hash before scene assembly.
+- Make the production `ShipGenerator` path call the unified bundle API once.
+  Remove authoritative Godot-side biome, encounter, loot, and gameplay-slice
+  decisions from that production branch.
+- A legacy generator invocation must be explicitly migration-oracle mode and
+  never selected due to a missing class or runtime error.
+- Tests first: valid consumption, malformed/mismatched/unsupported bundle,
+  missing adapter, explicit authored fallback, explicit oracle mode, and source
+  assertions against silent fallback/post-generation mutation.
+- Owned files: Godot procgen bridge/consumer and focused validation scripts.
+  Reusable loader/presentation code remains.
+
+### Task 6: Gate 2 coordinate-stable WorldIR
+
+- Generate coordinate markers, routes, biome/hazard fields, archetypes,
+  resource pressure, landmarks, and required extraction reachability.
+- Derive named streams from the full stable key; optional domains, iteration,
+  discovery order, and concurrency may not perturb existing results.
+- Validate graph/site identities and provide bounded repair then complete
+  authored fallback or fail closed.
+- Tests first: golden coordinates, order/concurrency invariance, extraction,
+  content/version isolation, optional-domain independence, and adversarial seeds.
+- Owned files: Rust WorldIR domain/content/fallbacks/tests and schemas.
+
+### Task 7: Gate 2 SiteIR mission compiler, validation, repair, and fallback
+
+- Extend existing topology/structural compilation with mission graph,
+  objective/extraction nodes, key-lock/repair ordering, functional prop sockets,
+  traversal clearance, LOS/cover, and reachability annotations.
+- Validate all layers together. Repairs are named, bounded, traced, and followed
+  by full revalidation. Never export partial site data.
+- Tests first: mission/lock-key/repair agents, socket/clearance/LOS properties,
+  objective/extraction reachability, repair bounds, and validated fallbacks.
+- Owned files: Rust SiteIR/compiler/domain validators/fallbacks/tests. Preserve
+  the existing structural core and golden baselines unless versioned intentionally.
+
+### Task 8: Gate 2 generated-world save identity and clean-break UX
+
+- Persist world/site identity, generator/content/schema/semantic identity, and
+  mutation deltas without duplicating generated authority.
+- Compatible saves regenerate then apply validated deltas. Incompatible worlds
+  are preserved and return a typed new-world requirement; profile/settings/
+  accessibility remain portable and no file is silently deleted or rewritten.
+- Tests first: compatible round trip, invalid delta target, every mismatch,
+  preserved incompatible file, prompt state, and portable profile/settings.
+- Owned files: Godot save/version compatibility models/UI seam and focused
+  tests; Rust compatibility helper only if the envelope contract requires it.
+
+### Task 9: Gate 3 encounter generation and replay
+
+- Generate compositions/spawns from authored factions, roles, abilities,
+  threat/economy budgets, occupancy, navigation, visibility, pacing, and bounded
+  player snapshot.
+- Trace candidates, constraints, scores, selection, and every spawn decision.
+- Tests first: budgets, critical-path and visibility fairness, navigation,
+  difficulty/threat monotonicity, cap/performance bounds, deterministic replay,
+  combat simulation, and adversarial unfair-spawn search.
+- Owned files: encounter content/domain/validators/simulation/tests and matching
+  bundle fields; Godot only assembles exported instructions.
+
+### Task 10: Gate 3 typed item generation and economy
+
+- Generate items from authored families, typed sockets/affixes, stat budgets,
+  rarity envelopes, drop-frequency/economy constraints, and visual tags.
+- Reject invalid combinations and ensure text/presentation cannot control stats.
+- Tests first: compatibility, budget/range, deterministic replay, loot-richness
+  monotonicity, economy simulations, drop targets, and dominant-item search.
+- Owned files: item content/domain/validators/economy simulation/tests and
+  matching bundle fields.
+
+### Task 11: Gate 3 creature, presentation, and provenance contracts
+
+- Generate compatible creature blueprints from authored body/rig/animation/
+  ability/behavior/material/footprint/counterplay definitions.
+- Bind runtime presentation only to approved manifest IDs; add complete asset
+  provenance schema/audit and deterministic Godot assembly.
+- Tests first: compatibility matrix, traversal/footprint and performance bounds,
+  invalid-combination search, deterministic replay, manifest binding, missing
+  asset failure, and provenance completeness.
+- Owned files: creature/presentation content/domain/tests, provenance tooling/
+  records, and deterministic Godot assembly. No runtime asset generation.
+
+### Task 12: Gate 4 deterministic adaptive proposal engine
+
+- Implement classical utility scoring/search, bounded run-local player snapshot,
+  validated-candidate ranker, and constrained encounter director.
+- Record normalized inputs, candidates, scores, tie-break, action, rationale,
+  version, confidence, and fallback so selection replays exactly.
+- Tests first: golden scores/ties, candidate validity, authored envelopes,
+  monotonicity/fairness/accessibility/performance, replay, and snapshot bounds.
+- Optional embedded inference remains disabled and out of scope unless an
+  evidence-backed follow-up is explicitly promoted; proposal/fallback seams may
+  be tested with a fake invalid/timeout implementation.
+- Owned files: adaptive Rust modules/content/tests and trace fields.
+
+### Task 13: Gate 5 bounded diagnostics and promoted corpora
+
+- Serialize local-only bounded diagnostic bundles with request identity,
+  versions, hashes, summary traces/metrics/timings, and failure codes.
+- Add source-controlled failure/approval corpus formats, deterministic replay,
+  and promotion to authored fixture/fallback with provenance.
+- Tests first: size/item caps, deterministic redaction/summary, personal-data
+  field rejection, corpus freshness/replay, and promotion validation.
+- Owned files: Rust/Godot diagnostic serializers, corpus data/tooling/tests.
+
+### Task 14: Gate 5 in-Godot seed laboratory
+
+- Build an actual in-engine tool showing world, mission, topology, navigation,
+  encounter, item, and creature graphs plus metrics/validation failures.
+- Support compare, parameter locks, selective regeneration, rejected candidates,
+  repair explanation, named channels/rules, hashes/manifests, and promotion.
+- Tests first for pure models/controllers, then clean headless scene smoke and
+  RoboGodot/manual interaction evidence when the connector is available.
+- Owned files: typed seed-lab models/controllers/resources/scenes and tests. No
+  HTML, screenshots, or proof docs as a substitute for behavior.
+
+### Task 15: Gate 6 all-entry-point cutover and request-scoped transport
+
+- Switch travel, starting scene, top-down mode, saves, captures, and debug tools
+  to `ProcgenBundle` and remove fixed temporary filenames in favor of in-memory
+  documents or request-scoped paths.
+- Register clean travel, bundle, and parity smokes in the canonical `run_clean`
+  regression only after they emit no unexpected warning/error.
+- Tests first: source/call-site inventory, concurrent path collision, each entry
+  point, fallback/save reset, travel gameplay, and canonical warning policy.
+- Owned files: production entry points/load transport and focused/canonical
+  validation. Do not delete the migration oracle yet.
+
+### Task 16: Gate 6 parity, scale, retirement decision, and acceptance synthesis
+
+- Execute native Windows/macOS/Linux and Web semantic-hash parity; 10,000-case
+  PR campaign; million-domain nightly campaign; metamorphic/adversarial/corpus/
+  simulation suites; exports; full Godot; windowed performance; visual and
+  representative gameplay review.
+- Verify all release and per-stage/queue/entity/instance/navigation/build-size
+  budgets with fresh evidence.
+- Delete legacy generation only if every parity, fallback, save-reset, export,
+  gameplay, warning/error, and evidence prerequisite is available and accepted.
+  Otherwise preserve it as an explicit oracle and report Gate 6 blocked without
+  weakening the production no-silent-fallback contract.
+- Owned files: scale/parity/export/CI evidence and conditional legacy retirement;
+  final docs/status updates. This task is an acceptance decision owned by the
+  primary agent; a worker may only run bounded evidence collection.
+
 ## Test and acceptance plan
 
 - Preserve the Rust baseline: all workspace tests and the 1,800-ship stress
@@ -217,4 +430,3 @@ requirements, ADRs, and gate evidence created by Gate 0.
 - Godot validation in the prior planning session was unverified; this execution
   must produce fresh evidence on available toolchains and report unavailable
   platform gates explicitly.
-
