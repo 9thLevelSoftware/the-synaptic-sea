@@ -243,6 +243,10 @@ promoted content-manifest entry.
 - Site mission contract: Gate 2 advances the site overlay independently while
   retaining platform v3 and structural ship v2; checked earlier schema files
   remain immutable. See ADR-0063.
+- Gameplay/presentation contract: Gate 3 advances the typed player snapshot,
+  request, gameplay, presentation, complete-bundle, and lifecycle schemas while
+  retaining the validated platform-v3, structural-v2, WorldIR-v2, and SiteIR-v2
+  layers. See ADR-0064.
 
 ## Gate acceptance criteria
 
@@ -359,3 +363,5 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0060-deterministic-bounded-procgen-lifecycle.md`
 - `docs/game/adr/0061-procgen-platform-structural-version-separation.md`
 - `docs/game/adr/0062-generated-world-save-envelope-and-clean-break.md`
+- `docs/game/adr/0063-site-mission-overlay-and-contract-versioning.md`
+- `docs/game/adr/0064-authoritative-gameplay-blueprints-and-presentation-bindings.md`
