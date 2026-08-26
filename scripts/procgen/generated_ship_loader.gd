@@ -539,6 +539,10 @@ func _build_loot_container_specs(layout_doc: Dictionary, gameplay_doc: Dictionar
 		if c.has("slot_kind"):
 			loot_spec["slot_kind"] = str(c.get("slot_kind", ""))
 			loot_spec["slot_index"] = int(c.get("slot_index", 0))
+		# Explicit authored stacks must survive into the coordinator; omitting
+		# this key is why golden/builder contents never reached in-game loot.
+		if c.has("contents") and typeof(c.get("contents")) == TYPE_ARRAY:
+			loot_spec["contents"] = (c.get("contents") as Array).duplicate(true)
 		out.append(loot_spec)
 	return out
 
