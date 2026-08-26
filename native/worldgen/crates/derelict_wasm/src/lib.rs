@@ -116,6 +116,7 @@ enum Entry {
 }
 struct State {
     next_id: i64,
+    id_space_exhausted: bool,
     queue: VecDeque<i64>,
     entries: BTreeMap<i64, Entry>,
     tombstones: BTreeMap<i64, ProcgenFailureCode>,
@@ -127,6 +128,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             next_id: 1,
+            id_space_exhausted: false,
             queue: VecDeque::new(),
             entries: BTreeMap::new(),
             tombstones: BTreeMap::new(),
@@ -474,21 +476,20 @@ impl WasmService {
             result.events.insert(0, LifecycleEvent::Rejected);
             return self.encode(result);
         }
-        let id = match s.next_id.checked_add(1) {
-            Some(next) => {
-                let id = s.next_id;
-                s.next_id = next;
-                id
-            }
-            None => {
-                return self.encode(failure(
-                    None,
-                    ProcgenFailureCode::Capacity,
-                    "request id space exhausted",
-                    LifecycleEvent::Rejected,
-                ))
-            }
-        };
+        if s.id_space_exhausted {
+            return self.encode(failure(
+                None,
+                ProcgenFailureCode::Capacity,
+                "request id space exhausted",
+                LifecycleEvent::Rejected,
+            ));
+        }
+        let id = s.next_id;
+        if let Some(next) = id.checked_add(1) {
+            s.next_id = next;
+        } else {
+            s.id_space_exhausted = true;
+        }
         s.highest_admitted = id;
         s.admitted_at.insert(id, self.clock.now_ms());
         s.queue.push_back(id);
@@ -581,7 +582,9 @@ impl WasmService {
     #[cfg(test)]
     fn set_next_id(&self, next_id: i64) {
         assert!(next_id > 0);
-        self.state.borrow_mut().next_id = next_id;
+        let mut state = self.state.borrow_mut();
+        state.next_id = next_id;
+        state.id_space_exhausted = false;
     }
 }
 
@@ -1114,8 +1117,13 @@ mod tests {
         service.set_next_id(i64::MAX);
         let first = parse(&service.submit(&request_json()));
         let second = parse(&service.submit(&request_json()));
-        assert_eq!(failure_code(&first), Some(ProcgenFailureCode::Capacity));
-        assert_eq!(first, second);
+        assert_eq!(first.request_id, Some(i64::MAX));
+        assert!(first.failure.is_none());
+        assert_eq!(failure_code(&second), Some(ProcgenFailureCode::Capacity));
+        assert_eq!(
+            parse(&service.poll_request(i64::MAX)).request_id,
+            Some(i64::MAX)
+        );
         service.reset();
         assert_eq!(parse(&service.submit(&request_json())).request_id, Some(1));
     }
