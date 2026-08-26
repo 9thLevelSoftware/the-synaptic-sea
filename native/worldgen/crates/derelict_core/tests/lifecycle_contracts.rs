@@ -110,6 +110,17 @@ fn capabilities() -> ProcgenCapabilities {
     }
 }
 
+fn generated_bundle_value() -> serde_json::Value {
+    serde_json::to_value(
+        generate_bundle(
+            request(),
+            &derelict_core::GenData::default_bundle().unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
 #[test]
 fn lifecycle_failure_round_trip_and_state_validation() {
     let result = LifecycleResult::failed(
@@ -281,4 +292,108 @@ fn capability_limits_and_all_failure_codes_validate_at_both_boundaries() {
         assert!(schema_valid("procgen-failure-1", &value));
         assert!(ProcgenFailure::from_json(&serde_json::to_string(&value).unwrap()).is_ok());
     }
+}
+
+#[test]
+fn lifecycle_invalid_state_payload_matrix_matches_rust_and_schema() {
+    let bundle = generated_bundle_value();
+    let failed = serde_json::to_value(LifecycleResult::failed(
+        Some(8),
+        failure(),
+        vec![LifecycleEvent::Failed],
+    ))
+    .unwrap();
+    let failure_value = failed["failure"].clone();
+    for status in ["accepted", "queued", "running", "cancel_requested"] {
+        let base = serde_json::json!({"schema_version":PROCGEN_LIFECYCLE_RESULT_SCHEMA,"status":status,"request_id":1,"bundle":null,"failure":null,"events":["admitted"]});
+        for mutation in ["missing_id", "null_id", "bundle", "failure"] {
+            let mut invalid = base.clone();
+            match mutation {
+                "missing_id" => {
+                    invalid.as_object_mut().unwrap().remove("request_id");
+                }
+                "null_id" => invalid["request_id"] = serde_json::Value::Null,
+                "bundle" => invalid["bundle"] = bundle.clone(),
+                "failure" => invalid["failure"] = failure_value.clone(),
+                _ => unreachable!(),
+            }
+            assert!(
+                !schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &invalid),
+                "{status}/{mutation}"
+            );
+            assert!(
+                LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err(),
+                "{status}/{mutation}"
+            );
+        }
+    }
+    for (status, payload) in [
+        ("completed", "neither"),
+        ("completed", "failure"),
+        ("completed", "both"),
+        ("failed", "neither"),
+        ("failed", "bundle"),
+        ("failed", "both"),
+    ] {
+        let mut invalid = serde_json::json!({"schema_version":PROCGEN_LIFECYCLE_RESULT_SCHEMA,"status":status,"request_id":1,"bundle":null,"failure":null,"events":["completed"]});
+        match payload {
+            "failure" => invalid["failure"] = failure_value.clone(),
+            "bundle" => invalid["bundle"] = bundle.clone(),
+            "both" => {
+                invalid["bundle"] = bundle.clone();
+                invalid["failure"] = failure_value.clone();
+            }
+            "neither" => {}
+            _ => unreachable!(),
+        }
+        assert!(
+            !schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &invalid),
+            "{status}/{payload}"
+        );
+        assert!(
+            LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err(),
+            "{status}/{payload}"
+        );
+    }
+}
+
+#[test]
+fn nested_unknown_fields_reject_at_rust_and_schema_boundaries() {
+    let mut bundle = generated_bundle_value();
+    bundle["request"]["site"]["unexpected"] = true.into();
+    let lifecycle = serde_json::json!({"schema_version":PROCGEN_LIFECYCLE_RESULT_SCHEMA,"status":"completed","request_id":1,"bundle":bundle,"failure":null,"events":["completed"]});
+    assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &lifecycle));
+    assert!(LifecycleResult::from_json(&serde_json::to_string(&lifecycle).unwrap()).is_err());
+    let mut failure = serde_json::to_value(LifecycleResult::failed(
+        Some(1),
+        failure(),
+        vec![LifecycleEvent::Failed],
+    ))
+    .unwrap();
+    failure["failure"]["unexpected"] = true.into();
+    assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &failure));
+    assert!(LifecycleResult::from_json(&serde_json::to_string(&failure).unwrap()).is_err());
+    let mut caps = serde_json::to_value(capabilities()).unwrap();
+    caps["schemas"]["unexpected"] = true.into();
+    assert!(!schema_valid(PROCGEN_CAPABILITIES_SCHEMA, &caps));
+    assert!(ProcgenCapabilities::from_json(&serde_json::to_string(&caps).unwrap()).is_err());
+    let manifest = GeneratorManifest {
+        schema_version: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
+        rust_source_commit: "a".repeat(40),
+        generator_version: 2,
+        content_manifest_hash: "b".repeat(64),
+        export_schemas: ExportSchemas::v1(),
+        adapter_schemas: AdapterSchemas::v1(),
+        target: "wasm32-unknown-unknown".into(),
+        dirty_development: false,
+    };
+    let mut manifest_value = serde_json::to_value(manifest).unwrap();
+    manifest_value["export_schemas"]["unexpected"] = true.into();
+    assert!(!schema_valid(
+        PROCGEN_GENERATOR_MANIFEST_SCHEMA,
+        &manifest_value
+    ));
+    assert!(
+        GeneratorManifest::from_json(&serde_json::to_string(&manifest_value).unwrap()).is_err()
+    );
 }
