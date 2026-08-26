@@ -100,10 +100,8 @@ fn authored_fallback_rejects_each_independent_mutation() {
     let mut candidate = generate_candidate(&req, &rules).unwrap();
     candidate.markers[1].x += 1;
     let base = resolve_world(&req, candidate, &rules, &fallback).unwrap();
-    let mut cases: Vec<(
-        &str,
-        Box<dyn Fn(&mut derelict_core::world::WorldGenerationOutcome)>,
-    )> = vec![
+    type Mutation = Box<dyn Fn(&mut derelict_core::world::WorldGenerationOutcome)>;
+    let mut cases: Vec<(&str, Mutation)> = vec![
         (
             "neighbor_archetype",
             Box::new(|o| o.world_ir.markers[1].archetype_id = "corvette".into()),

@@ -398,9 +398,9 @@ impl WorldGenerationOutcome {
 
 fn stable_code(value: &str) -> bool {
     !value.is_empty()
-        && value.bytes().all(|b| {
-            b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-' || b == b':'
-        })
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
 }
 impl WorldGenerationRequest {
     fn validate(&self, rules: &WorldRules) -> Result<(), WorldError> {
