@@ -1144,7 +1144,7 @@ func _validate_encounter(value: Variant, blueprint_ids: Dictionary, site_ir: Dic
 		var reward_source: String = str(s.reward_source_id)
 		var blueprint_id: String = str(s.blueprint_id)
 		var faction_id: String = str(s.faction_id)
-		if not blueprint_ids.has(blueprint_id) or not rooms.has(int(s.room)) or protected_rooms.has(int(s.room)) or not _validate_cell_xy(s.cell) or not _is_valid_world_id(spawn_id) or not _is_valid_world_id(str(s.decision_id)) or not _is_valid_world_id(reward_source) or not ENCOUNTER_FACTIONS.has(faction_id) or spawn_ids.has(spawn_id) or reward_sources.has(reward_source): return _reject("encounter_spawns")
+		if not blueprint_ids.has(blueprint_id) or not rooms.has(int(s.room)) or protected_rooms.has(int(s.room)) or not _validate_cell(s.cell) or not _is_valid_world_id(spawn_id) or not _is_valid_world_id(str(s.decision_id)) or not _is_valid_world_id(reward_source) or not ENCOUNTER_FACTIONS.has(faction_id) or spawn_ids.has(spawn_id) or reward_sources.has(reward_source): return _reject("encounter_spawns")
 		for key in ["threat_cost", "performance_cost", "reward_value"]:
 			if not _is_bounded_integer(s[key], 0, 10000): return _reject("encounter_spawns")
 		var blueprint: Dictionary = blueprint_ids[blueprint_id]
@@ -1201,7 +1201,7 @@ func _validate_encounter_trace(value: Variant, blueprint_ids: Dictionary, reques
 		var candidate: Dictionary = candidate_value
 		var decision: Dictionary = decision_value
 		if not _has_exact_keys(candidate, ["candidate_id", "channel_id", "room", "cell", "blueprint_id", "faction_id", "score_bp", "navigation_distance", "has_cover", "accepted", "rationale_codes"]) or not _has_exact_keys(decision, ["decision_id", "channel_id", "candidate_id", "score_bp", "accepted", "rationale_codes", "selected_spawn_id"]): return _reject("encounter_trace")
-		if not _is_valid_world_id(str(candidate.candidate_id)) or candidate_ids.has(str(candidate.candidate_id)) or str(candidate.channel_id) != "gameplay.encounter_candidate" or not blueprint_ids.has(str(candidate.blueprint_id)) or not ENCOUNTER_FACTIONS.has(str(candidate.faction_id)) or not _validate_cell_xy(candidate.cell) or not _is_bounded_integer(candidate.room, 0, 65535) or not _is_bounded_integer(candidate.score_bp, 0, 10000) or not _is_bounded_integer(candidate.navigation_distance, 0, 65535) or candidate.has_cover is not bool or candidate.accepted is not bool or not _validate_encounter_rationales(candidate.rationale_codes): return _reject("encounter_trace")
+		if not _is_valid_world_id(str(candidate.candidate_id)) or candidate_ids.has(str(candidate.candidate_id)) or str(candidate.channel_id) != "gameplay.encounter_candidate" or not blueprint_ids.has(str(candidate.blueprint_id)) or not ENCOUNTER_FACTIONS.has(str(candidate.faction_id)) or not _validate_cell(candidate.cell) or not _is_bounded_integer(candidate.room, 0, 65535) or not _is_bounded_integer(candidate.score_bp, 0, 10000) or not _is_bounded_integer(candidate.navigation_distance, 0, 65535) or candidate.has_cover is not bool or candidate.accepted is not bool or not _validate_encounter_rationales(candidate.rationale_codes): return _reject("encounter_trace")
 		if not _is_valid_world_id(str(decision.decision_id)) or decision_ids.has(str(decision.decision_id)) or str(decision.channel_id) != "gameplay.encounter_selection" or str(decision.candidate_id) != str(candidate.candidate_id) or int(decision.score_bp) != int(candidate.score_bp) or bool(decision.accepted) != bool(candidate.accepted) or not _same_json(decision.rationale_codes, candidate.rationale_codes): return _reject("encounter_trace")
 		if bool(candidate.accepted) != (decision.selected_spawn_id != null) or (bool(candidate.accepted) and (not decision.selected_spawn_id is String or not _is_valid_world_id(str(decision.selected_spawn_id)) or not _same_json(candidate.rationale_codes, ["accepted"]))) or (not bool(candidate.accepted) and (candidate.rationale_codes as Array).has("accepted")): return _reject("encounter_trace")
 		if bool(candidate.accepted): decision_selected_ids.append(str(decision.selected_spawn_id))
@@ -1313,9 +1313,6 @@ func _is_bounded_contract_id(value: String, maximum: int) -> bool:
 	for code in value.to_ascii_buffer():
 		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code in [58, 95, 45, 46]): return false
 	return true
-
-func _validate_cell_xy(value: Variant) -> bool:
-	return value is Dictionary and _has_exact_keys(value, ["x", "y"]) and _is_bounded_integer(value.x, -128, 127) and _is_bounded_integer(value.y, -128, 127)
 
 func _validate_gameplay(value: Variant, ship: Dictionary) -> bool:
 	if not value is Dictionary: return _reject("gameplay_slice_shape")

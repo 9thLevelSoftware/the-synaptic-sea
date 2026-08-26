@@ -19,7 +19,7 @@ func _init() -> void:
 	var caps: Dictionary = JSON.parse_string(str(generator.capabilities()))
 	_expect(ValidatorScript.new().validate(build, generator) == ValidatorScript.OK, failures, "manifest")
 	var consumer: RefCounted = ConsumerScript.new()
-	var fixture: Dictionary = _find_safe_return_fixture(generator, consumer, runtime)
+	var fixture: Dictionary = _find_safe_return_fixture(generator, consumer, build, runtime, caps)
 	var request: Dictionary = fixture.get("request", {})
 	var fallback_raw: String = str(fixture.get("lifecycle", ""))
 	_expect(not fallback_raw.is_empty(), failures, "fallback_bundle_fixture")
@@ -38,14 +38,14 @@ func _init() -> void:
 		(provider_request.site as Dictionary).site_id = "provider-mutated"
 		return valid_context)
 	var selected_bundle: Dictionary = selected.resolve(request, consumer)
-	_expect(not selected_bundle.is_empty(), failures, "selected_bundle")
-	_expect(selected.last_outcome == "selected" and selected.last_error.is_empty(), failures, "selected_outcome")
+	_expect(not selected_bundle.is_empty(), failures, "selected_bundle:%s" % selected.last_error)
+	_expect(selected.last_outcome == "selected" and selected.last_error.is_empty(), failures, "selected_outcome:%s:%s" % [selected.last_outcome, selected.last_error])
 	_expect(str((request.site as Dictionary).site_id) == original_site_id, failures, "provider_request_isolated")
 
 	var identity: RefCounted = FallbackPolicyScript.new()
 	identity.configure("world:safe-world-v3", func(_request: Dictionary) -> Dictionary: return valid_context)
 	_expect(identity.resolve(request, consumer).is_empty(), failures, "identity_rejected")
-	_expect(identity.last_outcome == "invalid" and identity.last_error == "fallback_identity", failures, "identity_outcome")
+	_expect(identity.last_outcome == "invalid" and identity.last_error == "fallback_identity", failures, "identity_outcome:%s:%s" % [identity.last_outcome, identity.last_error])
 
 	var malformed: RefCounted = FallbackPolicyScript.new()
 	malformed.configure(SAFE_RETURN_ID, func(_request: Dictionary) -> Dictionary: return {"lifecycle": fallback_raw})
@@ -72,14 +72,16 @@ func _init() -> void:
 	_finish(failures)
 
 
-func _find_safe_return_fixture(generator: Object, consumer: RefCounted, runtime: Dictionary) -> Dictionary:
+func _find_safe_return_fixture(generator: Object, consumer: RefCounted, build: Dictionary, runtime: Dictionary, caps: Dictionary) -> Dictionary:
 	for seed_value in 192:
 		var request: Dictionary = consumer.build_request(seed_value, 0, 1, runtime, "standard")
 		if request.is_empty():
 			continue
 		var raw: String = str(generator.generate_bundle(JSON.stringify(request)))
+		if consumer.consume(raw, request, build, runtime, caps).is_empty():
+			continue
 		var fallback_raw: String = _safe_return_fixture(raw)
-		if not fallback_raw.is_empty():
+		if not fallback_raw.is_empty() and not consumer.consume(fallback_raw, request, build, runtime, caps).is_empty():
 			return {"request": request, "lifecycle": fallback_raw}
 	return {}
 

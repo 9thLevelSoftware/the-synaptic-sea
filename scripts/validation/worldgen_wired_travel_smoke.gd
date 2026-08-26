@@ -107,13 +107,44 @@ func _assert_ship(label: String, ship: Node3D) -> bool:
 			label, str(layout.get("biome_id", "")), str(layout.get("difficulty_id", ""))])
 		return false
 	var encounters_variant: Variant = layout.get("encounters", null)
-	if not encounters_variant is Array or not (encounters_variant as Array).is_empty():
-		_fail("%s contains Godot-authored post-generation encounters" % label)
+	if not encounters_variant is Array or not _encounters_are_authoritative(encounters_variant, ship.gameplay_doc):
+		_fail("%s lost authoritative bundle encounter provenance" % label)
 		return false
 	var gameplay_loot: Variant = ship.gameplay_doc.get("loot_containers", null)
 	if not gameplay_loot is Array or ship.get_loot_container_specs_copy().size() != (gameplay_loot as Array).size():
 		_fail("%s changed authoritative loot-container count" % label)
 		return false
+	return true
+
+
+func _encounters_are_authoritative(encounters: Array, gameplay: Dictionary) -> bool:
+	var blueprints: Dictionary = {}
+	for blueprint_value in gameplay.get("creature_blueprints", []):
+		if not blueprint_value is Dictionary:
+			return false
+		blueprints[str((blueprint_value as Dictionary).get("id", ""))] = blueprint_value
+	var selected_spawns: Dictionary = {}
+	for decision_value in gameplay.get("gameplay_decisions", []):
+		if decision_value is Dictionary and str((decision_value as Dictionary).get("domain", "")) == "encounter" \
+				and bool((decision_value as Dictionary).get("accepted", false)):
+			selected_spawns[str((decision_value as Dictionary).get("selected_id", ""))] = true
+	for encounter_value in encounters:
+		if not encounter_value is Dictionary:
+			return false
+		var encounter: Dictionary = encounter_value
+		var spawn_id: String = str(encounter.get("spawn_id", ""))
+		var blueprint_id: String = str(encounter.get("blueprint_id", ""))
+		var blueprint_value: Variant = encounter.get("creature_blueprint", null)
+		if spawn_id.is_empty() or str(encounter.get("id", "")) != spawn_id \
+				or str(encounter.get("decision_id", "")).is_empty() \
+				or not selected_spawns.has(spawn_id) or not blueprints.has(blueprint_id) \
+				or not blueprint_value is Dictionary \
+				or str((blueprint_value as Dictionary).get("id", "")) != blueprint_id \
+				or not encounter.get("generated_items", null) is Array \
+				or not encounter.get("asset_ids", null) is Array or (encounter.asset_ids as Array).is_empty() \
+				or not encounter.get("presentation_binding_ids", null) is Array or (encounter.presentation_binding_ids as Array).is_empty() \
+				or encounter.has("difficulty_tier") or encounter.has("encounter_table_id"):
+			return false
 	return true
 
 

@@ -3,10 +3,15 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{40}$')] [string] $SourceCommit,
     [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{64}$')] [string] $ContentHash,
     [ValidateSet('true', 'false')] [string] $Dirty = 'false',
-    [string] $OutputDirectory = (Join-Path $PSScriptRoot '..\..\..\addons\derelict\bin\web'),
+    [string] $OutputDirectory = '',
     [string] $WasmBindgen = 'wasm-bindgen'
 )
 $ErrorActionPreference = 'Stop'
+$OutputDirectory = if ($OutputDirectory) {
+    $OutputDirectory
+} else {
+    Join-Path $PSScriptRoot '..\..\..\addons\derelict\bin\web'
+}
 $worldgen = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stage = Join-Path ([System.IO.Path]::GetTempPath()) ('derelict-wasm-' + [guid]::NewGuid().ToString('N'))
 try {

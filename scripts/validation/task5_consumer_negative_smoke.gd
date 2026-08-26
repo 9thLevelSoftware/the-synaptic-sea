@@ -226,6 +226,27 @@ func _nested_bundle_cases(original: Dictionary) -> Array:
 	var gameplay_case: Dictionary = original.duplicate(true)
 	(gameplay_case.bundle.gameplay_ir.legacy_slice.objectives as Array)[0] = "not-an-objective"
 	cases.append(["nested_gameplay", gameplay_case, "gameplay_slice_shape"])
+	var creature_case: Dictionary = original.duplicate(true)
+	(creature_case.bundle.gameplay_ir.creature_blueprints as Array)[0].ability_id = "ability_forged"
+	cases.append(["gate3_creature_authored_contract", creature_case, "creature_blueprints"])
+	var encounter_cell_case: Dictionary = original.duplicate(true)
+	((encounter_cell_case.bundle.gameplay_ir.encounter.trace.candidates as Array)[0].cell as Dictionary).erase("deck")
+	cases.append(["gate3_encounter_cell_contract", encounter_cell_case, "encounter_trace"])
+	var encounter_spawn_case: Dictionary = original.duplicate(true)
+	(encounter_spawn_case.bundle.gameplay_ir.encounter.spawns as Array)[0].faction_id = "forged_faction"
+	cases.append(["gate3_encounter_faction", encounter_spawn_case, "encounter_spawns"])
+	var item_case: Dictionary = original.duplicate(true)
+	(item_case.bundle.gameplay_ir.items as Array)[0].socket_id = "socket_forged"
+	cases.append(["gate3_item_socket", item_case, "items_shape"])
+	var drop_case: Dictionary = original.duplicate(true)
+	(drop_case.bundle.gameplay_ir.drops as Array)[0].source_id = "missing_source"
+	cases.append(["gate3_drop_source", drop_case, "drops_shape"])
+	var decision_case: Dictionary = original.duplicate(true)
+	(decision_case.bundle.gameplay_ir.decisions as Array)[0].channel_id = "gameplay.forged"
+	cases.append(["gate3_decision_channel", decision_case, "gameplay_decisions"])
+	var presentation_case: Dictionary = original.duplicate(true)
+	(presentation_case.bundle.presentation_ir.instructions as Array)[0].adapter_binding_ids[0] = "binding:forged"
+	cases.append(["gate3_presentation_binding", presentation_case, "presentation_binding"])
 	return cases
 
 func _site_overlay_cases(original: Dictionary) -> Array:

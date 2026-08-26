@@ -3,6 +3,8 @@ extends SceneTree
 const ConsumerScript := preload("res://scripts/procgen/procgen_bundle_consumer.gd")
 const MapperScript := preload("res://scripts/procgen/procgen_bundle_mapper.gd")
 
+var _last_structural_difference: String = ""
+
 func _init() -> void:
 	var generator: Object = ClassDB.instantiate("DerelictGenerator") as Object
 	if generator == null:
@@ -29,12 +31,12 @@ func _init() -> void:
 			failures.append("fractured fixture was not confirmed fractured")
 			continue
 		var mapped: Dictionary = MapperScript.new().map_to_loader_documents(bundle)
-		var params: Dictionary = {"archetype_id": str(request.site.archetype_id), "intactness_override": int(request.site.intactness_override_bp), "loot_richness": int(request.site.loot_richness_bp)}
+		var params: Dictionary = {"archetype_id": str(request.site.archetype_id), "intactness_override": int(request.site.intactness_override_bp), "loot_richness": int(request.site.loot_richness_bp), "difficulty_id": str(request.difficulty_id)}
 		var native_layout: Variant = JSON.parse_string(str(generator.export_layout_json(int(item.seed), params, "ship_structural_v0")))
 		# The legacy exports are migration oracles only. Structural layout remains
 		# byte-equivalent, but gameplay is now authoritative in SiteIR v2 and must
 		# not be asserted equal to the legacy gameplay slice export.
-		if mapped.is_empty() or not _structural_oracle_matches(mapped.layout, native_layout, bundle.site_ir): failures.append("%s layout parity" % item.label)
+		if mapped.is_empty() or not _structural_oracle_matches(mapped.layout, native_layout, bundle.site_ir): failures.append("%s layout parity:%s" % [item.label, _last_structural_difference])
 		var native_gameplay: Variant = JSON.parse_string(str(generator.export_gameplay_slice_json(int(item.seed), params)))
 		if not native_gameplay is Dictionary: failures.append("%s legacy gameplay oracle unavailable" % item.label)
 		if mapped.is_empty() or not _authoritative_objectives_match(mapped): failures.append("%s site mission projection" % item.label)
@@ -71,11 +73,42 @@ func _structural_oracle_matches(mapped_layout: Dictionary, native_layout: Varian
 	var mapped_view: Dictionary = mapped_layout.duplicate(true)
 	var native_view: Dictionary = (native_layout as Dictionary).duplicate(true)
 	for view in [mapped_view, native_view]:
+		# Gate 3 replaces the migration oracle's empty encounter array with the
+		# authoritative GameplayIR projection and adds the approved presentation
+		# assembly. Keep this migration-oracle comparison strictly structural.
+		view["encounters"] = []
+		view.erase("presentation_assembly")
 		view["blocked_links"] = []
 		for portal_value in view.get("portals", []):
 			if portal_value is Dictionary and gated_refs.has(str((portal_value as Dictionary).get("edge_key", ""))):
 				(portal_value as Dictionary)["state"] = "SITE_GATE"
-	return _same(mapped_view, native_view)
+	_last_structural_difference = _first_difference(mapped_view, native_view, "layout")
+	return _last_structural_difference.is_empty()
+
+func _first_difference(a: Variant, b: Variant, path: String) -> String:
+	if a is Dictionary and b is Dictionary:
+		if a.size() != b.size():
+			var only_a: Array = []
+			var only_b: Array = []
+			for key in a.keys():
+				if not b.has(key): only_a.append(key)
+			for key in b.keys():
+				if not a.has(key): only_b.append(key)
+			return "%s.keys(%d!=%d only_mapped=%s only_oracle=%s)" % [path, a.size(), b.size(), str(only_a), str(only_b)]
+		for key in a.keys():
+			if not b.has(key): return "%s.%s(missing)" % [path, str(key)]
+			var nested: String = _first_difference(a[key], b[key], "%s.%s" % [path, str(key)])
+			if not nested.is_empty(): return nested
+		return ""
+	if a is Array and b is Array:
+		if a.size() != b.size(): return "%s.size(%d!=%d)" % [path, a.size(), b.size()]
+		for i in a.size():
+			var nested: String = _first_difference(a[i], b[i], "%s[%d]" % [path, i])
+			if not nested.is_empty(): return nested
+		return ""
+	if (a is int or a is float) and (b is int or b is float):
+		return "" if float(a) == float(b) else "%s(%s!=%s)" % [path, str(a), str(b)]
+	return "" if a == b else "%s(%s!=%s)" % [path, str(a), str(b)]
 
 func _authoritative_objectives_match(mapped: Dictionary) -> bool:
 	var site: Dictionary = mapped.get("site_ir", {})

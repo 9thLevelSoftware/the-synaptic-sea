@@ -56,6 +56,43 @@ fn legacy_request_is_explicitly_normalized() {
 }
 
 #[test]
+fn legacy_request_with_damage_sealed_portal_uses_complete_safe_fallback() {
+    let request = legacy_request(12, &derelict_core::model::GenParams::new("frigate"), "");
+    let bundle = derelict_core::procgen::generate_bundle(
+        request,
+        &derelict_core::GenData::default_bundle().unwrap(),
+    )
+    .expect("valid legacy request must not fail when authored fallback sees a structural lock");
+
+    assert!(bundle.validate().is_ok());
+    assert_eq!(
+        bundle.trace.fallback.as_deref(),
+        Some("site:authored-safe-return")
+    );
+    assert_eq!(
+        bundle.site_ir.mission_graph.mission_id,
+        "authored-safe-return"
+    );
+    assert!(bundle
+        .site_ir
+        .ship
+        .topology
+        .portals
+        .iter()
+        .all(|portal| portal.state != derelict_core::structural::plan::EdgeKind::Locked));
+    assert!(bundle.site_ir.mission_graph.gates.iter().all(|gate| {
+        bundle
+            .site_ir
+            .navigation
+            .edges
+            .iter()
+            .filter(|edge| edge.gate_id.as_deref() == Some(gate.id.as_str()))
+            .count()
+            == 2
+    }));
+}
+
+#[test]
 fn blank_legacy_identity_uses_authored_defaults() {
     let mut params = derelict_core::model::GenParams::new("   ");
     let request = super::generator::legacy_request(42, &params, "  ");

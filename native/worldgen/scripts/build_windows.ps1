@@ -6,6 +6,11 @@ param(
 )
 
 $root = Split-Path $PSScriptRoot -Parent
+$resolvedDestRepo = if ($DestRepo) {
+    $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestRepo)
+} else {
+    $null
+}
 Push-Location $root
 try {
     $cargoArgs = @("build", "-p", "derelict_godot")
@@ -44,8 +49,8 @@ try {
     Write-Host "Installed derelict_godot.dll ($profileDir) -> $localBin"
     Write-Host "Registered DerelictGenerator addon -> $extensionList"
 
-    if ($DestRepo) {
-        $destAddon = Join-Path $DestRepo "addons\derelict"
+    if ($resolvedDestRepo) {
+        $destAddon = Join-Path $resolvedDestRepo "addons\derelict"
         $destBin = Join-Path $destAddon "bin\win64"
         New-Item -ItemType Directory -Force $destBin | Out-Null
         Copy-Item $extensionSource $destAddon -Force

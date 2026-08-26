@@ -1,7 +1,7 @@
 //! Validated, deterministic mission overlay for an already-generated ship.
 //! This module deliberately owns no structural generation state.
 use crate::model::Ship;
-use crate::structural::plan::{edge_key, Cell, EdgeKind, NO_ROOM};
+use crate::structural::plan::{edge_key, Cell, Dir, EdgeKind, NO_ROOM};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -1823,12 +1823,66 @@ pub fn fallback_return_path(site: &SiteIR) -> Vec<u16> {
     site.ship.critical_path.iter().rev().copied().collect()
 }
 
+fn normalize_authored_fallback_locks(ship: &mut Ship) -> Result<(), SiteError> {
+    // The authored safe-return mission intentionally has no gate prerequisite.
+    // A damage-sealed portal therefore cannot remain locked: it would be an
+    // unbound gate and could strand optional rooms. Normalize every redundant
+    // structural representation together before compiling the fallback layer.
+    let mut unlocked_refs = BTreeSet::new();
+    for portal in &mut ship.topology.portals {
+        if portal.exterior || portal.state != EdgeKind::Locked {
+            continue;
+        }
+        let direction = Dir::between(portal.from_cell, portal.to_cell)
+            .ok_or_else(|| SiteError::Validation("fallback locked portal adjacency".into()))?;
+        unlocked_refs.insert(edge_key(portal.from_cell, direction));
+        portal.state = EdgeKind::Door;
+    }
+    for reference in unlocked_refs {
+        let edge = ship
+            .plan
+            .edges
+            .get_mut(&reference)
+            .ok_or_else(|| SiteError::Validation("fallback locked edge missing".into()))?;
+        if edge.kind != EdgeKind::Locked {
+            return Err(SiteError::Validation(
+                "fallback locked edge mismatch".into(),
+            ));
+        }
+        edge.kind = EdgeKind::Door;
+        edge.module_id = crate::structural::compile::DOOR_MODULE.into();
+        let mut placement_count = 0;
+        for placement in &mut ship.plan.placements {
+            if placement.edge_key == reference {
+                placement.kind = EdgeKind::Door;
+                placement.module_id = crate::structural::compile::DOOR_MODULE.into();
+                placement_count += 1;
+            }
+        }
+        if placement_count != 1 {
+            return Err(SiteError::Validation(
+                "fallback locked placement mismatch".into(),
+            ));
+        }
+        let tag = format!("edge:{reference}");
+        for entity in &mut ship.entities {
+            if entity.tags.contains(&tag) {
+                entity.locked = false;
+                entity.open = false;
+                entity.tags.retain(|value| value != "sealed");
+            }
+        }
+    }
+    Ok(())
+}
+
 fn build_fallback(
-    ship: Ship,
+    mut ship: Ship,
     request: &crate::world::WorldGenerationRequest,
 ) -> Result<SiteIR, SiteError> {
     let fallback = SiteFallback::bundled()?;
     fallback.validate()?;
+    normalize_authored_fallback_locks(&mut ship)?;
     let template = SiteTemplate {
         id: fallback.mission_id,
         archetypes: vec![request.archetype_id.clone()],
