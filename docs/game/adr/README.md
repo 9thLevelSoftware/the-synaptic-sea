@@ -47,6 +47,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0060 | docs/game/adr/0060-deterministic-bounded-procgen-lifecycle.md | bounded native lifecycle, explicit cancellation/timeouts, and native/Web adapter contract |
 | 0061 | docs/game/adr/0061-procgen-platform-structural-version-separation.md | platform v3 coordinate-world identity with preserved structural ship v2 |
 | 0062 | docs/game/adr/0062-generated-world-save-envelope-and-clean-break.md | typed generated-world identity/deltas, preserved incompatible files, and portable settings |
+| 0063 | docs/game/adr/0063-site-mission-overlay-and-contract-versioning.md | SiteIR v2 mission/navigation overlay, immutable complete-contract transition, structural ship v2 preserved |
 
 ## Notes
 

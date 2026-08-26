@@ -240,13 +240,16 @@ promoted content-manifest entry.
 - Save compatibility: a closed generated-world envelope regenerates then applies
   fully validated deltas; typed incompatibility preserves the original file and
   portable profile/settings data. See ADR-0062.
+- Site mission contract: Gate 2 advances the site overlay independently while
+  retaining platform v3 and structural ship v2; checked earlier schema files
+  remain immutable. See ADR-0063.
 
 ## Gate acceptance criteria
 
 ### Gate 0 — governance and source unification
 
 - Canonical spec, `REQ-PG-*`, risks, validation plan, systems inventory, and
-  ADR-0057..0062 agree.
+  ADR-0057..0063 agree.
 - `D:\world_gen` history is imported under `native/worldgen/` without importing
   external untracked tooling state.
 - Separate scoped board cards exist for Gates 0 through 6 with dependencies,
