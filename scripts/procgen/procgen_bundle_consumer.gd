@@ -65,7 +65,7 @@ func _validate(bundle: Dictionary, request: Dictionary, manifest: Dictionary, ca
 		if str((bundle[layer] as Dictionary).get("schema_version", "")) != SCHEMAS[layer]: _fail("%s_schema" % layer); return false
 	if str((bundle.metrics as Dictionary).get("schema_version", "")) != SCHEMAS.metrics or str((bundle.trace as Dictionary).get("schema_version", "")) != SCHEMAS.generation_trace: _fail("diagnostic_schema"); return false
 	var returned_request: Dictionary = bundle.request
-	if JSON.stringify(_canonical(returned_request)) != JSON.stringify(_canonical(request)): _fail("request_identity"); return false
+	if not _same_json(returned_request, request): _fail("request_identity"); return false
 	var world: Dictionary = bundle.world_ir
 	var site: Dictionary = request.site
 	if str(world.get("site_id", "")) != str(site.site_id) or int(world.get("world_seed", -1)) != int(request.world_seed) or int(world.get("x", 99)) != 0 or int(world.get("y", 99)) != 0: _fail("world_identity"); return false
@@ -84,7 +84,8 @@ func _validate_capabilities(caps: Dictionary, runtime_manifest: Dictionary) -> b
 	var domains: Variant = caps.get("supported_domains", [])
 	if domains is not Array or (domains as Array) != DOMAINS: _fail("capability_domains"); return false
 	var schemas: Variant = caps.get("schemas", {})
-	if not schemas is Dictionary or str((schemas as Dictionary).get("procgen_bundle", "")) != SCHEMAS.procgen_bundle: _fail("capability_schemas"); return false
+	var expected_schemas: Variant = runtime_manifest.get("adapter_schemas", {})
+	if not schemas is Dictionary or not expected_schemas is Dictionary or (schemas as Dictionary) != (expected_schemas as Dictionary): _fail("capability_schemas"); return false
 	for key in ["max_request_bytes", "max_entities", "max_trace_entries", "max_events", "deadline_ms"]:
 		if int(caps.get(key, 0)) <= 0: _fail("capability_%s" % key); return false
 	return true
@@ -100,6 +101,7 @@ func _verify_hash(bundle: Dictionary) -> bool:
 	return true
 
 func _canonical(value: Variant) -> Variant:
+	if value is float and is_equal_approx(value, round(value)): return int(value)
 	if value is Dictionary:
 		var result: Dictionary = {}
 		var keys: Array[String] = []
@@ -112,6 +114,20 @@ func _canonical(value: Variant) -> Variant:
 		for item in value: output.append(_canonical(item))
 		return output
 	return value
+
+func _same_json(left: Variant, right: Variant) -> bool:
+	if (left is int or left is float) and (right is int or right is float): return float(left) == float(right)
+	if left is Dictionary and right is Dictionary:
+		if left.size() != right.size(): return false
+		for key in left.keys():
+			if not right.has(key) or not _same_json(left[key], right[key]): return false
+		return true
+	if left is Array and right is Array:
+		if left.size() != right.size(): return false
+		for index in left.size():
+			if not _same_json(left[index], right[index]): return false
+		return true
+	return left == right
 
 func _fail(code: String) -> Dictionary:
 	last_error = code

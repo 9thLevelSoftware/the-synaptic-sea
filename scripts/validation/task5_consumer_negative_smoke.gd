@@ -5,10 +5,11 @@ const ConsumerScript := preload("res://scripts/procgen/procgen_bundle_consumer.g
 func _init() -> void:
 	var consumer: RefCounted = ConsumerScript.new()
 	var failures: Array[String] = []
-	var caps: Dictionary = {"schema_version": "procgen-capabilities-1", "adapter_kind": "native", "supports_sync": true, "target": "x86_64-pc-windows-msvc", "worker_mode": "thread_pool", "supported_domains": ["world", "site", "gameplay", "presentation"], "schemas": {"procgen_bundle": "procgen-bundle-1"}, "max_request_bytes": 1, "max_entities": 1, "max_trace_entries": 1, "max_events": 1, "deadline_ms": 1}
-	if not consumer._validate_capabilities(caps, {"target": "x86_64-pc-windows-msvc"}): failures.append("capability baseline rejected")
-	caps["schemas"] = {"procgen_bundle": "wrong"}
-	if consumer._validate_capabilities(caps, {"target": "x86_64-pc-windows-msvc"}): failures.append("schema mismatch accepted")
+	var adapter_schemas: Dictionary = {"lifecycle_result": "procgen-lifecycle-result-1", "capabilities": "procgen-capabilities-1", "generator_manifest": "procgen-generator-manifest-1"}
+	var caps: Dictionary = {"schema_version": "procgen-capabilities-1", "adapter_kind": "native", "supports_sync": true, "target": "x86_64-pc-windows-msvc", "worker_mode": "thread_pool", "supported_domains": ["world", "site", "gameplay", "presentation"], "schemas": adapter_schemas.duplicate(), "max_request_bytes": 1, "max_entities": 1, "max_trace_entries": 1, "max_events": 1, "deadline_ms": 1}
+	if not consumer._validate_capabilities(caps, {"target": "x86_64-pc-windows-msvc", "adapter_schemas": adapter_schemas}): failures.append("capability baseline rejected")
+	caps["schemas"] = {"lifecycle_result": "wrong"}
+	if consumer._validate_capabilities(caps, {"target": "x86_64-pc-windows-msvc", "adapter_schemas": adapter_schemas}): failures.append("schema mismatch accepted")
 	var request: Dictionary = consumer.build_request(42, 0, 1)
 	if request.is_empty() or consumer.build_request(9007199254740992, 0, 1).is_empty() == false: failures.append("seed bound")
 	var malformed: Dictionary = consumer.consume("{\"status\":\"completed\",\"bundle\":{}}", request, {"manifest_schema":"procgen-build-manifest-1"}, {"schema_version":"procgen-generator-manifest-1"}, caps)
@@ -16,5 +17,5 @@ func _init() -> void:
 	if not failures.is_empty():
 		for failure in failures: print("TASK5 CONSUMER FAIL:%s" % failure)
 		quit(1); return
-	print("TASK5 CONSUMER PASS negative_matrix=true hash_fail_closed=true caps_fail_closed=true seed_bound=true")
+	print("TASK5 CONSUMER PASS negative_matrix=true caps_fail_closed=true seed_bound=true")
 	quit(0)
