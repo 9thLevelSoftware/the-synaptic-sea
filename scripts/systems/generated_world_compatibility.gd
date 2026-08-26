@@ -6,13 +6,13 @@ const Site := preload("res://scripts/systems/generated_world_site_identity.gd")
 const Delta := preload("res://scripts/systems/procgen_mutation_delta.gd")
 const Result := preload("res://scripts/systems/procgen_load_result.gd")
 
-var current_platform := ""
+var current_platform: Variant = 3
 var current_content_hash := ""
 var current_schema_map: Dictionary = {}
 var bundle_provider: Object = null
 var applier: Object = null
 
-func configure(platform: String, content_hash: String, schemas: Dictionary, provider: Object, mutation_applier: Object) -> void:
+func configure(platform: Variant, content_hash: String, schemas: Dictionary, provider: Object, mutation_applier: Object) -> void:
 	current_platform = platform; current_content_hash = content_hash; current_schema_map = schemas.duplicate(true)
 	bundle_provider = provider; applier = mutation_applier
 
@@ -65,7 +65,7 @@ func _regenerate(identity: RefCounted) -> Variant:
 
 func _bundle_matches(bundle: Variant, identity: RefCounted) -> bool:
 	if typeof(bundle) == TYPE_DICTIONARY:
-		return str(bundle.get("site_id", "")) == identity.site_id and int(bundle.get("x", 999999)) == identity.x and int(bundle.get("y", 999999)) == identity.y and int(bundle.get("seed", -1)) == identity.derived_site_seed and str(bundle.get("structural_generator_version", "")) == identity.structural_generator_version and str(bundle.get("semantic_hash", "")) == identity.base_bundle_semantic_hash
+		return bundle.size() == 7 and str(bundle.get("site_id", "")) == identity.site_id and typeof(bundle.get("x")) == TYPE_INT and int(bundle.get("x")) == identity.x and typeof(bundle.get("y")) == TYPE_INT and int(bundle.get("y")) == identity.y and typeof(bundle.get("site_seed")) == TYPE_INT and int(bundle.get("site_seed")) == identity.derived_site_seed and typeof(bundle.get("structural_generator_version")) == TYPE_INT and int(bundle.get("structural_generator_version")) == identity.structural_generator_version and str(bundle.get("semantic_hash", "")) == identity.base_bundle_semantic_hash and typeof(bundle.get("targets")) == TYPE_ARRAY
 	return bundle != null and bundle.get("site_id") == identity.site_id
 
 func _bundle_targets(bundle: Variant) -> Array:
