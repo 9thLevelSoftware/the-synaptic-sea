@@ -321,16 +321,20 @@ impl CreatureCatalogue {
             channel: "gameplay.creature_blueprint".into(),
             sub_index: 0,
         };
-        let seed = key.seed().map_err(CreatureError::Key)? as usize;
+        let seed = key.seed().map_err(CreatureError::Key)?;
         let mut valid = Vec::new();
         let mut rejected = Vec::new();
         let mut all = self.fallbacks.clone();
         all.sort_by(|a, b| a.id.cmp(&b.id));
         for (i, b) in all.iter().take(MAX_CANDIDATES).enumerate() {
             let ok = self.validate_blueprint(b, c).is_ok();
+            let candidate_offset = u64::try_from(i)
+                .map_err(|_| CreatureError::Invalid("candidate_index".into()))?
+                .wrapping_mul(7919);
             let rec = CandidateRecord {
                 candidate_id: b.id.clone(),
-                score: ((seed.wrapping_add(i * 7919)) % 10_001) as u32,
+                score: u32::try_from(seed.wrapping_add(candidate_offset) % 10_001)
+                    .map_err(|_| CreatureError::Invalid("candidate_score".into()))?,
                 accepted: ok,
                 rationale: if ok {
                     "validated".into()

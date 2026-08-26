@@ -1,4 +1,5 @@
 //! Closed, manifest-bound presentation assembly. Presentation is cosmetic only.
+use crate::rng::stable_index;
 use crate::world::{WorldGenerationRequest, WorldKey, PROCGEN_GENERATOR_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -497,7 +498,7 @@ pub fn assemble(
         considered.sort_by(|a, b| a.asset_id.cmp(&b.asset_id));
         rejected.sort_by(|a, b| a.asset_id.cmp(&b.asset_id));
         let chosen = can
-            .get((seed as usize) % can.len().max(1))
+            .get(stable_index(seed, can.len()).ok_or(PresentationError::Invalid("no_fallback"))?)
             .copied()
             .ok_or(PresentationError::Invalid("no_fallback"))?;
         if can.is_empty() {

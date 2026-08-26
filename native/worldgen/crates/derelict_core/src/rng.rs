@@ -27,6 +27,17 @@ pub fn key(master_seed: u64, tag: &str, sub: u64) -> u64 {
     h.finish()
 }
 
+/// Reduce a deterministic 64-bit seed to a collection index without first
+/// truncating high seed bits on 32-bit targets. Empty collections have no
+/// valid index.
+pub fn stable_index(seed: u64, len: usize) -> Option<usize> {
+    let modulus = u64::try_from(len).ok()?;
+    if modulus == 0 {
+        return None;
+    }
+    usize::try_from(seed % modulus).ok()
+}
+
 /// Inclusive integer range roll.
 pub fn roll_range(rng: &mut Pcg64, min: i64, max: i64) -> i64 {
     if min >= max {
@@ -100,6 +111,14 @@ mod tests {
         let y: u64 = b.random();
         assert_eq!(x1, x2);
         assert_ne!(x1, y);
+    }
+
+    #[test]
+    fn stable_index_preserves_high_seed_bits_before_reducing() {
+        let seed = u64::from(u32::MAX) + 1;
+        assert_eq!(stable_index(seed, 3), Some(1));
+        assert_ne!(stable_index(seed, 3), Some(((seed as u32) as usize) % 3));
+        assert_eq!(stable_index(seed, 0), None);
     }
 
     #[test]

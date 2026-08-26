@@ -1,4 +1,5 @@
 //! Closed, deterministic authored item generation for GameplayIR-2.
+use crate::rng::stable_index;
 use crate::world::{WorldGenerationRequest, WorldKey, PROCGEN_GENERATOR_VERSION};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -431,7 +432,8 @@ pub fn generate_items(
         sub_index: 0,
     };
     let seed = k.seed().map_err(ItemError::Key)?;
-    let f = &cat.families[(seed as usize) % cat.families.len()];
+    let family_index = stable_index(seed, cat.families.len()).ok_or(ItemError::NoFallback)?;
+    let f = &cat.families[family_index];
     let s = cat
         .sockets
         .iter()
@@ -466,7 +468,8 @@ pub fn generate_items(
             });
             return fallback(c, cat, decisions);
         }
-        let d = ds[(seed as usize) % ds.len()];
+        let affix_index = stable_index(seed, ds.len()).ok_or(ItemError::NoFallback)?;
+        let d = ds[affix_index];
         let item_id = format!("item:{x:02}");
         let width = match d
             .max_value
