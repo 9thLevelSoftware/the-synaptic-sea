@@ -82,6 +82,7 @@ enum Tombstone {
 }
 struct State {
     next_id: i64,
+    first_admitted: Option<i64>,
     highest_admitted: i64,
     queue: VecDeque<i64>,
     entries: BTreeMap<i64, Entry>,
@@ -111,10 +112,21 @@ fn failure(code: ProcgenFailureCode, message: impl Into<String>) -> ProcgenFailu
     }
 }
 fn events(mut e: Vec<LifecycleEvent>, max: usize, x: LifecycleEvent) -> Vec<LifecycleEvent> {
-    if e.len() < max {
-        e.push(x);
+    if max == 0 {
+        return e;
     }
+    if e.len() >= max {
+        e.remove(0);
+    }
+    e.push(x);
     e
+}
+fn lifecycle_events(max: usize, final_event: LifecycleEvent) -> Vec<LifecycleEvent> {
+    events(
+        events(vec![LifecycleEvent::Admitted], max, LifecycleEvent::Started),
+        max,
+        final_event,
+    )
 }
 fn bundle_ok(b: &ProcgenBundle, l: &Limits) -> bool {
     b.validate().is_ok()
@@ -151,6 +163,15 @@ fn retain(s: &mut State, l: &Limits, id: i64, result: LifecycleResult) {
         }
     }
 }
+fn prune_tombstones(s: &mut State, l: &Limits) {
+    while s.tombstones.len() > l.retained_results {
+        if let Some(old) = s.tombstones.keys().next().copied() {
+            s.tombstones.remove(&old);
+        } else {
+            break;
+        }
+    }
+}
 #[allow(dead_code)]
 impl Service {
     pub fn new(
@@ -173,6 +194,7 @@ impl Service {
             shared: Arc::new(Shared {
                 state: Mutex::new(State {
                     next_id,
+                    first_admitted: None,
                     highest_admitted: 0,
                     queue: VecDeque::new(),
                     entries: BTreeMap::new(),
@@ -210,14 +232,12 @@ impl Service {
     ) -> LifecycleResult {
         LifecycleResult::failed(id, f, e)
     }
-    fn validate_request(&self, request: &ProcgenRequest) -> Result<(), ProcgenFailure> {
-        let bytes = serde_json::to_vec(request).map_err(|_| {
-            failure(
-                ProcgenFailureCode::InvalidRequest,
-                "request serialization failed",
-            )
-        })?;
-        if bytes.len() > self.limits.max_request_bytes {
+    fn validate_request(
+        &self,
+        request: &ProcgenRequest,
+        raw_len: usize,
+    ) -> Result<(), ProcgenFailure> {
+        if raw_len > self.limits.max_request_bytes {
             return Err(failure(ProcgenFailureCode::Capacity, "request too large"));
         }
         request
@@ -231,24 +251,7 @@ impl Service {
         }
         Ok(())
     }
-    pub fn submit_json(&self, json: &str) -> LifecycleResult {
-        if json.len() > self.limits.max_request_bytes {
-            return self.failed(
-                None,
-                failure(ProcgenFailureCode::Capacity, "request too large"),
-                vec![LifecycleEvent::Rejected],
-            );
-        }
-        match ProcgenRequest::from_json(json) {
-            Ok(r) => self.submit(r),
-            Err(e) => self.failed(
-                None,
-                failure(ProcgenFailureCode::InvalidRequest, e.to_string()),
-                vec![LifecycleEvent::Rejected],
-            ),
-        }
-    }
-    pub fn submit(&self, request: ProcgenRequest) -> LifecycleResult {
+    fn admit(&self, request: ProcgenRequest, raw_len: usize) -> LifecycleResult {
         let mut s = self.shared.state.lock().unwrap();
         if s.shutdown {
             return self.failed(
@@ -257,7 +260,7 @@ impl Service {
                 vec![LifecycleEvent::Rejected, LifecycleEvent::Shutdown],
             );
         }
-        if let Err(f) = self.validate_request(&request) {
+        if let Err(f) = self.validate_request(&request, raw_len) {
             return self.failed(None, f, vec![LifecycleEvent::Rejected]);
         }
         if s.queue.len() >= self.limits.queue_capacity {
@@ -276,20 +279,29 @@ impl Service {
         }
         let id = s.next_id;
         s.next_id = if id == i64::MAX { 0 } else { id + 1 };
+        s.first_admitted.get_or_insert(id);
         s.highest_admitted = id;
-        let job = Job {
-            request,
-            admitted_ms: self.clock.now_ms(),
-            cancel_requested: false,
-            events: vec![LifecycleEvent::Admitted, LifecycleEvent::Queued],
-        };
+        let ev = events(
+            vec![LifecycleEvent::Admitted],
+            self.limits.max_events,
+            LifecycleEvent::Queued,
+        );
         s.queue.push_back(id);
-        s.entries.insert(id, Entry::Queued(job));
+        s.entries.insert(
+            id,
+            Entry::Queued(Job {
+                request,
+                admitted_ms: self.clock.now_ms(),
+                cancel_requested: false,
+                events: ev.clone(),
+            }),
+        );
         self.shared.wake.notify_one();
-        LifecycleResult::accepted(id, vec![LifecycleEvent::Admitted, LifecycleEvent::Queued])
+        LifecycleResult::accepted(id, ev)
     }
-    pub fn generate_sync_json(&self, json: &str) -> LifecycleResult {
-        if json.len() > self.limits.max_request_bytes {
+    #[allow(clippy::needless_as_bytes)]
+    pub fn submit_json(&self, json: &str) -> LifecycleResult {
+        if json.as_bytes().len() > self.limits.max_request_bytes {
             return self.failed(
                 None,
                 failure(ProcgenFailureCode::Capacity, "request too large"),
@@ -297,7 +309,31 @@ impl Service {
             );
         }
         match ProcgenRequest::from_json(json) {
-            Ok(r) => self.generate_sync(r),
+            Ok(r) => self.admit(r, json.as_bytes().len()),
+            Err(e) => self.failed(
+                None,
+                failure(ProcgenFailureCode::InvalidRequest, e.to_string()),
+                vec![LifecycleEvent::Rejected],
+            ),
+        }
+    }
+    pub fn submit(&self, request: ProcgenRequest) -> LifecycleResult {
+        let raw_len = serde_json::to_vec(&request)
+            .map(|v| v.len())
+            .unwrap_or(usize::MAX);
+        self.admit(request, raw_len)
+    }
+    #[allow(clippy::needless_as_bytes)]
+    pub fn generate_sync_json(&self, json: &str) -> LifecycleResult {
+        if json.as_bytes().len() > self.limits.max_request_bytes {
+            return self.failed(
+                None,
+                failure(ProcgenFailureCode::Capacity, "request too large"),
+                vec![LifecycleEvent::Rejected],
+            );
+        }
+        match ProcgenRequest::from_json(json) {
+            Ok(r) => self.generate_sync_with_len(r, json.as_bytes().len()),
             Err(e) => self.failed(
                 None,
                 failure(ProcgenFailureCode::InvalidRequest, e.to_string()),
@@ -306,7 +342,13 @@ impl Service {
         }
     }
     pub fn generate_sync(&self, request: ProcgenRequest) -> LifecycleResult {
-        if let Err(f) = self.validate_request(&request) {
+        let raw_len = serde_json::to_vec(&request)
+            .map(|v| v.len())
+            .unwrap_or(usize::MAX);
+        self.generate_sync_with_len(request, raw_len)
+    }
+    fn generate_sync_with_len(&self, request: ProcgenRequest, raw_len: usize) -> LifecycleResult {
+        if let Err(f) = self.validate_request(&request, raw_len) {
             return self.failed(None, f, vec![LifecycleEvent::Rejected]);
         }
         let start = self.clock.now_ms();
@@ -317,51 +359,31 @@ impl Service {
                     self.failed(
                         None,
                         failure(ProcgenFailureCode::ValidationFailure, "invalid output"),
-                        vec![
-                            LifecycleEvent::Admitted,
-                            LifecycleEvent::Started,
-                            LifecycleEvent::Failed,
-                        ],
+                        lifecycle_events(self.limits.max_events, LifecycleEvent::Failed),
                     )
                 } else if self.clock.now_ms().saturating_sub(start) >= self.limits.deadline_ms {
                     self.failed(
                         None,
                         failure(ProcgenFailureCode::Timeout, "completion deadline exceeded"),
-                        vec![
-                            LifecycleEvent::Admitted,
-                            LifecycleEvent::Started,
-                            LifecycleEvent::TimedOut,
-                        ],
+                        lifecycle_events(self.limits.max_events, LifecycleEvent::TimedOut),
                     )
                 } else {
                     LifecycleResult::completed(
                         None,
                         bundle,
-                        vec![
-                            LifecycleEvent::Admitted,
-                            LifecycleEvent::Started,
-                            LifecycleEvent::Completed,
-                        ],
+                        lifecycle_events(self.limits.max_events, LifecycleEvent::Completed),
                     )
                 }
             }
             Ok(Err(f)) => self.failed(
                 None,
                 f,
-                vec![
-                    LifecycleEvent::Admitted,
-                    LifecycleEvent::Started,
-                    LifecycleEvent::Failed,
-                ],
+                lifecycle_events(self.limits.max_events, LifecycleEvent::Failed),
             ),
             Err(_) => self.failed(
                 None,
                 failure(ProcgenFailureCode::InternalFailure, "generator panic"),
-                vec![
-                    LifecycleEvent::Admitted,
-                    LifecycleEvent::Started,
-                    LifecycleEvent::Failed,
-                ],
+                lifecycle_events(self.limits.max_events, LifecycleEvent::Failed),
             ),
         }
     }
@@ -382,11 +404,19 @@ impl Service {
                     LifecycleEvent::ResultConsumed,
                 );
                 s.tombstones.insert(id, Tombstone::Consumed);
+                prune_tombstones(&mut s, &self.limits);
                 r
             }
             Some(entry @ Entry::Queued(_)) => {
                 s.entries.insert(id, entry);
-                LifecycleResult::queued(id, vec![LifecycleEvent::Admitted, LifecycleEvent::Queued])
+                LifecycleResult::queued(
+                    id,
+                    events(
+                        vec![LifecycleEvent::Admitted],
+                        self.limits.max_events,
+                        LifecycleEvent::Queued,
+                    ),
+                )
             }
             Some(Entry::Running(job)) => {
                 let cancel = job.cancel_requested;
@@ -406,12 +436,16 @@ impl Service {
                 }
             }
             None => {
-                let expired = s.tombstones.contains_key(&id)
-                    || (id <= s.highest_admitted && (s.next_id == 0 || id < s.next_id));
+                let tombstone = s.tombstones.get(&id).copied();
+                let expired = tombstone.is_some()
+                    || s.first_admitted
+                        .is_some_and(|first| id >= first && id <= s.highest_admitted);
                 self.failed(
                     Some(id),
                     failure(
-                        if expired {
+                        if matches!(tombstone, Some(Tombstone::Consumed)) {
+                            ProcgenFailureCode::ResultConsumed
+                        } else if expired {
                             ProcgenFailureCode::ResultExpired
                         } else {
                             ProcgenFailureCode::UnknownRequest
@@ -429,6 +463,22 @@ impl Service {
     }
     pub fn cancel(&self, id: i64) -> LifecycleResult {
         let mut s = self.shared.state.lock().unwrap();
+        if id <= 0 {
+            return self.failed(
+                Some(id),
+                failure(
+                    if matches!(s.tombstones.get(&id), Some(Tombstone::Consumed)) {
+                        ProcgenFailureCode::ResultConsumed
+                    } else if s.tombstones.contains_key(&id) {
+                        ProcgenFailureCode::ResultExpired
+                    } else {
+                        ProcgenFailureCode::UnknownRequest
+                    },
+                    "unknown request",
+                ),
+                vec![LifecycleEvent::Rejected],
+            );
+        }
         match s.entries.remove(&id) {
             Some(Entry::Queued(mut job)) => {
                 if let Some(p) = s.queue.iter().position(|x| *x == id) {
@@ -449,11 +499,16 @@ impl Service {
                     failure(ProcgenFailureCode::Cancellation, "cancelled"),
                     job.events,
                 );
-                retain(&mut s, &self.limits, id, r);
+                retain(&mut s, &self.limits, id, r.clone());
                 self.shared.wake.notify_all();
-                LifecycleResult::cancel_requested(id, vec![LifecycleEvent::CancelRequested])
+                r
             }
             Some(Entry::Running(mut job)) => {
+                if job.cancel_requested {
+                    let out = LifecycleResult::cancel_requested(id, job.events.clone());
+                    s.entries.insert(id, Entry::Running(job));
+                    return out;
+                }
                 job.cancel_requested = true;
                 job.events = events(
                     job.events,
@@ -464,17 +519,34 @@ impl Service {
                 s.entries.insert(id, Entry::Running(job));
                 out
             }
-            Some(entry @ Entry::Terminal(_)) => {
-                s.entries.insert(id, entry);
-                self.failed(
-                    Some(id),
-                    failure(ProcgenFailureCode::TooLateCancellation, "terminal result"),
-                    vec![LifecycleEvent::Rejected],
-                )
+            Some(Entry::Terminal(r)) => {
+                if r.failure
+                    .as_ref()
+                    .is_some_and(|f| f.code == ProcgenFailureCode::Cancellation)
+                {
+                    let out = r.clone();
+                    s.entries.insert(id, Entry::Terminal(r));
+                    out
+                } else {
+                    let out = self.failed(
+                        Some(id),
+                        failure(ProcgenFailureCode::TooLateCancellation, "terminal result"),
+                        vec![LifecycleEvent::Rejected],
+                    );
+                    s.entries.insert(id, Entry::Terminal(r));
+                    out
+                }
             }
             None => self.failed(
                 Some(id),
-                failure(ProcgenFailureCode::UnknownRequest, "unknown request"),
+                failure(
+                    if s.tombstones.contains_key(&id) {
+                        ProcgenFailureCode::ResultExpired
+                    } else {
+                        ProcgenFailureCode::UnknownRequest
+                    },
+                    "unknown request",
+                ),
                 vec![LifecycleEvent::Rejected],
             ),
         }
@@ -532,6 +604,19 @@ fn worker(
                     if job.cancel_requested {
                         continue;
                     }
+                    if clock.now_ms().saturating_sub(job.admitted_ms) >= limits.deadline_ms {
+                        retain(
+                            &mut s,
+                            &limits,
+                            id,
+                            LifecycleResult::failed(
+                                Some(id),
+                                failure(ProcgenFailureCode::Timeout, "admission deadline exceeded"),
+                                events(job.events, limits.max_events, LifecycleEvent::TimedOut),
+                            ),
+                        );
+                        continue;
+                    }
                     job.events = events(job.events, limits.max_events, LifecycleEvent::Started);
                     s.entries.insert(id, Entry::Running(job.clone()));
                     break (id, job);
@@ -539,59 +624,71 @@ fn worker(
                 s = shared.wake.wait(s).unwrap();
             }
         };
-        if clock.now_ms().saturating_sub(job.admitted_ms) >= limits.deadline_ms {
-            let mut s = shared.state.lock().unwrap();
-            s.entries.remove(&id);
-            retain(
-                &mut s,
-                &limits,
-                id,
-                LifecycleResult::failed(
-                    Some(id),
-                    failure(ProcgenFailureCode::Timeout, "admission deadline exceeded"),
-                    events(job.events, limits.max_events, LifecycleEvent::TimedOut),
-                ),
-            );
-            continue;
-        }
         let generated =
             std::panic::catch_unwind(AssertUnwindSafe(|| (generator)(job.request.clone())));
         let mut s = shared.state.lock().unwrap();
-        let cancelled = matches!(s.entries.get(&id), Some(Entry::Running(j)) if j.cancel_requested);
-        s.entries.remove(&id);
+        let current = match s.entries.remove(&id) {
+            Some(Entry::Running(j)) => j,
+            _ => job.clone(),
+        };
+        let cancelled = current.cancel_requested;
         let result = if cancelled {
             LifecycleResult::failed(
                 Some(id),
                 failure(ProcgenFailureCode::Cancellation, "cancel requested"),
-                events(job.events, limits.max_events, LifecycleEvent::Cancelled),
+                events(
+                    current.events.clone(),
+                    limits.max_events,
+                    LifecycleEvent::Cancelled,
+                ),
             )
         } else if clock.now_ms().saturating_sub(job.admitted_ms) >= limits.deadline_ms {
             LifecycleResult::failed(
                 Some(id),
                 failure(ProcgenFailureCode::Timeout, "completion deadline exceeded"),
-                events(job.events, limits.max_events, LifecycleEvent::TimedOut),
+                events(
+                    current.events.clone(),
+                    limits.max_events,
+                    LifecycleEvent::TimedOut,
+                ),
             )
         } else {
             match generated {
                 Ok(Ok(bundle)) if bundle_ok(&bundle, &limits) => LifecycleResult::completed(
                     Some(id),
                     bundle,
-                    events(job.events, limits.max_events, LifecycleEvent::Completed),
+                    events(
+                        current.events.clone(),
+                        limits.max_events,
+                        LifecycleEvent::Completed,
+                    ),
                 ),
                 Ok(Ok(_)) => LifecycleResult::failed(
                     Some(id),
                     failure(ProcgenFailureCode::ValidationFailure, "invalid output"),
-                    events(job.events, limits.max_events, LifecycleEvent::Failed),
+                    events(
+                        current.events.clone(),
+                        limits.max_events,
+                        LifecycleEvent::Failed,
+                    ),
                 ),
                 Ok(Err(f)) => LifecycleResult::failed(
                     Some(id),
                     f,
-                    events(job.events, limits.max_events, LifecycleEvent::Failed),
+                    events(
+                        current.events.clone(),
+                        limits.max_events,
+                        LifecycleEvent::Failed,
+                    ),
                 ),
                 Err(_) => LifecycleResult::failed(
                     Some(id),
                     failure(ProcgenFailureCode::InternalFailure, "generator panic"),
-                    events(job.events, limits.max_events, LifecycleEvent::Failed),
+                    events(
+                        current.events.clone(),
+                        limits.max_events,
+                        LifecycleEvent::Failed,
+                    ),
                 ),
             }
         };
