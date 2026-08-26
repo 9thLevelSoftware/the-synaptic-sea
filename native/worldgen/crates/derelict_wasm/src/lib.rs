@@ -11,6 +11,8 @@ use derelict_core::procgen::{
 };
 use derelict_core::GenData;
 use serde_json::to_string;
+#[cfg(target_arch = "wasm32")]
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -20,6 +22,10 @@ use std::sync::OnceLock;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 use wasm_bindgen::prelude::*;
+
+#[cfg(test)]
+#[path = "../build_support.rs"]
+mod build_support_tests;
 
 const MAX_REQUEST: usize = 64 * 1024;
 const MAX_ENTITIES: usize = 4096;
@@ -52,7 +58,26 @@ impl Clock for DefaultClock {
     fn now_ms(&self) -> u64 {
         #[cfg(target_arch = "wasm32")]
         {
-            js_sys::Date::now().max(0.0) as u64
+            thread_local! {
+                static LAST_MS: Cell<u64> = const { Cell::new(0) };
+            }
+            let global = js_sys::global();
+            let monotonic = js_sys::Reflect::get(&global, &JsValue::from_str("performance"))
+                .ok()
+                .and_then(|performance| {
+                    js_sys::Reflect::get(&performance, &JsValue::from_str("now"))
+                        .ok()
+                        .and_then(|value| value.dyn_into::<js_sys::Function>().ok())
+                        .and_then(|now| now.call0(&performance).ok())
+                        .and_then(|value| value.as_f64())
+                })
+                .unwrap_or_else(js_sys::Date::now)
+                .max(0.0) as u64;
+            LAST_MS.with(|last| {
+                let clamped = monotonic.max(last.get());
+                last.set(clamped);
+                clamped
+            })
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -116,6 +141,7 @@ pub struct WasmService {
     data: Arc<dyn DataProvider>,
     generator: Arc<dyn Generator>,
     serializer: Arc<dyn Serializer>,
+    expected_content_hash: String,
     state: RefCell<State>,
 }
 impl Default for WasmService {
@@ -125,6 +151,7 @@ impl Default for WasmService {
             data: Arc::new(DefaultData),
             generator: Arc::new(DefaultGenerator),
             serializer: Arc::new(JsonSerializer),
+            expected_content_hash: CONTENT_HASH.into(),
             state: RefCell::new(State::default()),
         }
     }
@@ -136,11 +163,28 @@ impl WasmService {
         generator: Arc<dyn Generator>,
         serializer: Arc<dyn Serializer>,
     ) -> Self {
+        Self::new_with_content_hash(clock, data, generator, serializer, CONTENT_HASH.into())
+    }
+
+    pub fn new_with_content_hash(
+        clock: Arc<dyn Clock>,
+        data: Arc<dyn DataProvider>,
+        generator: Arc<dyn Generator>,
+        serializer: Arc<dyn Serializer>,
+        expected_content_hash: String,
+    ) -> Self {
+        assert!(
+            expected_content_hash.len() == 64
+                && expected_content_hash
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        );
         Self {
             clock,
             data,
             generator,
             serializer,
+            expected_content_hash,
             state: RefCell::new(State::default()),
         }
     }
@@ -153,7 +197,7 @@ impl WasmService {
     }
 }
 fn json_fallback() -> String {
-    r#"{"schema_version":"procgen-lifecycle-result-1","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"internal_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
+    r#"{"schema_version":"procgen-lifecycle-result-1","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
 }
 
 fn failure(
@@ -224,7 +268,10 @@ fn retain_cancelled(state: &mut State, id: i64, result: LifecycleResult) {
     }
     state.entries.insert(id, Entry::Cancelled(Box::new(result)));
 }
-fn validate_request(raw: &str) -> Result<ProcgenRequest, Box<LifecycleResult>> {
+fn validate_request(
+    raw: &str,
+    expected_content_hash: &str,
+) -> Result<ProcgenRequest, Box<LifecycleResult>> {
     if raw.len() > MAX_REQUEST {
         return Err(Box::new(failure(
             None,
@@ -241,7 +288,7 @@ fn validate_request(raw: &str) -> Result<ProcgenRequest, Box<LifecycleResult>> {
             LifecycleEvent::Rejected,
         ))
     })?;
-    if req.content_manifest_hash != CONTENT_HASH {
+    if req.content_manifest_hash != expected_content_hash {
         return Err(Box::new(failure(
             None,
             ProcgenFailureCode::GeneratorContentMismatch,
@@ -310,7 +357,17 @@ impl WasmService {
                 }
             }
             if state.data.is_none() {
-                state.data = self.data.data().ok();
+                match self.data.data() {
+                    Ok(data) => state.data = Some(data),
+                    Err(message) => {
+                        return failure(
+                            request_id,
+                            ProcgenFailureCode::AdapterFailure,
+                            &message,
+                            LifecycleEvent::Failed,
+                        )
+                    }
+                }
             }
             let Some(data) = state.data.as_ref() else {
                 return failure(
@@ -391,7 +448,7 @@ impl WasmService {
     }
 
     pub fn sync(&self, request_json: &str) -> String {
-        match validate_request(request_json) {
+        match validate_request(request_json, &self.expected_content_hash) {
             Ok(req) => {
                 let admitted = self.clock.now_ms();
                 let mut result = self.generate(req, Some(admitted), None);
@@ -402,18 +459,20 @@ impl WasmService {
         }
     }
     pub fn submit(&self, request_json: &str) -> String {
-        let req = match validate_request(request_json) {
+        let req = match validate_request(request_json, &self.expected_content_hash) {
             Ok(r) => r,
             Err(result) => return self.encode(*result),
         };
         let mut s = self.state.borrow_mut();
         if s.queue.len() >= QUEUE {
-            return self.encode(failure(
+            let mut result = failure(
                 None,
                 ProcgenFailureCode::Overload,
                 "queue full",
                 LifecycleEvent::Overloaded,
-            ));
+            );
+            result.events.insert(0, LifecycleEvent::Rejected);
+            return self.encode(result);
         }
         let id = match s.next_id.checked_add(1) {
             Some(next) => {
@@ -518,6 +577,12 @@ impl WasmService {
     pub fn reset(&self) {
         *self.state.borrow_mut() = State::default();
     }
+
+    #[cfg(test)]
+    fn set_next_id(&self, next_id: i64) {
+        assert!(next_id > 0);
+        self.state.borrow_mut().next_id = next_id;
+    }
 }
 
 thread_local! { static SERVICE: RefCell<WasmService> = RefCell::new(WasmService::default()); }
@@ -576,20 +641,23 @@ fn json_capabilities(value: ProcgenCapabilities) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use derelict_core::model::EntityKind;
     use derelict_core::procgen::{
-        PlayerModel, PresentationRequest, SiteRequest, PROCGEN_REQUEST_SCHEMA,
+        semantic_hash, PlayerModel, PresentationRequest, ProcgenBundle, SiteRequest,
+        PROCGEN_REQUEST_SCHEMA,
     };
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-    fn request_json() -> String {
-        serde_json::to_string(&ProcgenRequest {
+    fn request(seed: u64, content_hash: &str) -> ProcgenRequest {
+        ProcgenRequest {
             schema_version: PROCGEN_REQUEST_SCHEMA.into(),
-            world_seed: 42,
+            world_seed: seed,
             site: SiteRequest {
-                site_id: "site-a".into(),
+                site_id: format!("site-{seed}"),
                 x: 1,
                 y: 2,
                 archetype_id: "shuttle".into(),
-                kit_id: "default".into(),
+                kit_id: "ship_structural_v0".into(),
                 intactness_override_bp: None,
                 cause_of_loss: None,
                 loot_richness_bp: 10_000,
@@ -606,14 +674,96 @@ mod tests {
                 Domain::Presentation,
             ],
             generator_version: 2,
-            content_manifest_hash: "0".repeat(64),
+            content_manifest_hash: content_hash.into(),
             presentation: PresentationRequest {
-                seed: 1,
+                seed,
                 locale: "en-US".into(),
             },
-        })
-        .unwrap()
+        }
     }
+
+    fn request_json() -> String {
+        serde_json::to_string(&request(42, CONTENT_HASH)).unwrap()
+    }
+
+    fn parse(json: &str) -> LifecycleResult {
+        LifecycleResult::from_json(json)
+            .unwrap_or_else(|error| panic!("invalid lifecycle JSON ({error}): {json}"))
+    }
+
+    fn failure_code(result: &LifecycleResult) -> Option<ProcgenFailureCode> {
+        result.failure.as_ref().map(|failure| failure.code.clone())
+    }
+
+    #[derive(Default)]
+    struct ManualClock(AtomicU64);
+    impl ManualClock {
+        fn set(&self, value: u64) {
+            self.0.store(value, Ordering::SeqCst);
+        }
+    }
+    impl Clock for ManualClock {
+        fn now_ms(&self) -> u64 {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    type GeneratorFn =
+        dyn Fn(ProcgenRequest, &GenData) -> Result<ProcgenBundle, ProcgenFailure> + Send + Sync;
+    struct TestGenerator {
+        calls: Arc<AtomicUsize>,
+        generate_fn: Arc<GeneratorFn>,
+    }
+    impl Generator for TestGenerator {
+        fn generate(
+            &self,
+            request: ProcgenRequest,
+            data: &GenData,
+        ) -> Result<ProcgenBundle, ProcgenFailure> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            (self.generate_fn)(request, data)
+        }
+    }
+    fn test_generator<F>(generate_fn: F) -> (Arc<TestGenerator>, Arc<AtomicUsize>)
+    where
+        F: Fn(ProcgenRequest, &GenData) -> Result<ProcgenBundle, ProcgenFailure>
+            + Send
+            + Sync
+            + 'static,
+    {
+        let calls = Arc::new(AtomicUsize::new(0));
+        (
+            Arc::new(TestGenerator {
+                calls: Arc::clone(&calls),
+                generate_fn: Arc::new(generate_fn),
+            }),
+            calls,
+        )
+    }
+
+    fn service_with(
+        clock: Arc<dyn Clock>,
+        generator: Arc<dyn Generator>,
+        data: Arc<dyn DataProvider>,
+        serializer: Arc<dyn Serializer>,
+    ) -> WasmService {
+        WasmService::new_with_content_hash(clock, data, generator, serializer, CONTENT_HASH.into())
+    }
+
+    struct FailingData;
+    impl DataProvider for FailingData {
+        fn data(&self) -> Result<GenData, String> {
+            Err("content load failed".into())
+        }
+    }
+
+    struct FailingSerializer;
+    impl Serializer for FailingSerializer {
+        fn serialize(&self, _: &LifecycleResult) -> Result<String, String> {
+            Err("serializer failed".into())
+        }
+    }
+
     #[test]
     fn capabilities_are_cooperative() {
         let c = capabilities_value();
@@ -626,14 +776,34 @@ mod tests {
         let m = manifest_value();
         assert_eq!(m.target, "wasm32-unknown-unknown");
         assert!(m.validate().is_ok());
+        let capabilities_json = json_capabilities(capabilities_value());
+        ProcgenCapabilities::from_json(&capabilities_json).unwrap();
+        let manifest_json = generator_manifest();
+        GeneratorManifest::from_json(&manifest_json).unwrap();
     }
 
     #[test]
-    fn invalid_requests_do_not_consume_ids_or_queue_slots() {
+    fn malformed_oversized_and_mismatched_requests_do_not_consume_ids() {
         let service = WasmService::default();
-        let first = service.submit("not-json");
-        assert!(first.contains("invalid_request"));
-        assert!(service.submit(&request_json()).contains("\"request_id\":1"));
+        assert_eq!(
+            failure_code(&parse(&service.submit("not-json"))),
+            Some(ProcgenFailureCode::InvalidRequest)
+        );
+        assert_eq!(
+            failure_code(&parse(&service.submit(&"x".repeat(MAX_REQUEST + 1)))),
+            Some(ProcgenFailureCode::Capacity)
+        );
+        let mismatched_hash = if CONTENT_HASH.bytes().all(|byte| byte == b'1') {
+            "0".repeat(64)
+        } else {
+            "1".repeat(64)
+        };
+        let mismatch = serde_json::to_string(&request(7, &mismatched_hash)).unwrap();
+        assert_eq!(
+            failure_code(&parse(&service.submit(&mismatch))),
+            Some(ProcgenFailureCode::GeneratorContentMismatch)
+        );
+        assert_eq!(parse(&service.submit(&request_json())).request_id, Some(1));
     }
 
     #[test]
@@ -647,20 +817,319 @@ mod tests {
     }
 
     #[test]
-    fn lifecycle_events_preserve_admission_queue_and_consumption_order() {
+    fn queue_overload_is_deterministic_and_recovery_uses_id_nine() {
         let service = WasmService::default();
-        let accepted = service.submit(&request_json());
-        assert!(accepted.find("admitted").unwrap() < accepted.find("queued").unwrap());
-        let terminal = service.poll_request(1);
-        assert!(terminal.find("admitted").unwrap() < terminal.find("queued").unwrap());
-        assert!(terminal.find("started").unwrap() < terminal.find("result_consumed").unwrap());
-        assert!(service.poll_request(1).contains("result_consumed"));
+        for expected in 1..=QUEUE as i64 {
+            assert_eq!(
+                parse(&service.submit(&request_json())).request_id,
+                Some(expected)
+            );
+        }
+        let overload = parse(&service.submit(&request_json()));
+        assert_eq!(failure_code(&overload), Some(ProcgenFailureCode::Overload));
+        assert_eq!(
+            overload.events,
+            vec![LifecycleEvent::Rejected, LifecycleEvent::Overloaded]
+        );
+        assert_eq!(
+            parse(&service.poll_request(1)).status,
+            derelict_core::lifecycle::LifecycleStatus::Completed
+        );
+        assert_eq!(parse(&service.submit(&request_json())).request_id, Some(9));
+    }
+
+    #[test]
+    fn sync_and_cooperative_poll_generate_once_with_matching_semantics() {
+        let (generator, calls) = test_generator(core_generate_bundle);
+        let service = service_with(
+            Arc::new(ManualClock::default()),
+            generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        let sync = parse(&service.sync(&request_json()));
+        assert_eq!(
+            sync.events,
+            vec![
+                LifecycleEvent::Admitted,
+                LifecycleEvent::Started,
+                LifecycleEvent::Completed
+            ]
+        );
+        let accepted = parse(&service.submit(&request_json()));
+        assert_eq!(
+            accepted.events,
+            vec![LifecycleEvent::Admitted, LifecycleEvent::Queued]
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let terminal = parse(&service.poll_request(1));
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            terminal.events,
+            vec![
+                LifecycleEvent::Admitted,
+                LifecycleEvent::Queued,
+                LifecycleEvent::Started,
+                LifecycleEvent::Completed,
+                LifecycleEvent::ResultConsumed
+            ]
+        );
+        assert_eq!(
+            sync.bundle.unwrap().semantic_hash,
+            terminal.bundle.unwrap().semantic_hash
+        );
+        let consumed = parse(&service.poll_request(1));
+        assert_eq!(
+            failure_code(&consumed),
+            Some(ProcgenFailureCode::ResultConsumed)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn queued_cancellation_is_idempotent_and_consumed_once() {
+        let service = WasmService::default();
+        service.submit(&request_json());
+        let first = parse(&service.cancel_request(1));
+        let second = parse(&service.cancel_request(1));
+        assert_eq!(first, second);
+        assert_eq!(
+            first.events,
+            vec![
+                LifecycleEvent::Admitted,
+                LifecycleEvent::Queued,
+                LifecycleEvent::CancelRequested,
+                LifecycleEvent::Cancelled
+            ]
+        );
+        let consumed = parse(&service.poll_request(1));
+        assert_eq!(
+            consumed.events.last(),
+            Some(&LifecycleEvent::ResultConsumed)
+        );
+        assert_eq!(
+            failure_code(&parse(&service.cancel_request(1))),
+            Some(ProcgenFailureCode::ResultConsumed)
+        );
+    }
+
+    #[test]
+    fn retained_cancellations_and_tombstones_are_bounded_and_decay_to_expired() {
+        let service = WasmService::default();
+        for id in 1..=17 {
+            assert_eq!(parse(&service.submit(&request_json())).request_id, Some(id));
+            service.cancel_request(id);
+        }
+        assert_eq!(
+            failure_code(&parse(&service.poll_request(1))),
+            Some(ProcgenFailureCode::ResultExpired)
+        );
+        for id in 2..=17 {
+            service.poll_request(id);
+        }
+        assert_eq!(
+            failure_code(&parse(&service.poll_request(1))),
+            Some(ProcgenFailureCode::ResultExpired)
+        );
+        let state = service.state.borrow();
+        assert!(state.entries.len() <= RETAINED);
+        assert!(state.tombstones.len() <= RETAINED);
+        assert!(state.queue.is_empty());
+        assert!(state.admitted_at.is_empty());
+    }
+
+    #[test]
+    fn injected_clock_proves_prestart_and_postgeneration_deadlines() {
+        let pre_clock = Arc::new(ManualClock::default());
+        let (pre_generator, pre_calls) = test_generator(core_generate_bundle);
+        let pre = service_with(
+            pre_clock.clone(),
+            pre_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        pre.submit(&request_json());
+        pre_clock.set(2_000);
+        let timed_out = parse(&pre.poll_request(1));
+        assert_eq!(failure_code(&timed_out), Some(ProcgenFailureCode::Timeout));
+        assert_eq!(pre_calls.load(Ordering::SeqCst), 0);
+
+        let post_clock = Arc::new(ManualClock::default());
+        let clock_for_generator = post_clock.clone();
+        let (post_generator, post_calls) = test_generator(move |request, data| {
+            let bundle = core_generate_bundle(request, data)?;
+            clock_for_generator.set(2_000);
+            Ok(bundle)
+        });
+        let post = service_with(
+            post_clock,
+            post_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&post.sync(&request_json()))),
+            Some(ProcgenFailureCode::Timeout)
+        );
+        assert_eq!(post_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn panic_invalid_failure_and_data_errors_are_contained() {
+        let (panic_generator, _) = test_generator(|_, _| panic!("boom"));
+        let panic_service = service_with(
+            Arc::new(ManualClock::default()),
+            panic_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&panic_service.sync(&request_json()))),
+            Some(ProcgenFailureCode::InternalFailure)
+        );
+
+        let (bad_failure_generator, _) = test_generator(|_, _| {
+            Err(ProcgenFailure {
+                schema_version: "bad".into(),
+                code: ProcgenFailureCode::GenerationFailure,
+                stage: "generation".into(),
+                message: "bad failure".into(),
+                retryable: false,
+                fallback_id: None,
+            })
+        });
+        let bad_failure_service = service_with(
+            Arc::new(ManualClock::default()),
+            bad_failure_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&bad_failure_service.sync(&request_json()))),
+            Some(ProcgenFailureCode::AdapterFailure)
+        );
+
+        let (unused_generator, calls) = test_generator(core_generate_bundle);
+        let data_service = service_with(
+            Arc::new(ManualClock::default()),
+            unused_generator,
+            Arc::new(FailingData),
+            Arc::new(JsonSerializer),
+        );
+        data_service.submit(&request_json());
+        let failed = parse(&data_service.poll_request(1));
+        assert_eq!(failed.request_id, Some(1));
+        assert_eq!(
+            failure_code(&failed),
+            Some(ProcgenFailureCode::AdapterFailure)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn invalid_bundle_trace_overflow_and_entity_overflow_fail_closed() {
+        let (invalid_generator, _) = test_generator(|request, data| {
+            let mut bundle = core_generate_bundle(request, data)?;
+            bundle.semantic_hash = "f".repeat(64);
+            Ok(bundle)
+        });
+        let invalid_service = service_with(
+            Arc::new(ManualClock::default()),
+            invalid_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&invalid_service.sync(&request_json()))),
+            Some(ProcgenFailureCode::ValidationFailure)
+        );
+
+        let (trace_generator, _) = test_generator(|request, data| {
+            let mut bundle = core_generate_bundle(request, data)?;
+            bundle.trace.candidate_decisions = vec!["candidate".into(); MAX_TRACE + 1];
+            Ok(bundle)
+        });
+        let trace_service = service_with(
+            Arc::new(ManualClock::default()),
+            trace_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&trace_service.sync(&request_json()))),
+            Some(ProcgenFailureCode::ValidationFailure)
+        );
+
+        let (entity_generator, _) = test_generator(|request, data| {
+            let mut bundle = core_generate_bundle(request, data)?;
+            let mut entity = bundle.site_ir.ship.entities[0].clone();
+            entity.kind = EntityKind::Furniture;
+            entity.proto = "adapter-cap-probe".into();
+            bundle.site_ir.ship.entities.clear();
+            for id in 0..=MAX_ENTITIES as u32 {
+                entity.id = id;
+                bundle.site_ir.ship.entities.push(entity.clone());
+            }
+            bundle.gameplay_ir.legacy_slice = serde_json::from_value(
+                derelict_core::structural::export::to_gameplay_slice_json(&bundle.site_ir.ship),
+            )
+            .unwrap();
+            bundle.metrics.entity_count = bundle.site_ir.ship.entities.len() as u32;
+            bundle.semantic_hash = semantic_hash(&bundle).unwrap();
+            assert!(bundle.validate().is_ok());
+            Ok(bundle)
+        });
+        let entity_service = service_with(
+            Arc::new(ManualClock::default()),
+            entity_generator,
+            Arc::new(DefaultData),
+            Arc::new(JsonSerializer),
+        );
+        assert_eq!(
+            failure_code(&parse(&entity_service.sync(&request_json()))),
+            Some(ProcgenFailureCode::Capacity)
+        );
+    }
+
+    #[test]
+    fn serialization_fallback_is_nonempty_and_typed() {
+        let (generator, _) = test_generator(core_generate_bundle);
+        let service = service_with(
+            Arc::new(ManualClock::default()),
+            generator,
+            Arc::new(DefaultData),
+            Arc::new(FailingSerializer),
+        );
+        let result = parse(&service.sync(&request_json()));
+        assert_eq!(
+            failure_code(&result),
+            Some(ProcgenFailureCode::AdapterFailure)
+        );
+        assert!(!json_fallback().is_empty());
+    }
+
+    #[test]
+    fn request_id_exhaustion_and_reset_are_deterministic() {
+        let service = WasmService::default();
+        service.set_next_id(i64::MAX);
+        let first = parse(&service.submit(&request_json()));
+        let second = parse(&service.submit(&request_json()));
+        assert_eq!(failure_code(&first), Some(ProcgenFailureCode::Capacity));
+        assert_eq!(first, second);
+        service.reset();
+        assert_eq!(parse(&service.submit(&request_json())).request_id, Some(1));
     }
 
     #[test]
     fn malformed_and_future_ids_are_stable_typed_failures() {
         let service = WasmService::default();
-        assert!(service.poll_request(i64::MAX).contains("unknown_request"));
-        assert!(service.cancel_request(-1).contains("unknown_request"));
+        assert_eq!(
+            failure_code(&parse(&service.poll_request(i64::MAX))),
+            Some(ProcgenFailureCode::UnknownRequest)
+        );
+        assert_eq!(
+            failure_code(&parse(&service.cancel_request(-1))),
+            Some(ProcgenFailureCode::UnknownRequest)
+        );
     }
 }
