@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
+const MAX_ID_LEN: usize = 64;
+
 /// Platform contract version.  `model::GENERATOR_VERSION` remains structural v2.
 pub const PROCGEN_GENERATOR_VERSION: u32 = 3;
 pub const MAX_PUBLIC_SEED: u64 = 9_007_199_254_740_991;
@@ -40,7 +42,7 @@ impl WorldKey {
         {
             return Err("content_manifest_hash");
         }
-        if self.site_id.is_empty() || self.domain.is_empty() || self.channel.is_empty() {
+        if !valid_id(&self.site_id) || !valid_id(&self.domain) || !valid_id(&self.channel) {
             return Err("identity");
         }
         Ok(())
@@ -68,6 +70,19 @@ impl WorldKey {
     }
 }
 
+fn valid_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_ID_LEN
+        && value.bytes().all(|b| {
+            b.is_ascii_lowercase()
+                || b.is_ascii_digit()
+                || b == b':'
+                || b == b'_'
+                || b == b'-'
+                || b == b'.'
+        })
+}
+
 pub fn derive_site_seed_v3(key: &WorldKey) -> Result<u64, &'static str> {
     key.seed()
 }
@@ -86,6 +101,11 @@ fn put_u64(h: &mut Sha256, value: u64) {
 fn put_i32(h: &mut Sha256, value: i32) {
     put_len(h, 4);
     h.update(value.to_be_bytes());
+}
+
+fn in_range(seed: u64, range: &RouteRange) -> u32 {
+    let span = u64::from(range.max_bp - range.min_bp) + 1;
+    range.min_bp + (seed % span) as u32
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -107,16 +127,6 @@ pub struct RouteEdge {
     pub cost_bp: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SiteRecord {
-    pub site_id: String,
-    pub x: i32,
-    pub y: i32,
-    pub archetype_id: String,
-    pub site_seed: u64,
-    pub selected: bool,
-}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BiomeField {
@@ -160,7 +170,7 @@ pub struct ExtractionGuarantee {
     pub path: Vec<String>,
 }
 
-/// Canonical radius-one sector: center first, then row-major neighbors.
+/// Canonical radius-one sector: row-major neighbors (the center is excluded).
 pub fn radius_one_coordinates(x: i32, y: i32) -> Result<Vec<(i32, i32)>, &'static str> {
     [
         (-1, -1),
@@ -261,6 +271,7 @@ impl WorldRules {
             || self.archetypes.len() != 4
             || self.biomes.is_empty()
             || self.hazards.is_empty()
+            || self.landmarks.is_empty()
             || self.resources.is_empty()
             || self.route_cost_bp.min_bp == 0
             || self.route_cost_bp.min_bp > self.route_cost_bp.max_bp
@@ -275,8 +286,12 @@ impl WorldRules {
             .chain(self.hazards.iter())
             .chain(self.landmarks.iter())
             .chain(self.resources.iter())
-            .any(|s| s.is_empty())
+            .any(|s| !valid_id(s))
             || self.archetypes.iter().collect::<BTreeSet<_>>().len() != self.archetypes.len()
+            || self.biomes.iter().collect::<BTreeSet<_>>().len() != self.biomes.len()
+            || self.hazards.iter().collect::<BTreeSet<_>>().len() != self.hazards.len()
+            || self.landmarks.iter().collect::<BTreeSet<_>>().len() != self.landmarks.len()
+            || self.resources.iter().collect::<BTreeSet<_>>().len() != self.resources.len()
         {
             return Err(WorldError::Invalid("rules_unique"));
         }
@@ -288,12 +303,38 @@ impl WorldFallback {
         serde_json::from_str(include_str!("../assets/world/safe_fallback_v3.json"))
             .map_err(|_| WorldError::Invalid("fallback_json"))
     }
+    pub fn validate(&self, rules: &WorldRules) -> Result<(), WorldError> {
+        rules.validate()?;
+        if self.schema_version != "world-fallback-1"
+            || self.platform_version != PROCGEN_GENERATOR_VERSION
+            || !valid_id(&self.fallback_id)
+            || !rules.biomes.contains(&self.biome_id)
+            || !rules.hazards.contains(&self.hazard_id)
+            || self.landmarks.is_empty()
+            || self
+                .landmarks
+                .iter()
+                .any(|id| !rules.landmarks.contains(id))
+            || self.route_cost_bp < rules.route_cost_bp.min_bp
+            || self.route_cost_bp > rules.route_cost_bp.max_bp
+        {
+            return Err(WorldError::Invalid("fallback"));
+        }
+        Ok(())
+    }
 }
 impl WorldGenerationRequest {
     fn validate(&self, rules: &WorldRules) -> Result<(), WorldError> {
         if self.world_seed > MAX_PUBLIC_SEED
             || self.platform_version != 3
-            || self.site_id.is_empty()
+            || !valid_id(&self.site_id)
+            || !valid_id(&self.archetype_id)
+            || self.content_manifest_hash.len() != 64
+            || !self
+                .content_manifest_hash
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit())
+            || self.content_manifest_hash != self.content_manifest_hash.to_ascii_lowercase()
             || !rules.archetypes.iter().any(|a| a == &self.archetype_id)
             || self.x == i32::MIN
             || self.x == i32::MAX
@@ -312,23 +353,24 @@ pub fn generate_candidate(
 ) -> Result<WorldIRv2, WorldError> {
     req.validate(rules)?;
     let coords = radius_one_coordinates(req.x, req.y).map_err(WorldError::Invalid)?;
+    let selected_seed = key(
+        req,
+        "site",
+        "site.structural",
+        0,
+        req.x,
+        req.y,
+        &req.site_id,
+    )?
+    .seed()
+    .map_err(WorldError::Key)?;
     let mut markers = vec![CoordinateMarker {
         marker_id: "marker:0".into(),
         site_id: req.site_id.clone(),
         x: req.x,
         y: req.y,
         archetype_id: req.archetype_id.clone(),
-        site_seed: key(
-            req,
-            "site",
-            "site.structural",
-            0,
-            req.x,
-            req.y,
-            &req.site_id,
-        )?
-        .seed()
-        .map_err(WorldError::Key)?,
+        site_seed: selected_seed,
         selected: true,
     }];
     for (i, (x, y)) in coords.iter().enumerate() {
@@ -354,80 +396,102 @@ pub fn generate_candidate(
     }
     let mut routes = Vec::new();
     for i in 1..9 {
+        let route_seed = key(
+            req,
+            "world",
+            "world.route",
+            i as u32,
+            req.x,
+            req.y,
+            &format!("marker:{i}"),
+        )?
+        .seed()
+        .map_err(WorldError::Key)?;
         routes.push(RouteEdge {
             from: "marker:0".into(),
             to: format!("marker:{i}"),
-            cost_bp: rules.route_cost_bp.min_bp,
+            cost_bp: in_range(route_seed, &rules.route_cost_bp),
         });
     }
+    let hub_seed = key(req, "world", "world.route", 9, req.x, req.y, "anchor:hub")?
+        .seed()
+        .map_err(WorldError::Key)?;
+    routes.push(RouteEdge {
+        from: "marker:0".into(),
+        to: "anchor:hub".into(),
+        cost_bp: in_range(hub_seed, &rules.route_cost_bp),
+    });
+    let extraction_seed = key(
+        req,
+        "world",
+        "world.route",
+        10,
+        req.x,
+        req.y,
+        "anchor:extraction",
+    )?
+    .seed()
+    .map_err(WorldError::Key)?;
     routes.push(RouteEdge {
         from: "anchor:hub".into(),
-        to: "marker:0".into(),
-        cost_bp: rules.route_cost_bp.min_bp,
-    });
-    routes.push(RouteEdge {
-        from: "anchor:extraction".into(),
-        to: "anchor:hub".into(),
-        cost_bp: rules.route_cost_bp.min_bp,
+        to: "anchor:extraction".into(),
+        cost_bp: in_range(extraction_seed, &rules.route_cost_bp),
     });
     routes.sort_by(|a, b| (a.from.as_str(), a.to.as_str()).cmp(&(b.from.as_str(), b.to.as_str())));
-    let fields = |domain: &str, channel: &str, values: &Vec<CoordinateMarker>| {
-        values
-            .iter()
-            .enumerate()
-            .map(|(i, m)| {
-                let s = key(req, domain, channel, i as u32, m.x, m.y, &m.site_id)
-                    .ok()
-                    .and_then(|k| k.seed().ok())
-                    .unwrap_or(0);
-                (i, s)
-            })
-            .collect::<Vec<_>>()
-    };
-    let biome_fields = markers
-        .iter()
-        .enumerate()
-        .map(|(i, m)| BiomeField {
+    let mut biome_fields = Vec::with_capacity(markers.len());
+    let mut hazard_fields = Vec::with_capacity(markers.len());
+    let mut resource_pressures = Vec::with_capacity(markers.len());
+    let mut landmarks = Vec::with_capacity(markers.len());
+    for (i, m) in markers.iter().enumerate() {
+        let biome_seed = key(req, "world", "world.biome", i as u32, m.x, m.y, &m.site_id)?
+            .seed()
+            .map_err(WorldError::Key)?;
+        let hazard_seed = key(req, "world", "world.hazard", i as u32, m.x, m.y, &m.site_id)?
+            .seed()
+            .map_err(WorldError::Key)?;
+        let resource_seed = key(
+            req,
+            "world",
+            "world.resource",
+            i as u32,
+            m.x,
+            m.y,
+            &m.site_id,
+        )?
+        .seed()
+        .map_err(WorldError::Key)?;
+        let landmark_seed = key(
+            req,
+            "world",
+            "world.landmark",
+            i as u32,
+            m.x,
+            m.y,
+            &m.site_id,
+        )?
+        .seed()
+        .map_err(WorldError::Key)?;
+        biome_fields.push(BiomeField {
             marker_id: m.marker_id.clone(),
-            biome_id: rules.biomes
-                [fields("world", "world.biome", &markers)[i].1 as usize % rules.biomes.len()]
-            .clone(),
-            intensity_bp: fields("world", "world.biome", &markers)[i].1 as u32 % 10001,
-        })
-        .collect();
-    let hazard_fields = markers
-        .iter()
-        .enumerate()
-        .map(|(i, m)| HazardField {
+            biome_id: rules.biomes[biome_seed as usize % rules.biomes.len()].clone(),
+            intensity_bp: (biome_seed % 10001) as u32,
+        });
+        hazard_fields.push(HazardField {
             marker_id: m.marker_id.clone(),
-            hazard_id: rules.hazards
-                [fields("world", "world.hazard", &markers)[i].1 as usize % rules.hazards.len()]
-            .clone(),
-            severity_bp: fields("world", "world.hazard", &markers)[i].1 as u32 % 10001,
-        })
-        .collect();
-    let resource_pressures = markers
-        .iter()
-        .enumerate()
-        .map(|(i, m)| ResourcePressure {
+            hazard_id: rules.hazards[hazard_seed as usize % rules.hazards.len()].clone(),
+            severity_bp: (hazard_seed % 10001) as u32,
+        });
+        resource_pressures.push(ResourcePressure {
             marker_id: m.marker_id.clone(),
-            resource_id: rules.resources
-                [fields("world", "world.resource", &markers)[i].1 as usize % rules.resources.len()]
-            .clone(),
-            pressure_bp: fields("world", "world.resource", &markers)[i].1 as u32 % 10001,
-        })
-        .collect();
-    let landmarks = markers
-        .iter()
-        .enumerate()
-        .map(|(i, m)| LandmarkRecord {
+            resource_id: rules.resources[resource_seed as usize % rules.resources.len()].clone(),
+            pressure_bp: (resource_seed % 10001) as u32,
+        });
+        landmarks.push(LandmarkRecord {
             id: format!("landmark:{i}"),
             marker_id: m.marker_id.clone(),
-            kind: rules.landmarks
-                [fields("world", "world.landmark", &markers)[i].1 as usize % rules.landmarks.len()]
-            .clone(),
-        })
-        .collect();
+            kind: rules.landmarks[landmark_seed as usize % rules.landmarks.len()].clone(),
+        });
+    }
     let world = WorldIRv2 {
         schema_version: "world-ir-2".into(),
         world_seed: req.world_seed,
@@ -463,7 +527,7 @@ pub fn generate_candidate(
             ],
         },
     };
-    world.validate_with_rules(rules)?;
+    world.validate_for_request(req, rules)?;
     Ok(world)
 }
 fn key(
@@ -489,6 +553,124 @@ fn key(
 }
 
 impl WorldIRv2 {
+    pub fn validate_for_request(
+        &self,
+        req: &WorldGenerationRequest,
+        rules: &WorldRules,
+    ) -> Result<(), WorldError> {
+        req.validate(rules)?;
+        self.validate_with_rules(rules)?;
+        if self.world_seed != req.world_seed
+            || self.site_id != req.site_id
+            || self.x != req.x
+            || self.y != req.y
+            || self.archetype_id != req.archetype_id
+        {
+            return Err(WorldError::Invalid("request_identity"));
+        }
+        for (i, marker) in self.markers.iter().enumerate() {
+            let (x, y, site_id, archetype) = if i == 0 {
+                (req.x, req.y, req.site_id.clone(), req.archetype_id.clone())
+            } else {
+                let (x, y) =
+                    radius_one_coordinates(req.x, req.y).map_err(WorldError::Invalid)?[i - 1];
+                let sid = format!("site:{x}:{y}");
+                let seed = key(req, "world", "world.archetype", (i - 1) as u32, x, y, &sid)?
+                    .seed()
+                    .map_err(WorldError::Key)?;
+                let expected = &rules.archetypes[seed as usize % rules.archetypes.len()];
+                if marker.archetype_id != *expected {
+                    return Err(WorldError::Invalid("marker_archetype"));
+                }
+                (x, y, sid, expected.clone())
+            };
+            if marker.x != x
+                || marker.y != y
+                || marker.site_id != site_id
+                || marker.archetype_id != archetype
+                || marker.selected != (i == 0)
+                || marker.site_seed
+                    != key(req, "site", "site.structural", 0, x, y, &site_id)?
+                        .seed()
+                        .map_err(WorldError::Key)?
+            {
+                return Err(WorldError::Invalid("marker_identity"));
+            }
+            let channels = [
+                ("world.biome", 0),
+                ("world.hazard", 1),
+                ("world.resource", 2),
+                ("world.landmark", 3),
+            ];
+            for (channel, kind) in channels {
+                let seed = key(req, "world", channel, i as u32, x, y, &site_id)?
+                    .seed()
+                    .map_err(WorldError::Key)?;
+                match kind {
+                    0 if self.biome_fields[i].biome_id
+                        != rules.biomes[seed as usize % rules.biomes.len()]
+                        || self.biome_fields[i].intensity_bp != (seed % 10001) as u32 =>
+                    {
+                        return Err(WorldError::Invalid("biome"))
+                    }
+                    1 if self.hazard_fields[i].hazard_id
+                        != rules.hazards[seed as usize % rules.hazards.len()]
+                        || self.hazard_fields[i].severity_bp != (seed % 10001) as u32 =>
+                    {
+                        return Err(WorldError::Invalid("hazard"))
+                    }
+                    2 if self.resource_pressures[i].resource_id
+                        != rules.resources[seed as usize % rules.resources.len()]
+                        || self.resource_pressures[i].pressure_bp != (seed % 10001) as u32 =>
+                    {
+                        return Err(WorldError::Invalid("resource"))
+                    }
+                    3 if self.landmarks[i].kind
+                        != rules.landmarks[seed as usize % rules.landmarks.len()] =>
+                    {
+                        return Err(WorldError::Invalid("landmark"))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut expected_routes = vec![
+            (
+                "anchor:hub".to_string(),
+                "anchor:extraction".to_string(),
+                10_u32,
+                "anchor:extraction".to_string(),
+            ),
+            (
+                "marker:0".to_string(),
+                "anchor:hub".to_string(),
+                9,
+                "anchor:hub".to_string(),
+            ),
+        ];
+        expected_routes.extend((1..9).map(|i| {
+            (
+                "marker:0".to_string(),
+                format!("marker:{i}"),
+                i as u32,
+                format!("marker:{i}"),
+            )
+        }));
+        expected_routes
+            .sort_by(|a, b| (a.0.as_str(), a.1.as_str()).cmp(&(b.0.as_str(), b.1.as_str())));
+        for (edge, (from, to, n, site)) in self.routes.iter().zip(expected_routes) {
+            let seed = key(req, "world", "world.route", n, req.x, req.y, &site)?
+                .seed()
+                .map_err(WorldError::Key)?;
+            if edge.from != from
+                || edge.to != to
+                || edge.cost_bp != in_range(seed, &rules.route_cost_bp)
+            {
+                return Err(WorldError::Invalid("route"));
+            }
+        }
+        Ok(())
+    }
     pub fn validate_with_rules(&self, rules: &WorldRules) -> Result<(), WorldError> {
         rules.validate().map_err(|_| WorldError::Invalid("rules"))?;
         self.validate().map_err(WorldError::Invalid)?;
@@ -501,6 +683,25 @@ impl WorldIRv2 {
             .any(|m| !rules.archetypes.iter().any(|a| a == &m.archetype_id))
         {
             return Err(WorldError::Invalid("marker_archetype"));
+        }
+        if self
+            .biome_fields
+            .iter()
+            .any(|f| !rules.biomes.contains(&f.biome_id))
+            || self
+                .hazard_fields
+                .iter()
+                .any(|f| !rules.hazards.contains(&f.hazard_id))
+            || self
+                .resource_pressures
+                .iter()
+                .any(|f| !rules.resources.contains(&f.resource_id))
+            || self
+                .landmarks
+                .iter()
+                .any(|f| !rules.landmarks.contains(&f.kind))
+        {
+            return Err(WorldError::Invalid("field_family"));
         }
         if self.routes.iter().any(|r| {
             r.cost_bp < rules.route_cost_bp.min_bp || r.cost_bp > rules.route_cost_bp.max_bp
@@ -515,6 +716,7 @@ impl WorldIRv2 {
             || self.site_id.is_empty()
             || self.archetype_id.is_empty()
             || self.markers.len() != 9
+            || self.routes.len() != 10
             || self.biome_fields.len() != 9
             || self.hazard_fields.len() != 9
             || self.resource_pressures.len() != 9
@@ -537,30 +739,62 @@ impl WorldIRv2 {
         {
             return Err("anchors");
         }
-        if self
-            .markers
-            .iter()
-            .enumerate()
-            .any(|(i, m)| m.marker_id != format!("marker:{i}") || m.site_seed > MAX_PUBLIC_SEED)
-        {
+        if self.markers.iter().enumerate().any(|(i, m)| {
+            m.marker_id != format!("marker:{i}")
+                || !valid_id(&m.marker_id)
+                || !valid_id(&m.site_id)
+                || !valid_id(&m.archetype_id)
+                || m.site_seed > MAX_PUBLIC_SEED
+                || m.selected != (i == 0)
+        }) {
             return Err("markers");
         }
         let mut endpoints = BTreeSet::new();
+        let known: BTreeSet<String> = (0..9)
+            .map(|i| format!("marker:{i}"))
+            .chain(["anchor:hub".to_string(), "anchor:extraction".to_string()])
+            .collect();
         for edge in &self.routes {
             if edge.from.is_empty()
                 || edge.to.is_empty()
-                || edge.from >= edge.to
+                || !known.contains(&edge.from)
+                || !known.contains(&edge.to)
                 || edge.cost_bp == 0
-                || edge.cost_bp > 100_000
+                || edge.cost_bp > 10_000
                 || !endpoints.insert((edge.from.clone(), edge.to.clone()))
             {
                 return Err("routes");
             }
+            if self.biome_fields.iter().enumerate().any(|(i, f)| {
+                f.marker_id != self.markers[i].marker_id
+                    || !valid_id(&f.biome_id)
+                    || f.intensity_bp > 10_000
+            }) || self.hazard_fields.iter().enumerate().any(|(i, f)| {
+                f.marker_id != self.markers[i].marker_id
+                    || !valid_id(&f.hazard_id)
+                    || f.severity_bp > 10_000
+            }) || self.resource_pressures.iter().enumerate().any(|(i, f)| {
+                f.marker_id != self.markers[i].marker_id
+                    || !valid_id(&f.resource_id)
+                    || f.pressure_bp > 10_000
+            }) || self.landmarks.iter().enumerate().any(|(i, f)| {
+                f.id != format!("landmark:{i}")
+                    || f.marker_id != self.markers[i].marker_id
+                    || !valid_id(&f.id)
+                    || !valid_id(&f.kind)
+            }) {
+                return Err("fields");
+            }
         }
-        if self.extraction.path.windows(2).any(|pair| {
-            !endpoints.contains(&(pair[0].clone(), pair[1].clone()))
-                && !endpoints.contains(&(pair[1].clone(), pair[0].clone()))
-        }) {
+        if self.extraction.selected_marker_id != "marker:0"
+            || self.extraction.hub_anchor_id != "anchor:hub"
+            || self.extraction.extraction_anchor_id != "anchor:extraction"
+            || self
+                .extraction
+                .path
+                .windows(2)
+                .any(|pair| !endpoints.contains(&(pair[0].clone(), pair[1].clone())))
+        {
             return Err("extraction_path");
         }
         Ok(())
@@ -586,6 +820,7 @@ mod tests {
     #[test]
     fn full_key_is_bounded_and_sensitive() {
         let a = key().seed().unwrap();
+        assert_eq!(a, 7_276_578_952_791_713);
         assert!(a <= MAX_PUBLIC_SEED);
         let mut b = key();
         b.y = 3;
@@ -694,7 +929,47 @@ mod tests {
     #[test]
     fn fallback_is_closed_and_does_not_force_archetype() {
         let fallback = WorldFallback::bundled().unwrap();
+        fallback.validate(&WorldRules::bundled().unwrap()).unwrap();
         assert_eq!(fallback.platform_version, 3);
         assert!(serde_json::from_str::<WorldFallback>("{\"schema_version\":\"world-fallback-1\",\"platform_version\":3,\"fallback_id\":\"x\",\"biome_id\":\"b\",\"hazard_id\":\"h\",\"landmarks\":[],\"route_cost_bp\":1,\"extra\":1}").is_err());
+    }
+
+    #[test]
+    fn world_key_rejects_malformed_identity_components() {
+        let mut k = key();
+        k.content_manifest_hash = "A".repeat(64);
+        assert_eq!(k.seed(), Err("content_manifest_hash"));
+        k = key();
+        k.site_id = "SITE".into();
+        assert_eq!(k.seed(), Err("identity"));
+        k = key();
+        k.domain = "x".repeat(MAX_ID_LEN + 1);
+        assert_eq!(k.seed(), Err("identity"));
+    }
+
+    #[test]
+    fn request_aware_validation_rejects_each_major_mutation() {
+        let rules = WorldRules::bundled().unwrap();
+        let req = WorldGenerationRequest {
+            world_seed: 42,
+            platform_version: 3,
+            content_manifest_hash: "a".repeat(64),
+            site_id: "selected".into(),
+            x: 4,
+            y: 7,
+            archetype_id: "shuttle".into(),
+        };
+        let world = generate_candidate(&req, &rules).unwrap();
+        let mutations: [fn(&mut WorldIRv2); 4] = [
+            |w: &mut WorldIRv2| w.markers[1].x += 1,
+            |w: &mut WorldIRv2| w.biome_fields[0].intensity_bp ^= 1,
+            |w: &mut WorldIRv2| w.routes[0].cost_bp += 1,
+            |w: &mut WorldIRv2| w.extraction.path.reverse(),
+        ];
+        for mutate in mutations {
+            let mut altered = world.clone();
+            mutate(&mut altered);
+            assert!(altered.validate_for_request(&req, &rules).is_err());
+        }
     }
 }
