@@ -164,7 +164,10 @@ func get_summary() -> Dictionary:
 		for c in carts:
 			cart_dicts.append(c.get_summary())
 		result["carts"] = cart_dicts
-	if has_fire():
+	# Persist whenever seeded or vented, not only while something still burns.
+	# A vents-only / extinguished derelict keeps fire_seeded=true; omitting the
+	# blob would skip seed on load and drop vented_compartments.
+	if fire != null and (fire_seeded or has_fire() or not fire.vented_compartments.is_empty()):
 		result["fire"] = fire.get_summary()
 	if not arc_summary.is_empty():
 		result["arc"] = arc_summary.duplicate(true)
