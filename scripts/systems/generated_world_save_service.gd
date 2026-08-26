@@ -11,14 +11,16 @@ const MAX_BYTES := 1048576
 const _SLOT_RE := "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
 var _request_counter: int = 0
 var failpoint: String = ""
+var storage_directory: String = DIRECTORY
+var token_queue: Array[String] = []
 
-func path_for(slot_id := "world") -> String:
+func path_for(slot_id: Variant = "world") -> String:
 	if typeof(slot_id) != TYPE_STRING: return ""
 	var re := RegEx.new()
 	re.compile(_SLOT_RE)
 	if re.search(str(slot_id)) == null:
 		return ""
-	return DIRECTORY.path_join(str(slot_id) + "." + FILE_NAME)
+	return storage_directory.path_join(str(slot_id) + "." + FILE_NAME)
 
 func load_and_validate(slot_id: String, compatibility: RefCounted):
 	var path := path_for(slot_id)
@@ -39,11 +41,14 @@ func load_and_validate(slot_id: String, compatibility: RefCounted):
 func save(slot_id: String, envelope: RefCounted) -> bool:
 	if path_for(slot_id).is_empty() or envelope == null or not envelope is Envelope or Envelope.from_dict(envelope.to_dict()) == null: return false
 	var dir := DirAccess.open("user://")
-	if dir == null or _failed("directory") or dir.make_dir_recursive("generated-world-save-1") != OK and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(DIRECTORY)):
+	var relative_dir := storage_directory.trim_prefix("user://")
+	if dir == null or _failed("directory") or dir.make_dir_recursive(relative_dir) != OK and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(storage_directory)):
 		return false
 	var final_path := path_for(slot_id)
-	var stage_path := final_path + ".stage." + _request_token()
-	var backup_path := final_path + ".backup." + _request_token()
+	var token := _unique_token(final_path)
+	if token.is_empty(): return false
+	var stage_path := final_path + ".stage." + token
+	var backup_path := final_path + ".backup." + token
 	if _failed("stage_open"): return false
 	var file := FileAccess.open(stage_path, FileAccess.WRITE)
 	if file == null: return false
@@ -68,7 +73,18 @@ func save(slot_id: String, envelope: RefCounted) -> bool:
 
 func _request_token() -> String:
 	_request_counter += 1
+	if not token_queue.is_empty(): return token_queue.pop_front()
 	return "%s-%s-%s" % [str(Time.get_ticks_usec()), str(randi()), str(_request_counter)]
+
+func _unique_token(final_path: String) -> String:
+	for attempt in 32:
+		var token := _request_token()
+		if token.is_empty() or token.length() > 128: continue
+		var valid := true
+		for c in token:
+			if not (c >= "A" and c <= "Z" or c >= "a" and c <= "z" or c >= "0" and c <= "9" or c == "-" or c == "_"): valid = false
+		if valid and not FileAccess.file_exists(final_path + ".stage." + token) and not FileAccess.file_exists(final_path + ".backup." + token): return token
+	return ""
 
 func _failed(stage: String) -> bool:
 	return failpoint == stage

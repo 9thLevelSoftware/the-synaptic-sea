@@ -7,6 +7,9 @@ const FILE_PATH := "user://portable-settings/settings-state-1.json"
 const DIRECTORY := "user://portable-settings"
 const MAX_BYTES := 65536
 var failpoint: String = ""
+var _request_counter: int = 0
+var storage_path: String = FILE_PATH
+var token_queue: Array[String] = []
 
 func _closed_payload(payload: Variant) -> bool:
 	if typeof(payload) != TYPE_DICTIONARY: return false
@@ -22,8 +25,10 @@ func save(state: SettingsState) -> bool:
 	if state == null or not _valid_payload(state.get_payload()): return false
 	var dir := DirAccess.open("user://")
 	if dir == null or dir.make_dir_recursive("portable-settings") != OK and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("user://portable-settings")): return false
-	var path := FILE_PATH + ".stage." + str(Time.get_ticks_usec()) + "." + str(randi())
-	var backup_path := FILE_PATH + ".backup." + str(Time.get_ticks_usec()) + "." + str(randi())
+	var token := _unique_token(storage_path)
+	if token.is_empty(): return false
+	var path := storage_path + ".stage." + token
+	var backup_path := storage_path + ".backup." + token
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null: return false
 	var document := JSON.stringify({"schema_version":"portable-settings-1", "settings":state.get_payload()})
@@ -34,11 +39,11 @@ func save(state: SettingsState) -> bool:
 	if check != null: check.close()
 	if typeof(parsed) != TYPE_DICTIONARY or parsed.size() != 2 or parsed.get("schema_version") != "portable-settings-1" or not _valid_payload(parsed.get("settings")):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path)); return false
-	var had_final := FileAccess.file_exists(FILE_PATH)
-	if had_final and (_failed("backup") or DirAccess.rename_absolute(ProjectSettings.globalize_path(FILE_PATH), ProjectSettings.globalize_path(backup_path)) != OK): DirAccess.remove_absolute(ProjectSettings.globalize_path(path)); return false
-	var result := DirAccess.rename_absolute(ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(FILE_PATH)) if not _failed("promote") else ERR_CANT_CREATE
+	var had_final := FileAccess.file_exists(storage_path)
+	if had_final and (_failed("backup") or DirAccess.rename_absolute(ProjectSettings.globalize_path(storage_path), ProjectSettings.globalize_path(backup_path)) != OK): DirAccess.remove_absolute(ProjectSettings.globalize_path(path)); return false
+	var result := DirAccess.rename_absolute(ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(storage_path)) if not _failed("promote") else ERR_CANT_CREATE
 	if result != OK:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path)); if had_final and not _failed("restore"): DirAccess.rename_absolute(ProjectSettings.globalize_path(backup_path), ProjectSettings.globalize_path(FILE_PATH)); return false
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path)); if had_final and not _failed("restore"): DirAccess.rename_absolute(ProjectSettings.globalize_path(backup_path), ProjectSettings.globalize_path(storage_path)); return false
 	if had_final: DirAccess.remove_absolute(ProjectSettings.globalize_path(backup_path))
 	return true
 
@@ -67,3 +72,12 @@ func _valid_payload(payload: Variant) -> bool:
 
 func _failed(stage: String) -> bool:
 	return failpoint == stage
+
+func _unique_token(final_path: String) -> String:
+	for attempt in 32:
+		var token: String = token_queue.pop_front() if not token_queue.is_empty() else "%s-%s-%s" % [str(Time.get_ticks_usec()), str(randi()), str(_request_counter + 1)]
+		_request_counter += 1
+		var valid := not token.is_empty()
+		for c in token: valid = valid and (c >= "A" and c <= "Z" or c >= "a" and c <= "z" or c >= "0" and c <= "9" or c == "-" or c == "_")
+		if valid and not FileAccess.file_exists(final_path + ".stage." + token) and not FileAccess.file_exists(final_path + ".backup." + token): return token
+	return ""
