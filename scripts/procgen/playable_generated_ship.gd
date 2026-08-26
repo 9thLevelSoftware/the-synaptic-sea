@@ -4977,7 +4977,8 @@ func _build_fire_zones() -> void:
 			pos = assigned[cid_s]["position"]
 			layout_spec = assigned[cid_s]["spec"]
 		else:
-			while leftover_idx < layout_zones.size() and claimed.has(leftover_idx):
+			while leftover_idx < layout_zones.size() and (
+					claimed.has(leftover_idx) or not _fire_layout_zone_mapped_cid(layout_zones[leftover_idx]).is_empty()):
 				leftover_idx += 1
 			if leftover_idx < layout_zones.size():
 				var row: Dictionary = layout_zones[leftover_idx]
@@ -5046,6 +5047,14 @@ func _away_fire_layout_zones() -> Array:
 			spec = specs[i]
 		out.append({"position": markers[i], "spec": spec})
 	return out
+
+## Mapped compartment_id on a layout fire-zone row, or "" for visual-only /
+## unmapped markers. Fallback assignment must skip reserved mapped markers.
+func _fire_layout_zone_mapped_cid(row: Variant) -> String:
+	if not (row is Dictionary):
+		return ""
+	var spec: Dictionary = (row as Dictionary)["spec"] if (row as Dictionary).get("spec") is Dictionary else {}
+	return _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
 
 func _attach_zone_to_active_ship(node: Node) -> void:
 	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -10911,9 +10920,10 @@ func _build_loot_context(spec: Dictionary) -> Dictionary:
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
-	var contents: Array = LootContainerScript.normalized_contents(spec)
-	if not contents.is_empty():
-		ctx["contents"] = contents
+	# Presence of the authored field selects the authored grant path, including
+	# explicit empty contents (`[]`) that must not fall through to table rolls.
+	if spec.has("contents") and typeof(spec.get("contents")) == TYPE_ARRAY:
+		ctx["contents"] = LootContainerScript.normalized_contents(spec)
 	return ctx
 
 func _resolve_current_loot_quality_modifier() -> float:

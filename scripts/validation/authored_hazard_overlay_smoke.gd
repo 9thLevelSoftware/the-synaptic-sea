@@ -9,8 +9,11 @@ extends SceneTree
 #   - unmapped/no-cid zones do not ignite
 #   - hazard_source is ignored (runtime stamp still overlays)
 #   - fire-zone visuals pin hydroponics to the cid-tagged marker, not index 0
+#   - mapped hydroponics marker is reserved when that fire is absent
 #   - loot specs copy contents; try_interact grants those stacks (no table roll)
-# Marker: AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true
+#   - explicit empty contents does not fall through to a table roll
+#   - authored unique items carry unique_id and cannot be granted twice
+# Marker: AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true contents_empty=true unique_gated=true mapped_reserved=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
@@ -134,6 +137,7 @@ func _validate() -> void:
 
 	var root: Node = playable.current_ship.scene_root
 	var marker_matched: bool = false
+	var mapped_reserved: bool = false
 	if root != null and is_instance_valid(root):
 		var declared_markers: Array[Vector3] = [SENTINEL_HYDRO, SENTINEL_VISUAL]
 		root.fire_zone_markers = declared_markers
@@ -148,6 +152,14 @@ func _validate() -> void:
 			var eng_wrong: bool = eng_zone is Node3D \
 				and (eng_zone as Node3D).position.distance_to(SENTINEL_HYDRO) < 0.01
 			marker_matched = not eng_wrong
+		if fs != null:
+			fs.extinguish("hydroponics")
+		playable._build_fire_zones()
+		var eng_after = playable.fire_zone_nodes.get("engineering", null)
+		var hydro_gone: bool = not playable.fire_zone_nodes.has("hydroponics")
+		var eng_not_hydro: bool = eng_after is Node3D \
+			and (eng_after as Node3D).position.distance_to(SENTINEL_HYDRO) >= 0.01
+		mapped_reserved = hydro_gone and eng_not_hydro
 
 	var loader := GeneratedShipLoaderScript.new()
 	loader.layout_doc = {
@@ -197,16 +209,97 @@ func _validate() -> void:
 	var contents_granted: bool = searched and lc.searched and after_core == before_core + 3
 	lc.queue_free()
 
+	var empty_ctx: Dictionary = playable._build_loot_context({"kind": "generic_crate", "contents": []})
+	var empty_key: bool = empty_ctx.has("contents")
+	var table_ids: Array = ["scrap_metal", "wiring_spool", "power_cell", "frayed_cable_coil", "cracked_pressure_valve", "contaminated_water"]
+	var before_table: Dictionary = {}
+	for table_id in table_ids:
+		before_table[str(table_id)] = int(playable.inventory_state.get_quantity(str(table_id)))
+	var empty_lc = LootContainerScript.new()
+	empty_lc.configure(
+		"empty_authored_crate",
+		"generic_crate",
+		"overlay-smoke:empty_authored_crate",
+		playable.inventory_state,
+		playable._loot_tables,
+		Vector3.ZERO,
+		1.8,
+		empty_ctx
+	)
+	var empty_capture: Dictionary = {"granted": [{"sentinel": true}]}
+	empty_lc.container_searched.connect(func(_cid, granted):
+		empty_capture["granted"] = granted
+	)
+	empty_lc.set_validation_player_in_range(playable.player)
+	empty_lc.try_interact(playable.player)
+	var empty_granted: Array = empty_capture.get("granted", [])
+	var table_unchanged: bool = true
+	for table_id in table_ids:
+		if int(playable.inventory_state.get_quantity(str(table_id))) != int(before_table[str(table_id)]):
+			table_unchanged = false
+			break
+	var contents_empty: bool = empty_key and empty_lc.searched and empty_granted.is_empty() and table_unchanged
+	empty_lc.queue_free()
+
+	var unique_ctx: Dictionary = playable._build_loot_context({
+		"kind": "generic_crate",
+		"contents": [{"item_id": "captains_black_box", "qty": 1}],
+	})
+	var unique_lc = LootContainerScript.new()
+	unique_lc.configure(
+		"unique_crate_a",
+		"generic_crate",
+		"overlay-smoke:unique_crate_a",
+		playable.inventory_state,
+		playable._loot_tables,
+		Vector3.ZERO,
+		1.8,
+		unique_ctx
+	)
+	var unique_capture: Dictionary = {"granted": []}
+	unique_lc.container_searched.connect(func(_cid, granted):
+		unique_capture["granted"] = granted
+	)
+	unique_lc.set_validation_player_in_range(playable.player)
+	unique_lc.try_interact(playable.player)
+	var unique_grants: Array = unique_capture.get("granted", [])
+	playable._on_loot_container_searched("unique_crate_a", unique_grants, null)
+	var unique_meta: bool = not unique_grants.is_empty() \
+		and str((unique_grants[0] as Dictionary).get("unique_id", "")) == "captains_black_box" \
+		and playable.unique_item_state != null \
+		and playable.unique_item_state.is_claimed("captains_black_box")
+	playable.inventory_state.remove_item("captains_black_box", 1)
+	var unique_lc2 = LootContainerScript.new()
+	unique_lc2.configure(
+		"unique_crate_b",
+		"generic_crate",
+		"overlay-smoke:unique_crate_b",
+		playable.inventory_state,
+		playable._loot_tables,
+		Vector3.ZERO,
+		1.8,
+		unique_ctx
+	)
+	unique_lc2.set_validation_player_in_range(playable.player)
+	unique_lc2.try_interact(playable.player)
+	var unique_gated: bool = unique_meta \
+		and int(playable.inventory_state.get_quantity("captains_black_box")) == 0 \
+		and unique_lc2.searched
+	unique_lc.queue_free()
+	unique_lc2.queue_free()
+
 	if variant_fire and authored_fire and variant_breach and authored_breach and vented \
 			and unmapped_visual and hazard_source_ignored and contents_copied \
-			and contents_granted and marker_matched:
-		print("AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true")
+			and contents_granted and marker_matched and contents_empty \
+			and unique_gated and mapped_reserved:
+		print("AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true contents_empty=true unique_gated=true mapped_reserved=true")
 		_cleanup_and_quit(0)
 	else:
-		_fail("variant_fire=%s authored_fire=%s variant_breach=%s authored_breach=%s vented=%s unmapped_visual=%s hazard_source_ignored=%s contents_copied=%s contents_granted=%s marker_matched=%s burning=%s" % [
+		_fail("variant_fire=%s authored_fire=%s variant_breach=%s authored_breach=%s vented=%s unmapped_visual=%s hazard_source_ignored=%s contents_copied=%s contents_granted=%s marker_matched=%s contents_empty=%s unique_gated=%s mapped_reserved=%s burning=%s" % [
 			str(variant_fire), str(authored_fire), str(variant_breach), str(authored_breach),
 			str(vented), str(unmapped_visual), str(hazard_source_ignored), str(contents_copied),
-			str(contents_granted), str(marker_matched), str(burning)])
+			str(contents_granted), str(marker_matched), str(contents_empty), str(unique_gated),
+			str(mapped_reserved), str(burning)])
 
 func _layout_has_role(rooms: Array, role: String) -> bool:
 	for room in rooms:

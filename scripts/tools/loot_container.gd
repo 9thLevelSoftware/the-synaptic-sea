@@ -2,11 +2,13 @@ extends Area3D
 class_name LootContainer
 
 ## Searchable loot container. On first interaction it grants `loot_context.contents`
-## when present (authored stacks), otherwise rolls its table deterministically
-## (seed = container's seed_source) into the player InventoryState, then marks
-## itself searched. Mirrors ToolPickup's interaction/range contract.
+## when that key is present (authored stacks, including explicit empty), otherwise
+## rolls its table deterministically (seed = container's seed_source) into the
+## player InventoryState, then marks itself searched. Mirrors ToolPickup's
+## interaction/range contract.
 
 const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
+const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 
 signal container_searched(container_id: String, granted: Array)
@@ -93,33 +95,65 @@ func try_interact(player_body: Node) -> bool:
 	if candidate_player != player_body and not _is_player_in_direct_range(player_body):
 		return false
 	var granted: Array = []
-	var authored: Array = normalized_contents(loot_context)
-	if not authored.is_empty():
-		for stack_v in authored:
-			var stack: Dictionary = stack_v
-			var item_id: String = str(stack.get("item_id", ""))
-			var qty: int = int(stack.get("quantity", stack.get("qty", 0)))
-			if item_id.is_empty() or qty <= 0:
-				continue
-			var added: int = inventory_state.add_item(item_id, qty)
-			if added > 0:
-				granted.append({"item_id": item_id, "quantity": added})
+	if loot_context.has("contents"):
+		granted = _grant_authored_contents()
 	else:
-		var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
-		for entry in rolled:
-			var item_id: String = str((entry as Dictionary).get("item_id", ""))
-			var qty: int = int((entry as Dictionary).get("quantity", 0))
-			if item_id.is_empty() or qty <= 0:
-				continue
-			var added: int = inventory_state.add_item(item_id, qty)
-			if added > 0:
-				var grant_entry: Dictionary = (entry as Dictionary).duplicate(true)
-				grant_entry["quantity"] = added
-				granted.append(grant_entry)
+		granted = _grant_rolled_contents()
 	# Searching consumes the container even if the bag was full (no re-roll on revisit).
 	set_searched(true)
 	emit_signal("container_searched", container_id, granted)
 	return true
+
+func _grant_authored_contents() -> Array:
+	var granted: Array = []
+	var item_defs: Dictionary = loot_context.get("item_definitions", ItemDefsScript.load_definitions())
+	if typeof(item_defs) != TYPE_DICTIONARY:
+		item_defs = ItemDefsScript.load_definitions()
+	var unique_state = loot_context.get("unique_state", null)
+	for stack_v in normalized_contents(loot_context):
+		if not (stack_v is Dictionary):
+			continue
+		var stack: Dictionary = stack_v
+		var item_id: String = str(stack.get("item_id", ""))
+		var qty: int = int(stack.get("quantity", stack.get("qty", 0)))
+		if item_id.is_empty() or qty <= 0:
+			continue
+		var unique_id: String = str(stack.get("unique_id", ItemDefsScript.unique_id(item_defs, item_id)))
+		var seed_key: String = str(stack.get("seed_key", "%s|%s" % [seed_source, item_id]))
+		var codex_entry_id: String = str(stack.get("codex_entry_id", ItemDefsScript.codex_entry_id(item_defs, item_id)))
+		if unique_state != null and not unique_id.is_empty() and unique_state.has_method("can_claim"):
+			if not bool(unique_state.can_claim(unique_id, seed_key)):
+				continue
+		var added: int = inventory_state.add_item(item_id, qty)
+		if added <= 0:
+			continue
+		var grant_entry: Dictionary = {
+			"item_id": item_id,
+			"quantity": added,
+			"seed_key": seed_key,
+		}
+		if not unique_id.is_empty():
+			grant_entry["unique_id"] = unique_id
+			grant_entry["world_unique"] = true
+		if not codex_entry_id.is_empty():
+			grant_entry["codex_entry_id"] = codex_entry_id
+		granted.append(grant_entry)
+	return granted
+
+func _grant_rolled_contents() -> Array:
+	var granted: Array = []
+	var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
+	for entry in rolled:
+		var item_id: String = str((entry as Dictionary).get("item_id", ""))
+		var qty: int = int((entry as Dictionary).get("quantity", 0))
+		if item_id.is_empty() or qty <= 0:
+			continue
+		var added: int = inventory_state.add_item(item_id, qty)
+		if added > 0:
+			var grant_entry: Dictionary = (entry as Dictionary).duplicate(true)
+			grant_entry["quantity"] = added
+			granted.append(grant_entry)
+	return granted
 
 func _interaction_radius() -> float:
 	if collision_shape != null and collision_shape.shape is SphereShape3D:
