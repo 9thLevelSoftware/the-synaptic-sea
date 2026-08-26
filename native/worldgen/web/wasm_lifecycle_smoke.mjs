@@ -1,0 +1,40 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+
+const root = process.argv[2] ?? path.resolve('addons/derelict/bin/web');
+const corpusPath = process.argv[3] ?? path.resolve('native/worldgen/tests/adapter_parity/corpus.json');
+const require = createRequire(import.meta.url);
+const binding = require(path.resolve(root, 'derelict_wasm.js'));
+const wasm = fs.readFileSync(path.resolve(root, 'derelict_wasm_bg.wasm'));
+if (typeof binding.initSync === 'function') binding.initSync({ module: wasm });
+const parse = (raw) => JSON.parse(raw);
+const cap = parse(binding.capabilities());
+const manifest = parse(binding.generator_manifest());
+if (cap.adapter_kind !== 'web' || cap.worker_mode !== 'cooperative' || cap.queue_capacity !== 8) throw new Error('capabilities contract mismatch');
+if (manifest.target !== 'wasm32-unknown-unknown') throw new Error('manifest target mismatch');
+const vectors = JSON.parse(fs.readFileSync(corpusPath, 'utf8'));
+const ids = [];
+for (const vector of vectors.slice(0, 8)) ids.push(BigInt(parse(binding.generate_bundle_async(JSON.stringify(vector.request))).request_id));
+if (ids.join(',') !== '1,2,3,4,5,6,7,8') throw new Error(`queue ids mismatch: ${ids}`);
+const overload = parse(binding.generate_bundle_async(JSON.stringify(vectors[0].request)));
+if (overload.failure?.code !== 'overload') throw new Error('overload contract mismatch');
+const recovered = parse(binding.poll(ids[0]));
+if (recovered.bundle?.semantic_hash !== vectors[0].expected_semantic_hash) throw new Error('queue recovery mismatch');
+const cancelled = parse(binding.generate_bundle_async(JSON.stringify(vectors[0].request)));
+const cancelId = BigInt(cancelled.request_id);
+if (parse(binding.cancel(cancelId)).failure?.code !== 'cancellation') throw new Error('cancel contract mismatch');
+if (parse(binding.cancel(cancelId)).failure?.code !== 'cancellation') throw new Error('cancel idempotence mismatch');
+if (parse(binding.poll(cancelId)).failure?.code !== 'cancellation') throw new Error('cancel poll mismatch');
+for (const vector of vectors) {
+  const raw = JSON.stringify(vector.request);
+  const sync = parse(binding.generate_bundle(raw));
+  if (sync.bundle?.semantic_hash !== vector.expected_semantic_hash) throw new Error(`${vector.name} sync hash mismatch`);
+  const accepted = parse(binding.generate_bundle_async(raw));
+  const id = BigInt(accepted.request_id);
+  const terminal = parse(binding.poll(id));
+  if (terminal.bundle?.semantic_hash !== vector.expected_semantic_hash) throw new Error(`${vector.name} async hash mismatch`);
+  const consumed = parse(binding.poll(id));
+  if (consumed.failure?.code !== 'result_consumed') throw new Error(`${vector.name} consumed contract mismatch`);
+}
+console.log('WASM_LIFECYCLE_SMOKE: PASS');

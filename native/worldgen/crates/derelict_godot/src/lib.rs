@@ -17,6 +17,8 @@ mod build_support_tests;
 #[cfg(test)]
 mod generator_tests;
 #[cfg(test)]
+mod parity_tests;
+#[cfg(test)]
 mod service_tests;
 
 struct DerelictExtension;

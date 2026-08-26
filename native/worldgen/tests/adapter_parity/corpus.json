@@ -1,0 +1,124 @@
+[
+  {
+    "name": "shuttle_intact_easy_positive",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 42,
+      "site": {"site_id": "parity-shuttle-intact", "x": 3, "y": -2, "archetype_id": "shuttle", "kit_id": "default", "intactness_override_bp": 10000, "cause_of_loss": null, "loot_richness_bp": 5000},
+      "difficulty_id": "easy",
+      "player_model": {"schema_version": "player-model-1", "signals": [1, -2, 3]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 9, "locale": "en-US"}
+    },
+    "expected_semantic_hash": "c527686c38076b3f3f2fb5b9cc20e853083f4f9ca3b47d44c45da36255b5ae6d"
+  },
+  {
+    "name": "shuttle_intact_easy_presentation_variant",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 42,
+      "site": {"site_id": "parity-shuttle-intact", "x": 3, "y": -2, "archetype_id": "shuttle", "kit_id": "default", "intactness_override_bp": 10000, "cause_of_loss": null, "loot_richness_bp": 5000},
+      "difficulty_id": "easy",
+      "player_model": {"schema_version": "player-model-1", "signals": [1, -2, 3]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 901, "locale": "fr-FR"}
+    },
+    "expected_semantic_hash": "c527686c38076b3f3f2fb5b9cc20e853083f4f9ca3b47d44c45da36255b5ae6d",
+    "same_semantics_as": "shuttle_intact_easy_positive"
+  },
+  {
+    "name": "corvette_damaged_negative",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 77,
+      "site": {"site_id": "parity-corvette-damaged", "x": -19, "y": 24, "archetype_id": "corvette", "kit_id": "default", "intactness_override_bp": 5000, "cause_of_loss": "ReactorBreach", "loot_richness_bp": 12000},
+      "difficulty_id": "hard",
+      "player_model": {"schema_version": "player-model-1", "signals": [-7, 0, 11]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 77, "locale": "en-GB"}
+    },
+    "expected_semantic_hash": "4bd73eba039f84942c516c895871f0e35110dab53b745d2c1d97eff3be7e2c7a"
+  },
+  {
+    "name": "freighter_fractured_extreme",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 12,
+      "site": {"site_id": "parity-freighter-fractured", "x": 1024, "y": -1025, "archetype_id": "freighter", "kit_id": "default", "intactness_override_bp": 0, "cause_of_loss": "ReactorBreach", "loot_richness_bp": 30000},
+      "difficulty_id": "extreme",
+      "player_model": {"schema_version": "player-model-1", "signals": [99, -99]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 1200, "locale": "de-DE"}
+    },
+    "expected_semantic_hash": "5e2d80150610c359ea2bafe25f50beae65c2c9aad76090ff6ed8f00712722810"
+  },
+  {
+    "name": "frigate_damaged_origin",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 314159,
+      "site": {"site_id": "parity-frigate-damaged", "x": 0, "y": 0, "archetype_id": "frigate", "kit_id": "default", "intactness_override_bp": 2500, "cause_of_loss": "PirateBoarding", "loot_richness_bp": 20000},
+      "difficulty_id": "nightmare",
+      "player_model": {"schema_version": "player-model-1", "signals": [2, 4, 8, 16]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 2718, "locale": "ja-JP"}
+    },
+    "expected_semantic_hash": "18255a89e0a93a76ddb283cc54a6542ac22ece93a624e78a7b9591ffe81842b1"
+  },
+  {
+    "name": "corvette_intact_max_positive",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 987654321,
+      "site": {"site_id": "parity-corvette-max", "x": 2147483647, "y": 2147483647, "archetype_id": "corvette", "kit_id": "default", "intactness_override_bp": 10000, "cause_of_loss": "Unknown", "loot_richness_bp": 0},
+      "difficulty_id": "standard",
+      "player_model": {"schema_version": "player-model-1", "signals": []},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 0, "locale": "en-US"}
+    },
+    "expected_semantic_hash": "ed568703b303497819f388c5821ef8f9e03fcf7a20821f571ed4d0adbc741199"
+  },
+  {
+    "name": "freighter_damaged_min_negative",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 1844674407370955161,
+      "site": {"site_id": "parity-freighter-min", "x": -2147483648, "y": -2147483647, "archetype_id": "freighter", "kit_id": "default", "intactness_override_bp": 7000, "cause_of_loss": "Depressurization", "loot_richness_bp": 7500},
+      "difficulty_id": "hard",
+      "player_model": {"schema_version": "player-model-1", "signals": [-1, -3, -5]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 1844674407370955161, "locale": "es-ES"}
+    },
+    "expected_semantic_hash": "aa3d6c553f279bc52192d52f4543f71303b8aa8b03d4231be0d2d65e2b9cc72d"
+  },
+  {
+    "name": "frigate_fractured_mid",
+    "request": {
+      "schema_version": "procgen-request-1",
+      "world_seed": 9090,
+      "site": {"site_id": "parity-frigate-fractured", "x": 4096, "y": -4096, "archetype_id": "frigate", "kit_id": "default", "intactness_override_bp": 1, "cause_of_loss": "ReactorBreach", "loot_richness_bp": 15000},
+      "difficulty_id": "easy",
+      "player_model": {"schema_version": "player-model-1", "signals": [5]},
+      "requested_domains": ["world", "site", "gameplay", "presentation"],
+      "generator_version": 2,
+      "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+      "presentation": {"seed": 42, "locale": "it-IT"}
+    },
+    "expected_semantic_hash": "bb9737f8568e54ebad4ae7a79de8daf5500c6b52c2c0ac46b87653859fef83a5"
+  }
+]
+
