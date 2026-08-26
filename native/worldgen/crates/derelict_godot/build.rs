@@ -5,17 +5,10 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+mod build_support;
 
-const TARGET: &str = "x86_64-pc-windows-msvc";
+const TARGET: &str = build_support::WIN_TARGET;
 const CONTENT_HASH: &str = "content_manifest_hash";
-
-fn valid_hex(value: &str, len: usize) -> bool {
-    value.len() == len
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        && value == value.to_ascii_lowercase()
-}
 fn fail(message: &str) -> ! {
     panic!("derelict_godot build metadata: {message}")
 }
@@ -138,19 +131,23 @@ fn main() {
             content_env.unwrap_or(manifest_content),
         )
     };
-    if !valid_hex(&source, 40) {
+    if !build_support::valid_hex(&source, 40) {
         fail("source commit must be 40 lowercase hexadecimal characters");
     }
-    if !valid_hex(&content, 64) {
+    if !build_support::valid_hex(&content, 64) {
         fail("content manifest hash must be 64 lowercase hexadecimal characters");
     }
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../../");
     require_commit(&root, &source);
-    let dirty = match env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") {
-        Ok(value) if value == "true" => true,
-        Ok(value) if value == "false" => false,
-        Ok(_) => fail("dirty-development override must be true or false"),
-        Err(_) => git_dirty(&root, &source).unwrap_or_else(|e| fail(&e)),
+    let dirty = match build_support::parse_dirty_override(
+        env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT")
+            .ok()
+            .as_deref(),
+    )
+    .unwrap_or_else(|e| fail(&e))
+    {
+        Some(value) => value,
+        None => git_dirty(&root, &source).unwrap_or_else(|e| fail(&e)),
     };
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT={source}");
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH={content}");

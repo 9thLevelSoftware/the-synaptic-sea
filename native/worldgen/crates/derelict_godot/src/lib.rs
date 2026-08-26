@@ -12,6 +12,9 @@ mod generator;
 mod service;
 
 #[cfg(test)]
+#[path = "../build_support.rs"]
+mod build_support_tests;
+#[cfg(test)]
 mod generator_tests;
 #[cfg(test)]
 mod service_tests;
