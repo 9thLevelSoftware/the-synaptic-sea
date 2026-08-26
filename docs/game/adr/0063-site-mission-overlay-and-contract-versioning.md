@@ -49,14 +49,25 @@ the bundle returns without violating Rust authority.
    nodes, props, and gates similarly share a unique nonempty `repair_id`.
    Stable IDs derive from the full Task 6 site key plus named site channels,
    never array discovery order or a shared mutable RNG stream.
-6. Functional prop sockets bind an approved prop kind to an existing room and
-   traversable cell. Navigation edges bind existing portals/verticals and carry
-   integer traversal cost, clearance, gate, and passability annotations. LOS and
-   cover are bounded integer/cell annotations; filenames and presentation paths
-   never control mechanics. Portal navigation references use the structural
-   plan's canonical `edge_key`. A vertical reference is `vertical:<a>:<b>`,
-   where each endpoint is the `(deck,x,y,room_id)` integer tuple and `a/b` are
-   lexicographically ordered; direction remains a separate edge field.
+6. Each functional prop socket records an anchor cell and a distinct cardinally
+   adjacent approach cell. Both cells belong to the same `RoomSpec`, and the
+   structural plan's occupancy maps both cells to that named room. The approach
+   cell must be reachable in the progression state where the prop is required;
+   required props cannot share anchor or approach cells. Key and repair props
+   carry their matching optional `key_id` or `repair_id`. Navigation edges bind
+   existing portals/verticals and carry integer traversal cost, clearance, gate,
+   and passability annotations. LOS and cover are bounded integer/cell
+   annotations; filenames and presentation paths never control mechanics.
+   Every non-exterior portal and every vertical emits two directed navigation
+   edges. Exterior portals are excluded from internal navigation and terminate
+   at the extraction prop. Ungated `Door`, `Hatch`, and `Breach` portals are
+   passable. A `Locked` portal remains present but is initially blocked and must
+   bind its key-lock gate; any other mission-gated edge is initially blocked
+   until its prerequisite is complete. `Solid` and `Open` portal intents are
+   invalid. Portal navigation references use the structural plan's canonical
+   `edge_key`. A vertical reference is `vertical:<a>:<b>`, where each endpoint
+   is the `(deck,x,y,room_id)` integer tuple and `a/b` are lexicographically
+   ordered; direction remains a separate edge field.
 7. Validation uses an automated progression agent that proves start,
    prerequisites, every required objective, and extraction are reachable in
    order. It also proves every referenced structural identity exists, every
