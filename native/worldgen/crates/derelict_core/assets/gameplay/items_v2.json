@@ -16,7 +16,7 @@
     {"id":"affix_damage","socket_kind":"weapon","stat":"damage","min_value":10,"max_value":50,"cost_per_value":1,"value_per_point":2}
   ],
   "rarities": [
-    {"id":"common","min_budget":1,"max_budget":200,"value_multiplier_bp":10000,"max_affixes":1}
+    {"id":"common","min_budget":0,"max_budget":200,"value_multiplier_bp":10000,"max_affixes":1}
   ],
   "fallback":{"id":"item_baseline","family_id":"tool","rarity_id":"common","visual_tag":"item_tool","base_value":25},
   "caps":{"max_total_value":10000,"max_per_item_value":1000,"max_count":64,"max_drop_frequency_bp":10000}
