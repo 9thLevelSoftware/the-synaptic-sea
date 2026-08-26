@@ -2,13 +2,20 @@
 
 ## Status
 
-In progress for Gate 2 content-complete target. Implements the
+Superseded as the production generation authority by
+`docs/game/features/unified_procgen_platform.md` and ADR-0057. Retained as the
+validated migration-oracle and reusable Godot loader/presentation baseline;
+new runtime work must not extend its silent GDScript fallback or
+post-generation gameplay mutation assumptions.
+
+Originally implemented for the Gate 2 content-complete target. Implements the
 Task 12 package plan:
 `docs/game/build-plans/12-procedural-generation-expansion-e2e.md`.
 
 ## Requirement cross-reference
 
-- REQ-PG-001..012 (proposed in `docs/game/05_requirements.md`).
+- Historical REQ-PG-001/007/012 evidence; the current REQ-PG-001..012 contract
+  is owned by `docs/game/features/unified_procgen_platform.md`.
 - Source templates: `data/procgen/templates/{spine,bifurcated,stacked}.json`.
 - Source blueprint: `scripts/procgen/ship_blueprint.gd`.
 - Source pipeline: `scripts/procgen/ship_layout_generator.gd`.

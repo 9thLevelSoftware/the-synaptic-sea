@@ -919,44 +919,268 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `main_playable_slice_multislot_save_smoke.gd`
   - `MAIN PLAYABLE MULTISLOT SAVE PASS`
 
-## REQ-PG-001: Procedural generation expansion (REQ-PG-001)
+## REQ-PG-001: One authoritative Rust generator on native and Web
 
-- Source: `docs/game/features/procedural_generation_expansion.md`
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: gameplay / architecture
+- Priority: must
+- Status: Approved
+- Rationale: Platform-dependent algorithms and silent fallbacks make a seed an
+  unreliable identity and hide broken integration.
+- Acceptance criteria:
+  - Rust source and history live under `native/worldgen/` with source, schemas,
+    manifests, adapters, and checked artifacts versioned together.
+  - Desktop GDExtension and WebAssembly execute the same Rust core.
+  - A missing or incompatible adapter returns an explicit failure or declared
+    authored fallback and never selects the legacy GDScript generator silently.
+  - The GDScript generator is non-production migration-oracle tooling until its
+    Gate 6 deletion criteria pass.
+- Verification:
+  - Rust workspace tests and native/Web adapter contract tests.
+  - Godot missing-adapter and manifest-mismatch smokes.
+  - Native/Web semantic-hash parity suite.
+
+## REQ-PG-002: Versioned request, bundle, trace, and proposal contracts
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: technical
+- Priority: must
+- Status: Approved
+- Rationale: Every consumer needs a typed, versioned contract that distinguishes
+  mechanics from target-specific presentation and diagnostics.
+- Acceptance criteria:
+  - `ProcgenRequest` binds world seed, site identity/coordinates, difficulty,
+    bounded player snapshot, requested domains, generator version, and content
+    manifest hash.
+  - `ProcgenBundle` contains `WorldIR`, `SiteIR`, `GameplayIR`, `PresentationIR`,
+    semantic hash, metrics, bounded `GenerationTrace`, and a version envelope.
+  - `AdaptiveProposal` contains constrained action, score, rationale codes,
+    confidence, and rule/model version and cannot bypass validators.
+  - Unknown major schema versions fail closed; supported versions round-trip.
+- Verification:
+  - Schema round-trip and unknown-major rejection tests.
+  - Canonical semantic-hash tests over all IR layers.
+
+## REQ-PG-003: Single-pass lifecycle API with bounded asynchronous execution
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: technical / performance
+- Priority: must
+- Status: Approved
+- Rationale: Separate layout/gameplay runs and unbounded threads can drift output,
+  exhaust resources, and make cancellation or overload nondeterministic.
+- Acceptance criteria:
+  - `generate_bundle` executes requested stages once and returns one complete
+    bundle or an explicit result code.
+  - Native and Web provide equivalent `generate_bundle`,
+    `generate_bundle_async`, `poll`, `cancel`, `capabilities`, and
+    `generator_manifest` behavior.
+  - Async execution has bounded workers, queue, retained results, request/entity
+    caps, cancellation, and time budgets.
+  - Saturation, cancellation, timeout, and invalid requests have deterministic
+    outcomes and trace entries; no thread-per-request path remains.
+- Verification:
+  - Lifecycle contract, saturation, cancellation, timeout, and resource-bound
+    tests on core and adapters.
+
+## REQ-PG-004: Build-manifest provenance and mismatch rejection
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: build / integrity
+- Priority: must
+- Status: Approved
+- Rationale: A checked native or Web artifact is trustworthy only when the game
+  can prove which source, content, schemas, and target produced it.
+- Acceptance criteria:
+  - The build manifest records Rust source commit, generator version,
+    content-manifest hash, target, binary/WASM hash, and export-schema versions.
+  - Build tooling generates the manifest reproducibly and checks the artifact
+    bytes actually shipped.
+  - Rust adapters, Godot startup, saves, and CI reject relevant mismatches with a
+    stable error; no mismatch is downgraded to GDScript generation.
+- Verification:
+  - Manifest generation/check command.
+  - Tampered source, content, target, artifact, generator, and schema tests.
+  - Godot startup manifest smoke.
+
+## REQ-PG-005: Coordinate-stable world generation
+
+- Source: `docs/game/features/unified_procgen_platform.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Validated
-- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Status: Approved
+- Rationale: A persistent exploration world must not change when sites are
+  discovered in a different order or generated concurrently.
 - Acceptance criteria:
-  - The "Procedural generation expansion" package is implemented and smoke-validated.
+  - `WorldIR` owns coordinate-addressed markers, route graph, biome/hazard fields,
+    site archetypes, resources, landmarks, and extraction guarantees.
+  - Every site derives from `(world_seed, generator_version,
+    content_manifest_hash, coordinate/site_id, domain, named_channel)`.
+  - Discovery order, parallel scheduling, optional domain requests, locale, and
+    presentation-only seeds do not change mechanical output.
+  - Routes and at least one required extraction path validate or fail closed.
 - Verification:
-  - `room_variant_selector_smoke.gd`
-  - `ROOM VARIANT SELECTOR PASS`
+  - Ordering/concurrency metamorphic tests and coordinate golden corpus.
+  - Locale and presentation-seed isolation tests.
 
-## REQ-PG-007: Procedural generation expansion (REQ-PG-007)
+## REQ-PG-006: Validated site, mission, and ship compilation
 
-- Source: `docs/game/features/procedural_generation_expansion.md`
+- Source: `docs/game/features/unified_procgen_platform.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Validated
-- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Status: Approved
+- Rationale: A connected floor plan alone does not prove the mission, locks,
+  objectives, cover, clearance, or extraction are playable.
 - Acceptance criteria:
-  - The "Procedural generation expansion" package is implemented and smoke-validated.
+  - `SiteIR` extends the existing Rust topology/compiler with mission graph,
+    key/lock and repair-gate order, functional prop sockets, traversal clearance,
+    LOS/cover annotations, objective reachability, and extraction reachability.
+  - Generation applies `validate -> bounded local repair -> revalidate ->
+    authored-safe fallback/fail closed` and never exports a partial site.
+  - Every fallback is complete, validated, versioned, traced, and represented in
+    the regression corpus.
 - Verification:
-  - `encounter_injector_smoke.gd`
-  - `ENCOUNTER INJECTOR PASS`
+  - Structural/mission validators, bounded-repair tests, authored-fallback
+    fixtures, flood-fill/A*/objective/lock-key agents, and adversarial seeds.
 
-## REQ-PG-012: Procedural generation expansion (REQ-PG-012)
+## REQ-PG-007: Authoritative, fair, replayable encounters
 
-- Source: `docs/game/features/procedural_generation_expansion.md`
+- Source: `docs/game/features/unified_procgen_platform.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Validated
-- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Status: Approved
+- Rationale: Godot-side encounter injection cannot participate in whole-bundle
+  budgets, validation, replay, or native/Web parity.
 - Acceptance criteria:
-  - The "Procedural generation expansion" package is implemented and smoke-validated.
+  - Rust composes encounters from authored factions, roles, abilities,
+    threat/economy budgets, occupancy, navigation, visibility, pacing, and the
+    bounded player snapshot.
+  - Every spawn/composition includes replayable candidates, scores, constraints,
+    selection, and rationale codes in the trace.
+  - Critical paths, spawn fairness, accessibility, navigation, entity caps, and
+    performance budgets validate before export.
+  - Godot instantiates exported encounter instructions without authoritative
+    mutation.
 - Verification:
-  - `seed_determinism_smoke.gd`
-  - `SEED DETERMINISM PASS`
+  - Encounter property/metamorphic tests, combat simulation, unfair-spawn search,
+    trace replay, and Godot bundle-consumer smoke.
+
+## REQ-PG-008: Budgeted authored item generation
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: gameplay / economy
+- Priority: must
+- Status: Approved
+- Rationale: Generated rewards must remain learnable and economically bounded,
+  with no prose or visual tag able to create mechanics.
+- Acceptance criteria:
+  - Items combine authored families, typed sockets/affixes, stat budgets, rarity
+    envelopes, drop-frequency targets, economy constraints, and visual-binding
+    tags.
+  - All item stats derive from typed authored definitions and validate within
+    budget; unconstrained text never controls stats.
+  - Increasing loot richness cannot systematically reduce expected loot value,
+    and no generated item becomes dominant across representative simulations.
+- Verification:
+  - Compatibility/budget/property tests, economy simulation, richness
+    metamorphic tests, dominant-item search, and trace replay.
+
+## REQ-PG-009: Compatible creature blueprints and approved presentation assets
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: gameplay / content pipeline
+- Priority: must
+- Status: Approved
+- Rationale: Runtime procedural variety must not assemble incompatible rigs,
+  footprints, abilities, or unlicensed/unapproved assets.
+- Acceptance criteria:
+  - Creature blueprints combine only compatible authored body plans, rigs,
+    animations, abilities, behaviors, materials, footprints, and counterplay
+    roles and pass traversal/performance validation.
+  - Runtime visuals/audio/VFX are deterministic assembly of approved manifest
+    identifiers; offline generative/Blender tooling is never a runtime authority.
+  - Promoted assets record source/license, tool/model version, inputs,
+    parameters/seed, human changes, technical validation, art approval, and the
+    promoted manifest entry.
+- Verification:
+  - Compatibility matrix tests, navigation/footprint simulation, invalid
+    blueprint adversarial search, manifest binding tests, and provenance audit.
+
+## REQ-PG-010: Deterministic adaptive ranker and encounter director
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Rationale: Adaptation must improve pacing without hidden rule changes,
+  validator bypass, network dependency, or irreproducible decisions.
+- Acceptance criteria:
+  - A deterministic classical utility/search implementation ranks only fully
+    validated world/site candidates and directs encounters only within authored
+    threat, economy, fairness, accessibility, and performance envelopes.
+  - Player modeling is bounded, versioned, run-local, offline, and excludes
+    account identity and free-form personal data.
+  - Inputs, candidates, scores, action, rationale, version, and fallback are
+    sufficient to replay the decision.
+  - Any later embedded model is disabled by default, uses `AdaptiveProposal`,
+    cannot bypass validation, and deterministically falls back on timeout,
+    unsupported hardware, invalid output, error, or disabled configuration.
+- Verification:
+  - Golden scoring/tie-break tests, replay tests, difficulty/threat monotonicity,
+    envelope properties, and forced model-fallback tests.
+
+## REQ-PG-011: Seed laboratory, diagnostics, and promoted regression corpus
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: tooling / observability
+- Priority: must
+- Status: Approved
+- Rationale: Designers need to inspect why a seed passed, failed, repaired, or was
+  selected without reading raw logs or collecting player data.
+- Acceptance criteria:
+  - The in-Godot seed laboratory displays world, mission, topology, navigation,
+    encounter, item, and creature graphs with metrics and validation failures.
+  - It supports seed comparison, locked parameters, selective regeneration,
+    rejected candidates, repair explanations, rule/RNG-channel traces, semantic
+    hashes, version manifests, and promotion to authored fixtures/fallbacks.
+  - Promoted failures and approved candidates are source-controlled corpora.
+  - Bounded local diagnostic bundles include request identity, versions, hashes,
+    trace summaries, metrics, timings, and failure codes without personal data.
+- Verification:
+  - Headless model tests, RoboGodot/manual interaction review when available,
+    corpus replay, bounded-output/privacy checks, and source freshness checks.
+
+## REQ-PG-012: Cross-platform cutover, persistence, parity, and production gates
+
+- Source: `docs/game/features/unified_procgen_platform.md`
+- Type: release / performance / persistence
+- Priority: must
+- Status: Approved
+- Rationale: The platform is complete only when every production entry point and
+  supported target uses the bundle with compatible saves and production budgets.
+- Acceptance criteria:
+  - Saves persist world/site identity, generator/content versions, semantic
+    identity, and mutation deltas; incompatible pre-release worlds show a clear
+    new-world prompt without deleting the old world, while profile/settings data
+    remains portable.
+  - Travel, starting scene, top-down mode, saves, captures, and debug tools use
+    `ProcgenBundle`; fixed temporary filenames are replaced by in-memory data or
+    request-scoped paths.
+  - Windows, macOS, Linux, and Web produce the same semantic hash for identical
+    requests/manifests and the legacy production generator is removed only after
+    parity, fallback, save-reset, export, visual, performance, and gameplay gates.
+  - PR validation covers at least 10,000 composite cases; nightly covers at least
+    one million domain cases, metamorphic checks, adversarial search, corpus
+    replay, and native/Web parity.
+  - Generation stays under 2 seconds, scene load under 3 seconds, peak memory
+    under 512 MB target / 1 GB stop, and runtime stays at 60 fps target / 30 fps
+    stop with explicit stage/queue/entity/instance/navigation/build-size budgets.
+- Verification:
+  - Save compatibility/reset smokes and all-entry-point source assertions.
+  - Windows/macOS/Linux/Web exports and semantic parity campaign.
+  - Composite/nightly/simulation/adversarial suites, full canonical Godot
+    regression with no unclassified warnings/errors, windowed performance,
+    visual review, and representative gameplay evidence.
 
 ## REQ-RL-001: Distribution, store, achievements, demo, localization, post-launch ops (REQ-RL-001)
 

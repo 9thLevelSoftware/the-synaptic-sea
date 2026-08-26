@@ -2,10 +2,14 @@
 
 - **Author:** Synaptic Sea design
 - **Date:** 2026-08-23
-- **Status:** Draft
+- **Status:** Superseded for generator authority by
+  `docs/game/features/unified_procgen_platform.md`; retained for reusable
+  enclosure, walkability, loader, and presentation work
 - **Project:** The Sargasso of Stars / The Synaptic Sea
-- **Engine:** Godot 4.6.2 GDScript (Forward+)
-- **Supersedes / amends:** none. Consumes ADR-0053 as done for enclosure geometry. Amends ADR-0049 (nav graph source). Extends ADR-0029, ADR-0050, ADR-0051, ADR-0052.
+- **Engine:** Godot consumer/assembly layer; Rust is authoritative per ADR-0057
+- **Supersedes / amends:** Superseded where it assumes GDScript generation or a
+  GDScript-owned gameplay slice. Consumes ADR-0053 as done for enclosure
+  geometry. Its loader/presentation work remains input to the unified platform.
 - **Related feature specs:** `docs/game/features/socketed_enclosed_interiors.md`, `docs/game/features/component_slots.md`, `docs/game/features/procedural_generation_expansion.md`, `docs/game/features/vertical_slice_v1.md`, `docs/game/features/module_integrity.md`
 
 ---

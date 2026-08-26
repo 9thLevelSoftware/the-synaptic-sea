@@ -38,6 +38,12 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0051 | docs/game/adr/0051-module-integrity-not-voxels.md | Module integrity is the unit of destruction (not voxels); salvage pillar grain lock |
 | 0052 | docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md | portable prop sidecars, generated bindings, and visual-only runtime binding |
 | 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
+| 0054 | docs/game/adr/0054-compiler-edge-nav-and-walkability.md | compiler-edge standing navigation and fail-closed walkability |
+| 0055 | docs/game/adr/0055-layout-generator-owns-structural-compile.md | legacy GDScript compiler/stamp order retained as migration evidence |
+| 0056 | docs/game/adr/0056-modular-socket-catalog-kit-fallback.md | authored socket-catalog fallback for missing presentation kits |
+| 0057 | docs/game/adr/0057-rust-authoritative-procgen-native-web.md | Rust-only production generation on native and Web; no silent GDScript fallback |
+| 0058 | docs/game/adr/0058-procgen-ir-versioning-save-fallback.md | layered IR, semantic versions/hashes, save reset, and authored fallbacks |
+| 0059 | docs/game/adr/0059-deterministic-adaptive-proposals.md | deterministic adaptive proposal boundary before optional embedded inference |
 
 ## Notes
 

@@ -6,11 +6,20 @@ No completion claim without fresh validation evidence.
 
 ## Godot binary
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2`
+Canonical release evidence uses Godot 4.7.1 at
+`/opt/homebrew/bin/godot`. Set `GODOT` explicitly on every host. The current
+Windows supplemental binary is:
+
+`C:\Users\dasbl\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe`
+
+The 4.7.2 run may supply additional Windows evidence but does not replace the
+documented 4.7.1 release gate. RoboGodot is the preferred live-editor MCP when
+it is available; headless CLI output remains the canonical automated evidence.
 
 ## Project root
 
-`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
+Set `ROOT` to the repository/worktree root. Do not encode a developer checkout
+path in new validation commands.
 
 ## Focused route-control validation
 
@@ -85,6 +94,106 @@ Expected:
 - `GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30`
 
 `seed=` on the same line is informational. Do not pin `seed=42`.
+
+## Unified procedural-generation platform (REQ-PG-001..012)
+
+Feature: `docs/game/features/unified_procgen_platform.md`.
+Architecture: ADR-0057, ADR-0058, and ADR-0059.
+
+No unified-platform gate is GREEN merely because a pass marker appears. Rust,
+Godot, target-export, semantic-parity, performance, and warning/error evidence
+must all be fresh for the gate being closed. Unexpected Godot `ERROR:` or
+`WARNING:` lines remain blocking.
+
+### Gate 0 focused evidence
+
+```bash
+ROOT="${ROOT:-.}"
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" --workspace
+python "$ROOT/tools/build_system_inventory.py" --check
+python "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
+python "$ROOT/scripts/validation/validate_procgen_build_manifest.py" --check
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_build_manifest_smoke.gd
+```
+
+Gate 0 must additionally retain the imported Rust history, prove that the
+checked native artifact hash matches the manifest, and show separate scoped
+Gate 0..6 cards on `synaptic-sea-stage-gate`.
+
+### Gate 1 focused evidence
+
+- Rust schema/round-trip and unified single-pass bundle tests.
+- Native and Web lifecycle contract tests for `generate_bundle`,
+  `generate_bundle_async`, `poll`, `cancel`, `capabilities`, and
+  `generator_manifest`.
+- Deterministic queue saturation, request/entity cap, cancellation, timeout, and
+  retained-result-bound tests.
+- Godot envelope/mismatch/missing-adapter/fallback and bundle-consumer smokes;
+  source assertions prove no authoritative post-generation encounter, loot, or
+  biome mutation remains in the production bridge.
+
+### Gate 2 focused evidence
+
+- Coordinate/discovery-order/parallel-scheduling invariance tests.
+- World route/extraction validators and site mission/topology/lock-key/repair,
+  prop-socket, clearance, LOS/cover, objective, and extraction agents.
+- Bounded repair/fail-closed/authored-fallback corpus.
+- Compatible/incompatible save tests, including clear new-world prompt, no
+  implicit file deletion, and portable profile/settings.
+
+### Gate 3 focused evidence
+
+- Encounter fairness/budget/navigation/visibility properties and combat
+  simulation.
+- Item compatibility/stat/economy/rarity/drop-frequency properties and economy
+  simulation.
+- Creature body/rig/animation/ability/behavior/footprint compatibility,
+  traversal simulation, and invalid-combination search.
+- Presentation manifest binding, asset provenance audit, and deterministic scene
+  assembly/visual review.
+
+### Gate 4 focused evidence
+
+- Deterministic utility-score, tie-break, proposal-shape, trace-replay, and
+  validated-candidate-only tests.
+- Difficulty cannot systematically reduce expected threat; encounter actions
+  stay inside threat/economy/fairness/accessibility/performance envelopes.
+- Optional embedded experiment remains disabled until separately promoted;
+  forced timeout, unsupported capability, invalid output, error, and disabled
+  paths exactly match deterministic fallback behavior.
+
+### Gate 5 focused evidence
+
+- Seed-lab model tests for graph data, comparison, parameter locks, selective
+  regeneration, rejected candidates, repairs, named channels, hashes/manifests,
+  and promotion.
+- Headless scene smoke plus RoboGodot/manual interaction review when available.
+- Promoted failure/approval corpus replay and source-freshness checks.
+- Diagnostic bundle size/cap tests and personal-data field audit.
+
+### Gate 6 production and scale evidence
+
+- Register `worldgen_wired_travel_smoke.gd` and new bundle/parity smokes in the
+  canonical `run_clean` bundle only after their output is clean.
+- PR: at least 10,000 deterministic composite cases across domains, versions,
+  archetypes, difficulties, damage states, and adapters.
+- Nightly: at least 1,000,000 domain cases, promoted failure replay,
+  metamorphic checks, adversarial seed search, and native/Web parity.
+- Metamorphic assertions: difficulty does not systematically lower threat; loot
+  richness does not systematically lower loot value; presentation-only seeds do
+  not change topology/stats; locale does not change mechanics; identical
+  request/version/manifest produces an identical semantic hash.
+- Windows, macOS, Linux, and Web exports; full regression; windowed performance;
+  visual review; and representative gameplay evidence.
+- Budgets: generation <2 s, scene load <3 s, peak memory 512 MB target / 1 GB
+  stop, runtime 60 fps target / 30 fps stop, plus declared per-stage latency,
+  queue, entity, instance, navigation, and Web build-size limits.
+
+Current baseline (2026-08-26): the external Rust workspace passes all workspace
+tests. Windows Godot 4.7.2 reaches `WORLDGEN WIRED TRAVEL PASS`, but missing
+damaged/breached structural GLBs emit unexpected errors; the smoke is therefore
+blocking and remains unregistered. Canonical Godot 4.7.1 and macOS/Linux/Web
+evidence remain unverified.
 
 ## Regression bundle
 
