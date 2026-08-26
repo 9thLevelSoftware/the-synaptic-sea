@@ -9,6 +9,7 @@ pub const MAX_ITEMS: usize = 64;
 pub const MAX_AFFIXES: usize = 3;
 pub const MAX_SOURCES: usize = 64;
 pub const MAX_BP: u32 = 10_000;
+pub const MAX_LOOT_RICHNESS_BP: u32 = 30_000;
 type Result<T> = std::result::Result<T, ItemError>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -301,7 +302,7 @@ impl ItemGenerationContext {
         c.validate()?;
         if self.request.platform_version != PROCGEN_GENERATOR_VERSION
             || !id(&self.difficulty_id)
-            || self.loot_richness_bp > MAX_BP
+            || self.loot_richness_bp > MAX_LOOT_RICHNESS_BP
             || self.eligible_sources.is_empty()
             || self.eligible_sources.len() > MAX_SOURCES
             || self.max_count == 0

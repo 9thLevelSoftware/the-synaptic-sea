@@ -65,8 +65,8 @@ fn deterministic_identity_is_stable() {
 #[test]
 fn loot_richness_is_monotonic_and_preserves_prefix() {
     let (_, _, low) = generated(0);
-    let (_, _, medium) = generated(5_000);
-    let (_, _, high) = generated(10_000);
+    let (_, _, medium) = generated(15_000);
+    let (_, _, high) = generated(30_000);
     assert!(low.items.len() <= medium.items.len());
     assert!(medium.items.len() <= high.items.len());
     assert_eq!(
@@ -81,6 +81,15 @@ fn loot_richness_is_monotonic_and_preserves_prefix() {
     let medium_value: u32 = medium.items.iter().map(|item| item.economy_value).sum();
     let high_value: u32 = high.items.iter().map(|item| item.economy_value).sum();
     assert!(low_value <= medium_value && medium_value <= high_value);
+}
+
+#[test]
+fn site_level_loot_richness_bounds_are_supported_exactly() {
+    let (context, catalogue, outcome) = generated(30_000);
+    outcome.validate(&context, &catalogue).unwrap();
+    let mut invalid = context;
+    invalid.loot_richness_bp = 30_001;
+    assert!(generate_items(&invalid, &catalogue).is_err());
 }
 
 #[test]
