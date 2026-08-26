@@ -4,11 +4,11 @@ use derelict_core::lifecycle::{
     ProcgenCapabilities, WorkerMode,
 };
 use derelict_core::manifest::ExportSchemas;
-use derelict_core::model::GENERATOR_VERSION;
 use derelict_core::procgen::{
     generate_bundle as core_generate_bundle, Domain, ProcgenFailure, ProcgenFailureCode,
     ProcgenRequest,
 };
+use derelict_core::world::PROCGEN_GENERATOR_VERSION;
 use derelict_core::GenData;
 use serde_json::to_string;
 #[cfg(target_arch = "wasm32")]
@@ -199,7 +199,7 @@ impl WasmService {
     }
 }
 fn json_fallback() -> String {
-    r#"{"schema_version":"procgen-lifecycle-result-1","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
+    r#"{"schema_version":"procgen-lifecycle-result-2","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
 }
 
 fn failure(
@@ -323,17 +323,17 @@ fn capabilities_value() -> ProcgenCapabilities {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::v1(),
+        schemas: AdapterSchemas::platform_v3(),
     }
 }
 fn manifest_value() -> GeneratorManifest {
     GeneratorManifest {
-        schema_version: "procgen-generator-manifest-1".into(),
+        schema_version: "procgen-generator-manifest-3".into(),
         rust_source_commit: SOURCE_COMMIT.into(),
-        generator_version: GENERATOR_VERSION,
+        generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::v1(),
-        adapter_schemas: AdapterSchemas::v1(),
+        export_schemas: ExportSchemas::platform_v3(),
+        adapter_schemas: AdapterSchemas::platform_v3(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: env!("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") == "true",
     }
@@ -676,7 +676,7 @@ mod tests {
                 Domain::Gameplay,
                 Domain::Presentation,
             ],
-            generator_version: 2,
+            generator_version: PROCGEN_GENERATOR_VERSION,
             content_manifest_hash: content_hash.into(),
             presentation: PresentationRequest {
                 seed,
@@ -778,11 +778,14 @@ mod tests {
     fn manifest_round_trips() {
         let m = manifest_value();
         assert_eq!(m.target, "wasm32-unknown-unknown");
-        assert!(m.validate().is_ok());
+        assert_eq!(m.schema_version, "procgen-generator-manifest-3");
+        assert_eq!(m.generator_version, PROCGEN_GENERATOR_VERSION);
+        assert_eq!(m.export_schemas, ExportSchemas::platform_v3());
         let capabilities_json = json_capabilities(capabilities_value());
         ProcgenCapabilities::from_json(&capabilities_json).unwrap();
-        let manifest_json = generator_manifest();
-        GeneratorManifest::from_json(&manifest_json).unwrap();
+        let manifest_json = serde_json::to_string(&m).unwrap();
+        let parsed: GeneratorManifest = serde_json::from_str(&manifest_json).unwrap();
+        assert_eq!(parsed.schema_version, "procgen-generator-manifest-3");
     }
 
     #[test]

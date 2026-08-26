@@ -14,14 +14,14 @@ const manifest = parse(binding.generator_manifest());
 const vectors = JSON.parse(fs.readFileSync(corpusPath, 'utf8'));
 const expectedDomains = ['world', 'site', 'gameplay', 'presentation'];
 const expectedAdapterSchemas = {
-  lifecycle_result: 'procgen-lifecycle-result-1',
+  lifecycle_result: 'procgen-lifecycle-result-2',
   capabilities: 'procgen-capabilities-1',
-  generator_manifest: 'procgen-generator-manifest-1',
+  generator_manifest: 'procgen-generator-manifest-3',
 };
 const expectedExportSchemas = {
   procgen_request: 'procgen-request-1',
-  procgen_bundle: 'procgen-bundle-1',
-  world_ir: 'world-ir-1',
+  procgen_bundle: 'procgen-bundle-2',
+  world_ir: 'world-ir-2',
   site_ir: 'site-ir-1',
   gameplay_ir: 'gameplay-ir-1',
   presentation_ir: 'presentation-ir-1',
@@ -45,9 +45,9 @@ if (cap.schema_version !== 'procgen-capabilities-1' || cap.adapter_kind !== 'web
     || cap.max_trace_entries !== 4096 || cap.max_events !== 32
     || cap.deadline_ms !== 2000 || !equal(cap.supported_domains, expectedDomains)
     || !equal(cap.schemas, expectedAdapterSchemas)) throw new Error('capabilities contract mismatch');
-if (manifest.schema_version !== 'procgen-generator-manifest-1'
+if (manifest.schema_version !== 'procgen-generator-manifest-3'
     || !/^[0-9a-f]{40}$/.test(manifest.rust_source_commit)
-    || manifest.generator_version !== 2
+    || manifest.generator_version !== 3
     || manifest.content_manifest_hash !== vectors[0].request.content_manifest_hash
     || !equal(manifest.export_schemas, expectedExportSchemas)
     || !equal(manifest.adapter_schemas, expectedAdapterSchemas)
