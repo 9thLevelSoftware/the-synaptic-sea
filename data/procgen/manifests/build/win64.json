@@ -1,23 +1,23 @@
 {
-  "manifest_schema": "procgen-build-manifest-2",
-  "rust_source_commit": "077f13eaf3994432127bc296b4f231a380c14d5c",
+  "manifest_schema": "procgen-build-manifest-3",
+  "rust_source_commit": "2d42e65f1ac30cb9c8306e28dcff3f7b267764cb",
   "generator_version": 3,
   "content_manifest_path": "data/procgen/manifests/content_manifest.json",
-  "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+  "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
   "target": "x86_64-pc-windows-msvc",
   "artifact": {
     "kind": "gdextension",
     "path": "addons/derelict/bin/win64/derelict_godot.dll",
-    "sha256": "d1b0fdad81ffea25496e2303ed7867035da3f9d112cf9c6efaa1fedf523c2cd9"
+    "sha256": "dd1ffd128724c1a8ae8cdcd8c9b4b90fdcc2a42af321dcfc67a8699f8cb0a096"
   },
   "export_schemas": {
-    "procgen_request": "procgen-request-1",
-    "procgen_bundle": "procgen-bundle-3",
+    "procgen_request": "procgen-request-2",
+    "procgen_bundle": "procgen-bundle-4",
     "world_ir": "world-ir-2",
     "site_ir": "site-ir-2",
-    "gameplay_ir": "gameplay-ir-1",
-    "presentation_ir": "presentation-ir-1",
-    "generation_trace": "generation-trace-2",
+    "gameplay_ir": "gameplay-ir-2",
+    "presentation_ir": "presentation-ir-2",
+    "generation_trace": "generation-trace-3",
     "adaptive_proposal": "adaptive-proposal-1"
   }
 }
