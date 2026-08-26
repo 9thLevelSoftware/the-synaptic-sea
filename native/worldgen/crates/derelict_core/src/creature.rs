@@ -139,20 +139,38 @@ impl CreatureCatalogue {
         }
         for b in &self.body_plans {
             if !valid_id(&b.id)
+                || !valid_id(&b.family)
                 || b.max_mass == 0
                 || b.rig_ids.is_empty()
                 || get(&self.footprints, |x| x.id == b.footprint_id).is_none()
+                || b.rig_ids
+                    .iter()
+                    .any(|id| get(&self.rigs, |x| x.id == *id).is_none())
             {
                 return Err(CreatureError::Invalid(format!("body:{}", b.id)));
             }
         }
         for r in &self.rigs {
-            if !valid_id(&r.id) || r.body_ids.is_empty() || r.animation_set_ids.is_empty() {
+            if !valid_id(&r.id)
+                || r.body_ids.is_empty()
+                || r.animation_set_ids.is_empty()
+                || r.body_ids
+                    .iter()
+                    .any(|id| get(&self.body_plans, |x| x.id == *id).is_none())
+                || r.animation_set_ids
+                    .iter()
+                    .any(|id| get(&self.animation_sets, |x| x.id == *id).is_none())
+            {
                 return Err(CreatureError::Invalid(format!("rig:{}", r.id)));
             }
         }
         for a in &self.animation_sets {
-            if !valid_id(&a.id) || a.rig_ids.is_empty() {
+            if !valid_id(&a.id)
+                || a.rig_ids.is_empty()
+                || a.rig_ids
+                    .iter()
+                    .any(|id| get(&self.rigs, |x| x.id == *id).is_none())
+            {
                 return Err(CreatureError::Invalid(format!("animation:{}", a.id)));
             }
         }
@@ -161,18 +179,30 @@ impl CreatureCatalogue {
                 || a.threat_cost == 0
                 || a.performance_cost == 0
                 || a.behavior_ids.is_empty()
+                || a.behavior_ids
+                    .iter()
+                    .any(|id| get(&self.behaviors, |x| x.id == *id).is_none())
             {
                 return Err(CreatureError::Invalid(format!("ability:{}", a.id)));
             }
         }
         for b in &self.behaviors {
-            if !valid_id(&b.id) || b.ability_ids.is_empty() || b.roles.is_empty() {
+            if !valid_id(&b.id)
+                || b.ability_ids.is_empty()
+                || b.roles.is_empty()
+                || b.ability_ids
+                    .iter()
+                    .any(|id| get(&self.abilities, |x| x.id == *id).is_none())
+            {
                 return Err(CreatureError::Invalid(format!("behavior:{}", b.id)));
             }
         }
         for m in &self.materials {
             if !valid_id(&m.id)
                 || m.body_ids.is_empty()
+                || m.body_ids
+                    .iter()
+                    .any(|id| get(&self.body_plans, |x| x.id == *id).is_none())
                 || m.visual_tags
                     .iter()
                     .any(|x| !self.rules.approved_visual_tags.contains(x))
@@ -184,7 +214,12 @@ impl CreatureCatalogue {
             }
         }
         for c in &self.counterplay {
-            if !valid_id(&c.id) || c.ability_ids.is_empty() {
+            if !valid_id(&c.id)
+                || c.ability_ids.is_empty()
+                || c.ability_ids
+                    .iter()
+                    .any(|id| get(&self.abilities, |x| x.id == *id).is_none())
+            {
                 return Err(CreatureError::Invalid(format!("counterplay:{}", c.id)));
             }
         }
