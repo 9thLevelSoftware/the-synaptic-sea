@@ -48,7 +48,7 @@ fn request() -> ProcgenRequest {
 
 #[test]
 fn accepted_omits_optional_payloads_and_capabilities_round_trip() {
-    let json = r#"{"schema_version":"procgen-lifecycle-result-2","status":"accepted","request_id":7,"events":["admitted"]}"#;
+    let json = r#"{"schema_version":"procgen-lifecycle-result-3","status":"accepted","request_id":7,"events":["admitted"]}"#;
     let accepted = LifecycleResult::from_json(json).unwrap();
     assert_eq!(accepted.bundle, None);
     assert_eq!(accepted.failure, None);
@@ -202,7 +202,7 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
         LifecycleResult::cancel_requested(4, events.clone()),
     ] {
         let value = serde_json::to_value(&result).unwrap();
-        assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &value));
+        assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &value));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&value).unwrap()).is_ok());
     }
     let bundle = generate_bundle(
@@ -212,11 +212,11 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
     .unwrap();
     let completed = LifecycleResult::completed(Some(5), bundle, events.clone());
     let value = serde_json::to_value(&completed).unwrap();
-    assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &value));
+    assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &value));
     assert!(LifecycleResult::from_json(&serde_json::to_string(&value).unwrap()).is_ok());
     let mut unknown = value.clone();
     unknown["unexpected"] = true.into();
-    assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &unknown));
+    assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &unknown));
     assert!(LifecycleResult::from_json(&serde_json::to_string(&unknown).unwrap()).is_err());
 
     for (field, bad) in [
@@ -230,14 +230,14 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
         let mut invalid =
             serde_json::to_value(LifecycleResult::accepted(1, events.clone())).unwrap();
         invalid[field] = bad;
-        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &invalid));
+        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &invalid));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
     }
     for count in [0, 33] {
         let mut invalid =
             serde_json::to_value(LifecycleResult::accepted(1, events.clone())).unwrap();
         invalid["events"] = serde_json::json!(vec!["admitted"; count]);
-        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &invalid));
+        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA, &invalid));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
     }
 }

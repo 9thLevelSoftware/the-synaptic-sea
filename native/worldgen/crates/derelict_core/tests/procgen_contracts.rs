@@ -190,11 +190,14 @@ fn every_public_schema_is_json_and_closed_at_root() {
     let names = [
         "procgen-request-1",
         "procgen-bundle-2",
+        "procgen-bundle-3",
         "world-ir-2",
         "site-ir-1",
+        "site-ir-2",
         "gameplay-ir-1",
         "presentation-ir-1",
         "generation-trace-1",
+        "generation-trace-2",
         "generation-metrics-1",
         "adaptive-proposal-1",
         "player-model-1",
@@ -221,7 +224,7 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-2.schema.json",
+            "{}/../../schemas/procgen-bundle-3.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -270,7 +273,7 @@ fn embedded_gameplay_constraints_match_standalone_and_rust() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-2.schema.json",
+            "{}/../../schemas/procgen-bundle-3.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -376,7 +379,7 @@ fn injected_valid_ship_with_invalid_bundle_trace_fails_at_bundle_validation() {
 }
 
 #[test]
-fn injected_identity_valid_ship_with_malformed_plan_fails_at_bundle_validation() {
+fn injected_identity_valid_ship_with_malformed_plan_fails_at_site_validation() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let mut report = derelict_core::generate_ship_timed(
         site_seed(),
@@ -386,9 +389,14 @@ fn injected_identity_valid_ship_with_malformed_plan_fails_at_bundle_validation()
     .unwrap();
     report.ship.plan.occupancy.clear();
     let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
-    assert!(
-        matches!(result, Err(ProcgenFailure { code: ProcgenFailureCode::ValidationFailure, stage, .. }) if stage == "bundle")
-    );
+    assert!(matches!(
+        result,
+        Err(ProcgenFailure {
+            code: ProcgenFailureCode::FallbackFailure,
+            stage,
+            ..
+        }) if stage == "site"
+    ));
 }
 
 #[test]
@@ -418,7 +426,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-2.schema.json",
+            "{}/../../schemas/procgen-bundle-3.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -506,7 +514,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
             "world-ir-2",
             serde_json::to_value(&bundle.world_ir).unwrap(),
         ),
-        ("site-ir-1", serde_json::to_value(&bundle.site_ir).unwrap()),
+        ("site-ir-2", serde_json::to_value(&bundle.site_ir).unwrap()),
         (
             "gameplay-ir-1",
             serde_json::to_value(&bundle.gameplay_ir).unwrap(),
@@ -516,7 +524,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
             serde_json::to_value(&bundle.presentation_ir).unwrap(),
         ),
         (
-            "generation-trace-1",
+            "generation-trace-2",
             serde_json::to_value(&bundle.trace).unwrap(),
         ),
         (
@@ -596,7 +604,7 @@ fn nested_unknown_fields_fail_at_serde_and_schema_boundaries() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-2.schema.json",
+            "{}/../../schemas/procgen-bundle-3.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),

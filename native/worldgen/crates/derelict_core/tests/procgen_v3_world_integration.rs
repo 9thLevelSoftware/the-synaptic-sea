@@ -8,7 +8,7 @@ use derelict_core::lifecycle::{
     PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
 use derelict_core::manifest::{
-    ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V2, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, WORLD_IR_SCHEMA_V2,
+    ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V3, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, WORLD_IR_SCHEMA_V2,
 };
 use derelict_core::procgen::{
     generate_bundle, semantic_hash, Domain, PlayerModel, PresentationRequest, ProcgenBundle,
@@ -159,7 +159,7 @@ fn complete_bundle_embeds_public_world_and_runs_structural_pipeline_once() {
     let expected_outcome = generate_world(&world_request(&req)).unwrap();
     let expected_world = expected_outcome.world_ir;
     let bundle = generate_bundle(req.clone(), &GenData::default_bundle().unwrap()).unwrap();
-    assert_eq!(bundle.schema_version, PROCGEN_BUNDLE_SCHEMA_V2);
+    assert_eq!(bundle.schema_version, PROCGEN_BUNDLE_SCHEMA_V3);
     assert_eq!(bundle.version.generator_version, 3);
     assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v3());
     assert_eq!(
@@ -245,11 +245,11 @@ fn requested_domain_order_and_locale_do_not_change_world_or_mechanics() {
 fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
-    let bundle_schema = public_schema(PROCGEN_BUNDLE_SCHEMA_V2);
+    let bundle_schema = public_schema(PROCGEN_BUNDLE_SCHEMA_V3);
     let bundle_validator = jsonschema::validator_for(&bundle_schema).unwrap();
     let bundle_value = serde_json::to_value(&bundle).unwrap();
     assert!(bundle_validator.is_valid(&bundle_value));
-    for schema in ["procgen-bundle-1", "procgen-bundle-3", "procgen-bundle-9"] {
+    for schema in ["procgen-bundle-1", "procgen-bundle-2", "procgen-bundle-9"] {
         let json = with_json_mutation(&bundle, |v| v["schema_version"] = schema.into());
         assert!(
             ProcgenBundle::from_json(&json).is_err(),
@@ -294,20 +294,20 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let result =
         LifecycleResult::completed(Some(1), bundle.clone(), vec![LifecycleEvent::Completed]);
-    assert_eq!(result.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2);
+    assert_eq!(result.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
     assert!(result.validate().is_ok());
     let json = serde_json::to_string(&result).unwrap();
     assert!(LifecycleResult::from_json(&json).is_ok());
-    let lifecycle_schema = public_schema(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2);
+    let lifecycle_schema = public_schema(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
     let lifecycle_validator = jsonschema::validator_for(&lifecycle_schema).unwrap();
     let lifecycle_value: Value = serde_json::from_str(&json).unwrap();
     assert!(lifecycle_validator.is_valid(&lifecycle_value));
     for schema in [
         "procgen-lifecycle-result-1",
-        "procgen-lifecycle-result-3",
+        "procgen-lifecycle-result-2",
         "procgen-lifecycle-result-9",
     ] {
-        let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, schema);
+        let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, schema);
         assert!(
             LifecycleResult::from_json(&substituted).is_err(),
             "accepted {schema}"
@@ -336,7 +336,7 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
         content_manifest_hash: CONTENT_HASH.into(),
         export_schemas: ExportSchemas::platform_v3(),
         adapter_schemas: AdapterSchemas {
-            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2.into(),
+            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3.into(),
             capabilities: "procgen-capabilities-1".into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         },

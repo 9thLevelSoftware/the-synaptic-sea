@@ -8,7 +8,7 @@ const VALID: &str = r#"{
   "content_manifest_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "target":"x86_64-pc-windows-msvc",
   "artifact":{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
-  "export_schemas":{"procgen_request":"procgen-request-1","procgen_bundle":"procgen-bundle-2","world_ir":"world-ir-2","site_ir":"site-ir-1","gameplay_ir":"gameplay-ir-1","presentation_ir":"presentation-ir-1","generation_trace":"generation-trace-1","adaptive_proposal":"adaptive-proposal-1"}
+  "export_schemas":{"procgen_request":"procgen-request-1","procgen_bundle":"procgen-bundle-3","world_ir":"world-ir-2","site_ir":"site-ir-2","gameplay_ir":"gameplay-ir-1","presentation_ir":"presentation-ir-1","generation_trace":"generation-trace-2","adaptive_proposal":"adaptive-proposal-1"}
 }"#;
 
 #[test]
@@ -79,12 +79,12 @@ fn every_required_build_field_is_enforced() {
     ] {
         let marker = match schema {
             "procgen_request" => "procgen-request-1",
-            "procgen_bundle" => "procgen-bundle-2",
+            "procgen_bundle" => "procgen-bundle-3",
             "world_ir" => "world-ir-2",
-            "site_ir" => "site-ir-1",
+            "site_ir" => "site-ir-2",
             "gameplay_ir" => "gameplay-ir-1",
             "presentation_ir" => "presentation-ir-1",
-            "generation_trace" => "generation-trace-1",
+            "generation_trace" => "generation-trace-2",
             _ => "adaptive-proposal-1",
         };
         assert!(
@@ -101,9 +101,16 @@ fn draft_2020_schema_enforces_both_exact_target_artifact_pairs() {
     ))
     .unwrap();
     let validator = jsonschema::validator_for(&schema).unwrap();
-    let windows: serde_json::Value = serde_json::from_str(VALID).unwrap();
+    // The published build-manifest-1 schema is an immutable structural
+    // contract; validate its historical export map separately from the
+    // current platform-v3 map exercised above.
+    let legacy = VALID
+        .replace("procgen-bundle-3", "procgen-bundle-2")
+        .replace("site-ir-2", "site-ir-1")
+        .replace("generation-trace-2", "generation-trace-1");
+    let windows: serde_json::Value = serde_json::from_str(&legacy).unwrap();
     assert!(validator.is_valid(&windows));
-    let web = VALID
+    let web = legacy
         .to_string()
         .replace("x86_64-pc-windows-msvc", "wasm32-unknown-unknown")
         .replace("gdextension", "wasm")
@@ -112,8 +119,8 @@ fn draft_2020_schema_enforces_both_exact_target_artifact_pairs() {
             "addons/derelict/bin/web/derelict_wasm_bg.wasm",
         );
     assert!(validator.is_valid(&serde_json::from_str::<serde_json::Value>(&web).unwrap()));
-    let mismatch = VALID.replace("gdextension", "wasm");
+    let mismatch = legacy.replace("gdextension", "wasm");
     assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&mismatch).unwrap()));
-    let unknown = VALID.replace("\n}", ",\n  \"unexpected\": true\n}");
+    let unknown = legacy.replace("\n}", ",\n  \"unexpected\": true\n}");
     assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&unknown).unwrap()));
 }
