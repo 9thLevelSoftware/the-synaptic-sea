@@ -907,7 +907,7 @@ impl WorldIRv2 {
         self.validate_for_request_mode(req, rules, None)
     }
 
-    fn validate_for_fallback(
+    pub fn validate_for_fallback(
         &self,
         req: &WorldGenerationRequest,
         rules: &WorldRules,

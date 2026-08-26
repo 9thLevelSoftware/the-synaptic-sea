@@ -1,7 +1,7 @@
 use derelict_core::lifecycle::{GeneratorManifest, LifecycleResult, ProcgenCapabilities};
 use derelict_core::procgen::{
     AdaptiveProposal, GameplayIR, GenerationMetrics, GenerationTrace, PlayerModel, PresentationIR,
-    ProcgenBundle, ProcgenFailure, ProcgenRequest, SiteIR, WorldIR,
+    ProcgenBundle, ProcgenFailure, ProcgenRequest, SiteIR,
 };
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
@@ -73,6 +73,33 @@ fn apply_request_constraints(root: &mut Value) {
         serde_json::json!({"const":"player-model-1"});
     def(root, "PresentationRequest")["properties"]["locale"] =
         serde_json::json!({"type":"string","pattern":"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"});
+}
+
+fn apply_platform_v3_constraints(root: &mut Value) {
+    let request = def(root, "ProcgenRequest");
+    request["properties"]["generator_version"] = serde_json::json!({"const":3});
+    request["properties"]["world_seed"] =
+        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+    let envelope = def(root, "VersionEnvelope");
+    envelope["properties"]["generator_version"] = serde_json::json!({"const":3});
+    let exports = def(root, "ExportSchemas");
+    exports["properties"]["procgen_bundle"] = serde_json::json!({"const":"procgen-bundle-2"});
+    exports["properties"]["world_ir"] = serde_json::json!({"const":"world-ir-2"});
+    let world = def(root, "WorldIR");
+    world["properties"]["world_seed"] =
+        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+    world["properties"]["site_seed"] =
+        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+    let trace = def(root, "GenerationTrace");
+    trace["properties"]["rng_channels"] = serde_json::json!({"const":["world.archetype","world.biome","world.hazard","world.resource","world.landmark","world.route_cost","site.structural","meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
+    if let Some(adapter) = root
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+        .and_then(|d| d.get_mut("AdapterSchemas"))
+    {
+        adapter["properties"]["lifecycle_result"] =
+            serde_json::json!({"const":"procgen-lifecycle-result-2"});
+    }
 }
 
 fn apply_gameplay_constraints(root: &mut Value) {
@@ -335,8 +362,8 @@ fn main() {
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
     let mut items: Vec<(&str, Value)> = vec![
         ("procgen-request-1", schema::<ProcgenRequest>()),
-        ("procgen-bundle-1", schema::<ProcgenBundle>()),
-        ("world-ir-1", schema::<WorldIR>()),
+        // procgen-bundle-1 and world-ir-1 are immutable migration evidence;
+        // they are intentionally not regenerated from the v3 Rust contracts.
         ("site-ir-1", schema::<SiteIR>()),
         ("gameplay-ir-1", schema::<GameplayIR>()),
         ("presentation-ir-1", schema::<PresentationIR>()),
@@ -345,7 +372,7 @@ fn main() {
         ("player-model-1", schema::<PlayerModel>()),
         ("procgen-failure-1", schema::<ProcgenFailure>()),
         ("generation-metrics-1", schema::<GenerationMetrics>()),
-        ("procgen-lifecycle-result-1", schema::<LifecycleResult>()),
+        // procgen-lifecycle-result-1 is immutable migration evidence.
         ("procgen-capabilities-1", schema::<ProcgenCapabilities>()),
         (
             "procgen-generator-manifest-1",
@@ -357,12 +384,14 @@ fn main() {
     let mut world_v2 = schema::<derelict_core::world::WorldIRv2>();
     world_v2["title"] = Value::String("world-ir-2".into());
     world_v2["$id"] = Value::String("world-ir-2".into());
+    apply_platform_v3_constraints(&mut world_v2);
     items.push(("world-ir-2", world_v2));
     let mut bundle_v2 = schema::<ProcgenBundle>();
     replace_string_values(&mut bundle_v2, "procgen-bundle-1", "procgen-bundle-2");
     replace_string_values(&mut bundle_v2, "world-ir-1", "world-ir-2");
     bundle_v2["title"] = Value::String("procgen-bundle-2".into());
     bundle_v2["$id"] = Value::String("procgen-bundle-2".into());
+    apply_platform_v3_constraints(&mut bundle_v2);
     items.push(("procgen-bundle-2", bundle_v2));
     let mut lifecycle_v2 = schema::<LifecycleResult>();
     replace_string_values(
@@ -374,6 +403,7 @@ fn main() {
     replace_string_values(&mut lifecycle_v2, "world-ir-1", "world-ir-2");
     lifecycle_v2["title"] = Value::String("procgen-lifecycle-result-2".into());
     lifecycle_v2["$id"] = Value::String("procgen-lifecycle-result-2".into());
+    apply_platform_v3_constraints(&mut lifecycle_v2);
     items.push(("procgen-lifecycle-result-2", lifecycle_v2));
     let write = env::args().any(|arg| arg == "--write");
     let check = env::args().any(|arg| arg == "--check");

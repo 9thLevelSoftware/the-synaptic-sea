@@ -3,6 +3,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "definitions": {
+    "BiomeField": {
+      "additionalProperties": false,
+      "properties": {
+        "biome_id": {
+          "type": "string"
+        },
+        "intensity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "biome_id",
+        "intensity_bp",
+        "marker_id"
+      ],
+      "type": "object"
+    },
     "CauseOfLoss": {
       "enum": [
         "ReactorBreach",
@@ -69,6 +91,46 @@
         "module_id",
         "room_id",
         "variant"
+      ],
+      "type": "object"
+    },
+    "CoordinateMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "site_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "marker_id",
+        "selected",
+        "site_id",
+        "site_seed",
+        "x",
+        "y"
       ],
       "type": "object"
     },
@@ -422,7 +484,7 @@
           "type": "string"
         },
         "procgen_bundle": {
-          "type": "string"
+          "const": "procgen-bundle-2"
         },
         "procgen_request": {
           "type": "string"
@@ -431,7 +493,7 @@
           "type": "string"
         },
         "world_ir": {
-          "type": "string"
+          "const": "world-ir-2"
         }
       },
       "required": [
@@ -443,6 +505,33 @@
         "procgen_request",
         "site_ir",
         "world_ir"
+      ],
+      "type": "object"
+    },
+    "ExtractionGuarantee": {
+      "additionalProperties": false,
+      "properties": {
+        "extraction_anchor_id": {
+          "type": "string"
+        },
+        "hub_anchor_id": {
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selected_marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extraction_anchor_id",
+        "hub_anchor_id",
+        "path",
+        "selected_marker_id"
       ],
       "type": "object"
     },
@@ -674,10 +763,31 @@
           "type": "array"
         },
         "rng_channels": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "const": [
+            "world.archetype",
+            "world.biome",
+            "world.hazard",
+            "world.resource",
+            "world.landmark",
+            "world.route_cost",
+            "site.structural",
+            "meta",
+            "hull",
+            "template",
+            "topology",
+            "residual_fill",
+            "door",
+            "furnish",
+            "story",
+            "intact",
+            "breach",
+            "scorch",
+            "seal",
+            "bodies",
+            "fracture",
+            "debris",
+            "loot"
+          ]
         },
         "schema_version": {
           "type": "string"
@@ -726,6 +836,28 @@
       ],
       "type": "object"
     },
+    "HazardField": {
+      "additionalProperties": false,
+      "properties": {
+        "hazard_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "severity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hazard_id",
+        "marker_id",
+        "severity_bp"
+      ],
+      "type": "object"
+    },
     "ItemStack": {
       "additionalProperties": false,
       "properties": {
@@ -743,6 +875,26 @@
       "required": [
         "item_id",
         "qty"
+      ],
+      "type": "object"
+    },
+    "LandmarkRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "marker_id"
       ],
       "type": "object"
     },
@@ -967,9 +1119,7 @@
           "type": "string"
         },
         "generator_version": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 3
         },
         "player_model": {
           "$ref": "#/definitions/PlayerModel"
@@ -990,8 +1140,8 @@
           "$ref": "#/definitions/SiteRequest"
         },
         "world_seed": {
-          "format": "uint64",
-          "minimum": 0.0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
           "type": "integer"
         }
       },
@@ -1005,6 +1155,28 @@
         "schema_version",
         "site",
         "world_seed"
+      ],
+      "type": "object"
+    },
+    "ResourcePressure": {
+      "additionalProperties": false,
+      "properties": {
+        "marker_id": {
+          "type": "string"
+        },
+        "pressure_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "resource_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marker_id",
+        "pressure_bp",
+        "resource_id"
       ],
       "type": "object"
     },
@@ -1186,6 +1358,28 @@
         "deck",
         "id",
         "role"
+      ],
+      "type": "object"
+    },
+    "RouteEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cost_bp",
+        "from",
+        "to"
       ],
       "type": "object"
     },
@@ -1552,9 +1746,7 @@
           "$ref": "#/definitions/ExportSchemas"
         },
         "generator_version": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 3
         }
       },
       "required": [
@@ -1630,17 +1822,83 @@
         }
       ]
     },
-    "WorldIR": {
+    "WorldAnchor": {
       "additionalProperties": false,
       "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "WorldIRv2": {
+      "additionalProperties": false,
+      "properties": {
+        "anchors": {
+          "items": {
+            "$ref": "#/definitions/WorldAnchor"
+          },
+          "type": "array"
+        },
         "archetype_id": {
           "type": "string"
+        },
+        "biome_fields": {
+          "items": {
+            "$ref": "#/definitions/BiomeField"
+          },
+          "type": "array"
+        },
+        "extraction": {
+          "$ref": "#/definitions/ExtractionGuarantee"
+        },
+        "hazard_fields": {
+          "items": {
+            "$ref": "#/definitions/HazardField"
+          },
+          "type": "array"
+        },
+        "landmarks": {
+          "items": {
+            "$ref": "#/definitions/LandmarkRecord"
+          },
+          "type": "array"
+        },
+        "markers": {
+          "items": {
+            "$ref": "#/definitions/CoordinateMarker"
+          },
+          "type": "array"
+        },
+        "resource_pressures": {
+          "items": {
+            "$ref": "#/definitions/ResourcePressure"
+          },
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/definitions/RouteEdge"
+          },
+          "type": "array"
         },
         "schema_version": {
           "type": "string"
         },
         "site_id": {
           "type": "string"
+        },
+        "site_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
         },
         "world_seed": {
           "format": "uint64",
@@ -1657,9 +1915,18 @@
         }
       },
       "required": [
+        "anchors",
         "archetype_id",
+        "biome_fields",
+        "extraction",
+        "hazard_fields",
+        "landmarks",
+        "markers",
+        "resource_pressures",
+        "routes",
         "schema_version",
         "site_id",
+        "site_seed",
         "world_seed",
         "x",
         "y"
@@ -1689,6 +1956,11 @@
     "site_ir": {
       "$ref": "#/definitions/SiteIR"
     },
+    "site_seed": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
     "trace": {
       "$ref": "#/definitions/GenerationTrace"
     },
@@ -1696,7 +1968,12 @@
       "$ref": "#/definitions/VersionEnvelope"
     },
     "world_ir": {
-      "$ref": "#/definitions/WorldIR"
+      "$ref": "#/definitions/WorldIRv2"
+    },
+    "world_seed": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
     }
   },
   "required": [

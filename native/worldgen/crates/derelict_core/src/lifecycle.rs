@@ -1,10 +1,11 @@
 //! Target-neutral lifecycle, capability, and generator identity contracts.
 use crate::manifest::ExportSchemas;
-use crate::model::GENERATOR_VERSION;
 use crate::procgen::{Domain, ProcgenBundle, ProcgenError, ProcgenFailure};
+use crate::world::PROCGEN_GENERATOR_VERSION;
 use serde::{Deserialize, Serialize};
 
-pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str = "procgen-lifecycle-result-1";
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str =
+    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2;
 pub const PROCGEN_CAPABILITIES_SCHEMA: &str = "procgen-capabilities-1";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = "procgen-generator-manifest-1";
 
@@ -198,10 +199,17 @@ impl AdapterSchemas {
         }
     }
     fn validate(&self) -> Result<(), LifecycleError> {
-        if self != &Self::v1() {
+        if self != &Self::platform_v3() {
             Err(LifecycleError::Invalid("schemas"))
         } else {
             Ok(())
+        }
+    }
+    pub fn platform_v3() -> Self {
+        Self {
+            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA.into(),
+            capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
+            generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         }
     }
 }
@@ -301,12 +309,12 @@ impl GeneratorManifest {
     pub fn validate(&self) -> Result<(), LifecycleError> {
         if self.schema_version != PROCGEN_GENERATOR_MANIFEST_SCHEMA
             || self.target.is_empty()
-            || self.generator_version != GENERATOR_VERSION
+            || self.generator_version != PROCGEN_GENERATOR_VERSION
             || self.rust_source_commit.len() != 40
             || !is_lower_hex(&self.rust_source_commit)
             || self.content_manifest_hash.len() != 64
             || !is_lower_hex(&self.content_manifest_hash)
-            || self.export_schemas != ExportSchemas::v1()
+            || self.export_schemas != ExportSchemas::platform_v3()
         {
             return Err(LifecycleError::Invalid("manifest"));
         }

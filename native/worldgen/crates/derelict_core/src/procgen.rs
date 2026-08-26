@@ -1,6 +1,8 @@
 //! Versioned contracts and the single-pass generation bundle.
 use crate::manifest::ExportSchemas;
 use crate::model::{CauseOfLoss, Ship, GENERATOR_VERSION};
+pub use crate::world::WorldIR;
+use crate::world::{WorldGenerationRequest, WorldRules};
 use crate::{generate_ship_timed, GenData, GenParams};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -9,8 +11,8 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
-pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA;
-pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V2;
+pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = crate::manifest::SITE_IR_SCHEMA;
 pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA;
 pub const PRESENTATION_IR_SCHEMA: &str = crate::manifest::PRESENTATION_IR_SCHEMA;
@@ -19,7 +21,14 @@ pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = crate::manifest::ADAPTIVE_PROPOSAL_SC
 pub const PLAYER_MODEL_SCHEMA: &str = "player-model-1";
 pub const FAILURE_SCHEMA: &str = "procgen-failure-1";
 pub const GENERATION_METRICS_SCHEMA: &str = "generation-metrics-1";
-const RNG_CHANNELS: [&str; 16] = [
+const RNG_CHANNELS: [&str; 23] = [
+    "world.archetype",
+    "world.biome",
+    "world.hazard",
+    "world.resource",
+    "world.landmark",
+    "world.route_cost",
+    "site.structural",
     "meta",
     "hull",
     "template",
@@ -95,16 +104,6 @@ pub struct VersionEnvelope {
     pub export_schemas: ExportSchemas,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WorldIR {
-    pub schema_version: String,
-    pub world_seed: u64,
-    pub site_id: String,
-    pub x: i32,
-    pub y: i32,
-    pub archetype_id: String,
-}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SiteIR {
@@ -236,9 +235,29 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("version"));
         }
-        if self.version.export_schemas != ExportSchemas::v1() {
+        if self.version.export_schemas != ExportSchemas::platform_v3() {
             return Err(ProcgenError::InvalidRequest("export_schemas"));
         }
+        let world_request = WorldGenerationRequest {
+            world_seed: self.request.world_seed,
+            platform_version: self.request.generator_version,
+            content_manifest_hash: self.request.content_manifest_hash.clone(),
+            site_id: self.request.site.site_id.clone(),
+            x: self.request.site.x,
+            y: self.request.site.y,
+            archetype_id: self.request.site.archetype_id.clone(),
+        };
+        let rules =
+            WorldRules::bundled().map_err(|_| ProcgenError::InvalidRequest("world_rules"))?;
+        let valid_world = if self.trace.fallback.is_some() {
+            let fallback = crate::world::WorldFallback::bundled()
+                .map_err(|_| ProcgenError::InvalidRequest("world_fallback"))?;
+            self.world_ir
+                .validate_for_fallback(&world_request, &rules, &fallback)
+        } else {
+            self.world_ir.validate_for_request(&world_request, &rules)
+        };
+        valid_world.map_err(|_| ProcgenError::InvalidRequest("world"))?;
         if self.world_ir.world_seed != self.request.world_seed
             || self.world_ir.site_id != self.request.site.site_id
             || self.world_ir.x != self.request.site.x
@@ -253,8 +272,8 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("presentation_identity"));
         }
-        if self.site_ir.ship.generator_version != self.request.generator_version
-            || self.site_ir.ship.seed != self.request.world_seed
+        if self.site_ir.ship.generator_version != GENERATOR_VERSION
+            || self.site_ir.ship.seed != self.world_ir.site_seed
             || self.site_ir.ship.archetype_id != self.request.site.archetype_id
         {
             return Err(ProcgenError::InvalidRequest("ship_identity"));
@@ -489,7 +508,9 @@ impl ProcgenRequest {
     }
     pub fn validate(&self) -> Result<(), ProcgenError> {
         check_schema(&self.schema_version, PROCGEN_REQUEST_SCHEMA)?;
-        if self.generator_version != GENERATOR_VERSION {
+        if self.generator_version != crate::world::PROCGEN_GENERATOR_VERSION
+            || self.world_seed > crate::world::MAX_PUBLIC_SEED
+        {
             return Err(ProcgenError::InvalidRequest("generator_version"));
         }
         if self.site.site_id.is_empty()
@@ -597,20 +618,76 @@ pub fn generate_bundle(
     request: ProcgenRequest,
     data: &GenData,
 ) -> Result<ProcgenBundle, ProcgenFailure> {
-    let seed = request.world_seed;
+    request.validate().map_err(|e| {
+        failure(
+            ProcgenFailureCode::InvalidRequest,
+            "request",
+            e.to_string(),
+            false,
+        )
+    })?;
+    let world_request = WorldGenerationRequest {
+        world_seed: request.world_seed,
+        platform_version: request.generator_version,
+        content_manifest_hash: request.content_manifest_hash.clone(),
+        site_id: request.site.site_id.clone(),
+        x: request.site.x,
+        y: request.site.y,
+        archetype_id: request.site.archetype_id.clone(),
+    };
+    let world = crate::world::generate_world(&world_request).map_err(|e| {
+        failure(
+            ProcgenFailureCode::GenerationFailure,
+            "world",
+            e.to_string(),
+            true,
+        )
+    })?;
+    let seed = world.world_ir.site_seed;
     let params = GenParams {
         archetype_id: request.site.archetype_id.clone(),
         intactness_override: request.site.intactness_override_bp,
         cause_override: request.site.cause_of_loss,
         loot_richness: request.site.loot_richness_bp,
     };
-    generate_bundle_with_pipeline(request, data, || generate_ship_timed(seed, &params, data))
+    generate_bundle_with_world_pipeline(request, data, world, || {
+        generate_ship_timed(seed, &params, data)
+    })
 }
 
 #[doc(hidden)]
 pub fn generate_bundle_with_pipeline<F>(
     request: ProcgenRequest,
+    data: &GenData,
+    pipeline: F,
+) -> Result<ProcgenBundle, ProcgenFailure>
+where
+    F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenError>,
+{
+    let world_request = WorldGenerationRequest {
+        world_seed: request.world_seed,
+        platform_version: request.generator_version,
+        content_manifest_hash: request.content_manifest_hash.clone(),
+        site_id: request.site.site_id.clone(),
+        x: request.site.x,
+        y: request.site.y,
+        archetype_id: request.site.archetype_id.clone(),
+    };
+    let world = crate::world::generate_world(&world_request).map_err(|e| {
+        failure(
+            ProcgenFailureCode::GenerationFailure,
+            "world",
+            e.to_string(),
+            true,
+        )
+    })?;
+    generate_bundle_with_world_pipeline(request, data, world, pipeline)
+}
+
+fn generate_bundle_with_world_pipeline<F>(
+    request: ProcgenRequest,
     _data: &GenData,
+    world: crate::world::WorldGenerationOutcome,
     pipeline: F,
 ) -> Result<ProcgenBundle, ProcgenFailure>
 where
@@ -634,8 +711,8 @@ where
     })?;
     let mut ship = report.ship;
     let repaired_fragments = reconcile_bundle_fragments(&mut ship);
-    if ship.generator_version != request.generator_version
-        || ship.seed != request.world_seed
+    if ship.generator_version != GENERATOR_VERSION
+        || ship.seed != world.world_ir.site_seed
         || ship.archetype_id != request.site.archetype_id
     {
         return Err(failure(
@@ -646,14 +723,12 @@ where
         ));
     }
     let legacy_slice = crate::structural::export::to_gameplay_slice_json(&ship);
-    let world_ir = WorldIR {
-        schema_version: WORLD_IR_SCHEMA.into(),
-        world_seed: request.world_seed,
-        site_id: request.site.site_id.clone(),
-        x: request.site.x,
-        y: request.site.y,
-        archetype_id: request.site.archetype_id.clone(),
-    };
+    let crate::world::WorldGenerationOutcome {
+        world_ir,
+        candidate_decisions: world_decisions,
+        repairs: world_repairs,
+        fallback: world_fallback,
+    } = world;
     let site_ir = SiteIR {
         schema_version: SITE_IR_SCHEMA.into(),
         ship: ship.clone(),
@@ -679,7 +754,7 @@ where
     let version = VersionEnvelope {
         generator_version: request.generator_version,
         content_manifest_hash: request.content_manifest_hash.clone(),
-        export_schemas: ExportSchemas::v1(),
+        export_schemas: ExportSchemas::platform_v3(),
     };
     let room_count = u32::try_from(ship.room_graph.nodes.len()).map_err(|_| {
         failure(
@@ -727,16 +802,22 @@ where
     let trace = GenerationTrace {
         schema_version: GENERATION_TRACE_SCHEMA.into(),
         rng_channels: RNG_CHANNELS.iter().map(|s| (*s).into()).collect(),
-        candidate_decisions: report.candidate_decisions,
+        candidate_decisions: world_decisions
+            .into_iter()
+            .chain(report.candidate_decisions)
+            .collect(),
         failed_constraints: report.failed_constraints,
         repairs: if repaired_fragments {
-            vec!["reconciled:fragment_metadata".into()]
+            world_repairs
+                .into_iter()
+                .chain(["reconciled:fragment_metadata".into()])
+                .collect()
         } else {
-            Vec::new()
+            world_repairs
         },
         retries: report.retries,
         stage_timings_micros: metrics.stage_timings_micros.clone(),
-        ..Default::default()
+        fallback: world_fallback,
     };
     let mut bundle = ProcgenBundle {
         schema_version: PROCGEN_BUNDLE_SCHEMA.into(),
@@ -808,6 +889,9 @@ fn mechanical_request(req: &ProcgenRequest) -> Value {
     let mut v = serde_json::to_value(req).unwrap_or(Value::Null);
     if let Some(o) = v.as_object_mut() {
         o.remove("presentation");
+        if let Some(domains) = o.get_mut("requested_domains").and_then(Value::as_array_mut) {
+            domains.sort_by_key(|value| value.as_str().unwrap_or_default().to_owned());
+        }
     }
     v
 }
