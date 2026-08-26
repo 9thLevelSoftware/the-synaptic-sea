@@ -109,9 +109,8 @@ func generate_from_seed(
 		seed_value: int,
 		size: int = 0,
 		condition: int = 1) -> Node3D:
-	# Prefer DerelictGenerator when the platform GDExtension is loaded.
-	# The checked-in addon currently ships only win64, so Linux/macOS keep
-	# the layout pipeline rather than failing every generate_from_seed caller.
+	# Rust/GDExtension is the sole production authority. Missing native support
+	# fails closed; the legacy layout pipeline is not a production fallback.
 	if USE_WORLDGEN and ClassDB.class_exists("DerelictGenerator"):
 		return _generate_via_worldgen(seed_value, size, condition)
 	if USE_WORLDGEN:

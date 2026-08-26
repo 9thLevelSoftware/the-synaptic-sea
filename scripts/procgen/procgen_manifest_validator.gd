@@ -13,7 +13,7 @@ const CONTENT_MANIFEST_INVALID: String = "content_manifest_invalid"
 const ARTIFACT_MISSING: String = "artifact_missing"
 const ARTIFACT_HASH_MISMATCH: String = "artifact_hash_mismatch"
 
-func validate(manifest: Dictionary, generator: Object, target_override: String = "") -> String:
+func validate(manifest: Dictionary, generator: Object, target_override: String = "", io_override: Dictionary = {}) -> String:
 	if manifest.is_empty(): return MANIFEST_MISSING
 	var required: Array[String] = ["manifest_schema", "rust_source_commit", "generator_version", "content_manifest_path", "content_manifest_hash", "target", "artifact", "export_schemas"]
 	for key in manifest.keys():
@@ -36,15 +36,18 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	if generator == null or not generator.has_method("generator_version") or int(generator.generator_version()) != 2:
 		return GENERATOR_VERSION_MISMATCH
 	var content_path: String = str(manifest.get("content_manifest_path", ""))
-	if not FileAccess.file_exists("res://" + content_path): return CONTENT_MANIFEST_MISSING
-	var content_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://" + content_path))
+	if not _io_exists(content_path, io_override): return CONTENT_MANIFEST_MISSING
+	var parser := JSON.new()
+	if parser.parse(_io_text(content_path, io_override)) != 0: return CONTENT_MANIFEST_INVALID
+	var content_variant: Variant = parser.data
 	if not content_variant is Dictionary: return CONTENT_MANIFEST_INVALID
 	var content: Dictionary = content_variant as Dictionary
 	for key in content.keys():
 		if not ["manifest_schema", "files", "content_manifest_hash"].has(str(key)): return CONTENT_MANIFEST_INVALID
 	if str(content.get("manifest_schema", "")) != "procgen-content-manifest-1" or not content.get("files", []) is Array: return CONTENT_MANIFEST_INVALID
-	var computed: String = _content_digest(content.get("files", []) as Array)
+	var computed: String = _content_digest(content.get("files", []) as Array, io_override)
 	if computed.is_empty(): return CONTENT_MANIFEST_INVALID
+	if computed == "__CONTENT_FILE_MISMATCH__": return CONTENT_HASH_MISMATCH
 	if computed != str(content.get("content_manifest_hash", "")) or computed != str(manifest.get("content_manifest_hash", "")): return CONTENT_HASH_MISMATCH
 	var artifact: Variant = manifest.get("artifact", {})
 	if not artifact is Dictionary: return MANIFEST_INVALID
@@ -52,8 +55,8 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 		if not ["kind", "path", "sha256"].has(str(key)): return MANIFEST_INVALID
 	if str((artifact as Dictionary).get("kind", "")) != "gdextension" or str((artifact as Dictionary).get("path", "")) != "addons/derelict/bin/win64/derelict_godot.dll": return MANIFEST_INVALID
 	var artifact_path: String = str((artifact as Dictionary).get("path", ""))
-	if not FileAccess.file_exists("res://" + artifact_path): return ARTIFACT_MISSING
-	if FileAccess.get_sha256("res://" + artifact_path) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
+	if not _io_exists(artifact_path, io_override): return ARTIFACT_MISSING
+	if _io_sha256(artifact_path, io_override) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
 	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-1", "world_ir":"world-ir-1", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"}
 	var schema_block: Variant = manifest.get("export_schemas", {})
 	if not schema_block is Dictionary: return MANIFEST_INVALID
@@ -68,7 +71,7 @@ func _is_hex(value: String) -> bool:
 		if not ((code >= 48 and code <= 57) or (code >= 97 and code <= 102)): return false
 	return true
 
-func _content_digest(entries: Array) -> String:
+func _content_digest(entries: Array, io_override: Dictionary = {}) -> String:
 	var paths: Array[String] = []
 	for entry_variant in entries:
 		if not entry_variant is Dictionary: return ""
@@ -85,12 +88,36 @@ func _content_digest(entries: Array) -> String:
 		if paths.has(path) or (not paths.is_empty() and paths[-1] >= path): return ""
 		paths.append(path)
 		var absolute: String = "res://" + path
-		if not FileAccess.file_exists(absolute) or FileAccess.get_sha256(absolute) != str(entry.get("sha256", "")): return ""
+		if not _io_exists(path, io_override): return "__CONTENT_FILE_MISMATCH__"
+		if _io_sha256(path, io_override) != str(entry.get("sha256", "")): return "__CONTENT_FILE_MISMATCH__"
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	for path in paths:
-		context.update(path.to_utf8_buffer()); context.update(PackedByteArray([0])); context.update(FileAccess.get_file_as_bytes("res://" + path)); context.update(PackedByteArray([0]))
+		context.update(path.to_utf8_buffer()); context.update(PackedByteArray([0])); context.update(_io_bytes(path, io_override)); context.update(PackedByteArray([0]))
 	return context.finish().hex_encode()
+
+func _io_exists(path: String, override: Dictionary) -> bool:
+	if override.has("missing") and (override["missing"] as Array).has(path): return false
+	if override.has("files") and (override["files"] as Dictionary).has(path): return true
+	return FileAccess.file_exists("res://" + path)
+
+func _io_bytes(path: String, override: Dictionary) -> PackedByteArray:
+	if override.has("files") and (override["files"] as Dictionary).has(path):
+		var value: Variant = (override["files"] as Dictionary)[path]
+		return value if value is PackedByteArray else str(value).to_utf8_buffer()
+	return FileAccess.get_file_as_bytes("res://" + path)
+
+func _io_text(path: String, override: Dictionary) -> String:
+	if override.has("files") and (override["files"] as Dictionary).has(path):
+		var value: Variant = (override["files"] as Dictionary)[path]
+		return value if value is String else (value as PackedByteArray).get_string_from_utf8()
+	return FileAccess.get_file_as_string("res://" + path)
+
+func _io_sha256(path: String, override: Dictionary) -> String:
+	if override.has("files") and (override["files"] as Dictionary).has(path):
+		var context := HashingContext.new()
+		context.start(HashingContext.HASH_SHA256); context.update(_io_bytes(path, override)); return context.finish().hex_encode()
+	return FileAccess.get_sha256("res://" + path)
 
 func validate_from_files(generator: Object, target_override: String = "") -> String:
 	var path: String = "res://data/procgen/manifests/build/win64.json"
