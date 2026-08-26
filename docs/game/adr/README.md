@@ -50,6 +50,8 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0063 | docs/game/adr/0063-site-mission-overlay-and-contract-versioning.md | SiteIR v2 mission/navigation overlay, immutable complete-contract transition, structural ship v2 preserved |
 | 0064 | docs/game/adr/0064-authoritative-gameplay-blueprints-and-presentation-bindings.md | typed player snapshot, authoritative encounter/item/creature generation, approved presentation bindings, and immutable Gate 3 contract transition |
 | 0065 | docs/game/adr/0065-gate3-contract-wrapper-version-propagation.md | additive Gate 3 request/bundle/lifecycle and capability/manifest wrapper propagation with immutable prior schemas |
+| 0066 | docs/game/adr/0066-gate3-generation-trace-channel-versioning.md | exact Gate 3 RNG-channel trace and immutable trace-2 preservation |
+| 0067 | docs/game/adr/0067-gate4-adaptive-trace-and-wrapper-versioning.md | bounded classical adaptive decisions, replay trace, and immutable Gate 4 wrapper transition |
 
 ## Notes
 

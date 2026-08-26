@@ -376,3 +376,5 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0063-site-mission-overlay-and-contract-versioning.md`
 - `docs/game/adr/0064-authoritative-gameplay-blueprints-and-presentation-bindings.md`
 - `docs/game/adr/0065-gate3-contract-wrapper-version-propagation.md`
+- `docs/game/adr/0066-gate3-generation-trace-channel-versioning.md`
+- `docs/game/adr/0067-gate4-adaptive-trace-and-wrapper-versioning.md`
