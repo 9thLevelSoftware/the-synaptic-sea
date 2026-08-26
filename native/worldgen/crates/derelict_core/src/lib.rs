@@ -12,6 +12,7 @@ pub mod lifecycle;
 pub mod manifest;
 pub mod model;
 pub mod pipeline;
+pub mod player_model;
 pub mod presentation;
 pub mod procgen;
 pub mod rng;
