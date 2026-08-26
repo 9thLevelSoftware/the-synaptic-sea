@@ -82,6 +82,7 @@ func consume(
 		capabilities: Dictionary = {}) -> Dictionary:
 	last_error = ""
 	if request.is_empty() or result_json.is_empty(): return _fail("missing_bundle")
+	if not _validate_request(request): return {}
 	if not _validate_context(request, build_manifest, runtime_manifest, capabilities): return {}
 	var parser := JSON.new()
 	if parser.parse(result_json) != OK or not parser.data is Dictionary: return _fail("malformed_bundle_json")
@@ -100,6 +101,68 @@ func consume(
 	if not _validate_bundle(bundle, request, build_manifest, capabilities): return {}
 	if not _verify_hash(result_json, bundle): return {}
 	return bundle.duplicate(true)
+
+func _validate_request(request: Dictionary) -> bool:
+	var request_keys: Array[String] = [
+		"schema_version", "world_seed", "site", "difficulty_id", "player_model",
+		"requested_domains", "generator_version", "content_manifest_hash", "presentation",
+	]
+	if not _has_exact_keys(request, request_keys): return _reject("request_shape")
+	if str(request.get("schema_version", "")) != EXPORT_SCHEMAS.procgen_request: return _reject("request_schema")
+	var world_seed: Variant = request.get("world_seed", null)
+	if not _is_json_integer(world_seed) or int(world_seed) < 0: return _reject("request_bounds")
+
+	var site_value: Variant = request.get("site", null)
+	var site_keys: Array[String] = [
+		"site_id", "x", "y", "archetype_id", "kit_id", "intactness_override_bp",
+		"cause_of_loss", "loot_richness_bp",
+	]
+	if not site_value is Dictionary or not _has_exact_keys(site_value, site_keys): return _reject("request_site_shape")
+	var site: Dictionary = site_value
+	if str(site.get("site_id", "")).is_empty() \
+			or not SUPPORTED_ARCHETYPES.has(str(site.get("archetype_id", ""))) \
+			or str(site.get("kit_id", "")) != "ship_structural_v0": return _reject("request_identity")
+	for coordinate in [site.get("x", null), site.get("y", null)]:
+		if not _is_json_integer(coordinate): return _reject("request_bounds")
+		if int(coordinate) != 0: return _reject("request_coordinates")
+	var intactness: Variant = site.get("intactness_override_bp", null)
+	var loot_richness: Variant = site.get("loot_richness_bp", null)
+	if not _is_json_integer(intactness) or int(intactness) < 0 or int(intactness) > 10000 \
+			or not _is_json_integer(loot_richness) or int(loot_richness) != 5000: return _reject("request_bounds")
+	if site.get("cause_of_loss", null) != null: return _reject("request_identity")
+	if not _validate_site_id(str(site.get("site_id", "")), int(world_seed), int(intactness)): return false
+
+	if not SUPPORTED_DIFFICULTIES.has(str(request.get("difficulty_id", ""))): return _reject("request_difficulty")
+	var player_value: Variant = request.get("player_model", null)
+	if not player_value is Dictionary or not _has_exact_keys(player_value, ["schema_version", "signals"]): return _reject("request_player_model")
+	var player: Dictionary = player_value
+	if str(player.get("schema_version", "")) != "player-model-1" \
+			or not player.get("signals", null) is Array \
+			or not (player.get("signals", []) as Array).is_empty(): return _reject("request_player_model")
+	if not _same_json(request.get("requested_domains", null), DOMAINS): return _reject("request_domains")
+	if not _is_json_integer(request.get("generator_version", null)) \
+			or int(request.get("generator_version", -1)) != GENERATOR_VERSION \
+			or str(request.get("content_manifest_hash", "")) != CONTENT_HASH: return _reject("request_version")
+
+	var presentation_value: Variant = request.get("presentation", null)
+	if not presentation_value is Dictionary or not _has_exact_keys(presentation_value, ["seed", "locale"]): return _reject("request_presentation")
+	var presentation: Dictionary = presentation_value
+	if not _is_json_integer(presentation.get("seed", null)) \
+			or not _same_json(presentation.get("seed", null), world_seed) \
+			or str(presentation.get("locale", "")) != "en-US": return _reject("request_presentation")
+	return true
+
+func _validate_site_id(site_id: String, world_seed: int, intactness: int) -> bool:
+	var parts: PackedStringArray = site_id.split("_")
+	if parts.size() != 4 or parts[0] != "site" \
+			or not parts[1].is_valid_int() or not parts[2].is_valid_int() or not parts[3].is_valid_int(): return _reject("request_site_id")
+	var size: int = parts[2].to_int()
+	var condition: int = parts[3].to_int()
+	var intactness_by_condition: Dictionary = {0: 9500, 1: 6000, 2: 2000}
+	if parts[1].to_int() != world_seed or size < 0 or size > 2 \
+			or not intactness_by_condition.has(condition) \
+			or int(intactness_by_condition[condition]) != intactness: return _reject("request_site_id")
+	return true
 
 func _validate_context(request: Dictionary, build: Dictionary, runtime: Dictionary, caps: Dictionary) -> bool:
 	var build_keys: Array[String] = ["manifest_schema", "rust_source_commit", "generator_version", "content_manifest_path", "content_manifest_hash", "target", "artifact", "export_schemas"]
@@ -285,7 +348,7 @@ func _has_exact_keys(value: Variant, expected: Array) -> bool:
 	return true
 
 func _is_json_integer(value: Variant) -> bool:
-	if value is int: return true
+	if value is int: return int(value) >= -MAX_SAFE_JSON_INTEGER and int(value) <= MAX_SAFE_JSON_INTEGER
 	return value is float and is_finite(float(value)) and float(value) == floor(float(value)) and absf(float(value)) <= float(MAX_SAFE_JSON_INTEGER)
 
 func _is_lower_hex(value: String, length: int) -> bool:
@@ -297,7 +360,15 @@ func _is_lower_hex(value: String, length: int) -> bool:
 func _is_sha256(value: String) -> bool: return _is_lower_hex(value, 64)
 
 func _same_json(left: Variant, right: Variant) -> bool:
-	if (left is int or left is float) and (right is int or right is float): return float(left) == float(right)
+	if left is int and right is int: return int(left) == int(right)
+	if left is float and right is float:
+		return is_finite(float(left)) and is_finite(float(right)) and float(left) == float(right)
+	if (left is int and right is float) or (left is float and right is int):
+		var integer: int = int(left) if left is int else int(right)
+		var floating: float = float(right) if left is int else float(left)
+		return integer >= -MAX_SAFE_JSON_INTEGER and integer <= MAX_SAFE_JSON_INTEGER \
+				and is_finite(floating) and floating == floor(floating) \
+				and absf(floating) <= float(MAX_SAFE_JSON_INTEGER) and integer == int(floating)
 	if left is Dictionary and right is Dictionary:
 		if left.size() != right.size(): return false
 		for key in left.keys():

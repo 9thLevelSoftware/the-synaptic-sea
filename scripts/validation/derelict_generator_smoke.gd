@@ -83,7 +83,7 @@ func _initialize() -> void:
 				break
 
 		# 5. Full pipeline (ShipGenerator).
-		var ship: Node3D = gen.generate(bp, archetype)
+		var ship: Node3D = gen.generate_migration_oracle(bp, archetype)
 		if ship == null:
 			failures.append("seed=%d ShipGenerator returned null" % seed_val)
 			continue

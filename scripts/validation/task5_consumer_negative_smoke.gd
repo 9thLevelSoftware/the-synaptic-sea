@@ -37,6 +37,24 @@ func _init() -> void:
 		count += 1
 		var result: Dictionary = consumer.consume(raw, request, build_case, runtime_case, caps_case)
 		_expect(result.is_empty() and consumer.last_error == str(item[5]), failures, str(item[0]) + ":" + consumer.last_error)
+	var request_cases: Array = [
+		["request_extra", "extra", true, "request_shape"],
+		["request_schema", "schema_version", "wrong", "request_schema"],
+		["request_seed_bounds", "world_seed", 9007199254740992, "request_bounds"],
+		["request_coordinate_bounds", "site.x", 9007199254740992, "request_bounds"],
+		["request_coordinate_v1", "site.y", 1, "request_coordinates"],
+		["request_player_signals", "player_model.signals", [1], "request_player_model"],
+		["request_domains_order", "requested_domains", ["site", "world", "gameplay", "presentation"], "request_domains"],
+		["request_presentation_seed", "presentation.seed", 43, "request_presentation"],
+	]
+	for item in request_cases:
+		var request_case: Dictionary = request.duplicate(true)
+		_set_path(request_case, str(item[1]), item[2])
+		count += 1
+		var result: Dictionary = consumer.consume(raw, request_case, build, runtime, caps)
+		_expect(result.is_empty() and consumer.last_error == str(item[3]), failures, str(item[0]) + ":" + consumer.last_error)
+	count += 1; _expect(consumer._same_json(42, 42.0), failures, "safe_mixed_numeric_identity")
+	count += 1; _expect(not consumer._same_json(9007199254740992, 9007199254740993), failures, "unsafe_integer_identity")
 	count += 1; _expect(consumer.build_request(9007199254740992, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "unsafe_seed")
 	count += 1; _expect(consumer.build_request(-1, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "negative_seed")
 	count += 1; _expect(consumer.build_request(42, 99, 1, runtime).is_empty() and consumer.last_error == "unsupported_ship_parameters", failures, "unsupported_size")

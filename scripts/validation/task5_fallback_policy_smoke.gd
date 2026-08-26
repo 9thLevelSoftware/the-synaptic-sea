@@ -46,6 +46,13 @@ func _init() -> void:
 	_expect(malformed.resolve(request, consumer).is_empty(), failures, "malformed_rejected")
 	_expect(malformed.last_outcome == "invalid" and malformed.last_error == "fallback_invalid", failures, "malformed_outcome")
 
+	var malformed_context: RefCounted = FallbackPolicyScript.new()
+	var wrong_context_types: Dictionary = valid_context.duplicate(true)
+	wrong_context_types.build_manifest = "not-a-dictionary"
+	malformed_context.configure("fixture-safe", func(_request: Dictionary) -> Dictionary: return wrong_context_types)
+	_expect(malformed_context.resolve(request, consumer).is_empty(), failures, "malformed_context_rejected")
+	_expect(malformed_context.last_outcome == "invalid" and malformed_context.last_error == "fallback_invalid", failures, "malformed_context_outcome")
+
 	var validation: RefCounted = FallbackPolicyScript.new()
 	var invalid_context: Dictionary = valid_context.duplicate(true)
 	invalid_context.lifecycle = fallback_raw.replace("\"semantic_hash\":\"", "\"semantic_hash\":\"0")

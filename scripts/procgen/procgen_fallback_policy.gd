@@ -25,11 +25,17 @@ func resolve(request: Dictionary, consumer: RefCounted) -> Dictionary:
 		return {}
 	var context: Dictionary = value
 	if not _has_exact_keys(context, ["lifecycle", "build_manifest", "runtime_manifest", "capabilities"]) \
-			or not context.get("lifecycle", null) is String:
+			or not context.get("lifecycle", null) is String \
+			or not context.get("build_manifest", null) is Dictionary \
+			or not context.get("runtime_manifest", null) is Dictionary \
+			or not context.get("capabilities", null) is Dictionary:
 		last_outcome = "invalid"
 		last_error = "fallback_invalid"
 		return {}
-	var parsed: Dictionary = consumer.consume(context.lifecycle, request, context.build_manifest, context.runtime_manifest, context.capabilities)
+	var build_manifest: Dictionary = context.build_manifest
+	var runtime_manifest: Dictionary = context.runtime_manifest
+	var capabilities: Dictionary = context.capabilities
+	var parsed: Dictionary = consumer.consume(context.lifecycle, request, build_manifest, runtime_manifest, capabilities)
 	if parsed.is_empty():
 		last_outcome = "invalid"
 		last_error = "fallback_validation_%s" % str(consumer.last_error)
