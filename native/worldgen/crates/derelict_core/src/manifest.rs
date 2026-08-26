@@ -116,13 +116,23 @@ impl BuildManifest {
         if !is_sha256(&self.content_manifest_hash) {
             return Err(ManifestError::InvalidField("content_manifest_hash"));
         }
-        if self.target != "x86_64-pc-windows-msvc" {
-            return Err(ManifestError::InvalidField("target"));
-        }
-        if self.artifact.kind != "gdextension"
-            || self.artifact.path != "addons/derelict/bin/win64/derelict_godot.dll"
-            || !is_sha256(&self.artifact.sha256)
-        {
+        let valid_pair = matches!(
+            (
+                self.target.as_str(),
+                self.artifact.kind.as_str(),
+                self.artifact.path.as_str()
+            ),
+            (
+                "x86_64-pc-windows-msvc",
+                "gdextension",
+                "addons/derelict/bin/win64/derelict_godot.dll"
+            ) | (
+                "wasm32-unknown-unknown",
+                "wasm",
+                "addons/derelict/bin/web/derelict_wasm_bg.wasm"
+            )
+        );
+        if !valid_pair || !is_sha256(&self.artifact.sha256) {
             return Err(ManifestError::InvalidField("artifact"));
         }
         let schemas = [

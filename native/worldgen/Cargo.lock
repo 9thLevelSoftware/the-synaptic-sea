@@ -358,6 +358,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "derelict_wasm"
+version = "0.1.0"
+dependencies = [
+ "derelict_core",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

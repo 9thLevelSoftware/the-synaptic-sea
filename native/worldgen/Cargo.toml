@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/derelict_core", "crates/derelict_cli", "crates/derelict_godot"]
+members = ["crates/derelict_core", "crates/derelict_cli", "crates/derelict_godot", "crates/derelict_wasm"]
 resolver = "2"
 
 [workspace.package]

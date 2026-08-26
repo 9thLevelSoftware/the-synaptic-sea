@@ -6,7 +6,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTENT_MANIFEST = ROOT / "data/procgen/manifests/content_manifest.json"
-BUILD_MANIFEST = ROOT / "data/procgen/manifests/build/win64.json"
+BUILD_MANIFESTS = {
+    "windows": (ROOT / "data/procgen/manifests/build/win64.json", "x86_64-pc-windows-msvc", "gdextension", ROOT / "addons/derelict/bin/win64/derelict_godot.dll", "addons/derelict/bin/win64/derelict_godot.dll"),
+    "web": (ROOT / "data/procgen/manifests/build/web.json", "wasm32-unknown-unknown", "wasm", ROOT / "addons/derelict/bin/web/derelict_wasm_bg.wasm", "addons/derelict/bin/web/derelict_wasm_bg.wasm"),
+}
 ARTIFACT = ROOT / "addons/derelict/bin/win64/derelict_godot.dll"
 CONTENT_ROOTS = [
     ROOT / "native/worldgen/crates/derelict_core/assets",
@@ -34,12 +37,12 @@ def content_document(paths: list[Path]) -> dict:
     entries = [{"path": rel(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]
     return {"manifest_schema": "procgen-content-manifest-1", "files": entries, "content_manifest_hash": content_hash(paths)}
 
-def build_document(content_digest: str, source_commit: str) -> dict:
+def build_document(content_digest: str, source_commit: str, target: str, kind: str, artifact_path: str, artifact: Path) -> dict:
     return {
         "manifest_schema": "procgen-build-manifest-1", "rust_source_commit": source_commit,
         "generator_version": 2, "content_manifest_path": "data/procgen/manifests/content_manifest.json",
-        "content_manifest_hash": content_digest, "target": "x86_64-pc-windows-msvc",
-        "artifact": {"kind": "gdextension", "path": "addons/derelict/bin/win64/derelict_godot.dll", "sha256": hashlib.sha256(ARTIFACT.read_bytes()).hexdigest()},
+        "content_manifest_hash": content_digest, "target": target,
+        "artifact": {"kind": kind, "path": artifact_path, "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()},
         "export_schemas": {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-1", "world_ir":"world-ir-1", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"},
     }
 
@@ -47,10 +50,11 @@ def canonical(value: dict) -> str:
     return json.dumps(value, indent=2, sort_keys=False) + "\n"
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); parser.add_argument("--source-commit"); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); parser.add_argument("--source-commit"); parser.add_argument("--target", choices=sorted(BUILD_MANIFESTS), default="windows"); args = parser.parse_args()
+    build_manifest, target, kind, artifact, artifact_path = BUILD_MANIFESTS[args.target]
     source_commit = args.source_commit
-    if source_commit is None and BUILD_MANIFEST.exists():
-        try: source_commit = json.loads(BUILD_MANIFEST.read_text(encoding="utf-8"))["rust_source_commit"]
+    if source_commit is None and build_manifest.exists():
+        try: source_commit = json.loads(build_manifest.read_text(encoding="utf-8"))["rust_source_commit"]
         except (OSError, KeyError, TypeError, json.JSONDecodeError): source_commit = ""
     if not isinstance(source_commit, str) or len(source_commit) != 40 or any(c not in "0123456789abcdef" for c in source_commit):
         print("source commit must be 40 lowercase hexadecimal characters", file=sys.stderr); return 1
@@ -58,10 +62,10 @@ def main() -> int:
     if commit_check.returncode != 0:
         print(f"source commit is not present in Git: {source_commit}", file=sys.stderr); return 1
     paths = files()
-    if not ARTIFACT.exists():
-        print(f"missing artifact: {rel(ARTIFACT)}", file=sys.stderr); return 1
-    content = content_document(paths); build = build_document(content["content_manifest_hash"], source_commit)
-    expected = {CONTENT_MANIFEST: canonical(content), BUILD_MANIFEST: canonical(build)}
+    if not artifact.exists():
+        print(f"missing artifact: {rel(artifact)}", file=sys.stderr); return 1
+    content = content_document(paths); build = build_document(content["content_manifest_hash"], source_commit, target, kind, artifact_path, artifact)
+    expected = {CONTENT_MANIFEST: canonical(content), build_manifest: canonical(build)}
     failures = []
     for path, text in expected.items():
         actual = path.read_text(encoding="utf-8") if path.exists() else None
