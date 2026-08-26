@@ -2,6 +2,7 @@
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
     ProcgenCapabilities, WorkerMode, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
+    PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::procgen::{
@@ -199,7 +200,9 @@ impl WasmService {
     }
 }
 fn json_fallback() -> String {
-    r#"{"schema_version":"procgen-lifecycle-result-2","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
+    format!(
+        r#"{{"schema_version":"{PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3}","status":"failed","request_id":null,"bundle":null,"failure":{{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null}},"events":["failed"]}}"#
+    )
 }
 
 fn failure(
@@ -647,7 +650,7 @@ mod tests {
     use derelict_core::model::{EntityKind, GENERATOR_VERSION};
     use derelict_core::procgen::{
         semantic_hash, PlayerModel, PresentationRequest, ProcgenBundle, SiteRequest,
-        PROCGEN_REQUEST_SCHEMA,
+        GENERATION_TRACE_SCHEMA, PROCGEN_BUNDLE_SCHEMA, PROCGEN_REQUEST_SCHEMA, SITE_IR_SCHEMA,
     };
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
@@ -814,6 +817,30 @@ mod tests {
     }
 
     #[test]
+    fn request_schema_substitution_and_unknown_fields_fail_closed() {
+        let service = WasmService::default();
+        let valid = request_json();
+
+        let substituted_schema = valid.replace(
+            "\"schema_version\":\"procgen-request-1\"",
+            "\"schema_version\":\"procgen-request-2\"",
+        );
+        assert_eq!(
+            failure_code(&parse(&service.sync(&substituted_schema))),
+            Some(ProcgenFailureCode::InvalidRequest)
+        );
+
+        let mut with_unknown: serde_json::Value = serde_json::from_str(&valid).unwrap();
+        with_unknown["unexpected"] = serde_json::Value::Bool(true);
+        let with_unknown = serde_json::to_string(&with_unknown).unwrap();
+        assert_eq!(
+            failure_code(&parse(&service.sync(&with_unknown))),
+            Some(ProcgenFailureCode::InvalidRequest)
+        );
+        assert_eq!(parse(&service.submit(&valid)).request_id, Some(1));
+    }
+
+    #[test]
     fn injected_services_have_isolated_lifecycle_state() {
         let left = WasmService::default();
         let right = WasmService::default();
@@ -856,8 +883,11 @@ mod tests {
         );
         let sync = parse(&service.sync(&request_json()));
         let sync_bundle = sync.bundle.as_ref().expect("sync bundle");
-        assert_eq!(sync_bundle.schema_version, "procgen-bundle-2");
+        assert_eq!(sync.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+        assert_eq!(sync_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(sync_bundle.world_ir.schema_version, "world-ir-2");
+        assert_eq!(sync_bundle.site_ir.schema_version, SITE_IR_SCHEMA);
+        assert_eq!(sync_bundle.trace.schema_version, GENERATION_TRACE_SCHEMA);
         assert_eq!(
             sync_bundle.site_ir.ship.generator_version,
             GENERATOR_VERSION
@@ -882,8 +912,14 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         let terminal = parse(&service.poll_request(1));
         let terminal_bundle = terminal.bundle.as_ref().expect("terminal bundle");
-        assert_eq!(terminal_bundle.schema_version, "procgen-bundle-2");
+        assert_eq!(terminal.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+        assert_eq!(terminal_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(terminal_bundle.world_ir.schema_version, "world-ir-2");
+        assert_eq!(terminal_bundle.site_ir.schema_version, SITE_IR_SCHEMA);
+        assert_eq!(
+            terminal_bundle.trace.schema_version,
+            GENERATION_TRACE_SCHEMA
+        );
         assert_eq!(
             terminal_bundle.site_ir.ship.generator_version,
             GENERATOR_VERSION
