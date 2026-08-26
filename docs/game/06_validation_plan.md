@@ -132,6 +132,23 @@ Gate 0..6 cards on `synaptic-sea-stage-gate`.
   source assertions prove no authoritative post-generation encounter, loot, or
   biome mutation remains in the production bridge.
 
+Focused commands (each Godot command requires its PASS marker and no unexpected
+`ERROR:`/`WARNING:` line):
+
+```bash
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_canonical_json_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_live_consumer_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_consumer_negative_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_live_mapper_parity_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_mapper_fixture_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_bridge_source_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_fallback_policy_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/worldgen_wired_travel_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://native/worldgen/godot/tests/lifecycle_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_build_manifest_smoke.gd
+node "$ROOT/native/worldgen/web/wasm_lifecycle_smoke.mjs"
+```
+
 ### Gate 2 focused evidence
 
 - Coordinate/discovery-order/parallel-scheduling invariance tests.
@@ -191,11 +208,15 @@ Gate 0..6 cards on `synaptic-sea-stage-gate`.
   stop, runtime 60 fps target / 30 fps stop, plus declared per-stage latency,
   queue, entity, instance, navigation, and Web build-size limits.
 
-Current baseline (2026-08-26): the external Rust workspace passes all workspace
-tests. Windows Godot 4.7.2 reaches `WORLDGEN WIRED TRAVEL PASS`, but missing
-damaged/breached structural GLBs emit unexpected errors; the smoke is therefore
-blocking and remains unregistered. Canonical Godot 4.7.1 and macOS/Linux/Web
-evidence remain unverified.
+Current baseline (2026-08-26): imported Rust fmt, strict clippy, all workspace
+tests, and the 1,800-ship stress sweep pass. Windows Godot 4.7.2 passes all ten
+focused Gate 1 commands above, including `WORLDGEN WIRED TRAVEL PASS`, with no
+unexpected warnings or errors. Source structural GLBs are valid; the earlier
+missing-asset output came from an incomplete isolated-worktree import cache.
+The installed WASM package passes the Node lifecycle/shared-parity smoke. These
+smokes remain intentionally unregistered until Gate 6 Task 15 updates the
+canonical regression bundle. Canonical Godot 4.7.1, macOS/Linux exports, and
+final exported-Web parity remain unverified.
 
 ## Regression bundle
 

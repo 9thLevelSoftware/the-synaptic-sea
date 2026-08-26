@@ -316,7 +316,7 @@ Fresh evidence is required for every completion claim:
 
 ```text
 cargo test --workspace
-cargo run --release -p worldgen-cli -- stress --ships 1800
+cargo run --release -p derelict_cli -- --stress
 python tools/build_system_inventory.py --check
 python scripts/validation/doc_currency_validators.py requirement-trace
 <godot> --headless --path . --script res://scripts/validation/worldgen_wired_travel_smoke.gd
@@ -332,10 +332,15 @@ peak memory under 512 MB target / 1 GB stop, and 60 fps target / 30 fps stop.
 Per-stage latency, queue depth, entities, instances, navigation, and Web build
 size receive explicit budgets before their gate closes.
 
-Current Windows baseline: Rust workspace tests pass. Godot 4.7.2 Mono from the
-Downloads directory reaches the wired-travel pass marker, but unexpected missing
-structural-asset errors remain blocking; it is not clean Gate evidence. The
-documented 4.7.1 toolchain and macOS/Linux/Web parity remain unverified.
+Current Windows evidence: Rust fmt, strict clippy, workspace tests, and the
+1,800-ship release stress sweep pass. The exact Godot 4.7.2 Mono console in the
+Downloads directory passes the ten-script Gate 1 bundle/mapper/fallback/
+lifecycle/manifest/wired-travel suite with no unexpected warnings or errors.
+The structural source GLBs are present and valid; the earlier missing-asset
+diagnosis was traced to an incomplete isolated-worktree import cache. The
+installed WebAssembly package also passes its Node lifecycle and shared parity
+corpus. Canonical Godot 4.7.1, macOS/Linux exports, and final exported-Web parity
+remain explicit Gate 6 evidence and are not yet verified.
 
 ## Risks
 
