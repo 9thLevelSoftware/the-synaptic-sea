@@ -260,6 +260,17 @@ fn generation_is_call_order_invariant_and_thread_byte_identical() {
 #[test]
 fn malformed_candidate_matrix_rejects_every_named_mutation() {
     let (req, rules, world) = candidate();
+    let marker_archetype_alt = rules
+        .archetypes
+        .iter()
+        .find(|id| *id != &world.markers[1].archetype_id)
+        .cloned()
+        .unwrap();
+    let route_cost_alt = if world.routes[0].cost_bp < rules.route_cost_bp.max_bp {
+        world.routes[0].cost_bp + 1
+    } else {
+        world.routes[0].cost_bp - 1
+    };
     let mut mutations: Vec<(&str, CandidateMutation)> = Vec::new();
     macro_rules! m {
         ($name:expr, $body:expr) => {
@@ -279,9 +290,9 @@ fn malformed_candidate_matrix_rejects_every_named_mutation() {
     m!("marker_site", |w: &mut WorldIR| w.markers[1].site_id =
         "site:bad".into());
     m!("marker_coord", |w: &mut WorldIR| w.markers[1].x += 1);
-    m!("marker_archetype", |w: &mut WorldIR| w.markers[1]
+    m!("marker_archetype", move |w: &mut WorldIR| w.markers[1]
         .archetype_id =
-        "shuttle".into());
+        marker_archetype_alt.clone());
     m!("marker_seed", |w: &mut WorldIR| w.markers[1].site_seed ^= 1);
     m!("marker_selected", |w: &mut WorldIR| w.markers[1].selected =
         true);
@@ -304,14 +315,14 @@ fn malformed_candidate_matrix_rejects_every_named_mutation() {
     }
     m!("biome_family", |w: &mut WorldIR| w.biome_fields[0]
         .biome_id =
-        "ion_storm".into());
+        "unknown_family".into());
     m!("hazard_family", |w: &mut WorldIR| w.hazard_fields[0]
         .hazard_id =
-        "scrap".into());
+        "unknown_family".into());
     m!("resource_family", |w: &mut WorldIR| w.resource_pressures
         [0]
     .resource_id =
-        "relay".into());
+        "unknown_family".into());
     m!("biome_bp", |w: &mut WorldIR| w.biome_fields[0]
         .intensity_bp ^= 1);
     m!("hazard_bp", |w: &mut WorldIR| w.hazard_fields[0]
@@ -342,10 +353,9 @@ fn malformed_candidate_matrix_rejects_every_named_mutation() {
         let r = &mut w.routes[0];
         std::mem::swap(&mut r.from, &mut r.to);
     });
-    m!("route_reversed", |w: &mut WorldIR| {
-        let r = &mut w.routes[0];
-        std::mem::swap(&mut r.from, &mut r.to);
-    });
+    m!("route_cost_changed", move |w: &mut WorldIR| w.routes[0]
+        .cost_bp =
+        route_cost_alt);
     m!("route_unsorted", |w: &mut WorldIR| w.routes.swap(0, 1));
     m!("route_zero", |w: &mut WorldIR| w.routes[0].cost_bp = 0);
     m!("route_over_max", |w: &mut WorldIR| w.routes[0].cost_bp =
@@ -389,10 +399,7 @@ fn malformed_candidate_matrix_rejects_every_named_mutation() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             altered.validate_for_request(&req, &rules)
         }));
-        assert!(
-            matches!(result, Ok(Err(_)) | Err(_)),
-            "mutation {name} was accepted"
-        );
+        assert!(matches!(result, Ok(Err(_))), "mutation {name} was accepted");
     }
     eprintln!("malformed candidate matrix cases: {}", mutations.len());
 }
