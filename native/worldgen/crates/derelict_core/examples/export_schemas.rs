@@ -333,7 +333,7 @@ fn enrich(name: &str, root: &mut Value) {
 
 fn main() {
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
-    let items: [(&str, Value); 14] = [
+    let mut items: Vec<(&str, Value)> = vec![
         ("procgen-request-1", schema::<ProcgenRequest>()),
         ("procgen-bundle-1", schema::<ProcgenBundle>()),
         ("world-ir-1", schema::<WorldIR>()),
@@ -352,6 +352,29 @@ fn main() {
             schema::<GeneratorManifest>(),
         ),
     ];
+    // Platform-v3 schemas are additive immutable siblings. Generate them from
+    // the Rust contracts rather than maintaining hand-written JSON stubs.
+    let mut world_v2 = schema::<derelict_core::world::WorldIRv2>();
+    world_v2["title"] = Value::String("world-ir-2".into());
+    world_v2["$id"] = Value::String("world-ir-2".into());
+    items.push(("world-ir-2", world_v2));
+    let mut bundle_v2 = schema::<ProcgenBundle>();
+    replace_string_values(&mut bundle_v2, "procgen-bundle-1", "procgen-bundle-2");
+    replace_string_values(&mut bundle_v2, "world-ir-1", "world-ir-2");
+    bundle_v2["title"] = Value::String("procgen-bundle-2".into());
+    bundle_v2["$id"] = Value::String("procgen-bundle-2".into());
+    items.push(("procgen-bundle-2", bundle_v2));
+    let mut lifecycle_v2 = schema::<LifecycleResult>();
+    replace_string_values(
+        &mut lifecycle_v2,
+        "procgen-lifecycle-result-1",
+        "procgen-lifecycle-result-2",
+    );
+    replace_string_values(&mut lifecycle_v2, "procgen-bundle-1", "procgen-bundle-2");
+    replace_string_values(&mut lifecycle_v2, "world-ir-1", "world-ir-2");
+    lifecycle_v2["title"] = Value::String("procgen-lifecycle-result-2".into());
+    lifecycle_v2["$id"] = Value::String("procgen-lifecycle-result-2".into());
+    items.push(("procgen-lifecycle-result-2", lifecycle_v2));
     let write = env::args().any(|arg| arg == "--write");
     let check = env::args().any(|arg| arg == "--check");
     if !write && !check {
@@ -374,5 +397,18 @@ fn main() {
                 process::exit(1);
             }
         }
+    }
+}
+
+fn replace_string_values(value: &mut Value, from: &str, to: &str) {
+    match value {
+        Value::String(s) if s == from => *s = to.into(),
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|v| replace_string_values(v, from, to)),
+        Value::Array(values) => values
+            .iter_mut()
+            .for_each(|v| replace_string_values(v, from, to)),
+        _ => {}
     }
 }

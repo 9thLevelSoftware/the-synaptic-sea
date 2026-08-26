@@ -1,14 +1,138 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"world-ir-2",
-  "title":"world-ir-2",
-  "type":"object",
-  "additionalProperties":false,
-  "required":["schema_version","world_seed","site_id","x","y","archetype_id","site_seed","markers","routes","biome_id","hazard_id","resource_pressure_bp","landmarks","extraction_path"],
-  "properties":{
-    "schema_version":{"const":"world-ir-2"},"world_seed":{"type":"integer","minimum":0,"maximum":9007199254740991},"site_id":{"type":"string","minLength":1},"x":{"type":"integer"},"y":{"type":"integer"},"archetype_id":{"type":"string","minLength":1},"site_seed":{"type":"integer","minimum":0,"maximum":9007199254740991},
-    "markers":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["x","y","kind","value"],"properties":{"x":{"type":"integer"},"y":{"type":"integer"},"kind":{"type":"string"},"value":{"type":"integer"}}}},
-    "routes":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["from","to","cost_bp"],"properties":{"from":{"type":"string"},"to":{"type":"string"},"cost_bp":{"type":"integer","minimum":1,"maximum":100000}}}},
-    "biome_id":{"type":"string","minLength":1},"hazard_id":{"type":"string","minLength":1},"resource_pressure_bp":{"type":"integer","minimum":0,"maximum":100000},"landmarks":{"type":"array","items":{"type":"string"}},"extraction_path":{"type":"array","minItems":3,"items":{"type":"string"}}
-  }
+  "$id": "world-ir-2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "CoordinateMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "value": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "RouteEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cost_bp",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "archetype_id": {
+      "type": "string"
+    },
+    "biome_id": {
+      "type": "string"
+    },
+    "extraction_path": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "hazard_id": {
+      "type": "string"
+    },
+    "landmarks": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "markers": {
+      "items": {
+        "$ref": "#/definitions/CoordinateMarker"
+      },
+      "type": "array"
+    },
+    "resource_pressure_bp": {
+      "format": "uint32",
+      "minimum": 0.0,
+      "type": "integer"
+    },
+    "routes": {
+      "items": {
+        "$ref": "#/definitions/RouteEdge"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_seed": {
+      "format": "uint64",
+      "minimum": 0.0,
+      "type": "integer"
+    },
+    "world_seed": {
+      "format": "uint64",
+      "minimum": 0.0,
+      "type": "integer"
+    },
+    "x": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "y": {
+      "format": "int32",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "archetype_id",
+    "biome_id",
+    "extraction_path",
+    "hazard_id",
+    "landmarks",
+    "markers",
+    "resource_pressure_bp",
+    "routes",
+    "schema_version",
+    "site_id",
+    "site_seed",
+    "world_seed",
+    "x",
+    "y"
+  ],
+  "title": "world-ir-2",
+  "type": "object"
 }

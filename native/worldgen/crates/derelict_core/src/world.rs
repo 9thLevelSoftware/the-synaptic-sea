@@ -9,7 +9,8 @@ use std::collections::BTreeSet;
 pub const PROCGEN_GENERATOR_VERSION: u32 = 3;
 pub const MAX_PUBLIC_SEED: u64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct WorldKey {
     pub world_seed: u64,
     pub platform_version: u32,
@@ -87,20 +88,23 @@ fn put_i32(h: &mut Sha256, value: i32) {
     h.update(value.to_be_bytes());
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CoordinateMarker {
     pub x: i32,
     pub y: i32,
     pub kind: String,
     pub value: i32,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RouteEdge {
     pub from: String,
     pub to: String,
     pub cost_bp: u32,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct WorldIRv2 {
     pub schema_version: String,
     pub world_seed: u64,
