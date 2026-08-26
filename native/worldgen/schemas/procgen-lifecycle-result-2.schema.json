@@ -2218,19 +2218,19 @@
           "type": "array"
         },
         "schema_version": {
-          "type": "string"
+          "const": "world-ir-2"
         },
         "site_id": {
           "type": "string"
         },
         "site_seed": {
-          "format": "uint64",
-          "minimum": 0.0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
           "type": "integer"
         },
         "world_seed": {
-          "format": "uint64",
-          "minimum": 0.0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
           "type": "integer"
         },
         "x": {
@@ -2308,18 +2308,8 @@
     "schema_version": {
       "const": "procgen-lifecycle-result-2"
     },
-    "site_seed": {
-      "maximum": 9007199254740991,
-      "minimum": 0,
-      "type": "integer"
-    },
     "status": {
       "$ref": "#/definitions/LifecycleStatus"
-    },
-    "world_seed": {
-      "maximum": 9007199254740991,
-      "minimum": 0,
-      "type": "integer"
     }
   },
   "required": [

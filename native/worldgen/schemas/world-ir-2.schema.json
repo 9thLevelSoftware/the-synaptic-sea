@@ -238,33 +238,6 @@
       },
       "type": "array"
     },
-    "rng_channels": {
-      "const": [
-        "world.archetype",
-        "world.biome",
-        "world.hazard",
-        "world.resource",
-        "world.landmark",
-        "world.route_cost",
-        "site.structural",
-        "meta",
-        "hull",
-        "template",
-        "topology",
-        "residual_fill",
-        "door",
-        "furnish",
-        "story",
-        "intact",
-        "breach",
-        "scorch",
-        "seal",
-        "bodies",
-        "fracture",
-        "debris",
-        "loot"
-      ]
-    },
     "routes": {
       "items": {
         "$ref": "#/definitions/RouteEdge"

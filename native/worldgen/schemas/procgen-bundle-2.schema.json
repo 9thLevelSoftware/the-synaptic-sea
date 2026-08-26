@@ -1923,19 +1923,19 @@
           "type": "array"
         },
         "schema_version": {
-          "type": "string"
+          "const": "world-ir-2"
         },
         "site_id": {
           "type": "string"
         },
         "site_seed": {
-          "format": "uint64",
-          "minimum": 0.0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
           "type": "integer"
         },
         "world_seed": {
-          "format": "uint64",
-          "minimum": 0.0,
+          "maximum": 9007199254740991,
+          "minimum": 0,
           "type": "integer"
         },
         "x": {
@@ -1989,11 +1989,6 @@
     "site_ir": {
       "$ref": "#/definitions/SiteIR"
     },
-    "site_seed": {
-      "maximum": 9007199254740991,
-      "minimum": 0,
-      "type": "integer"
-    },
     "trace": {
       "$ref": "#/definitions/GenerationTrace"
     },
@@ -2002,11 +1997,6 @@
     },
     "world_ir": {
       "$ref": "#/definitions/WorldIRv2"
-    },
-    "world_seed": {
-      "maximum": 9007199254740991,
-      "minimum": 0,
-      "type": "integer"
     }
   },
   "required": [

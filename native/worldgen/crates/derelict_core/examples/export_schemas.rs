@@ -25,22 +25,36 @@ fn schema<T: JsonSchema>() -> Value {
 }
 
 fn def<'a>(root: &'a mut Value, name: &str) -> &'a mut Value {
-    if root
-        .get("definitions")
-        .and_then(Value::as_object)
-        .is_none_or(|defs| !defs.contains_key(name))
-        && (root.get("title").and_then(Value::as_str) == Some(name)
-            || root
-                .get("properties")
+    let root_title = root
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let standalone_title = root_title.starts_with("procgen-")
+        || root_title.starts_with("world-ir-")
+        || root_title.starts_with("site-ir-")
+        || root_title.starts_with("gameplay-ir-")
+        || root_title.starts_with("presentation-ir-")
+        || root_title.starts_with("generation-")
+        || root_title.starts_with("adaptive-");
+    if (root_title == name
+        || standalone_title
+            && !root
+                .get("definitions")
                 .and_then(Value::as_object)
-                .is_some_and(|p| p.contains_key("schema_version")))
+                .is_some_and(|defs| defs.contains_key(name)))
+        || (name == "WorldIRv2" && root.get("title").and_then(Value::as_str) == Some("world-ir-2"))
+        || (name == "ProcgenBundle"
+            && root.get("title").and_then(Value::as_str) == Some("procgen-bundle-2"))
+        || (name == "LifecycleResult"
+            && root.get("title").and_then(Value::as_str) == Some("procgen-lifecycle-result-2"))
     {
         return root;
     }
     root.get_mut("definitions")
         .and_then(Value::as_object_mut)
         .and_then(|defs| defs.get_mut(name))
-        .unwrap_or_else(|| panic!("missing schema definition {name}"))
+        .unwrap_or_else(|| panic!("missing schema definition {name}, title={root_title}"))
 }
 
 fn const_field(root: &mut Value, definition: &str, field: &str, value: &str) {
@@ -80,7 +94,7 @@ fn apply_request_constraints(root: &mut Value) {
 
 fn apply_platform_v3_constraints(root: &mut Value) {
     if root.get("title").and_then(Value::as_str) == Some("world-ir-2") {
-        def(root, "WorldIR")["properties"]["schema_version"] =
+        def(root, "WorldIRv2")["properties"]["schema_version"] =
             serde_json::json!({"const":"world-ir-2"});
     } else if root.get("title").and_then(Value::as_str) == Some("procgen-bundle-2") {
         def(root, "ProcgenBundle")["properties"]["schema_version"] =
@@ -90,7 +104,12 @@ fn apply_platform_v3_constraints(root: &mut Value) {
             serde_json::json!({"const":"procgen-lifecycle-result-2"});
     }
     let standalone_world = root.get("title").and_then(Value::as_str) == Some("world-ir-2");
-    if !standalone_world {
+    if !standalone_world
+        && root
+            .get("definitions")
+            .and_then(Value::as_object)
+            .is_some_and(|d| d.contains_key("ProcgenRequest"))
+    {
         let request = def(root, "ProcgenRequest");
         request["properties"]["generator_version"] = serde_json::json!({"const":3});
         request["properties"]["world_seed"] =
@@ -101,13 +120,26 @@ fn apply_platform_v3_constraints(root: &mut Value) {
         exports["properties"]["procgen_bundle"] = serde_json::json!({"const":"procgen-bundle-2"});
         exports["properties"]["world_ir"] = serde_json::json!({"const":"world-ir-2"});
     }
-    let world = def(root, "WorldIR");
-    world["properties"]["world_seed"] =
-        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
-    world["properties"]["site_seed"] =
-        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
-    let trace = def(root, "GenerationTrace");
-    trace["properties"]["rng_channels"] = serde_json::json!({"const":["world.archetype","world.biome","world.hazard","world.resource","world.landmark","world.route_cost","site.structural","meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
+    if root
+        .get("definitions")
+        .and_then(Value::as_object)
+        .is_some_and(|d| d.contains_key("WorldIRv2"))
+        || standalone_world
+    {
+        let world = def(root, "WorldIRv2");
+        world["properties"]["world_seed"] =
+            serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+        world["properties"]["site_seed"] =
+            serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+    }
+    if root
+        .get("definitions")
+        .and_then(Value::as_object)
+        .is_some_and(|d| d.contains_key("GenerationTrace"))
+    {
+        let trace = def(root, "GenerationTrace");
+        trace["properties"]["rng_channels"] = serde_json::json!({"const":["world.archetype","world.biome","world.hazard","world.resource","world.landmark","world.route_cost","site.structural","meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
+    }
     if let Some(adapter) = root
         .get_mut("definitions")
         .and_then(Value::as_object_mut)
@@ -217,7 +249,8 @@ fn enrich(name: &str, root: &mut Value) {
     let (definition, version) = match name {
         "procgen-request-1" => ("ProcgenRequest", "procgen-request-1"),
         "procgen-bundle-1" | "procgen-bundle-2" => ("ProcgenBundle", "procgen-bundle-1"),
-        "world-ir-1" | "world-ir-2" => ("WorldIR", "world-ir-1"),
+        "world-ir-1" => ("WorldIR", "world-ir-1"),
+        "world-ir-2" => ("WorldIRv2", "world-ir-1"),
         "site-ir-1" => ("SiteIR", "site-ir-1"),
         "gameplay-ir-1" => ("GameplayIR", "gameplay-ir-1"),
         "presentation-ir-1" => ("PresentationIR", "presentation-ir-1"),
@@ -235,6 +268,16 @@ fn enrich(name: &str, root: &mut Value) {
     };
     const_field(root, definition, "schema_version", version);
     root["title"] = Value::String(name.into());
+    if matches!(
+        name,
+        "procgen-lifecycle-result-1" | "procgen-lifecycle-result-2"
+    ) && !root
+        .get("definitions")
+        .and_then(Value::as_object)
+        .is_some_and(|d| d.contains_key("ProcgenBundle") && d.contains_key("ProcgenRequest"))
+    {
+        return;
+    }
     if matches!(
         name,
         "procgen-request-1" | "procgen-bundle-1" | "procgen-bundle-2"
@@ -263,6 +306,11 @@ fn enrich(name: &str, root: &mut Value) {
         apply_metrics_constraints(root);
     }
     if matches!(name, "procgen-bundle-1" | "procgen-bundle-2") {
+        let world_definition = if name == "procgen-bundle-2" {
+            "WorldIRv2"
+        } else {
+            "WorldIR"
+        };
         for (nested, nested_version) in [
             ("WorldIR", "world-ir-1"),
             ("SiteIR", "site-ir-1"),
@@ -271,7 +319,20 @@ fn enrich(name: &str, root: &mut Value) {
             ("GenerationTrace", "generation-trace-1"),
             ("GenerationMetrics", "generation-metrics-1"),
         ] {
-            const_field(root, nested, "schema_version", nested_version);
+            const_field(
+                root,
+                if nested == "WorldIR" {
+                    world_definition
+                } else {
+                    nested
+                },
+                "schema_version",
+                if nested == "WorldIR" && name == "procgen-bundle-2" {
+                    "world-ir-2"
+                } else {
+                    nested_version
+                },
+            );
         }
     } else if matches!(
         name,
@@ -283,6 +344,11 @@ fn enrich(name: &str, root: &mut Value) {
         apply_gameplay_constraints(root);
         apply_trace_constraints(root);
         apply_metrics_constraints(root);
+        let world_definition = if name == "procgen-lifecycle-result-2" {
+            "WorldIRv2"
+        } else {
+            "WorldIR"
+        };
         for (nested, nested_version) in [
             ("WorldIR", "world-ir-1"),
             ("SiteIR", "site-ir-1"),
@@ -291,7 +357,20 @@ fn enrich(name: &str, root: &mut Value) {
             ("GenerationTrace", "generation-trace-1"),
             ("GenerationMetrics", "generation-metrics-1"),
         ] {
-            const_field(root, nested, "schema_version", nested_version);
+            const_field(
+                root,
+                if nested == "WorldIR" {
+                    world_definition
+                } else {
+                    nested
+                },
+                "schema_version",
+                if nested == "WorldIR" && name == "procgen-lifecycle-result-2" {
+                    "world-ir-2"
+                } else {
+                    nested_version
+                },
+            );
         }
         def(root, "VersionEnvelope")["properties"]["generator_version"] =
             serde_json::json!({"const":2});
