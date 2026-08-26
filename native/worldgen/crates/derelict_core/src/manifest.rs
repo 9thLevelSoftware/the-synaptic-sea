@@ -11,6 +11,9 @@ pub const GAMEPLAY_IR_SCHEMA: &str = "gameplay-ir-1";
 pub const PRESENTATION_IR_SCHEMA: &str = "presentation-ir-1";
 pub const GENERATION_TRACE_SCHEMA: &str = "generation-trace-1";
 pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
+pub const PROCGEN_BUNDLE_SCHEMA_V2: &str = "procgen-bundle-2";
+pub const WORLD_IR_SCHEMA_V2: &str = "world-ir-2";
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str = "procgen-lifecycle-result-2";
 
 #[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -53,6 +56,22 @@ impl ExportSchemas {
             procgen_request: PROCGEN_REQUEST_SCHEMA.into(),
             procgen_bundle: PROCGEN_BUNDLE_SCHEMA.into(),
             world_ir: WORLD_IR_SCHEMA.into(),
+            site_ir: SITE_IR_SCHEMA.into(),
+            gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
+            presentation_ir: PRESENTATION_IR_SCHEMA.into(),
+            generation_trace: GENERATION_TRACE_SCHEMA.into(),
+            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
+        }
+    }
+
+    /// Platform-v3 export map. Unchanged layer schemas intentionally retain
+    /// their v1 identifiers; only the expanded world and complete envelope
+    /// advance.
+    pub fn platform_v3() -> Self {
+        Self {
+            procgen_request: PROCGEN_REQUEST_SCHEMA.into(),
+            procgen_bundle: PROCGEN_BUNDLE_SCHEMA_V2.into(),
+            world_ir: WORLD_IR_SCHEMA_V2.into(),
             site_ir: SITE_IR_SCHEMA.into(),
             gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA.into(),

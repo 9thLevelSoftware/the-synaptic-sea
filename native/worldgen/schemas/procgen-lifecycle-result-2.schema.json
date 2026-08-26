@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"procgen-lifecycle-result-2","title":"procgen-lifecycle-result-2","type":"object","additionalProperties":true,"required":["schema_version"],"properties":{"schema_version":{"const":"procgen-lifecycle-result-2"}}}
