@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{40}$')] [string] $SourceCommit,
     [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{64}$')] [string] $ContentHash,
     [ValidateSet('true', 'false')] [string] $Dirty = 'false',
-    [string] $OutputDirectory = (Join-Path $PSScriptRoot '..\..\addons\derelict\bin\web'),
+    [string] $OutputDirectory = (Join-Path $PSScriptRoot '..\..\..\addons\derelict\bin\web'),
     [string] $WasmBindgen = 'wasm-bindgen'
 )
 $ErrorActionPreference = 'Stop'

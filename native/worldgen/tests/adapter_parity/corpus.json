@@ -46,7 +46,7 @@
     "expected_semantic_hash": "4bd73eba039f84942c516c895871f0e35110dab53b745d2c1d97eff3be7e2c7a"
   },
   {
-    "name": "freighter_fractured_extreme",
+    "name": "freighter_damaged_extreme",
     "request": {
       "schema_version": "procgen-request-1",
       "world_seed": 12,
@@ -94,23 +94,23 @@
     "name": "freighter_damaged_min_negative",
     "request": {
       "schema_version": "procgen-request-1",
-      "world_seed": 1844674407370955161,
+      "world_seed": 9007199254740991,
       "site": {"site_id": "parity-freighter-min", "x": -2147483648, "y": -2147483647, "archetype_id": "freighter", "kit_id": "default", "intactness_override_bp": 7000, "cause_of_loss": "Depressurization", "loot_richness_bp": 7500},
       "difficulty_id": "hard",
       "player_model": {"schema_version": "player-model-1", "signals": [-1, -3, -5]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
       "generator_version": 2,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
-      "presentation": {"seed": 1844674407370955161, "locale": "es-ES"}
+      "presentation": {"seed": 9007199254740991, "locale": "es-ES"}
     },
-    "expected_semantic_hash": "aa3d6c553f279bc52192d52f4543f71303b8aa8b03d4231be0d2d65e2b9cc72d"
+    "expected_semantic_hash": "b6c9398405ef907c8beb40b3bcb572ea086b8ba00fff08137a32892f33f8210a"
   },
   {
-    "name": "frigate_fractured_mid",
+    "name": "frigate_fractured_seed12",
     "request": {
       "schema_version": "procgen-request-1",
-      "world_seed": 9090,
-      "site": {"site_id": "parity-frigate-fractured", "x": 4096, "y": -4096, "archetype_id": "frigate", "kit_id": "default", "intactness_override_bp": 1, "cause_of_loss": "ReactorBreach", "loot_richness_bp": 15000},
+      "world_seed": 12,
+      "site": {"site_id": "parity-frigate-fractured", "x": 4096, "y": -4096, "archetype_id": "frigate", "kit_id": "default", "intactness_override_bp": null, "cause_of_loss": null, "loot_richness_bp": 15000},
       "difficulty_id": "easy",
       "player_model": {"schema_version": "player-model-1", "signals": [5]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
@@ -118,7 +118,7 @@
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 42, "locale": "it-IT"}
     },
-    "expected_semantic_hash": "bb9737f8568e54ebad4ae7a79de8daf5500c6b52c2c0ac46b87653859fef83a5"
+    "expected_semantic_hash": "96d80349833c8b0b627fb8671f247e62180ec1eab822794cf77d7111906c6813"
   }
 ]
 

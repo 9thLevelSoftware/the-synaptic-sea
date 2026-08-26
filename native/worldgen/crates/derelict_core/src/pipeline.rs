@@ -15,7 +15,7 @@ use crate::structural::project::project_to_raster;
 use crate::structural::validate::{validate, ValidationPolicy, ValidationStage};
 use crate::topology::{place_topology, residual_fill, RoleParams, TemplateDef};
 use std::collections::BTreeMap;
-use std::time::Instant;
+use web_time::Instant;
 
 /// Bounded retry budgets (attempt index folds into RNG stream sub-keys; the
 /// master seed is never mutated).
