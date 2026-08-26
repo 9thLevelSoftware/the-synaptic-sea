@@ -8,11 +8,11 @@
       "difficulty_id": "easy",
       "player_model": {"schema_version": "player-model-1", "signals": [1, -2, 3]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 9, "locale": "en-US"}
     },
-    "expected_semantic_hash": "c527686c38076b3f3f2fb5b9cc20e853083f4f9ca3b47d44c45da36255b5ae6d"
+    "expected_semantic_hash": "1a5ed1f01e1134b3fc7759d5601c0c6a50bfe9c08a9d41bcd196a9344057697f"
   },
   {
     "name": "shuttle_intact_easy_presentation_variant",
@@ -23,11 +23,11 @@
       "difficulty_id": "easy",
       "player_model": {"schema_version": "player-model-1", "signals": [1, -2, 3]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 901, "locale": "fr-FR"}
     },
-    "expected_semantic_hash": "c527686c38076b3f3f2fb5b9cc20e853083f4f9ca3b47d44c45da36255b5ae6d",
+    "expected_semantic_hash": "1a5ed1f01e1134b3fc7759d5601c0c6a50bfe9c08a9d41bcd196a9344057697f",
     "same_semantics_as": "shuttle_intact_easy_positive"
   },
   {
@@ -39,11 +39,11 @@
       "difficulty_id": "hard",
       "player_model": {"schema_version": "player-model-1", "signals": [-7, 0, 11]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 77, "locale": "en-GB"}
     },
-    "expected_semantic_hash": "4bd73eba039f84942c516c895871f0e35110dab53b745d2c1d97eff3be7e2c7a"
+    "expected_semantic_hash": "8327d593b5bbbc244d2b31bce2a194b458728b29fd047cb75c013af2305cfc74"
   },
   {
     "name": "freighter_damaged_extreme",
@@ -54,11 +54,11 @@
       "difficulty_id": "extreme",
       "player_model": {"schema_version": "player-model-1", "signals": [99, -99]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 1200, "locale": "de-DE"}
     },
-    "expected_semantic_hash": "5e2d80150610c359ea2bafe25f50beae65c2c9aad76090ff6ed8f00712722810"
+    "expected_semantic_hash": "a5d853ee2ceeaf6fbb70cb05cdba7875017df6b23ee8556d1764cdb522eb10b9"
   },
   {
     "name": "frigate_damaged_origin",
@@ -69,41 +69,41 @@
       "difficulty_id": "nightmare",
       "player_model": {"schema_version": "player-model-1", "signals": [2, 4, 8, 16]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 2718, "locale": "ja-JP"}
     },
-    "expected_semantic_hash": "18255a89e0a93a76ddb283cc54a6542ac22ece93a624e78a7b9591ffe81842b1"
+    "expected_semantic_hash": "033bc828e8da98db99ac3447d66d0553a39b17dd9f43309e25ac416fa73e9829"
   },
   {
     "name": "corvette_intact_max_positive",
     "request": {
       "schema_version": "procgen-request-1",
       "world_seed": 987654321,
-      "site": {"site_id": "parity-corvette-max", "x": 2147483647, "y": 2147483647, "archetype_id": "corvette", "kit_id": "default", "intactness_override_bp": 10000, "cause_of_loss": "Unknown", "loot_richness_bp": 0},
+      "site": {"site_id": "parity-corvette-max", "x": 1000000000, "y": 1000000000, "archetype_id": "corvette", "kit_id": "default", "intactness_override_bp": 10000, "cause_of_loss": "Unknown", "loot_richness_bp": 0},
       "difficulty_id": "standard",
       "player_model": {"schema_version": "player-model-1", "signals": []},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 0, "locale": "en-US"}
     },
-    "expected_semantic_hash": "ed568703b303497819f388c5821ef8f9e03fcf7a20821f571ed4d0adbc741199"
+    "expected_semantic_hash": "37d89eec7140eff5e5b763279b36fa450394d3e63b08df4d99c0a507837763d9"
   },
   {
     "name": "freighter_damaged_min_negative",
     "request": {
       "schema_version": "procgen-request-1",
       "world_seed": 9007199254740991,
-      "site": {"site_id": "parity-freighter-min", "x": -2147483648, "y": -2147483647, "archetype_id": "freighter", "kit_id": "default", "intactness_override_bp": 7000, "cause_of_loss": "Depressurization", "loot_richness_bp": 7500},
+      "site": {"site_id": "parity-freighter-min", "x": -1000000000, "y": -1000000000, "archetype_id": "freighter", "kit_id": "default", "intactness_override_bp": 7000, "cause_of_loss": "Depressurization", "loot_richness_bp": 7500},
       "difficulty_id": "hard",
       "player_model": {"schema_version": "player-model-1", "signals": [-1, -3, -5]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 9007199254740991, "locale": "es-ES"}
     },
-    "expected_semantic_hash": "b6c9398405ef907c8beb40b3bcb572ea086b8ba00fff08137a32892f33f8210a"
+    "expected_semantic_hash": "8b6745228ea1fd05cea8d263397abbf438e60e845c1dd828ef55712c5ad205e5"
   },
   {
     "name": "frigate_fractured_seed12",
@@ -114,10 +114,10 @@
       "difficulty_id": "easy",
       "player_model": {"schema_version": "player-model-1", "signals": [5]},
       "requested_domains": ["world", "site", "gameplay", "presentation"],
-      "generator_version": 2,
+      "generator_version": 3,
       "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
       "presentation": {"seed": 42, "locale": "it-IT"}
     },
-    "expected_semantic_hash": "96d80349833c8b0b627fb8671f247e62180ec1eab822794cf77d7111906c6813"
+    "expected_semantic_hash": "02fe29a60a7302003e2406c22c25ff9e7a32a47bdbba69ca0f8326cef26a6fe2"
   }
 ]

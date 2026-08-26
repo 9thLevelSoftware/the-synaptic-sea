@@ -1,11 +1,11 @@
 //! Deterministic lifecycle tests. Gates are one-shot channels; no sleeps/barriers.
 use super::service::{AdmissionOperation, Generator, Limits, MonotonicClock, Service};
 use derelict_core::lifecycle::{LifecycleEvent, LifecycleResult, LifecycleStatus};
-use derelict_core::model::GENERATOR_VERSION;
 use derelict_core::procgen::{
     Domain, PlayerModel, PresentationRequest, ProcgenBundle, ProcgenFailure, ProcgenFailureCode,
     ProcgenRequest, SiteRequest, FAILURE_SCHEMA,
 };
+use derelict_core::world::PROCGEN_GENERATOR_VERSION;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
@@ -54,7 +54,7 @@ fn req(seed: u64) -> ProcgenRequest {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        generator_version: GENERATOR_VERSION,
+        generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: HASH.into(),
         presentation: PresentationRequest {
             seed,

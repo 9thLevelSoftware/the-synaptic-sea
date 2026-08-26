@@ -7,11 +7,12 @@ use derelict_core::lifecycle::{
     ProcgenCapabilities, WorkerMode,
 };
 use derelict_core::manifest::ExportSchemas;
-use derelict_core::model::{GenParams, GENERATOR_VERSION};
+use derelict_core::model::GenParams;
 use derelict_core::procgen::{
     Domain, PlayerModel, PresentationRequest, ProcgenRequest, SiteRequest,
 };
 use derelict_core::procgen::{ProcgenFailure, ProcgenFailureCode};
+use derelict_core::world::PROCGEN_GENERATOR_VERSION;
 use derelict_core::GenData;
 use godot::builtin::{GString, VarDictionary, Variant};
 use godot::classes::RefCounted;
@@ -55,10 +56,10 @@ pub(crate) fn runtime_manifest() -> Result<GeneratorManifest, ProcgenFailure> {
     let manifest = GeneratorManifest {
         schema_version: "procgen-generator-manifest-1".into(),
         rust_source_commit: SOURCE_COMMIT.into(),
-        generator_version: GENERATOR_VERSION,
+        generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::v1(),
-        adapter_schemas: AdapterSchemas::v1(),
+        export_schemas: ExportSchemas::platform_v3(),
+        adapter_schemas: AdapterSchemas::platform_v3(),
         target: TARGET.into(),
         dirty_development: dirty_development(),
     };
@@ -92,7 +93,7 @@ pub(crate) fn runtime_capabilities() -> Result<ProcgenCapabilities, ProcgenFailu
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::v1(),
+        schemas: AdapterSchemas::platform_v3(),
     };
     capabilities
         .validate()
@@ -171,7 +172,7 @@ where
 {
     match serializer(value) {
         Ok(json) => json,
-        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-1\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
+        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-2\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
 fn serialize_string<T: Serialize>(value: &T) -> String {
@@ -247,7 +248,7 @@ pub(crate) fn legacy_request(seed: u64, params: &GenParams, kit_id: &str) -> Pro
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        generator_version: GENERATOR_VERSION,
+        generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
         presentation: PresentationRequest {
             seed,
@@ -374,7 +375,7 @@ impl DerelictGenerator {
     }
     #[func]
     fn generator_version(&self) -> i64 {
-        GENERATOR_VERSION as i64
+        PROCGEN_GENERATOR_VERSION as i64
     }
     #[func]
     fn export_layout_json(&self, seed: i64, params: VarDictionary, kit_id: GString) -> GString {

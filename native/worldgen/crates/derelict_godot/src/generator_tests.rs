@@ -8,14 +8,14 @@ use std::sync::{
 #[test]
 fn compiled_identity_constructs_valid_manifest_and_exact_capabilities() {
     let manifest = runtime_manifest().expect("compiled manifest");
-    assert_eq!(manifest.generator_version, 2);
+    assert_eq!(manifest.generator_version, 3);
     assert_eq!(
         manifest.adapter_schemas,
-        derelict_core::lifecycle::AdapterSchemas::v1()
+        derelict_core::lifecycle::AdapterSchemas::platform_v3()
     );
     assert_eq!(
         manifest.export_schemas,
-        derelict_core::manifest::ExportSchemas::v1()
+        derelict_core::manifest::ExportSchemas::platform_v3()
     );
     assert!(manifest.validate().is_ok());
 
@@ -36,7 +36,7 @@ fn compiled_identity_constructs_valid_manifest_and_exact_capabilities() {
 fn legacy_request_is_explicitly_normalized() {
     let request = legacy_request(42, &derelict_core::model::GenParams::new("shuttle"), "");
     assert_eq!(request.schema_version, "procgen-request-1");
-    assert_eq!(request.generator_version, 2);
+    assert_eq!(request.generator_version, 3);
     assert_eq!(request.site.site_id, "legacy-site");
     assert_eq!(request.site.kit_id, "ship_structural_v0");
     assert_eq!(request.difficulty_id, "standard");
@@ -44,6 +44,15 @@ fn legacy_request_is_explicitly_normalized() {
     assert_eq!(request.player_model.schema_version, "player-model-1");
     assert!(!request.content_manifest_hash.is_empty());
     assert!(request.validate().is_ok());
+
+    let bundle = derelict_core::procgen::generate_bundle(
+        request,
+        &derelict_core::GenData::default_bundle().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(bundle.version.generator_version, 3);
+    assert_eq!(bundle.site_ir.ship.generator_version, 2);
+    assert_eq!(bundle.site_ir.ship.seed, bundle.world_ir.site_seed);
 }
 
 #[test]
