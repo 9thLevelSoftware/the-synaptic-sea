@@ -1,0 +1,28 @@
+// Placeholder item registry. The real game will replace this with its own
+// item catalog; ids must stay stable once saves exist.
+(
+    items: [
+        (id: 1, name: "scrap_metal"),
+        (id: 2, name: "electronics"),
+        (id: 3, name: "power_cell"),
+        (id: 4, name: "ration_pack"),
+        (id: 5, name: "water_canister"),
+        (id: 6, name: "medkit"),
+        (id: 7, name: "stim_injector"),
+        (id: 8, name: "pistol"),
+        (id: 9, name: "pistol_ammo"),
+        (id: 10, name: "rifle"),
+        (id: 11, name: "rifle_ammo"),
+        (id: 12, name: "vac_suit_patch"),
+        (id: 13, name: "oxygen_candle"),
+        (id: 14, name: "tool_kit"),
+        (id: 15, name: "data_slate"),
+        (id: 16, name: "keycard"),
+        (id: 17, name: "fuel_rod"),
+        (id: 18, name: "hull_plate"),
+        (id: 19, name: "seed_packet"),
+        (id: 20, name: "luxury_goods"),
+        (id: 21, name: "cargo_crate_sealed"),
+        (id: 22, name: "captains_log"),
+    ],
+)

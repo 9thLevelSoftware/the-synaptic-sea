@@ -1,0 +1,19 @@
+// Ported from The Synaptic Sea data/procgen/templates/compact.json
+(
+    id: "compact",
+    description: "Single-deck minimal freighter with very tight corridors. Bridge forward, engineering aft, airlock lateral entry. Uses small role footprints; intended as the LIFE_BOAT-adjacent small variant.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "spine", role_pool: [Corridor], count: Range(2, 3), position_hint: Center, deck: 0, layout: Linear, attach_to: "entry"),
+        (id: "side_a", role_pool: [Cargo, Maintenance], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "spine"),
+        (id: "side_b", role_pool: [Medical, CrewQuarters], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "spine"),
+        (id: "destination", role_pool: [Engineering, Reactor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "spine"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "spine", distribution: Adjacent),
+        (from_zone: "spine", to_zone: "side_a", distribution: Spread),
+        (from_zone: "spine", to_zone: "side_b", distribution: Spread),
+        (from_zone: "spine", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

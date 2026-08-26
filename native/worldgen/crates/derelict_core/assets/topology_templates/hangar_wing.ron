@@ -1,0 +1,25 @@
+// Ported from The Synaptic Sea data/procgen/templates/hangar_wing.json
+(
+    id: "hangar_wing",
+    description: "Forward hangar/dock volume with side maintenance and aft engineering. Emphasizes large cargo/dock rooms.",
+    zones: [
+        (id: "entry", role_pool: [Airlock, Dock], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: ""),
+        (id: "hangar", role_pool: [Cargo, Dock], count: Range(1, 2), position_hint: Center, deck: 0, layout: Clustered, attach_to: "entry"),
+        (id: "maint_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "hangar"),
+        (id: "maint_bay", role_pool: [Maintenance, Storage, Armory], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "maint_corridor"),
+        (id: "aft_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "hangar"),
+        (id: "crew_nook", role_pool: [CrewQuarters, MessHall], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "aft_corridor"),
+        (id: "destination", role_pool: [Engineering, Bridge], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "aft_corridor"),
+        (id: "reactor_pocket", role_pool: [Reactor, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "destination"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "hangar", distribution: Adjacent),
+        (from_zone: "hangar", to_zone: "maint_corridor", distribution: Spread),
+        (from_zone: "maint_corridor", to_zone: "maint_bay", distribution: Spread),
+        (from_zone: "hangar", to_zone: "aft_corridor", distribution: Adjacent),
+        (from_zone: "aft_corridor", to_zone: "crew_nook", distribution: Spread),
+        (from_zone: "aft_corridor", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "destination", to_zone: "reactor_pocket", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

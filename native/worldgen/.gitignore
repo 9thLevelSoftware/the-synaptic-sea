@@ -1,0 +1,4 @@
+target/
+*.png
+godot/.godot/
+godot/addons/derelict/bin/

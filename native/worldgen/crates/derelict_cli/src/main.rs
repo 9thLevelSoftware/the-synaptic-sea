@@ -1,0 +1,424 @@
+//! Headless iteration harness for the derelict generator: renders ships as
+//! ASCII (edge-walls at 2x resolution) or top-down PNG without any engine.
+
+use clap::Parser;
+use derelict_core::model::{decal, EntityKind, FloorTile, WallEdge, NO_ROOM};
+use derelict_core::{GenData, GenParams, Ship};
+
+#[derive(Parser)]
+#[command(name = "derelict_cli", about = "Derelict ship generator harness")]
+struct Args {
+    /// Master seed.
+    #[arg(long, default_value_t = 1)]
+    seed: u64,
+    /// Archetype id (shuttle, corvette, freighter, frigate).
+    #[arg(long, default_value = "corvette")]
+    archetype: String,
+    /// Intactness 0.0..=1.0 (omit to roll from seed).
+    #[arg(long)]
+    intactness: Option<f32>,
+    /// Deck to render (default 0); use --all-decks for every deck.
+    #[arg(long, default_value_t = 0)]
+    deck: usize,
+    #[arg(long)]
+    all_decks: bool,
+    /// ASCII render to stdout.
+    #[arg(long, default_value_t = true)]
+    ascii: bool,
+    /// Write a PNG top-down render to this path.
+    #[arg(long)]
+    out: Option<String>,
+    /// Print per-stage generation timings (runs 10 iterations).
+    #[arg(long)]
+    bench: bool,
+    /// Render a sweep of seeds (count) as summaries only.
+    #[arg(long)]
+    sweep: Option<u64>,
+    /// Export layout.json + gameplay_slice.json (The Synaptic Sea contract)
+    /// into this directory.
+    #[arg(long)]
+    export_dir: Option<String>,
+    /// Kit id stamped into the exported layout.
+    #[arg(long, default_value = "ship_structural_v0")]
+    kit_id: String,
+    /// Stress sweep: every archetype x 3 intactness bands x 150 seeds
+    /// (1,800 ships), all fail-closed validated. Non-zero exit on any error.
+    #[arg(long)]
+    stress: bool,
+}
+
+fn main() {
+    let args = Args::parse();
+    let data = GenData::default_bundle().expect("embedded content data");
+    let mut params = GenParams::new(&args.archetype);
+    if let Some(f) = args.intactness {
+        params.intactness_override = Some((f.clamp(0.0, 1.0) * 10_000.0) as u16);
+    }
+
+    if args.stress {
+        let mut failures = 0u32;
+        let mut total = 0u32;
+        let mut rooms_total = 0u64;
+        let mut placements_total = 0u64;
+        for arch in ["shuttle", "corvette", "freighter", "frigate"] {
+            for (band, intact) in [("pristine", 9500u16), ("damaged", 5000), ("wrecked", 1000)] {
+                for seed in 0..150u64 {
+                    total += 1;
+                    let mut p = GenParams::new(arch);
+                    p.intactness_override = Some(intact);
+                    match derelict_core::generate_ship(seed * 7 + 13, &p, &data) {
+                        Ok(ship) => {
+                            rooms_total += ship.room_graph.nodes.len() as u64;
+                            placements_total += ship.plan.placements.len() as u64;
+                        }
+                        Err(e) => {
+                            failures += 1;
+                            println!("FAIL {arch}/{band} seed {}: {e}", seed * 7 + 13);
+                        }
+                    }
+                }
+            }
+        }
+        println!(
+            "STRESS {}: runs={total} failures={failures} rooms={rooms_total} module_placements={placements_total}",
+            if failures == 0 { "PASS" } else { "FAIL" }
+        );
+        std::process::exit(if failures == 0 { 0 } else { 1 });
+    }
+
+    if let Some(n) = args.sweep {
+        for s in 0..n {
+            let seed = args.seed + s;
+            match derelict_core::generate_ship(seed, &params, &data) {
+                Ok(ship) => println!("{}", summary_line(seed, &ship)),
+                Err(e) => println!("seed {seed}: ERROR {e}"),
+            }
+        }
+        return;
+    }
+
+    if args.bench {
+        let mut totals: Vec<(&'static str, u128)> = Vec::new();
+        let iters = 10;
+        for i in 0..iters {
+            let report = derelict_core::generate_ship_timed(args.seed + i, &params, &data)
+                .expect("generation failed");
+            for (name, us) in &report.stage_micros {
+                match totals.iter_mut().find(|(n, _)| n == name) {
+                    Some((_, t)) => *t += us,
+                    None => totals.push((name, *us)),
+                }
+            }
+        }
+        println!("avg over {iters} seeds ({}):", args.archetype);
+        let mut sum = 0u128;
+        for (name, t) in &totals {
+            println!("  {name:<10} {:>8.2} ms", *t as f64 / iters as f64 / 1000.0);
+            sum += t;
+        }
+        println!(
+            "  {:<10} {:>8.2} ms",
+            "TOTAL",
+            sum as f64 / iters as f64 / 1000.0
+        );
+        return;
+    }
+
+    let ship = match derelict_core::generate_ship(args.seed, &params, &data) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("generation failed: {e}");
+            std::process::exit(1);
+        }
+    };
+    print_summary(&ship, &data);
+
+    if let Some(dir) = &args.export_dir {
+        use derelict_core::structural::export::{
+            to_gameplay_slice_json, to_layout_json, ExportOptions,
+        };
+        std::fs::create_dir_all(dir).expect("create export dir");
+        let opts = ExportOptions {
+            kit_id: args.kit_id.clone(),
+            ..Default::default()
+        };
+        let layout = to_layout_json(&ship, &opts);
+        let slice = to_gameplay_slice_json(&ship);
+        let lp = format!("{dir}/layout.json");
+        let gp = format!("{dir}/gameplay_slice.json");
+        std::fs::write(&lp, serde_json::to_string_pretty(&layout).unwrap()).expect("write layout");
+        std::fs::write(&gp, serde_json::to_string_pretty(&slice).unwrap()).expect("write slice");
+        println!("exported {lp} and {gp}");
+    }
+
+    let decks: Vec<usize> = if args.all_decks {
+        (0..ship.decks.len()).collect()
+    } else {
+        vec![args.deck.min(ship.decks.len() - 1)]
+    };
+    if args.ascii {
+        for d in &decks {
+            println!("\n=== deck {d} ===");
+            println!("{}", render_ascii(&ship, *d));
+        }
+    }
+    if let Some(path) = &args.out {
+        let img = render_png(&ship, decks[0]);
+        img.save(path).expect("failed to write png");
+        println!("wrote {path}");
+    }
+}
+
+fn summary_line(seed: u64, ship: &Ship) -> String {
+    let l = &ship.decks[0].layer;
+    format!(
+        "seed {seed:>4}  {:<9} {:>3}x{:<3} decks {}  intact {:>5.2}  {:?}{}  rooms {:>2}  entities {:>3}",
+        ship.archetype_id,
+        l.width,
+        l.height,
+        ship.decks.len(),
+        ship.intactness as f32 / 10_000.0,
+        ship.cause_of_loss,
+        if ship.fractured { " FRACTURED" } else { "" },
+        ship.room_graph.nodes.len(),
+        ship.entities.len(),
+    )
+}
+
+fn print_summary(ship: &Ship, data: &GenData) {
+    println!("{}", summary_line(ship.seed, ship));
+    let mut by_kind: Vec<(String, u32)> = Vec::new();
+    for n in &ship.room_graph.nodes {
+        let k = format!("{:?}", n.kind);
+        match by_kind.iter_mut().find(|(name, _)| *name == k) {
+            Some((_, c)) => *c += 1,
+            None => by_kind.push((k, 1)),
+        }
+    }
+    let rooms: Vec<String> = by_kind.iter().map(|(k, c)| format!("{k}x{c}")).collect();
+    println!("rooms: {}", rooms.join(", "));
+    let containers = ship
+        .entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::Container)
+        .count();
+    let stacks: usize = ship.entities.iter().map(|e| e.inventory.len()).sum();
+    let items: u32 = ship
+        .entities
+        .iter()
+        .flat_map(|e| e.inventory.iter())
+        .map(|s| s.qty as u32)
+        .sum();
+    println!(
+        "entities: {} total, {} containers, {} loot stacks / {} items",
+        ship.entities.len(),
+        containers,
+        stacks,
+        items
+    );
+    for ev in &ship.damage_events {
+        println!(
+            "damage: {:?} deck {} at {:?} r={}",
+            ev.kind, ev.deck, ev.origin, ev.radius
+        );
+    }
+    let depress = ship
+        .room_graph
+        .nodes
+        .iter()
+        .filter(|n| n.depressurized)
+        .count();
+    println!(
+        "depressurized rooms: {depress}/{}",
+        ship.room_graph.nodes.len()
+    );
+    let _ = data;
+}
+
+/// ASCII render at 2x+1 resolution so edge walls are visible:
+/// even rows/cols carry edges and corners, odd/odd carry tile contents.
+fn render_ascii(ship: &Ship, deck: usize) -> String {
+    let layer = &ship.decks[deck].layer;
+    let w = layer.width as i32;
+    let h = layer.height as i32;
+    let gw = (2 * w + 1) as usize;
+    let gh = (2 * h + 1) as usize;
+    let mut grid = vec![' '; gw * gh];
+
+    let hedge = |e: WallEdge| match e {
+        WallEdge::None => ' ',
+        WallEdge::Hull => '=',
+        WallEdge::Interior => '-',
+        WallEdge::Doorway => '+',
+        WallEdge::Breached => '%',
+    };
+    let vedge = |e: WallEdge| match e {
+        WallEdge::None => ' ',
+        WallEdge::Hull => 'H',
+        WallEdge::Interior => '|',
+        WallEdge::Doorway => '+',
+        WallEdge::Breached => '%',
+    };
+
+    for y in 0..h {
+        for x in 0..w {
+            let i = (y * w + x) as usize;
+            let gx = (2 * x + 1) as usize;
+            let gy = (2 * y + 1) as usize;
+            // Tile content.
+            grid[gy * gw + gx] = match layer.floor[i] {
+                FloorTile::Void => ' ',
+                FloorTile::Deck => {
+                    if layer.decal[i] == decal::SCORCH_LIGHT
+                        || layer.decal[i] == decal::SCORCH_HEAVY
+                    {
+                        '*'
+                    } else {
+                        '.'
+                    }
+                }
+                FloorTile::Grated => ':',
+                FloorTile::DamagedDeck => '~',
+            };
+            // Edges (north on row above, west on col left).
+            grid[(gy - 1) * gw + gx] = hedge(layer.walls[i].north);
+            grid[gy * gw + gx - 1] = vedge(layer.walls[i].west);
+        }
+    }
+    // Entities overwrite tile cells.
+    for e in &ship.entities {
+        if e.pos.deck as usize != deck {
+            continue;
+        }
+        if e.kind == EntityKind::Door {
+            continue; // visible as '+' edges already
+        }
+        let gx = (2 * e.pos.x + 1) as usize;
+        let gy = (2 * e.pos.y + 1) as usize;
+        if gy < gh && gx < gw {
+            grid[gy * gw + gx] = match e.kind {
+                EntityKind::Container => 'c',
+                EntityKind::Terminal => 't',
+                EntityKind::Furniture => {
+                    if e.proto == "ladder" {
+                        'L'
+                    } else {
+                        'f'
+                    }
+                }
+                EntityKind::Body => 'b',
+                EntityKind::Debris => 'x',
+                EntityKind::ItemPile => 'i',
+                EntityKind::Door => '+',
+            };
+        }
+    }
+    // Corners: '+' where any adjacent edge is a wall.
+    for gy in (0..gh).step_by(2) {
+        for gx in (0..gw).step_by(2) {
+            let mut any = false;
+            if gx > 0 && grid[gy * gw + gx - 1] != ' ' {
+                any = true;
+            }
+            if gx + 1 < gw && grid[gy * gw + gx + 1] != ' ' {
+                any = true;
+            }
+            if gy > 0 && grid[(gy - 1) * gw + gx] != ' ' {
+                any = true;
+            }
+            if gy + 1 < gh && grid[(gy + 1) * gw + gx] != ' ' {
+                any = true;
+            }
+            if any {
+                grid[gy * gw + gx] = '+';
+            }
+        }
+    }
+
+    let mut out = String::with_capacity(gw * gh + gh);
+    for gy in 0..gh {
+        let row: String = grid[gy * gw..(gy + 1) * gw].iter().collect();
+        // Trim-right for compact output.
+        out.push_str(row.trim_end());
+        out.push('\n');
+    }
+    out
+}
+
+/// Simple top-down PNG: 6px tiles, 1px wall edges.
+fn render_png(ship: &Ship, deck: usize) -> image::RgbImage {
+    let layer = &ship.decks[deck].layer;
+    let s = 6u32;
+    let w = layer.width as u32 * s;
+    let h = layer.height as u32 * s;
+    let mut img = image::RgbImage::from_pixel(w, h, image::Rgb([8, 8, 16]));
+    let floor_color = |f: FloorTile, d: u8, room: u16| -> image::Rgb<u8> {
+        match f {
+            FloorTile::Void => image::Rgb([8, 8, 16]),
+            FloorTile::Deck => {
+                let tint = (room % 5) as u8 * 8;
+                if d == decal::SCORCH_HEAVY {
+                    image::Rgb([40, 32, 28])
+                } else if d == decal::SCORCH_LIGHT {
+                    image::Rgb([70, 60, 50])
+                } else {
+                    image::Rgb([100 + tint, 100 + tint, 110 + tint])
+                }
+            }
+            FloorTile::Grated => image::Rgb([70, 80, 90]),
+            FloorTile::DamagedDeck => image::Rgb([90, 70, 55]),
+        }
+    };
+    for y in 0..layer.height as u32 {
+        for x in 0..layer.width as u32 {
+            let i = (y * layer.width as u32 + x) as usize;
+            let c = floor_color(layer.floor[i], layer.decal[i], layer.room_id[i]);
+            for py in 0..s {
+                for px in 0..s {
+                    img.put_pixel(x * s + px, y * s + py, c);
+                }
+            }
+            let wall_c = |e: WallEdge| match e {
+                WallEdge::Hull => Some(image::Rgb([220, 220, 235])),
+                WallEdge::Interior => Some(image::Rgb([160, 160, 175])),
+                WallEdge::Doorway => Some(image::Rgb([80, 180, 90])),
+                WallEdge::Breached => Some(image::Rgb([200, 90, 60])),
+                WallEdge::None => None,
+            };
+            if let Some(c) = wall_c(layer.walls[i].north) {
+                for px in 0..s {
+                    img.put_pixel(x * s + px, y * s, c);
+                }
+            }
+            if let Some(c) = wall_c(layer.walls[i].west) {
+                for py in 0..s {
+                    img.put_pixel(x * s, y * s + py, c);
+                }
+            }
+        }
+    }
+    for e in &ship.entities {
+        if e.pos.deck as usize != deck || e.kind == EntityKind::Door {
+            continue;
+        }
+        let c = match e.kind {
+            EntityKind::Container => image::Rgb([230, 180, 60]),
+            EntityKind::Terminal => image::Rgb([60, 200, 220]),
+            EntityKind::Furniture => image::Rgb([140, 110, 80]),
+            EntityKind::Body => image::Rgb([200, 60, 60]),
+            EntityKind::Debris => image::Rgb([120, 120, 120]),
+            EntityKind::ItemPile => image::Rgb([240, 240, 120]),
+            EntityKind::Door => image::Rgb([80, 180, 90]),
+        };
+        let (x, y) = (e.pos.x as u32, e.pos.y as u32);
+        if x < layer.width as u32 && y < layer.height as u32 {
+            for py in 1..s - 1 {
+                for px in 1..s - 1 {
+                    img.put_pixel(x * s + px, y * s + py, c);
+                }
+            }
+        }
+    }
+    let _ = NO_ROOM;
+    img
+}

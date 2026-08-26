@@ -1,0 +1,25 @@
+// v2 archetype: sizes are in 4 m module-grid cells.
+(
+    id: "freighter",
+    display_name: "Bulk Freighter",
+    length: (18, 26),
+    beam: (10, 14),
+    decks: (1, 2),
+    hull_fill_bp: 9000,
+    asymmetry_bp: 400,
+    deck_erosion: 2,
+    template: "",
+    role_weights: [(Cargo, 5), (Storage, 4), (CrewQuarters, 2), (Engineering, 2), (MessHall, 2), (Medical, 1), (Hangar, 2)],
+    guaranteed_roles: [Cargo],
+    max_duplicates: 3,
+    filler_roles: [(Cargo, 120), (Storage, 100), (Compartment, 60)],
+    cause_weights: [
+        (PirateBoarding, 40),
+        (Depressurization, 20),
+        (DriveMisjump, 15),
+        (Plague, 10),
+        (ReactorBreach, 5),
+        (Unknown, 10),
+    ],
+    max_breaches: 7,
+)

@@ -1,0 +1,25 @@
+// v2 archetype: sizes are in 4 m module-grid cells.
+(
+    id: "frigate",
+    display_name: "Escort Frigate",
+    length: (24, 32),
+    beam: (12, 16),
+    decks: (2, 3),
+    hull_fill_bp: 8400,
+    asymmetry_bp: 500,
+    deck_erosion: 2,
+    template: "",
+    role_weights: [(Armory, 3), (CrewQuarters, 3), (Engineering, 3), (Reactor, 2), (Medical, 2), (MessHall, 2), (Security, 2), (Storage, 2), (Cargo, 2), (LifeSupport, 2)],
+    guaranteed_roles: [Engineering],
+    max_duplicates: 3,
+    filler_roles: [(Storage, 100), (Compartment, 90), (CrewQuarters, 50), (Cargo, 60)],
+    cause_weights: [
+        (PirateBoarding, 25),
+        (ReactorBreach, 20),
+        (Depressurization, 20),
+        (Plague, 15),
+        (DriveMisjump, 10),
+        (Unknown, 10),
+    ],
+    max_breaches: 10,
+)

@@ -1,0 +1,25 @@
+// Ported from The Synaptic Sea data/procgen/templates/vault.json
+(
+    id: "vault",
+    description: "Deep-core vault: long choke corridor into nested secure compartments. High threat pressure on the approach.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: ""),
+        (id: "approach", role_pool: [Corridor], count: Range(2, 4), position_hint: Center, deck: 0, layout: Linear, attach_to: "entry"),
+        (id: "guard_wing", role_pool: [Armory, Security, Storage], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "approach"),
+        (id: "antechamber", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "approach"),
+        (id: "vault_a", role_pool: [Cargo, Storage], count: Range(1, 2), position_hint: Center, deck: 0, layout: Clustered, attach_to: "antechamber"),
+        (id: "vault_b", role_pool: [Cargo, Armory], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "vault_a"),
+        (id: "destination", role_pool: [Bridge, Engineering], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "vault_b"),
+        (id: "life_support_nook", role_pool: [LifeSupport, Medical], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "antechamber"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "approach", distribution: Adjacent),
+        (from_zone: "approach", to_zone: "guard_wing", distribution: Spread),
+        (from_zone: "approach", to_zone: "antechamber", distribution: Adjacent),
+        (from_zone: "antechamber", to_zone: "vault_a", distribution: Adjacent),
+        (from_zone: "vault_a", to_zone: "vault_b", distribution: Adjacent),
+        (from_zone: "vault_b", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "antechamber", to_zone: "life_support_nook", distribution: Spread),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

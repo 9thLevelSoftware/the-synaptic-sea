@@ -1,0 +1,26 @@
+// Ported from The Synaptic Sea data/procgen/templates/ring.json
+(
+    id: "ring",
+    description: "Closed loop corridor with central core rooms. Player can circle the ship; critical path uses the ring then breaks into the core.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "ring_a", role_pool: [Corridor], count: Fixed(2), position_hint: Bow, deck: 0, layout: Linear, attach_to: "entry"),
+        (id: "ring_b", role_pool: [Corridor], count: Fixed(2), position_hint: Stern, deck: 0, layout: Linear, attach_to: "ring_a"),
+        (id: "ring_c", role_pool: [Corridor], count: Fixed(2), position_hint: Lateral, deck: 0, layout: Linear, attach_to: "ring_b"),
+        (id: "crew_pocket", role_pool: [CrewQuarters, MessHall, Medical], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "ring_a"),
+        (id: "cargo_pocket", role_pool: [Cargo, Storage], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "ring_b"),
+        (id: "core", role_pool: [Bridge, Engineering], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "ring_c"),
+        (id: "destination", role_pool: [Reactor, LifeSupport], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "core"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "ring_a", distribution: Adjacent),
+        (from_zone: "ring_a", to_zone: "ring_b", distribution: Adjacent),
+        (from_zone: "ring_b", to_zone: "ring_c", distribution: Adjacent),
+        (from_zone: "ring_c", to_zone: "ring_a", distribution: Adjacent),
+        (from_zone: "ring_a", to_zone: "crew_pocket", distribution: Spread),
+        (from_zone: "ring_b", to_zone: "cargo_pocket", distribution: Spread),
+        (from_zone: "ring_c", to_zone: "core", distribution: Adjacent),
+        (from_zone: "core", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)
