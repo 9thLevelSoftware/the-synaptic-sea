@@ -2,8 +2,8 @@
 
 ## Status
 
-Approved; Gates 0 through 4 are complete. Gate 5 is next. No later gate is
-considered complete until its scoped card,
+Approved; Gates 0 through 4 are complete. Gate 5 implementation is in
+progress. No later gate is considered complete until its scoped card,
 acceptance evidence, and regression evidence are current.
 
 This specification is canonical for procedural generation. It supersedes the
@@ -384,3 +384,4 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0065-gate3-contract-wrapper-version-propagation.md`
 - `docs/game/adr/0066-gate3-generation-trace-channel-versioning.md`
 - `docs/game/adr/0067-gate4-adaptive-trace-and-wrapper-versioning.md`
+- `docs/game/adr/0068-bounded-procgen-diagnostics-corpora-and-seed-lab.md`

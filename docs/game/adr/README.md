@@ -52,6 +52,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0065 | docs/game/adr/0065-gate3-contract-wrapper-version-propagation.md | additive Gate 3 request/bundle/lifecycle and capability/manifest wrapper propagation with immutable prior schemas |
 | 0066 | docs/game/adr/0066-gate3-generation-trace-channel-versioning.md | exact Gate 3 RNG-channel trace and immutable trace-2 preservation |
 | 0067 | docs/game/adr/0067-gate4-adaptive-trace-and-wrapper-versioning.md | bounded classical adaptive decisions, replay trace, and immutable Gate 4 wrapper transition |
+| 0068 | docs/game/adr/0068-bounded-procgen-diagnostics-corpora-and-seed-lab.md | bounded local diagnostics, reviewed promotion corpora, and authoritative-bundle seed-lab tooling |
 
 ## Notes
 
