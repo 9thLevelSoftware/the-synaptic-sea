@@ -53,8 +53,13 @@ fn main() {
         )
     );
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT={}", {
-        let dirty =
-            env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT").unwrap_or_else(|_| "false".into());
+        let dirty = match env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") {
+            Ok(value) => value,
+            Err(_) if wasm_target => {
+                panic!("missing required build identity SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT")
+            }
+            Err(_) => "true".into(),
+        };
         if dirty != "true" && dirty != "false" {
             panic!("invalid build identity SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT");
         }

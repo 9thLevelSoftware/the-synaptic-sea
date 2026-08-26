@@ -362,6 +362,7 @@ name = "derelict_wasm"
 version = "0.1.0"
 dependencies = [
  "derelict_core",
+ "js-sys",
  "serde",
  "serde_json",
  "wasm-bindgen",

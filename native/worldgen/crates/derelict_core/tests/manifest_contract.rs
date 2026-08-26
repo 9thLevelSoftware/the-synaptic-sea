@@ -93,3 +93,27 @@ fn every_required_build_field_is_enforced() {
         );
     }
 }
+
+#[test]
+fn draft_2020_schema_enforces_both_exact_target_artifact_pairs() {
+    let schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../schemas/procgen-build-manifest-1.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let windows: serde_json::Value = serde_json::from_str(VALID).unwrap();
+    assert!(validator.is_valid(&windows));
+    let web = VALID
+        .to_string()
+        .replace("x86_64-pc-windows-msvc", "wasm32-unknown-unknown")
+        .replace("gdextension", "wasm")
+        .replace(
+            "addons/derelict/bin/win64/derelict_godot.dll",
+            "addons/derelict/bin/web/derelict_wasm_bg.wasm",
+        );
+    assert!(validator.is_valid(&serde_json::from_str::<serde_json::Value>(&web).unwrap()));
+    let mismatch = VALID.replace("gdextension", "wasm");
+    assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&mismatch).unwrap()));
+    let unknown = VALID.replace("\n}", ",\n  \"unexpected\": true\n}");
+    assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&unknown).unwrap()));
+}
