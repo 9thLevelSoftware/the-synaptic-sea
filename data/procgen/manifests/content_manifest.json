@@ -188,7 +188,15 @@
     {
       "path": "native/worldgen/crates/derelict_core/assets/topology_templates/vault.ron",
       "sha256": "a3d5516d569a33801d4c6e42f85a1ed5f2acd5b0243a8fcde6a283a4981205cc"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/world/rules_v3.json",
+      "sha256": "72f84ac50766653c4a07ac52d2918f3c7e08906d2a02d0c608fd2092d8c929ec"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/world/safe_fallback_v3.json",
+      "sha256": "988d3d023a552188b0400843940f5724dc99e953b86049c7e2b70018e25990b1"
     }
   ],
-  "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2"
+  "content_manifest_hash": "e0364ba52fbf0b1c629c676d622fdc2ffd6964bee47c11cad58c320de22a7c1a"
 }

@@ -4,7 +4,7 @@ use derelict_wasm::{Clock, DataProvider, Generator, Serializer, WasmService};
 use serde::Deserialize;
 use std::sync::Arc;
 
-const CONTENT_HASH: &str = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2";
+const CONTENT_HASH: &str = "e0364ba52fbf0b1c629c676d622fdc2ffd6964bee47c11cad58c320de22a7c1a";
 
 struct ZeroClock;
 impl Clock for ZeroClock {
