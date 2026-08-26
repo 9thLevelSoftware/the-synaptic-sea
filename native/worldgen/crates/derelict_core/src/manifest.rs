@@ -107,6 +107,25 @@ pub enum ManifestError {
 }
 
 impl BuildManifest {
+    /// Validate the additive Gate-2 platform manifest without weakening the
+    /// established v1 manifest validator used by structural artifacts.
+    pub fn validate_platform_v3(&self) -> Result<(), ManifestError> {
+        if self.generator_version != 3 {
+            return Err(ManifestError::InvalidField("generator_version"));
+        }
+        if self.export_schemas != ExportSchemas::platform_v3() {
+            return Err(ManifestError::InvalidField("export_schemas"));
+        }
+        if self.manifest_schema != MANIFEST_SCHEMA
+            || self.content_manifest_path != "data/procgen/manifests/content_manifest.json"
+            || !is_sha256(&self.content_manifest_hash)
+            || !is_sha256(&self.artifact.sha256)
+        {
+            return Err(ManifestError::InvalidField("manifest"));
+        }
+        Ok(())
+    }
+
     pub fn from_json(json: &str) -> Result<Self, ManifestError> {
         let manifest: Self = serde_json::from_str(json)?;
         manifest.validate()?;
