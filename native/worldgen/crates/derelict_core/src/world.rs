@@ -118,6 +118,11 @@ pub struct WorldIRv2 {
     pub extraction_path: Vec<String>,
 }
 
+/// Current platform world document. The explicit v2 suffix above makes the
+/// schema transition visible at call sites while this alias keeps the domain
+/// API ergonomic for consumers.
+pub type WorldIR = WorldIRv2;
+
 impl WorldIRv2 {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.schema_version != "world-ir-2"
