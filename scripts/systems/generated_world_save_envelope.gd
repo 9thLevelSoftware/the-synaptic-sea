@@ -10,6 +10,7 @@ const MAX_BYTES := 1048576
 const MAX_HASH := 256
 const MAX_SEED := 9007199254740991
 const MAX_KEYS := 128
+const EXPORT_KEYS := ["procgen_request","procgen_bundle","world_ir","site_ir","gameplay_ir","presentation_ir","generation_trace","adaptive_proposal"]
 
 var world_seed: int = 0
 var platform_generator_version := 3
@@ -18,10 +19,12 @@ var export_schema_map: Dictionary = {}
 var sites: Array[Dictionary] = []
 
 func configure(seed: int, platform: Variant, content: String, schemas: Dictionary, site_values: Array) -> bool:
-	if seed < 0 or seed > MAX_SEED or typeof(platform) == TYPE_BOOL or (typeof(platform) != TYPE_INT and typeof(platform) != TYPE_FLOAT) or not is_finite(float(platform)) or float(platform) != 3 or not _hash64(content):
+	if seed < 0 or seed > MAX_SEED or typeof(platform) == TYPE_BOOL or (typeof(platform) != TYPE_INT and typeof(platform) != TYPE_FLOAT) or not is_finite(float(platform)) or float(platform) <= 0 or float(platform) > MAX_SEED or not _hash64(content):
 		return false
-	if schemas.is_empty() or schemas.size() > MAX_KEYS or site_values.size() > MAX_SITES:
+	if schemas.size() != 8 or site_values.size() > MAX_SITES:
 		return false
+	for key in EXPORT_KEYS:
+		if not schemas.has(key) or typeof(schemas[key]) != TYPE_STRING or str(schemas[key]).is_empty() or str(schemas[key]).length() > 128: return false
 	world_seed = seed; platform_generator_version = platform; content_manifest_hash = content
 	export_schema_map = schemas.duplicate(true); sites.clear()
 	var ids := {}
@@ -50,8 +53,8 @@ static func from_dict(value: Variant):
 	if typeof(value) != TYPE_DICTIONARY:
 		return null
 	var d: Dictionary = value
-	if str(d.get("schema_version", "")) != SCHEMA or d.size() != 6 or typeof(d.get("sites")) != TYPE_ARRAY or typeof(d.get("export_schema_map")) != TYPE_DICTIONARY:
+	if d.size() != 6 or d.get("schema_version") != SCHEMA or typeof(d.get("world_seed")) != TYPE_INT or typeof(d.get("platform_generator_version")) == TYPE_BOOL or (typeof(d.get("platform_generator_version")) != TYPE_INT and typeof(d.get("platform_generator_version")) != TYPE_FLOAT) or typeof(d.get("content_manifest_hash")) != TYPE_STRING or typeof(d.get("sites")) != TYPE_ARRAY or typeof(d.get("export_schema_map")) != TYPE_DICTIONARY:
 		return null
 	var result = load("res://scripts/systems/generated_world_save_envelope.gd").new()
-	if not result.configure(int(d.get("world_seed", -1)), d.get("platform_generator_version"), str(d.get("content_manifest_hash", "")), d["export_schema_map"], d["sites"]): return null
+	if not result.configure(d.world_seed, d.platform_generator_version, d.content_manifest_hash, d.export_schema_map, d.sites): return null
 	return result

@@ -29,7 +29,7 @@ func evaluate(document: Variant, source_path := ""):
 		return Result.make(Result.NEW_WORLD_REQUIRED, "export_schema_mismatch", source_path, summary)
 	if bundle_provider == null or applier == null:
 		return Result.make(Result.IO_FAILURE, "provider_unavailable", source_path, summary)
-	if not applier.has_method("validate_mutation") or not applier.has_method("apply_mutation"):
+	if not applier.has_method("validate_mutation") or not applier.has_method("apply_batch"):
 		return Result.make(Result.IO_FAILURE, "applier_contract_missing", source_path, summary)
 	var pending: Array[Dictionary] = []
 	for entry in envelope.sites:
@@ -48,10 +48,8 @@ func evaluate(document: Variant, source_path := ""):
 		for operation in item.delta.operations:
 			if not applier.validate_mutation(item.identity, operation, item.bundle):
 				return Result.make(Result.NEW_WORLD_REQUIRED, "mutation_rejected", source_path, summary)
-	for item in pending:
-		for operation in item.delta.operations:
-			if not applier.apply_mutation(item.identity, operation, item.bundle):
-				return Result.make(Result.IO_FAILURE, "mutation_apply_failed", source_path, summary)
+	if not applier.apply_batch(pending):
+		return Result.make(Result.IO_FAILURE, "mutation_apply_failed", source_path, summary)
 	var result: Variant = Result.make(Result.COMPATIBLE, "validated", source_path, summary)
 	result.envelope = envelope
 	return result
