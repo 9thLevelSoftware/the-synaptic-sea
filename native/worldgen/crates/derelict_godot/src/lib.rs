@@ -9,6 +9,7 @@ use godot::prelude::*;
 mod async_gen;
 mod convert;
 mod generator;
+mod service;
 
 struct DerelictExtension;
 
