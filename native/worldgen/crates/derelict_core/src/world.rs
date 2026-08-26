@@ -108,6 +108,14 @@ fn in_range(seed: u64, range: &RouteRange) -> u32 {
     range.min_bp + (seed % span) as u32
 }
 
+fn canonical_edge(from: &str, to: &str) -> (String, String) {
+    if from < to {
+        (from.into(), to.into())
+    } else {
+        (to.into(), from.into())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinateMarker {
@@ -311,6 +319,8 @@ impl WorldFallback {
             || !rules.biomes.contains(&self.biome_id)
             || !rules.hazards.contains(&self.hazard_id)
             || self.landmarks.is_empty()
+            || self.landmarks.iter().any(|id| !valid_id(id))
+            || self.landmarks.iter().collect::<BTreeSet<_>>().len() != self.landmarks.len()
             || self
                 .landmarks
                 .iter()
@@ -399,7 +409,7 @@ pub fn generate_candidate(
         let route_seed = key(
             req,
             "world",
-            "world.route",
+            "world.route_cost",
             i as u32,
             req.x,
             req.y,
@@ -407,24 +417,34 @@ pub fn generate_candidate(
         )?
         .seed()
         .map_err(WorldError::Key)?;
+        let (from, to) = canonical_edge("marker:0", &format!("marker:{i}"));
         routes.push(RouteEdge {
-            from: "marker:0".into(),
-            to: format!("marker:{i}"),
+            from,
+            to,
             cost_bp: in_range(route_seed, &rules.route_cost_bp),
         });
     }
-    let hub_seed = key(req, "world", "world.route", 9, req.x, req.y, "anchor:hub")?
-        .seed()
-        .map_err(WorldError::Key)?;
+    let hub_seed = key(
+        req,
+        "world",
+        "world.route_cost",
+        9,
+        req.x,
+        req.y,
+        "anchor:hub",
+    )?
+    .seed()
+    .map_err(WorldError::Key)?;
+    let (from, to) = canonical_edge("marker:0", "anchor:hub");
     routes.push(RouteEdge {
-        from: "marker:0".into(),
-        to: "anchor:hub".into(),
+        from,
+        to,
         cost_bp: in_range(hub_seed, &rules.route_cost_bp),
     });
     let extraction_seed = key(
         req,
         "world",
-        "world.route",
+        "world.route_cost",
         10,
         req.x,
         req.y,
@@ -432,9 +452,10 @@ pub fn generate_candidate(
     )?
     .seed()
     .map_err(WorldError::Key)?;
+    let (from, to) = canonical_edge("anchor:hub", "anchor:extraction");
     routes.push(RouteEdge {
-        from: "anchor:hub".into(),
-        to: "anchor:extraction".into(),
+        from,
+        to,
         cost_bp: in_range(extraction_seed, &rules.route_cost_bp),
     });
     routes.sort_by(|a, b| (a.from.as_str(), a.to.as_str()).cmp(&(b.from.as_str(), b.to.as_str())));
@@ -636,14 +657,14 @@ impl WorldIRv2 {
         }
         let mut expected_routes = vec![
             (
-                "anchor:hub".to_string(),
                 "anchor:extraction".to_string(),
+                "anchor:hub".to_string(),
                 10_u32,
                 "anchor:extraction".to_string(),
             ),
             (
-                "marker:0".to_string(),
                 "anchor:hub".to_string(),
+                "marker:0".to_string(),
                 9,
                 "anchor:hub".to_string(),
             ),
@@ -659,7 +680,7 @@ impl WorldIRv2 {
         expected_routes
             .sort_by(|a, b| (a.0.as_str(), a.1.as_str()).cmp(&(b.0.as_str(), b.1.as_str())));
         for (edge, (from, to, n, site)) in self.routes.iter().zip(expected_routes) {
-            let seed = key(req, "world", "world.route", n, req.x, req.y, &site)?
+            let seed = key(req, "world", "world.route_cost", n, req.x, req.y, &site)?
                 .seed()
                 .map_err(WorldError::Key)?;
             if edge.from != from
@@ -759,41 +780,41 @@ impl WorldIRv2 {
                 || edge.to.is_empty()
                 || !known.contains(&edge.from)
                 || !known.contains(&edge.to)
+                || edge.from >= edge.to
                 || edge.cost_bp == 0
                 || edge.cost_bp > 10_000
                 || !endpoints.insert((edge.from.clone(), edge.to.clone()))
             {
                 return Err("routes");
             }
-            if self.biome_fields.iter().enumerate().any(|(i, f)| {
-                f.marker_id != self.markers[i].marker_id
-                    || !valid_id(&f.biome_id)
-                    || f.intensity_bp > 10_000
-            }) || self.hazard_fields.iter().enumerate().any(|(i, f)| {
-                f.marker_id != self.markers[i].marker_id
-                    || !valid_id(&f.hazard_id)
-                    || f.severity_bp > 10_000
-            }) || self.resource_pressures.iter().enumerate().any(|(i, f)| {
-                f.marker_id != self.markers[i].marker_id
-                    || !valid_id(&f.resource_id)
-                    || f.pressure_bp > 10_000
-            }) || self.landmarks.iter().enumerate().any(|(i, f)| {
-                f.id != format!("landmark:{i}")
-                    || f.marker_id != self.markers[i].marker_id
-                    || !valid_id(&f.id)
-                    || !valid_id(&f.kind)
-            }) {
-                return Err("fields");
-            }
+        }
+        if self.biome_fields.iter().enumerate().any(|(i, f)| {
+            f.marker_id != self.markers[i].marker_id
+                || !valid_id(&f.biome_id)
+                || f.intensity_bp > 10_000
+        }) || self.hazard_fields.iter().enumerate().any(|(i, f)| {
+            f.marker_id != self.markers[i].marker_id
+                || !valid_id(&f.hazard_id)
+                || f.severity_bp > 10_000
+        }) || self.resource_pressures.iter().enumerate().any(|(i, f)| {
+            f.marker_id != self.markers[i].marker_id
+                || !valid_id(&f.resource_id)
+                || f.pressure_bp > 10_000
+        }) || self.landmarks.iter().enumerate().any(|(i, f)| {
+            f.id != format!("landmark:{i}")
+                || f.marker_id != self.markers[i].marker_id
+                || !valid_id(&f.id)
+                || !valid_id(&f.kind)
+        }) {
+            return Err("fields");
         }
         if self.extraction.selected_marker_id != "marker:0"
             || self.extraction.hub_anchor_id != "anchor:hub"
             || self.extraction.extraction_anchor_id != "anchor:extraction"
-            || self
-                .extraction
-                .path
-                .windows(2)
-                .any(|pair| !endpoints.contains(&(pair[0].clone(), pair[1].clone())))
+            || self.extraction.path.windows(2).any(|pair| {
+                !endpoints.contains(&(pair[0].clone(), pair[1].clone()))
+                    && !endpoints.contains(&(pair[1].clone(), pair[0].clone()))
+            })
         {
             return Err("extraction_path");
         }
