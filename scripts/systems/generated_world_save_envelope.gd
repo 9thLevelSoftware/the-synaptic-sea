@@ -53,6 +53,5 @@ static func from_dict(value: Variant):
 	if str(d.get("schema_version", "")) != SCHEMA or d.size() != 6 or typeof(d.get("sites")) != TYPE_ARRAY or typeof(d.get("export_schema_map")) != TYPE_DICTIONARY:
 		return null
 	var result = load("res://scripts/systems/generated_world_save_envelope.gd").new()
-	if not result.configure(int(d.get("world_seed", -1)), str(d.get("platform_generator_version", "")), str(d.get("content_manifest_hash", "")), d["export_schema_map"], d["sites"]):
-		return null
+	if not result.configure(int(d.get("world_seed", -1)), d.get("platform_generator_version"), str(d.get("content_manifest_hash", "")), d["export_schema_map"], d["sites"]): return null
 	return result
