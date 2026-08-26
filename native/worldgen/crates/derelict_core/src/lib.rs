@@ -13,6 +13,7 @@ pub mod pipeline;
 pub mod procgen;
 pub mod rng;
 pub mod role;
+pub mod site;
 pub mod stages;
 pub mod structural;
 pub mod topology;

@@ -1,0 +1,5 @@
+{
+  "schema_version": "site-fallback-1",
+  "mission_id": "authored-safe-return",
+  "mode": "ungated-critical-path-reverse"
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "site-rules-1",
+  "portal_cost": 1000,
+  "vertical_cost": 1500,
+  "clearance": 1,
+  "max_repairs": 2
+}
