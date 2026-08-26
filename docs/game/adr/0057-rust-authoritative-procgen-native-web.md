@@ -83,4 +83,3 @@ tests. Rebuilding that core would discard working evidence.
   same semantic hash.
 - Queue saturation, cancellation, timeout, and retained-result bounds are tested
   deterministically.
-

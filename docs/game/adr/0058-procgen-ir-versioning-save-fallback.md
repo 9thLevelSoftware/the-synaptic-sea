@@ -89,4 +89,3 @@ blob couples all of them.
 - Save compatibility tests for compatible mutation replay, incompatible
   new-world prompt, no implicit deletion, and preserved profile/settings.
 - Failure-corpus tests prove repair bounds and every authored fallback validates.
-
