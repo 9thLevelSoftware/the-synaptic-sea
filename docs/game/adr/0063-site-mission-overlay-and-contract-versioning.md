@@ -34,30 +34,47 @@ the bundle returns without violating Rust authority.
 3. The platform generator remains version 3 and the nested structural ship
    remains version 2. The bundle envelope's export-schema map and changed
    content-manifest hash distinguish the Task 7 contract/content. Validation
-   checks all three identities explicitly and never equates schema version with
-   either algorithm version.
+   checks all three identities explicitly: request/envelope/runtime/build
+   manifests equal platform 3, only `SiteIR.ship.generator_version` equals
+   structural 2, and the ship seed separately equals the full-key-derived
+   `WorldIR.site_seed`. It never equates schema version with either algorithm
+   version or equates the ship version with the request version.
 4. The site compiler consumes exactly one already validated structural ship and
    the selected `WorldIR` marker. It annotates stable room/cell/entity IDs; it
    does not mutate or rerun topology, damage, structural compilation, or loot.
 5. Mission graphs use closed node, edge, gate, objective, and prerequisite
    families. A lock names its earlier key source; a repair gate names its
-   reachable repair socket; objectives and extraction are ordered. Stable IDs
-   derive from the full Task 6 site key plus named site channels, never array
-   discovery order or a shared mutable RNG stream.
+   reachable repair socket; objectives and extraction are ordered. Acquire-key
+   nodes and key-lock gates carry the same unique nonempty `key_id`; repair
+   nodes, props, and gates similarly share a unique nonempty `repair_id`.
+   Stable IDs derive from the full Task 6 site key plus named site channels,
+   never array discovery order or a shared mutable RNG stream.
 6. Functional prop sockets bind an approved prop kind to an existing room and
    traversable cell. Navigation edges bind existing portals/verticals and carry
    integer traversal cost, clearance, gate, and passability annotations. LOS and
    cover are bounded integer/cell annotations; filenames and presentation paths
-   never control mechanics.
+   never control mechanics. Portal navigation references use the structural
+   plan's canonical `edge_key`. A vertical reference is `vertical:<a>:<b>`,
+   where each endpoint is the `(deck,x,y,room_id)` integer tuple and `a/b` are
+   lexicographically ordered; direction remains a separate edge field.
 7. Validation uses an automated progression agent that proves start,
    prerequisites, every required objective, and extraction are reachable in
    order. It also proves every referenced structural identity exists, every
    socket is traversable and nonconflicting, locks/keys and repairs are acyclic,
    and clearance/visibility/cover values stay inside authored envelopes.
+   Traversable portal edges cost 1,000 basis units and vertical edges 1,500;
+   both have one-cell clearance. Cover cells are room cells adjacent to a
+   canonical `Solid` structural edge, sorted by `(deck,x,y)`, capped at 64 per
+   room. LOS pairs are distinct same-deck/same-room cells sharing x or y with
+   every intermediate cell in the room, Manhattan distance 1..8,
+   lexicographically ordered by endpoint tuple, capped at 128 per room. These
+   constants live in authored rules and schema validation rejects deviations.
 8. Failure follows `validate -> named bounded local repair -> full revalidate ->
    complete manifest-bound authored mission fallback -> full revalidate/fail
    closed`. Repairs and fallback are trace-visible. No partial overlay enters a
-   bundle, and Godot cannot supply a missing mission record.
+   bundle, and Godot cannot supply a missing mission record. The fallback return
+   path is exactly the reverse of the structural ship's validated
+   `critical_path`; no return path is read from or written into `Ship`.
 
 ## Consequences
 
