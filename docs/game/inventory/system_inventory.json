@@ -8335,14 +8335,16 @@
       "kind": "simulation",
       "model_exists": true,
       "smoke": "native/worldgen/crates/derelict_core/tests/determinism.rs",
-      "reachable": false,
-      "driven": false,
-      "driven_at": "native/worldgen/crates/derelict_core/src/lib.rs",
-      "input": {"live": false, "desc": "Imported pure Rust generator; Gate 1 adapter wiring remains incomplete", "at": "native/worldgen/crates/derelict_core/src/pipeline.rs"},
-      "output": {"live": false, "desc": "Deterministic Rust ship output is tested but not yet consumed by the complete Godot bundle path", "at": "native/worldgen/crates/derelict_core/src/structural/export.rs"},
+      "reachable": true,
+      "driven": true,
+      "driven_at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle",
+      "input": {"live": true, "desc": "Versioned ProcgenRequest drives one Rust pipeline for world, site, gameplay, and presentation domains", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle"},
+      "output": {"live": true, "desc": "Validated ProcgenBundle with semantic hash, metrics, and trace is consumed unchanged by native and Web adapters", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle"},
       "confidence": "V",
-      "loops": [],
-      "integrations": []
+      "loops": ["travel"],
+      "integrations": [
+        {"to": "worldgen_gdextension", "via": "shared generate_bundle and bounded lifecycle core", "at": "native/worldgen/crates/derelict_godot/src/generator.rs", "health": "healthy"}
+      ]
     },
     {
       "id": "worldgen_gdextension",
@@ -8352,14 +8354,17 @@
       "kind": "adapter",
       "model_exists": true,
       "smoke": "scripts/validation/procgen_build_manifest_smoke.gd",
-      "reachable": false,
-      "driven": false,
+      "reachable": true,
+      "driven": true,
       "driven_at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen",
-      "input": {"live": false, "desc": "Manifest-gated native adapter seam; complete bundle/lifecycle cutover is Gate 1", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
-      "output": {"live": false, "desc": "GDExtension generator class is not claimed as complete native/Web parity", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
+      "input": {"live": true, "desc": "Manifest-gated ProcgenRequest JSON enters the same bounded Rust lifecycle used by Web", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
+      "output": {"live": true, "desc": "Complete ProcgenBundle JSON is validated by the Godot consumer before authored scene assembly", "at": "scripts/procgen/procgen_bundle_consumer.gd:consume"},
       "confidence": "V",
       "loops": ["travel"],
-      "integrations": []
+      "integrations": [
+        {"to": "procgen_manifest_validator", "via": "startup source/content/schema/artifact identity gate", "at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen", "health": "healthy"},
+        {"to": "ship_generator", "via": "generate_bundle lifecycle result consumed without Godot-side encounter or loot mutation", "at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen", "health": "healthy"}
+      ]
     }
   ],
   "loops": [

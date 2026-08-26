@@ -175,6 +175,28 @@ node "$ROOT/native/worldgen/web/wasm_lifecycle_smoke.mjs"
 - Presentation manifest binding, asset provenance audit, and deterministic scene
   assembly/visual review.
 
+Focused commands (each Godot command requires its PASS marker and no unexpected
+`ERROR:`/`WARNING:` line):
+
+```bash
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test creature_v2_domain
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test creature_v2_set
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test encounter_v2_domain
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test item_generation_v2
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test presentation_v2_contract
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test procgen_v4_gameplay_integration
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test gate3_wrapper_versions
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_player_model_request_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_exact_drop_runtime_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_authoritative_threat_runtime_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_authoritative_loot_bridge_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
+```
+
+The Gate 1 bundle/mapper/fallback/manifest/wired-travel commands remain part of
+Gate 3 because they prove the expanded bundle is consumed without restoring a
+Godot-side gameplay authority.
+
 ### Gate 4 focused evidence
 
 - Deterministic utility-score, tie-break, proposal-shape, trace-replay, and
@@ -212,15 +234,18 @@ node "$ROOT/native/worldgen/web/wasm_lifecycle_smoke.mjs"
   stop, runtime 60 fps target / 30 fps stop, plus declared per-stage latency,
   queue, entity, instance, navigation, and Web build-size limits.
 
-Current baseline (2026-08-26): imported Rust fmt, strict clippy, all workspace
-tests, and the 1,800-ship stress sweep pass. Windows Godot 4.7.2 passes all ten
-focused Gate 1 commands above, including `WORLDGEN WIRED TRAVEL PASS`, with no
-unexpected warnings or errors. Source structural GLBs are valid; the earlier
-missing-asset output came from an incomplete isolated-worktree import cache.
-The installed WASM package passes the Node lifecycle/shared-parity smoke. These
-smokes remain intentionally unregistered until Gate 6 Task 15 updates the
-canonical regression bundle. Canonical Godot 4.7.1, macOS/Linux exports, and
-final exported-Web parity remain unverified.
+Current baseline (2026-08-26): Gate 3 Rust source commit
+`c330e77929961be44cae1edcd347417f16ca89d0`, native artifact SHA-256
+`8d63a1e8bd8cd687bfaa8830e183e12eae83be940e35ebf5557a03ed725aa1a2`,
+and Web artifact SHA-256
+`724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8`.
+Rust fmt, strict clippy, all 295 workspace tests, and the 1,800-ship stress
+sweep pass. Windows Godot 4.7.2 passes the fourteen root-project Gate 3 commands
+plus the native lifecycle smoke, including `WORLDGEN WIRED TRAVEL PASS`, with no
+unexpected warnings or errors. The installed WASM package passes the Node
+lifecycle/shared-parity smoke. These smokes remain intentionally unregistered
+until Gate 6 updates the canonical regression bundle. Canonical Godot 4.7.1,
+macOS/Linux exports, and final exported-Web parity remain unverified.
 
 ## Regression bundle
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved; Gates 0 through 2 are complete and Gate 3 implementation is in
+Approved; Gates 0 through 3 are complete and Gate 4 implementation is in
 progress.
 No later gate is considered complete until its scoped card, acceptance evidence,
 and regression evidence are current.
@@ -346,15 +346,19 @@ peak memory under 512 MB target / 1 GB stop, and 60 fps target / 30 fps stop.
 Per-stage latency, queue depth, entities, instances, navigation, and Web build
 size receive explicit budgets before their gate closes.
 
-Current Windows evidence: Rust fmt, strict clippy, workspace tests, and the
-1,800-ship release stress sweep pass. The exact Godot 4.7.2 Mono console in the
-Downloads directory passes the ten-script Gate 1 bundle/mapper/fallback/
-lifecycle/manifest/wired-travel suite with no unexpected warnings or errors.
-The structural source GLBs are present and valid; the earlier missing-asset
-diagnosis was traced to an incomplete isolated-worktree import cache. The
-installed WebAssembly package also passes its Node lifecycle and shared parity
-corpus. Canonical Godot 4.7.1, macOS/Linux exports, and final exported-Web parity
-remain explicit Gate 6 evidence and are not yet verified.
+Current Windows Gate 3 evidence is bound to Rust source commit
+`c330e77929961be44cae1edcd347417f16ca89d0`, native SHA-256
+`8d63a1e8bd8cd687bfaa8830e183e12eae83be940e35ebf5557a03ed725aa1a2`,
+and Web SHA-256
+`724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8`.
+Rust fmt, strict clippy, all 295 workspace tests, and the 1,800-ship release
+stress sweep pass. The exact Godot 4.7.2 Mono console in the Downloads directory
+passes the fourteen-script root-project Gate 3 suite plus the native lifecycle
+smoke with
+no unexpected warnings or errors. The installed WebAssembly package passes its
+Node lifecycle and shared parity corpus. Canonical Godot 4.7.1, macOS/Linux
+exports, and final exported-Web parity remain explicit Gate 6 evidence and are
+not yet verified.
 
 ## Risks
 

@@ -1,6 +1,6 @@
 {
   "manifest_schema": "procgen-build-manifest-3",
-  "rust_source_commit": "2d42e65f1ac30cb9c8306e28dcff3f7b267764cb",
+  "rust_source_commit": "c330e77929961be44cae1edcd347417f16ca89d0",
   "generator_version": 3,
   "content_manifest_path": "data/procgen/manifests/content_manifest.json",
   "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
@@ -8,7 +8,7 @@
   "artifact": {
     "kind": "wasm",
     "path": "addons/derelict/bin/web/derelict_wasm_bg.wasm",
-    "sha256": "2e58389f7c5fdcd46846c118f74648305023fbf2063af24ebd10938ea86cd02f"
+    "sha256": "724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8"
   },
   "export_schemas": {
     "procgen_request": "procgen-request-2",
