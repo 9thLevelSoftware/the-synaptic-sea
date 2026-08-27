@@ -131,6 +131,9 @@ func _poll_child() -> void:
 			if not bool(checks.get("breach_scene_consumer", false)):
 				_fail("preview breach scene consumer did not drain oxygen")
 				return
+			if not bool(checks.get("radiation_scene_consumer", false)):
+				_fail("preview radiation scene consumer did not accumulate radiation")
+				return
 			print("DERELICT BUILDER PREVIEW SMOKE PASS checks=%d bundle=%s" % [REQUIRED_CHECKS.size(), _bundle_dir])
 			quit(0)
 			return

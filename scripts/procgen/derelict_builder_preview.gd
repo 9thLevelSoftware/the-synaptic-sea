@@ -31,6 +31,7 @@ const PREVIEW_FIRE_SIZE := Vector3(1.8, 1.2, 1.8)
 const PREVIEW_FIRE_COLOR := Color(1.0, 0.28, 0.05, 0.82)
 const PREVIEW_BREACH_SIZE := Vector3(2.6, 2.2, 1.6)
 const PREVIEW_BREACH_COLOR := Color(0.2, 0.65, 1.0, 0.45)
+const PREVIEW_RADIATION_COLOR := Color(0.65, 0.2, 0.9, 0.38)
 const PREVIEW_INPUT_BINDINGS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -64,6 +65,8 @@ var preview_fire_state
 var preview_fire_zones: Array[Area3D] = []
 var preview_oxygen_state
 var preview_breach_zones: Array[StaticBody3D] = []
+var preview_radiation_state
+var preview_radiation_zones: Array[Area3D] = []
 var preview_objective_controller
 var preview_objective_interactables: Array = []
 var _interaction_status: Label
@@ -121,7 +124,8 @@ func _process(delta: float) -> void:
 	var has_arc: bool = preview_arc_state != null and not preview_arc_zones.is_empty()
 	var has_fire: bool = preview_fire_state != null and not preview_fire_zones.is_empty()
 	var has_breach: bool = preview_oxygen_state != null and not preview_breach_zones.is_empty()
-	if not has_arc and not has_fire and not has_breach:
+	var has_radiation: bool = preview_radiation_state != null and not preview_radiation_zones.is_empty()
+	if not has_arc and not has_fire and not has_breach and not has_radiation:
 		return
 	if has_arc:
 		preview_arc_state.tick(delta)
@@ -132,6 +136,10 @@ func _process(delta: float) -> void:
 	if has_breach:
 		preview_oxygen_state.tick(delta, {"player_in_breach_zone": _preview_player_in_breach_zone()})
 		_apply_preview_breach_state()
+	if has_radiation:
+		preview_radiation_state.configure({"in_radiation_zone": _preview_player_in_radiation_zone()})
+		preview_radiation_state.tick(delta)
+		_apply_preview_radiation_state()
 
 
 func _validate_manifest(manifest: Dictionary) -> Array[String]:
@@ -201,12 +209,8 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	# hazard name used by the builder and the human-readable success marker.
 	checks["electrical"] = checks["arc"]
 
-	var radiation_specs: Array = loader.get_radiation_zone_specs()
-	var radiation_state = RadiationStateScript.new()
-	var radiation_spatially_ready := _radiation_spatial_query_ready(radiation_specs)
-	radiation_state.configure({"in_radiation_zone": radiation_spatially_ready})
-	radiation_state.tick(1.0)
-	checks["radiation"] = bool(checks["radiation"]) and (radiation_specs.is_empty() or (radiation_spatially_ready and radiation_state.radiation > 0.0))
+	checks["radiation_scene_consumer"] = _exercise_preview_radiation_runtime()
+	checks["radiation"] = bool(checks["radiation"]) and bool(checks["radiation_scene_consumer"])
 
 	checks["breach_scene_consumer"] = _exercise_preview_breach_runtime()
 	checks["breach"] = bool(checks["breach"]) and bool(checks["breach_scene_consumer"])
@@ -294,6 +298,7 @@ func _setup_interactive_runtime() -> bool:
 	_build_preview_fire_runtime()
 	_build_preview_breach_runtime()
 	_build_preview_arc_runtime()
+	_build_preview_radiation_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
 	return _interactive_runtime_ready()
@@ -465,6 +470,150 @@ func _exercise_preview_fire_runtime() -> bool:
 		if not preview_fire_state.is_burning(str(zone.get_meta("fire_compartment_id", ""))):
 			return false
 	return true
+
+
+func _build_preview_radiation_runtime() -> void:
+	preview_radiation_zones.clear()
+	preview_radiation_state = RadiationStateScript.new()
+	if not is_instance_valid(loader):
+		return
+	var specs: Array = loader.get_radiation_zone_specs()
+	var markers: Array[Vector3] = loader.get_radiation_zone_markers()
+	var segments: Array = loader.get_radiation_zone_segments()
+	if specs.size() != markers.size() or segments.size() != specs.size():
+		return
+	var radiation_material := _preview_radiation_material()
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary) or markers[index] == Vector3.INF:
+			continue
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_radiation_%d" % index)))
+		if zone_id.is_empty() or not (segments[index] is Dictionary):
+			continue
+		var segment: Dictionary = segments[index]
+		var from_position: Variant = segment.get("from", Vector3.INF)
+		var to_position: Variant = segment.get("to", Vector3.INF)
+		if not (from_position is Vector3) or not (to_position is Vector3):
+			continue
+		var direction: Vector3 = to_position - from_position
+		var length := maxf(2.0, direction.length() + 2.0)
+		var zone := Area3D.new()
+		zone.name = "BuilderPreviewRadiation_%s" % zone_id
+		zone.monitoring = false
+		zone.monitorable = false
+		zone.position = markers[index]
+		zone.rotation.y = atan2(direction.z, direction.x)
+		zone.collision_layer = 0
+		zone.collision_mask = 0
+		zone.set_meta("radiation_zone_id", zone_id)
+		zone.set_meta("radiation_zone_kind", str(spec.get("kind", "radiation")))
+		zone.set_meta("radiation_zone_visible", true)
+		zone.set_meta("radiation_zone_active", true)
+		zone.set_meta("radiation_zone_in_player", false)
+		var collision := CollisionShape3D.new()
+		collision.name = "BuilderPreviewRadiationCollision"
+		var box_shape := BoxShape3D.new()
+		box_shape.size = Vector3(length, 2.5, 2.5)
+		collision.shape = box_shape
+		zone.add_child(collision)
+		var visual := MeshInstance3D.new()
+		visual.name = "BuilderPreviewRadiationVisual"
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = box_shape.size
+		visual.mesh = box_mesh
+		visual.material_override = radiation_material
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		zone.add_child(visual)
+		loader.add_child(zone)
+		preview_radiation_zones.append(zone)
+	_apply_preview_radiation_state()
+
+
+func _preview_radiation_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = PREVIEW_RADIATION_COLOR
+	material.emission_enabled = true
+	material.emission = Color(0.35, 0.05, 0.65)
+	material.emission_energy_multiplier = 0.8
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+func _preview_player_in_radiation_zone() -> bool:
+	if preview_player == null:
+		return false
+	for zone in preview_radiation_zones:
+		if not is_instance_valid(zone):
+			continue
+		var local_position: Vector3 = zone.to_local(preview_player.global_position)
+		var collision := zone.get_node_or_null("BuilderPreviewRadiationCollision") as CollisionShape3D
+		var box_shape := collision.shape as BoxShape3D if collision != null else null
+		if box_shape != null and absf(local_position.x) <= box_shape.size.x * 0.5 \
+				and absf(local_position.y) <= box_shape.size.y * 0.5 \
+				and absf(local_position.z) <= box_shape.size.z * 0.5:
+			return true
+	return false
+
+
+func _apply_preview_radiation_state() -> void:
+	if preview_radiation_state == null:
+		return
+	var in_zone: bool = preview_radiation_state.in_radiation_zone
+	var radiation_level: float = preview_radiation_state.radiation
+	for zone in preview_radiation_zones:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("radiation_zone_in_player", in_zone and _preview_player_in_specific_radiation_zone(zone))
+		zone.set_meta("radiation_level", radiation_level)
+		zone.set_meta("radiation_health_drain_active", preview_radiation_state.get_health_drain_per_second() > 0.0)
+
+
+func _preview_player_in_specific_radiation_zone(zone: Area3D) -> bool:
+	if preview_player == null or not is_instance_valid(zone):
+		return false
+	var collision := zone.get_node_or_null("BuilderPreviewRadiationCollision") as CollisionShape3D
+	var box_shape := collision.shape as BoxShape3D if collision != null else null
+	if box_shape == null:
+		return false
+	var local_position: Vector3 = zone.to_local(preview_player.global_position)
+	return absf(local_position.x) <= box_shape.size.x * 0.5 \
+			and absf(local_position.y) <= box_shape.size.y * 0.5 \
+			and absf(local_position.z) <= box_shape.size.z * 0.5
+
+
+func _exercise_preview_radiation_runtime() -> bool:
+	var specs: Array = loader.get_radiation_zone_specs()
+	if specs.is_empty():
+		return true
+	if preview_radiation_state == null or preview_radiation_zones.size() != specs.size() or preview_player == null:
+		return false
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary):
+			return false
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_radiation_%d" % index)))
+		var matches := preview_radiation_zones.filter(func(zone: Area3D) -> bool: return str(zone.get_meta("radiation_zone_id", "")) == zone_id)
+		if matches.size() != 1:
+			return false
+		var zone: Area3D = matches[0]
+		var collision := zone.get_node_or_null("BuilderPreviewRadiationCollision") as CollisionShape3D
+		var visual := zone.get_node_or_null("BuilderPreviewRadiationVisual") as MeshInstance3D
+		if zone.monitoring or zone.monitorable or not zone.get_meta("radiation_zone_visible", false) \
+				or collision == null or collision.shape == null or visual == null or visual.mesh == null:
+			return false
+	var original_position: Vector3 = preview_player.global_position
+	preview_player.global_position = preview_radiation_zones[0].global_position
+	preview_radiation_state.configure({"radiation": 0.0, "in_radiation_zone": _preview_player_in_radiation_zone()})
+	preview_radiation_state.tick(1.0)
+	_apply_preview_radiation_state()
+	var accumulated: bool = preview_radiation_state.radiation > 0.0
+	var spatially_inside: bool = _preview_player_in_radiation_zone()
+	preview_player.global_position = original_position
+	preview_radiation_state.configure({"radiation": 0.0, "in_radiation_zone": false})
+	_apply_preview_radiation_state()
+	return spatially_inside and accumulated
 
 
 func _build_preview_breach_runtime() -> void:

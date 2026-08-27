@@ -3591,7 +3591,8 @@ func _player_fire_intensity() -> float:
 		if not is_instance_valid(z) or not (z is Node3D):
 			continue
 		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
-			return _active_fire_state().get_intensity(str(cid))
+			var compartment_id: String = str(z.get_meta("fire_compartment_id", cid))
+			return _active_fire_state().get_intensity(compartment_id)
 	return 0.0
 
 ## M7-B Task 8: applies fire degradation to the ship system housed in each burning
@@ -4981,8 +4982,8 @@ func _build_fire_zones() -> void:
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty() and layout_zones.is_empty():
 		return
-	var assigned: Dictionary = {}
 	var claimed: Dictionary = {}
+	var mapped_rows: Dictionary = {}
 	for cid in burning:
 		var cid_s: String = str(cid)
 		for zi in range(layout_zones.size()):
@@ -4993,64 +4994,71 @@ func _build_fire_zones() -> void:
 			var spec_cid: String = _authored_fire_compartment_id(spec)
 			if spec_cid.is_empty() or spec_cid != cid_s:
 				continue
-			assigned[cid_s] = {"position": row["position"], "spec": spec}
+			# Keep every authored marker for a compartment. A room may have
+			# multiple fire links (for example two cargo-hold sources), and each
+			# source needs its own spatially queryable runtime node.
+			if not mapped_rows.has(cid_s):
+				mapped_rows[cid_s] = []
+			(mapped_rows[cid_s] as Array).append({"position": row["position"], "spec": spec})
 			claimed[zi] = true
-			break
 	var leftover_idx: int = 0
 	var fallback_i: int = 0
 	for cid in burning:
 		var cid_s: String = str(cid)
-		var pos: Vector3
-		var layout_spec: Dictionary = {}
-		if assigned.has(cid_s):
-			pos = assigned[cid_s]["position"]
-			layout_spec = assigned[cid_s]["spec"]
-		else:
+		var placements: Array = mapped_rows.get(cid_s, [])
+		if placements.is_empty():
 			while leftover_idx < layout_zones.size() and (
 					claimed.has(leftover_idx) or not _fire_layout_zone_mapped_cid(layout_zones[leftover_idx]).is_empty()):
 				leftover_idx += 1
 			if leftover_idx < layout_zones.size():
 				var row: Dictionary = layout_zones[leftover_idx]
-				pos = row["position"]
-				layout_spec = row["spec"] if row.get("spec") is Dictionary else {}
+				placements.append({"position": row["position"], "spec": row["spec"] if row.get("spec") is Dictionary else {}})
 				claimed[leftover_idx] = true
 				leftover_idx += 1
 			else:
 				if positions.is_empty():
 					continue
-				pos = positions[fallback_i % positions.size()]
+				placements.append({"position": positions[fallback_i % positions.size()], "spec": {}})
 				fallback_i += 1
-		var zone := Area3D.new()
-		zone.name = "FireZone_%s" % str(cid)
-		# Passable: monitoring/monitorable off — these are visual + lookup nodes,
-		# NOT collision blockers. The player must be able to walk into a fire.
-		zone.monitoring = false
-		zone.monitorable = false
-		zone.set_meta("fire_compartment_id", str(cid))
-		if not layout_spec.is_empty():
-			zone.set_meta("fire_zone_layout_id", str(layout_spec.get("zone_id", "")))
-			zone.set_meta("fire_zone_layout_kind", str(layout_spec.get("kind", "")))
-		zone.position = pos
-		var shape := CollisionShape3D.new()
-		var sphere := SphereShape3D.new()
-		sphere.radius = 2.0
-		shape.shape = sphere
-		zone.add_child(shape)
-		var visual := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(1.2, 1.2, 1.2)
-		visual.mesh = box
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.95, 0.3, 0.05, 0.65)
-		mat.emission_enabled = true
-		mat.emission = Color(1.0, 0.4, 0.1)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		visual.material_override = mat
-		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		zone.add_child(visual)
-		_attach_zone_to_active_ship(zone)
-		fire_zone_nodes[str(cid)] = zone
+		for placement_i in range(placements.size()):
+			var placement: Dictionary = placements[placement_i]
+			var pos: Vector3 = placement["position"]
+			var layout_spec: Dictionary = placement["spec"] if placement.get("spec") is Dictionary else {}
+			var zone := Area3D.new()
+			zone.name = "FireZone_%s_%d" % [str(cid), placement_i]
+			# Passable: monitoring/monitorable off — these are visual + lookup nodes,
+			# NOT collision blockers. The player must be able to walk into a fire.
+			zone.monitoring = false
+			zone.monitorable = false
+			zone.set_meta("fire_compartment_id", cid_s)
+			zone.set_meta("fire_zone_marker_index", placement_i)
+			if not layout_spec.is_empty():
+				zone.set_meta("fire_zone_layout_id", str(layout_spec.get("zone_id", "")))
+				zone.set_meta("fire_zone_layout_kind", str(layout_spec.get("kind", "")))
+			zone.position = pos
+			var shape := CollisionShape3D.new()
+			var sphere := SphereShape3D.new()
+			sphere.radius = 2.0
+			shape.shape = sphere
+			zone.add_child(shape)
+			var visual := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(1.2, 1.2, 1.2)
+			visual.mesh = box
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.95, 0.3, 0.05, 0.65)
+			mat.emission_enabled = true
+			mat.emission = Color(1.0, 0.4, 0.1)
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			visual.material_override = mat
+			visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			zone.add_child(visual)
+			_attach_zone_to_active_ship(zone)
+			# Preserve the historical compartment key for existing consumers; use
+			# deterministic suffixes for additional authored markers.
+			var zone_key: String = cid_s if placement_i == 0 else "%s#%d" % [cid_s, placement_i]
+			fire_zone_nodes[zone_key] = zone
 
 # Layout-declared fire zones of the BOARDED derelict, as [{position, spec}]
 # pairs in the derelict's own frame. Mirrors _active_arc_loader's away-branch
@@ -5145,7 +5153,9 @@ func _refresh_fire_zones() -> void:
 			burning[str(cid)] = true
 	var rendered := {}
 	for cid in fire_zone_nodes:
-		rendered[str(cid)] = true
+		var zone = fire_zone_nodes[cid]
+		if is_instance_valid(zone) and zone.has_meta("fire_compartment_id"):
+			rendered[str(zone.get_meta("fire_compartment_id"))] = true
 	# Compare as sorted sets so a different key order does not force a needless rebuild.
 	var burning_keys: Array = burning.keys()
 	burning_keys.sort()
