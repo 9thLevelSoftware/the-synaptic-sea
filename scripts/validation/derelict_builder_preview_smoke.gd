@@ -26,6 +26,18 @@ func _initialize() -> void:
 	if layout.is_empty() or gameplay.is_empty() or kit.is_empty():
 		_fail("coherent fixture is unavailable")
 		return
+	if not PreviewScript._atmosphere_oxygen_probe_satisfied(true, 0.0, 0.0):
+		_fail("exhausted oxygen does not satisfy an authored drain probe")
+		return
+	if PreviewScript._atmosphere_oxygen_probe_satisfied(true, 0.0, 1.0):
+		_fail("authored drain probe permits exhausted oxygen to recover")
+		return
+	if PreviewScript._atmosphere_oxygen_probe_satisfied(true, 10.0, 10.0):
+		_fail("non-exhausted authored drain probe permits no drain")
+		return
+	if not PreviewScript._atmosphere_oxygen_probe_satisfied(false, 10.0, 10.0):
+		_fail("safe authored oxygen probe rejects unchanged oxygen")
+		return
 	# Exercise every authored runtime consumer with representative data. The
 	# golden fixture intentionally omits some optional hazards, which previously
 	# let acceptance succeed through "not applicable" branches alone.
@@ -139,6 +151,9 @@ func _poll_child() -> void:
 				return
 			if not bool(checks.get("atmosphere_scene_consumer", false)):
 				_fail("preview atmosphere scene consumer was not spatially ticking authored room state")
+				return
+			if not bool(checks.get("atmosphere_probe_state_pristine", false)):
+				_fail("preview atmosphere acceptance probe mutated persistent oxygen/radiation/temperature state")
 				return
 			print("DERELICT BUILDER PREVIEW SMOKE PASS checks=%d bundle=%s" % [REQUIRED_CHECKS.size(), _bundle_dir])
 			quit(0)
