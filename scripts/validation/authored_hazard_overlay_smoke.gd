@@ -2,13 +2,14 @@ extends SceneTree
 
 # Authored hazard overlay + explicit loot contents (PR 13).
 # Force the away branch, inject variant rooms PLUS mapped fire/breach zones,
-# vented_compartments, a visual-only unmapped zone, and hazard_source=runtime.
+# vented_compartments, a room-link fire, an invalid unmapped zone, and
+# hazard_source=runtime.
 # Asserts:
 #   - seed still runs (variant engineering fire + bridge breach present)
 #   - overlay ignites hydroponics, breaches cargo, vents cargo
-#   - unmapped/no-cid zones do not ignite
+#   - link-shaped zones resolve through room roles; invalid explicit roles do not ignite
 #   - hazard_source is ignored (runtime stamp still overlays)
-#   - fire-zone visuals pin hydroponics to the cid-tagged marker, not index 0
+#   - fire-zone visuals pin hydroponics to the room-link marker, not index 0
 #   - mapped hydroponics marker is reserved when that fire is absent
 #   - loot specs copy contents; try_interact grants those stacks (no table roll)
 #   - explicit empty contents does not fall through to a table roll
@@ -70,23 +71,19 @@ func _validate() -> void:
 	else:
 		_set_room_variant_by_role(rooms as Array, "bridge", "breached")
 
+	(rooms as Array).append({"id": "hydro_link_test", "room_role": "hydroponics", "variant": "standard"})
+
 	# Overlay records. hazard_source is a tooling stamp — seed + overlay must
-	# still run. Visual-only zone has no compartment_id (and an unmapped role).
+	# still run. The hydroponics fire uses the normal room-link shape with no
+	# compartment_id; the explicitly unmapped airlock record remains visual-only.
 	layout["hazard_source"] = "runtime"
 	layout["fire_zones"] = [
 		{
 			"id": "hydro_authored_fire",
 			"from_room": "airlock_01",
-			"to_room": "airlock_01",
-			"compartment_id": "hydroponics",
+			"to_room": "hydro_link_test",
 			"kind": "timed_fire",
 			"hazard_source": "runtime",
-		},
-		{
-			"id": "visual_only_fire",
-			"from_room": "cargo_01",
-			"to_room": "cargo_01",
-			"kind": "timed_fire",
 		},
 		{
 			"id": "unmapped_role_fire",
@@ -142,8 +139,8 @@ func _validate() -> void:
 		var declared_markers: Array[Vector3] = [SENTINEL_HYDRO, SENTINEL_VISUAL]
 		root.fire_zone_markers = declared_markers
 		root.fire_zone_specs = [
-			{"zone_id": "hydro_authored_fire", "compartment_id": "hydroponics", "kind": "timed_fire"},
-			{"zone_id": "visual_only_fire", "kind": "timed_fire"},
+			{"zone_id": "hydro_authored_fire", "from_room": "airlock_01", "to_room": "hydro_link_test", "kind": "timed_fire"},
+			{"zone_id": "unmapped_role_fire", "compartment_id": "airlock", "kind": "timed_fire"},
 		]
 		playable._build_fire_zones()
 		var hydro_zone = playable.fire_zone_nodes.get("hydroponics", null)

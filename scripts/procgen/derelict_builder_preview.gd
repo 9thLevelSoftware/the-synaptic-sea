@@ -28,6 +28,11 @@ const PREVIEW_ARC_DISCHARGED_COLOR := Color(0.35, 0.85, 1.0, 0.35)
 const PREVIEW_ARC_ARCING_COLOR := Color(0.95, 0.32, 1.0, 0.82)
 const PREVIEW_FIRE_SIZE := Vector3(1.8, 1.2, 1.8)
 const PREVIEW_FIRE_COLOR := Color(1.0, 0.28, 0.05, 0.82)
+const PREVIEW_FIRE_COMPARTMENT_FOR_ROLE := {
+	"bridge": "bridge", "cockpit": "bridge",
+	"engineering": "engineering", "reactor": "engineering", "engine_bay": "engineering",
+	"hydroponics": "hydroponics", "cargo": "cargo", "storage": "cargo",
+}
 const PREVIEW_BREACH_SIZE := Vector3(2.6, 2.2, 1.6)
 const PREVIEW_BREACH_COLOR := Color(0.2, 0.65, 1.0, 0.45)
 const PREVIEW_INPUT_BINDINGS := {
@@ -364,7 +369,7 @@ func _build_preview_fire_runtime() -> void:
 			continue
 		var spec: Dictionary = specs[index]
 		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_fire_%d" % index)))
-		var compartment_id := str(spec.get("compartment_id", spec.get("from_room", zone_id)))
+		var compartment_id := _preview_fire_compartment_id(spec)
 		if compartment_id.is_empty():
 			continue
 		if not compartments.has(compartment_id):
@@ -405,6 +410,32 @@ func _build_preview_fire_runtime() -> void:
 	for zone in preview_fire_zones:
 		preview_fire_state.ignite(str(zone.get_meta("fire_compartment_id")), 1.0)
 	_apply_preview_fire_state()
+
+
+func _preview_fire_compartment_id(spec: Dictionary) -> String:
+	for candidate_key in ["compartment_id", "to_room", "from_room"]:
+		var candidate := str(spec.get(candidate_key, "")).strip_edges()
+		if candidate.is_empty():
+			continue
+		if candidate in PREVIEW_FIRE_COMPARTMENT_FOR_ROLE.values():
+			return candidate
+		var mapped_role := str(PREVIEW_FIRE_COMPARTMENT_FOR_ROLE.get(candidate, ""))
+		if not mapped_role.is_empty():
+			return mapped_role
+		var rooms_variant: Variant = loader.layout_doc.get("rooms", []) if is_instance_valid(loader) else []
+		if not (rooms_variant is Array):
+			continue
+		for room_variant in rooms_variant:
+			if not (room_variant is Dictionary):
+				continue
+			var room: Dictionary = room_variant
+			if str(room.get("id", "")) != candidate:
+				continue
+			var room_role := str(room.get("room_role", room.get("role", "")))
+			var mapped_room := str(PREVIEW_FIRE_COMPARTMENT_FOR_ROLE.get(room_role, ""))
+			if not mapped_room.is_empty():
+				return mapped_room
+	return ""
 
 
 func _preview_fire_material() -> StandardMaterial3D:

@@ -288,6 +288,15 @@ func _validate() -> void:
 	if playable.body_temperature_state.in_extreme_zone:
 		_fail("temperature from an authored room leaked into a safe authored room")
 		return
+	# Leaving every authored atmosphere volume must not reactivate the legacy
+	# ship-wide derelict heat when any room-scoped temperature source exists.
+	playable.player.global_position = active_loader.to_global(safe_room_position + Vector3(100.0, 0.0, 0.0))
+	playable.body_temperature_state.temperature = 40.0
+	playable._tick_survival_attrition(1.0)
+	if playable.body_temperature_state.in_extreme_zone \
+			or playable.body_temperature_state.temperature >= 40.0:
+		_fail("room-authored temperature leaked ship-wide outside its volume")
+		return
 	# Pressure/oxygen and radiation-only atmosphere records do not define a
 	# thermal source.  The legacy derelict thermal hazard must remain active
 	# rather than treating an omitted temperature as nominal recovery.

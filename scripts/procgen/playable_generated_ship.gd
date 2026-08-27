@@ -3365,15 +3365,54 @@ func _authored_hazard_zone_dicts(zone_key: String) -> Array:
 			_append_zone_dicts(out, root.get_fire_zone_specs())
 	return out
 
-## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones
-## that carry a mapped compartment_id. Zones without that field stay visual-only
-## so existing goldens (link shape, no cid) do not suddenly ignite.
+func _mapped_authored_room_compartment(room_id: String) -> String:
+	var token := room_id.strip_edges()
+	if token.is_empty():
+		return ""
+	var sources: Array = []
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
+		sources.append(current_ship.built_layout.get("rooms", []))
+	var root = current_ship.scene_root if current_ship != null else null
+	if is_instance_valid(root) and typeof(root.get("layout_doc")) == TYPE_DICTIONARY:
+		sources.append(root.layout_doc.get("rooms", []))
+	for rooms_variant in sources:
+		if not (rooms_variant is Array):
+			continue
+		for room_variant in rooms_variant:
+			if not (room_variant is Dictionary):
+				continue
+			var room: Dictionary = room_variant
+			if str(room.get("id", "")) != token:
+				continue
+			return _mapped_authored_compartment_id(str(room.get("room_role", room.get("role", ""))))
+	return ""
+
+## Resolve a normal link-shaped authored fire record onto the boarded fire
+## model. Explicit compartment ids win; otherwise the destination and source
+## room ids are mapped through their authored room roles.
+func _authored_fire_compartment_id(zone: Dictionary) -> String:
+	var explicit := _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
+	if not explicit.is_empty():
+		return explicit
+	for endpoint_key in ["to_room", "from_room"]:
+		var endpoint := str(zone.get(endpoint_key, ""))
+		var mapped := _mapped_authored_compartment_id(endpoint)
+		if mapped.is_empty():
+			mapped = _mapped_authored_room_compartment(endpoint)
+		if not mapped.is_empty():
+			return mapped
+	return ""
+
+## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones.
+## Fire links may resolve through room ids; invalid or unmapped records remain
+## visual-only instead of inventing a preview-only compartment.
 func _authored_mapped_hazard_compartments(kind: String) -> Array:
 	var zone_key: String = "fire_zones" if kind == "fire" else "breach_zones"
 	var found: Dictionary = {}
 	for zone_v in _authored_hazard_zone_dicts(zone_key):
 		var zone: Dictionary = zone_v
-		var cid: String = _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
+		var cid: String = _authored_fire_compartment_id(zone) if kind == "fire" \
+			else _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
 		if cid.is_empty():
 			continue
 		found[cid] = true
@@ -4987,7 +5026,7 @@ func _build_fire_zones() -> void:
 				continue
 			var row: Dictionary = layout_zones[zi]
 			var spec: Dictionary = row["spec"] if row.get("spec") is Dictionary else {}
-			var spec_cid: String = _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
+			var spec_cid: String = _authored_fire_compartment_id(spec)
 			if spec_cid.is_empty() or spec_cid != cid_s:
 				continue
 			assigned[cid_s] = {"position": row["position"], "spec": spec}
@@ -5080,7 +5119,7 @@ func _fire_layout_zone_mapped_cid(row: Variant) -> String:
 	if not (row is Dictionary):
 		return ""
 	var spec: Dictionary = (row as Dictionary)["spec"] if (row as Dictionary).get("spec") is Dictionary else {}
-	return _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
+	return _authored_fire_compartment_id(spec)
 
 func _attach_zone_to_active_ship(node: Node) -> void:
 	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -8682,6 +8721,7 @@ func _tick_survival_attrition(delta: float) -> void:
 	var in_authored_radiation: Variant = null
 	var has_authored_radiation_source := false
 	var has_authored_temperature_source := false
+	var in_authored_temperature_source := false
 	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
 	var authored_atmosphere: Dictionary = {}
 	if is_instance_valid(authored_loader) \
@@ -8702,14 +8742,14 @@ func _tick_survival_attrition(delta: float) -> void:
 		var authored_atmosphere_specs: Variant = authored_loader.get("authored_atmosphere_specs")
 		if authored_atmosphere_specs is Array:
 			for authored_spec_variant in authored_atmosphere_specs:
-				if authored_spec_variant is Dictionary \
-						and int((authored_spec_variant as Dictionary).get("radiation_bp", 0)) > 0:
-					has_authored_radiation_source = true
+				if authored_spec_variant is Dictionary:
+					var authored_spec: Dictionary = authored_spec_variant
+					if int(authored_spec.get("radiation_bp", 0)) > 0:
+						has_authored_radiation_source = true
+					if authored_spec.has("temperature_c"):
+						has_authored_temperature_source = true
 	if not authored_atmosphere.is_empty() and authored_atmosphere.has("temperature_c"):
-		# Only the atmosphere at the player's current position is a real
-		# authored thermal source.  Other rooms' pressure/radiation fields must
-		# not suppress the legacy derelict thermal hazard here.
-		has_authored_temperature_source = true
+		in_authored_temperature_source = true
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8769,11 +8809,16 @@ func _tick_survival_attrition(delta: float) -> void:
 			radiation_state.in_radiation_zone = in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
-		if has_authored_temperature_source:
+		if in_authored_temperature_source:
 			var ambient_temperature := float(authored_atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
 			body_temperature_state.in_extreme_zone = ambient_temperature < body_temperature_state.safe_min \
 				or ambient_temperature > body_temperature_state.safe_max
 			body_temperature_state.tick(delta, {"ambient_temperature_c": ambient_temperature})
+		elif has_authored_temperature_source:
+			# A room-scoped authored temperature replaces the legacy ship-wide
+			# away hazard. Outside its volume the player recovers toward nominal.
+			body_temperature_state.in_extreme_zone = false
+			body_temperature_state.tick(delta)
 		else:
 			body_temperature_state.in_extreme_zone = in_hazard_env
 			body_temperature_state.tick(delta)

@@ -29,7 +29,7 @@ func _initialize() -> void:
 	# Exercise every authored runtime consumer with representative data. The
 	# golden fixture intentionally omits some optional hazards, which previously
 	# let acceptance succeed through "not applicable" branches alone.
-	layout["fire_zones"] = [_zone("preview_fire", "timed_fire", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0])]
+	layout["fire_zones"] = [_zone("preview_fire", "timed_fire", "spine_01", "cargo_01", [6, 0, 1], [6, -1, 1])]
 	layout["arc_zones"] = [
 		_zone("preview_arc_a", "electrical_arc", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0]),
 		_zone("preview_arc_b", "electrical_arc", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0]),
@@ -176,7 +176,6 @@ func _zone(id: String, kind: String, from_room: String, to_room: String, from_ce
 		"from_cell": from_cell,
 		"to_cell": to_cell,
 		"module_id": "",
-		"compartment_id": from_room,
 		"rationale": "builder runtime preview smoke",
 	}
 
