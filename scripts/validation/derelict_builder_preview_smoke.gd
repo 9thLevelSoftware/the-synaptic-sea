@@ -1,14 +1,12 @@
 extends SceneTree
 
+const PreviewScript := preload("res://scripts/procgen/derelict_builder_preview.gd")
 const LAYOUT_SOURCE := "res://data/procgen/golden/coherent_ship_001/layout.json"
 const GAMEPLAY_SOURCE := "res://data/procgen/golden/coherent_ship_001/gameplay_slice.json"
 const KIT_SOURCE := "res://data/kits/ship_structural_v0.json"
 const PREVIEW_SCENE := "res://scenes/procgen/derelict_builder_preview.tscn"
 const TIMEOUT_SECONDS := 45.0
-const REQUIRED_CHECKS := [
-	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
-	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
-]
+const REQUIRED_CHECKS := PreviewScript.REQUIRED_CHECKS
 
 var _child_pid := -1
 var _bundle_dir := ""

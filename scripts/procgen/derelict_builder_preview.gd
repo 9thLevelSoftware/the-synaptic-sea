@@ -10,6 +10,10 @@ const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd"
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
+const REQUIRED_CHECKS: Array[String] = [
+	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
+	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
+]
 
 var loader
 var manifest_path := ""
@@ -107,10 +111,6 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		"props": loader.get_placed_prop_specs_copy().size() == _array(gameplay.get("placed_props", [])).size(),
 		"vertical_links": int(_ship_summary.get("vertical_link_count", -1)) == _array(layout.get("vertical_connections", [])).size(),
 	}
-	for key in checks:
-		if not bool(checks[key]):
-			errors.append("runtime acceptance failed: %s" % key)
-
 	var fire_specs: Array = loader.get_fire_zone_specs()
 	var fire_state = FireStateScript.new()
 	if not fire_specs.is_empty():
@@ -148,9 +148,9 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	checks["atmosphere"] = _exercise_atmosphere(layout)
 
 	checks["portal_interaction"] = _exercise_portals(layout)
-	for key in ["fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction"]:
+	for key in REQUIRED_CHECKS:
 		if not bool(checks[key]):
-			errors.append("runtime behavior failed: %s" % key)
+			errors.append("runtime acceptance failed: %s" % key)
 	return {"ok": errors.is_empty(), "errors": errors, "checks": checks}
 
 
@@ -185,18 +185,16 @@ func _wait_for_navigation_sync() -> bool:
 	var vertices := region.navigation_mesh.get_vertices() if region.navigation_mesh != null else PackedVector3Array()
 	if not navigation_map.is_valid() or vertices.is_empty():
 		return false
-	# The preview runs and exits much faster than a normal gameplay scene. Push
-	# the baked resource through the same server RID and probe an actual vertex
-	# so a merely-created (but still empty) map cannot satisfy readiness.
-	NavigationServer3D.region_set_navigation_mesh(region.get_rid(), region.navigation_mesh)
-	NavigationServer3D.map_set_active(navigation_map, true)
+	# The preview runs and exits much faster than a normal gameplay scene. Give
+	# the active map one forced warm-up, then only poll for real server progress.
 	var probe_world: Vector3 = region.to_global(vertices[0])
+	await get_tree().physics_frame
+	NavigationServer3D.map_force_update(navigation_map)
 	for _frame in range(120):
-		await get_tree().physics_frame
-		NavigationServer3D.map_force_update(navigation_map)
 		if NavigationServer3D.map_get_iteration_id(navigation_map) > 0 \
 				and NavigationServer3D.map_get_closest_point(navigation_map, probe_world).distance_to(probe_world) <= 1.0:
 			return true
+		await get_tree().physics_frame
 	return false
 
 
@@ -348,7 +346,10 @@ func _finish(ok: bool, errors: Array, checks: Dictionary = {}) -> void:
 			file.close()
 	print("%s %s" % [RESULT_MARKER, JSON.stringify(result)])
 	if ok:
-		print("DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true")
+		var marker_parts: Array[String] = []
+		for key in REQUIRED_CHECKS:
+			marker_parts.append("%s=%s" % [key, "true" if bool(checks.get(key, false)) else "false"])
+		print("DERELICT BUILDER PREVIEW PASS %s" % " ".join(marker_parts))
 	if not ok:
 		push_error("DERELICT BUILDER PREVIEW FAIL %s" % "; ".join(errors))
 	if DisplayServer.get_name() == "headless" or not ok:
