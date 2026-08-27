@@ -1615,9 +1615,9 @@ func _add_radiation_zone_markers(source_layout: Dictionary, ship_root: Node3D) -
 		radiation_zone_specs.append(_normalize_zone_spec(zone))
 		radiation_zone_segments.append({"from": from_pos, "to": to_pos})
 		var length: float = maxf(2.0, from_pos.distance_to(to_pos) + 2.0)
-		ship_root.add_child(_make_trigger_volume(
+		ship_root.add_child(_make_oriented_trigger_volume(
 			"RadiationZone_%s" % str(zone.get("id", radiation_zone_markers.size() - 1)), midpoint,
-			Color(0.65, 0.2, 0.9, 0.3), Vector3(length, 2.5, 2.5)))
+			Color(0.65, 0.2, 0.9, 0.3), Vector3(length, 2.5, 2.5), from_pos, to_pos))
 
 
 func _add_authored_atmosphere_volumes(source_layout: Dictionary, ship_root: Node3D) -> void:
@@ -1829,6 +1829,16 @@ func _make_trigger_volume(node_name: String, world_position: Vector3, color: Col
 	material.albedo_color = color
 	mesh_node.material_override = material
 	area.add_child(mesh_node)
+	return area
+
+
+func _make_oriented_trigger_volume(
+	node_name: String, world_position: Vector3, color: Color, size: Vector3,
+	from_pos: Vector3, to_pos: Vector3) -> Area3D:
+	var area := _make_trigger_volume(node_name, world_position, color, size)
+	var segment := to_pos - from_pos
+	if segment.length_squared() > 0.000001:
+		area.quaternion = Quaternion(Vector3.RIGHT, segment.normalized())
 	return area
 
 

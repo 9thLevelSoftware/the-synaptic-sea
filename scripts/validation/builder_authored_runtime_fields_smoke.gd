@@ -25,7 +25,7 @@ func _initialize() -> void:
 		_fail("fixture has no floor placements")
 		return
 	var position := _vec3(placements[0].get("position", []))
-	var from_cell := _cell3(placements[0])
+	var from_cell: Array = [1, 1, 0]
 	var to_cell: Array = [2, 0, 0]
 	layout["radiation_zones"] = [{
 		"id": "builder_radiation_01",
@@ -61,6 +61,14 @@ func _initialize() -> void:
 	var radiation_to: Vector3 = radiation_segment["to"]
 	if radiation_from.distance_to(radiation_to) <= 5.0:
 		_fail("radiation regression segment was not longer than five meters")
+		return
+	var radiation_volume := loader.find_child("RadiationZone_builder_radiation_01", true, false)
+	if not radiation_volume is Area3D:
+		_fail("radiation collision volume was not materialized")
+		return
+	var volume_axis: Vector3 = (radiation_volume as Area3D).basis.x.normalized()
+	if absf(volume_axis.dot((radiation_to - radiation_from).normalized())) < 0.99:
+		_fail("radiation collision volume was not aligned to its authored segment")
 		return
 	for endpoint in [radiation_from, radiation_to, radiation_from.lerp(radiation_to, 0.5)]:
 		if loader.get_radiation_zone_at(endpoint, 0.1).is_empty():

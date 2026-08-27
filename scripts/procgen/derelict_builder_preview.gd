@@ -257,6 +257,8 @@ func _navigation_path_between_world(navigation_map: RID, start_world: Vector3, t
 func _exercise_vertical_links(layout: Dictionary) -> bool:
 	var authored_links := _array(layout.get("vertical_connections", []))
 	var expected_count := authored_links.size()
+	if loader.structural_root == null:
+		return expected_count == 0 and int(_ship_summary.get("vertical_link_count", -1)) == 0
 	var links: Array[Node] = loader.structural_root.find_children("VerticalLink_*", "NavigationLink3D", true, false)
 	if int(_ship_summary.get("vertical_link_count", -1)) != expected_count or links.size() != expected_count:
 		return false
@@ -382,6 +384,8 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 		if not accepted:
 			return false
 	return true
+
+
 func _exercise_portals(layout: Dictionary) -> bool:
 	var nodes: Array[Area3D] = loader.get_authored_portal_nodes()
 	if nodes.size() != _structural_portal_count(layout):
