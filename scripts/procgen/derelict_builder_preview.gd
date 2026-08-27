@@ -179,7 +179,11 @@ func _navigation_path_exists(local_target: Vector3) -> bool:
 	var start_on_map := NavigationServer3D.map_get_closest_point(navigation_map, start_world)
 	var target_on_map := NavigationServer3D.map_get_closest_point(navigation_map, target_world)
 	var path := NavigationServer3D.map_get_path(navigation_map, start_on_map, target_on_map, true)
-	return path.size() >= 2 or start_on_map.distance_to(target_on_map) <= 0.05
+	if path.size() >= 2:
+		return true
+	# A one-room document may intentionally use the same start and goal. Only
+	# that authored coincidence may accept a zero-length navigation path.
+	return start_world.distance_to(target_world) <= 0.05 and start_on_map.distance_to(target_on_map) <= 0.05
 
 
 func _wait_for_navigation_sync() -> bool:
@@ -189,10 +193,21 @@ func _wait_for_navigation_sync() -> bool:
 	if region == null:
 		return false
 	var navigation_map: RID = region.get_navigation_map()
+	var vertices := region.navigation_mesh.get_vertices() if region.navigation_mesh != null else PackedVector3Array()
+	if not navigation_map.is_valid() or vertices.is_empty():
+		return false
+	# The preview runs and exits much faster than a normal gameplay scene. Push
+	# the baked resource through the same server RID and probe an actual vertex
+	# so a merely-created (but still empty) map cannot satisfy readiness.
+	NavigationServer3D.region_set_navigation_mesh(region.get_rid(), region.navigation_mesh)
+	NavigationServer3D.map_set_active(navigation_map, true)
+	var probe_world: Vector3 = region.to_global(vertices[0])
 	for _frame in range(120):
-		if navigation_map.is_valid() and NavigationServer3D.map_get_iteration_id(navigation_map) > 0:
-			return true
 		await get_tree().physics_frame
+		NavigationServer3D.map_force_update(navigation_map)
+		if NavigationServer3D.map_get_iteration_id(navigation_map) > 0 \
+				and NavigationServer3D.map_get_closest_point(navigation_map, probe_world).distance_to(probe_world) <= 1.0:
+			return true
 	return false
 
 
@@ -217,31 +232,37 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 	var specs: Array = loader.get_loot_container_specs_copy()
 	if specs.is_empty() or specs.size() != _array(gameplay.get("loot_containers", [])).size():
 		return false
-	var spec: Dictionary = specs[0]
-	var contents: Array = _array(spec.get("contents", []))
-	if contents.is_empty() or not (contents[0] is Dictionary):
-		return false
-	var first_stack: Dictionary = contents[0]
-	var item_id := str(first_stack.get("item_id", ""))
-	var quantity := int(first_stack.get("qty", first_stack.get("quantity", 0)))
-	if item_id.is_empty() or quantity <= 0:
-		return false
-	var inventory = InventoryStateScript.new()
-	var container = LootContainerScript.new()
-	var player := Node3D.new()
-	add_child(container)
-	add_child(player)
-	container.configure(
-		str(spec.get("id", "preview_loot")), str(spec.get("loot_table", "")),
-		"derelict_builder_preview", inventory, {}, Vector3.ZERO, 1.8, spec
-	)
-	container.set_validation_player_in_range(player)
-	var before: int = inventory.get_quantity(item_id)
-	var interacted: bool = container.try_interact(player)
-	var accepted: bool = interacted and container.searched and inventory.get_quantity(item_id) == before + quantity
-	container.queue_free()
-	player.queue_free()
-	return accepted
+	for spec_variant in specs:
+		if not (spec_variant is Dictionary):
+			return false
+		var spec: Dictionary = spec_variant
+		var expected_contents: Array = LootContainerScript.normalized_contents(spec) if spec.has("contents") else []
+		var inventory = InventoryStateScript.new()
+		var container = LootContainerScript.new()
+		var player := Node3D.new()
+		add_child(container)
+		add_child(player)
+		container.configure(
+			str(spec.get("id", "preview_loot")), str(spec.get("loot_table", "")),
+			"derelict_builder_preview", inventory, {}, Vector3.ZERO, 1.8, spec
+		)
+		container.set_validation_player_in_range(player)
+		var interacted: bool = container.try_interact(player)
+		var accepted: bool = interacted and container.searched
+		for stack_variant in expected_contents:
+			if not (stack_variant is Dictionary):
+				accepted = false
+				continue
+			var stack: Dictionary = stack_variant
+			var item_id := str(stack.get("item_id", ""))
+			var quantity := int(stack.get("qty", stack.get("quantity", 0)))
+			if item_id.is_empty() or quantity <= 0 or inventory.get_quantity(item_id) != quantity:
+				accepted = false
+		container.queue_free()
+		player.queue_free()
+		if not accepted:
+			return false
+	return true
 
 
 func _exercise_portals(layout: Dictionary) -> bool:

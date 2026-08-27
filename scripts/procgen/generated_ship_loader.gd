@@ -938,12 +938,37 @@ func _build_navigation_region(_rooms: Array, ship_root: Node3D) -> NavigationReg
 
 	var nav_mesh: NavigationMesh = NavigationMesh.new()
 	NavigationMeshGenerator.bake_from_source_geometry_data(nav_mesh, source)
+	_orient_navigation_polygons_up(nav_mesh)
 
 	var nav_region: NavigationRegion3D = NavigationRegion3D.new()
 	nav_region.name = "GameplayNavigationRegion"
-	nav_region.navigation_mesh = nav_mesh
 	ship_root.add_child(nav_region)
+	nav_region.navigation_mesh = nav_mesh
+	NavigationServer3D.region_set_navigation_mesh(nav_region.get_rid(), nav_mesh)
+	var navigation_map := nav_region.get_navigation_map()
+	if navigation_map.is_valid():
+		NavigationServer3D.map_set_active(navigation_map, true)
 	return nav_region
+
+
+func _orient_navigation_polygons_up(nav_mesh: NavigationMesh) -> void:
+	var vertices := nav_mesh.get_vertices()
+	var polygons: Array[PackedInt32Array] = []
+	for index in range(nav_mesh.get_polygon_count()):
+		var polygon := nav_mesh.get_polygon(index)
+		if polygon.size() >= 3:
+			var a: Vector3 = vertices[polygon[0]]
+			var b: Vector3 = vertices[polygon[1]]
+			var c: Vector3 = vertices[polygon[2]]
+			if (b - a).cross(c - a).y < 0.0:
+				var reversed := PackedInt32Array()
+				for vertex_index in range(polygon.size() - 1, -1, -1):
+					reversed.append(polygon[vertex_index])
+				polygon = reversed
+		polygons.append(polygon)
+	nav_mesh.clear_polygons()
+	for polygon in polygons:
+		nav_mesh.add_polygon(polygon)
 
 
 func _read_placement_position(placement: Dictionary) -> Array:
