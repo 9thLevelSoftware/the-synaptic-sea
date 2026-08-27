@@ -47,6 +47,14 @@ func _initialize() -> void:
 			"cell": [int(second_cell[0]), int(second_cell[1]), second_deck],
 			"rotation": 2,
 		},
+		{
+			"id": "builder_visual_binding_01",
+			"kind": "Container",
+			"visual_id": "generic_locker",
+			"room_id": room_id,
+			"cell": [int(cell[0]), int(cell[1]), deck],
+			"rotation": 3,
+		},
 	]
 
 	var loader = LoaderScript.new()
@@ -58,10 +66,12 @@ func _initialize() -> void:
 		return
 	var specs: Array = loader.get_placed_prop_specs_copy()
 	var nodes: Array[Node3D] = loader.get_placed_prop_nodes()
-	if specs.size() != 2 or nodes.size() != 2:
-		_fail("expected two authored props specs=%d nodes=%d" % [specs.size(), nodes.size()])
+	if specs.size() != 3 or nodes.size() != 3:
+		_fail("expected three authored props specs=%d nodes=%d errors=%s" % [
+			specs.size(), nodes.size(), loader.get_placed_prop_errors(),
+		])
 		return
-	for index in range(2):
+	for index in range(3):
 		var spec: Dictionary = specs[index]
 		var node: Node3D = nodes[index]
 		var expected: Vector3 = spec.get("position", Vector3.INF)
@@ -74,15 +84,18 @@ func _initialize() -> void:
 		if not is_equal_approx(node.rotation_degrees.y, float(int(spec.get("quarter_turn", 0)) * 90)):
 			_fail("quarter-turn rotation was not materialized")
 			return
-		if node.get_node_or_null("Mesh") == null:
+		if index < 2 and node.get_node_or_null("Mesh") == null:
 			_fail("factory visual missing Mesh child")
+			return
+		if index == 2 and node.get_node_or_null("ImportedVisual") == null:
+			_fail("authored visual binding did not materialize its imported GLB")
 			return
 
 	loader.clear_loaded_ship()
 	if not loader.get_placed_prop_specs_copy().is_empty() or not loader.get_placed_prop_nodes().is_empty():
 		_fail("clear_loaded_ship did not clear authored props")
 		return
-	print("BUILDER PLACED PROPS PASS count=2 furniture=true container=true position=true rotation=true")
+	print("BUILDER PLACED PROPS PASS count=3 furniture=true container=true imported_visual=true position=true rotation=true")
 	loader.free()
 	quit(0)
 

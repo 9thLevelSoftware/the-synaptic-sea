@@ -9,6 +9,8 @@ const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
+const PropVisualBindingCatalogScript := preload("res://scripts/systems/prop_visual_binding_catalog.gd")
+const RuntimePropVisualBinderScript := preload("res://scripts/procgen/runtime_prop_visual_binder.gd")
 const AuthoredPortalRuntimeScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
 
 const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
@@ -1768,6 +1770,8 @@ func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dict
 	if typeof(raw_variant) != TYPE_ARRAY or ship_root == null:
 		return
 	var prop_catalog: Dictionary = GameplayPropFactoryScript.load_catalog().get("props", {}) as Dictionary
+	var visual_catalog = PropVisualBindingCatalogScript.new()
+	var visual_catalog_loaded: bool = visual_catalog.load_from_path()
 	for raw_prop in (raw_variant as Array):
 		if typeof(raw_prop) != TYPE_DICTIONARY:
 			continue
@@ -1790,7 +1794,9 @@ func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dict
 		var position: Vector3 = _room_cell_world(room, cell)
 		if position == Vector3.INF:
 			continue
-		if not prop_catalog.has(prop_id):
+		var dressing_binding: Dictionary = visual_catalog.get_dressing_binding(prop_id) \
+			if visual_catalog_loaded else {}
+		if not prop_catalog.has(prop_id) and dressing_binding.is_empty():
 			placed_prop_errors.append("unknown authored placed prop visual_id '%s'" % prop_id)
 			continue
 		var quarter_turns: int = 0
@@ -1807,7 +1813,17 @@ func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dict
 		spec["cell"] = cell.duplicate(true)
 		spec["position"] = position
 		spec["quarter_turn"] = quarter_turns
-		var prop: Node3D = GameplayPropFactoryScript.build(prop_id, position)
+		var prop: Node3D
+		if not dressing_binding.is_empty():
+			var imported_visual: Node3D = RuntimePropVisualBinderScript.create_dressing_visual(dressing_binding)
+			if imported_visual == null:
+				placed_prop_errors.append("authored placed prop visual_id '%s' could not be materialized" % prop_id)
+				continue
+			prop = Node3D.new()
+			prop.position = position
+			prop.add_child(imported_visual)
+		else:
+			prop = GameplayPropFactoryScript.build(prop_id, position)
 		prop.name = "PlacedProp_%s" % str(authored.get("id", placed_prop_specs.size()))
 		prop.rotation_degrees.y = float(quarter_turns * 90)
 		prop.set_meta("placed_prop", spec.duplicate(true))
