@@ -28,6 +28,8 @@ const PREVIEW_ARC_DISCHARGED_COLOR := Color(0.35, 0.85, 1.0, 0.35)
 const PREVIEW_ARC_ARCING_COLOR := Color(0.95, 0.32, 1.0, 0.82)
 const PREVIEW_FIRE_SIZE := Vector3(1.8, 1.2, 1.8)
 const PREVIEW_FIRE_COLOR := Color(1.0, 0.28, 0.05, 0.82)
+const PREVIEW_BREACH_SIZE := Vector3(2.6, 2.2, 1.6)
+const PREVIEW_BREACH_COLOR := Color(0.2, 0.65, 1.0, 0.45)
 const PREVIEW_INPUT_BINDINGS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -59,6 +61,8 @@ var preview_arc_state
 var preview_arc_zones: Array[StaticBody3D] = []
 var preview_fire_state
 var preview_fire_zones: Array[Area3D] = []
+var preview_oxygen_state
+var preview_breach_zones: Array[StaticBody3D] = []
 var preview_objective_controller
 var preview_objective_interactables: Array = []
 var _interaction_status: Label
@@ -115,7 +119,8 @@ func _process(delta: float) -> void:
 	# represented only by a one-shot acceptance model.
 	var has_arc: bool = preview_arc_state != null and not preview_arc_zones.is_empty()
 	var has_fire: bool = preview_fire_state != null and not preview_fire_zones.is_empty()
-	if not has_arc and not has_fire:
+	var has_breach: bool = preview_oxygen_state != null and not preview_breach_zones.is_empty()
+	if not has_arc and not has_fire and not has_breach:
 		return
 	if has_arc:
 		preview_arc_state.tick(delta)
@@ -123,6 +128,9 @@ func _process(delta: float) -> void:
 	if has_fire:
 		preview_fire_state.tick(delta, {})
 		_apply_preview_fire_state()
+	if has_breach:
+		preview_oxygen_state.tick(delta, {"player_in_breach_zone": _preview_player_in_breach_zone()})
+		_apply_preview_breach_state()
 
 
 func _validate_manifest(manifest: Dictionary) -> Array[String]:
@@ -199,15 +207,8 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	radiation_state.tick(1.0)
 	checks["radiation"] = bool(checks["radiation"]) and (radiation_specs.is_empty() or (radiation_spatially_ready and radiation_state.radiation > 0.0))
 
-	var breach_specs: Array = loader.get_breach_zone_specs()
-	var oxygen_state = OxygenStateScript.new()
-	oxygen_state.configure({"zone_ids": _zone_ids(breach_specs), "drain_rate": 6.0})
-	if not breach_specs.is_empty():
-		oxygen_state.tick(1.0, {"player_in_breach_zone": true})
-	checks["breach"] = bool(checks["breach"]) and (breach_specs.is_empty() or (
-		breach_specs.size() == loader.get_breach_zone_markers().size()
-		and oxygen_state.oxygen < oxygen_state.max_oxygen
-	))
+	checks["breach_scene_consumer"] = _exercise_preview_breach_runtime()
+	checks["breach"] = bool(checks["breach"]) and bool(checks["breach_scene_consumer"])
 
 	checks["atmosphere"] = _exercise_atmosphere(layout)
 
@@ -266,7 +267,7 @@ func _structural_wrappers_have_collision(root: Node3D) -> bool:
 
 func _has_collision_shape(node: Node) -> bool:
 	for candidate in node.find_children("*", "CollisionShape3D", true, false):
-		if (candidate as CollisionShape3D).shape != null:
+		if (candidate as CollisionShape3D).shape != null and not (candidate as CollisionShape3D).disabled:
 			return true
 	return false
 
@@ -290,6 +291,7 @@ func _setup_interactive_runtime() -> bool:
 	preview_camera_rig.make_current()
 	_build_preview_objective_runtime()
 	_build_preview_fire_runtime()
+	_build_preview_breach_runtime()
 	_build_preview_arc_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
@@ -457,6 +459,134 @@ func _exercise_preview_fire_runtime() -> bool:
 		if not preview_fire_state.is_burning(str(zone.get_meta("fire_compartment_id", ""))):
 			return false
 	return true
+
+
+func _build_preview_breach_runtime() -> void:
+	preview_breach_zones.clear()
+	preview_oxygen_state = OxygenStateScript.new()
+	if not is_instance_valid(loader):
+		return
+	var specs: Array = loader.get_breach_zone_specs()
+	var markers: Array[Vector3] = loader.get_breach_zone_markers()
+	if specs.size() != markers.size():
+		return
+	var zone_ids: Array[String] = []
+	var breach_material := _preview_breach_material()
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary) or markers[index] == Vector3.INF:
+			continue
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_breach_%d" % index)))
+		if zone_id.is_empty():
+			continue
+		zone_ids.append(zone_id)
+		var zone := StaticBody3D.new()
+		zone.name = "BuilderPreviewBreach_%s" % zone_id
+		zone.position = markers[index]
+		zone.collision_layer = 1
+		zone.collision_mask = 1
+		zone.set_meta("breach_zone_id", zone_id)
+		zone.set_meta("breach_zone_kind", str(spec.get("kind", "oxygen_breach")))
+		zone.set_meta("breach_zone_open", true)
+		zone.set_meta("breach_zone_sealed", false)
+		zone.set_meta("breach_zone_passability_blocked", false)
+		var collision := CollisionShape3D.new()
+		collision.name = "BuilderPreviewBreachCollision"
+		var box_shape := BoxShape3D.new()
+		box_shape.size = PREVIEW_BREACH_SIZE
+		collision.shape = box_shape
+		collision.position = Vector3(0.0, PREVIEW_BREACH_SIZE.y * 0.5, 0.0)
+		collision.disabled = true
+		zone.add_child(collision)
+		var visual := MeshInstance3D.new()
+		visual.name = "BuilderPreviewBreachVisual"
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = PREVIEW_BREACH_SIZE
+		visual.mesh = box_mesh
+		visual.position = collision.position
+		visual.material_override = breach_material
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		zone.add_child(visual)
+		loader.add_child(zone)
+		preview_breach_zones.append(zone)
+	preview_oxygen_state.configure({"zone_ids": zone_ids})
+	_apply_preview_breach_state()
+
+
+func _preview_breach_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = PREVIEW_BREACH_COLOR
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+func _preview_player_in_breach_zone() -> bool:
+	if preview_player == null:
+		return false
+	for zone in preview_breach_zones:
+		if not is_instance_valid(zone):
+			continue
+		var local_position: Vector3 = zone.to_local(preview_player.global_position)
+		if absf(local_position.x) <= PREVIEW_BREACH_SIZE.x * 0.5 \
+				and local_position.z >= -PREVIEW_BREACH_SIZE.z * 0.5 \
+				and local_position.z <= PREVIEW_BREACH_SIZE.z * 0.5 \
+				and local_position.y >= 0.0 and local_position.y <= PREVIEW_BREACH_SIZE.y:
+			return true
+	return false
+
+
+func _apply_preview_breach_state() -> void:
+	if preview_oxygen_state == null:
+		return
+	var summary: Dictionary = preview_oxygen_state.get_summary()
+	var breach_open: bool = bool(summary.get("breach_open", false))
+	var breach_sealed: bool = bool(summary.get("breach_sealed", false))
+	var blocked: bool = bool(summary.get("passability_blocked", false))
+	for zone in preview_breach_zones:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("breach_zone_open", breach_open)
+		zone.set_meta("breach_zone_sealed", breach_sealed)
+		zone.set_meta("breach_zone_passability_blocked", blocked)
+		for child in zone.get_children():
+			if child is CollisionShape3D:
+				(child as CollisionShape3D).disabled = not (breach_open and blocked)
+			elif child is MeshInstance3D and child.name == "BuilderPreviewBreachVisual":
+				(child as MeshInstance3D).visible = breach_open
+
+
+func _exercise_preview_breach_runtime() -> bool:
+	var specs: Array = loader.get_breach_zone_specs()
+	if specs.is_empty():
+		return true
+	if preview_oxygen_state == null or preview_breach_zones.size() != specs.size() or preview_player == null:
+		return false
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary):
+			return false
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_breach_%d" % index)))
+		var matches := preview_breach_zones.filter(func(zone: StaticBody3D) -> bool: return str(zone.get_meta("breach_zone_id", "")) == zone_id)
+		if matches.size() != 1:
+			return false
+		var zone: StaticBody3D = matches[0]
+		var collision := zone.get_node_or_null("BuilderPreviewBreachCollision") as CollisionShape3D
+		var visual := zone.get_node_or_null("BuilderPreviewBreachVisual") as MeshInstance3D
+		if collision == null or collision.shape == null or visual == null or visual.mesh == null:
+			return false
+	var original_position: Vector3 = preview_player.global_position
+	preview_player.global_position = preview_breach_zones[0].global_position
+	var inside: bool = _preview_player_in_breach_zone()
+	var oxygen_before: float = preview_oxygen_state.oxygen
+	preview_oxygen_state.tick(1.0, {"player_in_breach_zone": inside})
+	_apply_preview_breach_state()
+	var drained: bool = preview_oxygen_state.oxygen < oxygen_before
+	preview_player.global_position = original_position
+	preview_oxygen_state.configure({"zone_ids": _zone_ids(specs)})
+	_apply_preview_breach_state()
+	return inside and drained
 
 
 func _build_preview_arc_runtime() -> void:
