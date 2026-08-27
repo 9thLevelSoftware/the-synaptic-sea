@@ -502,7 +502,12 @@ func _build_preview_radiation_runtime() -> void:
 		zone.monitoring = false
 		zone.monitorable = false
 		zone.position = markers[index]
-		zone.rotation.y = atan2(direction.z, direction.x)
+		# Keep the preview volume aligned with the authored segment in all three
+		# axes.  Radiation links can cross decks, so yaw-only alignment would
+		# leave the box horizontal while the runtime loader uses the full
+		# Quaternion(Vector3.RIGHT, direction) orientation.
+		if direction.length_squared() > 0.000001:
+			zone.quaternion = Quaternion(Vector3.RIGHT, direction.normalized())
 		zone.collision_layer = 0
 		zone.collision_mask = 0
 		zone.set_meta("radiation_zone_id", zone_id)
@@ -590,6 +595,16 @@ func _exercise_preview_radiation_runtime() -> bool:
 		if matches.size() != 1:
 			return false
 		var zone: Area3D = matches[0]
+		var segments: Array = loader.get_radiation_zone_segments()
+		if index >= segments.size() or not (segments[index] is Dictionary):
+			return false
+		var from_position: Variant = (segments[index] as Dictionary).get("from", Vector3.INF)
+		var to_position: Variant = (segments[index] as Dictionary).get("to", Vector3.INF)
+		if not (from_position is Vector3) or not (to_position is Vector3):
+			return false
+		var direction := (to_position as Vector3) - (from_position as Vector3)
+		if direction.length_squared() > 0.000001 and zone.basis.x.normalized().dot(direction.normalized()) < 0.99:
+			return false
 		var collision := zone.get_node_or_null("BuilderPreviewRadiationCollision") as CollisionShape3D
 		var visual := zone.get_node_or_null("BuilderPreviewRadiationVisual") as MeshInstance3D
 		if zone.monitoring or zone.monitorable or not zone.get_meta("radiation_zone_visible", false) \

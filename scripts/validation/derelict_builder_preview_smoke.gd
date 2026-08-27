@@ -38,7 +38,10 @@ func _initialize() -> void:
 		_zone("preview_breach_airlock", "hull_breach", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0]),
 		_zone("preview_breach_ramp", "hull_breach", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0]),
 	]
-	layout["radiation_zones"] = [_zone("preview_radiation", "radiation", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0])]
+	# Cross-deck segment exercises the preview's full 3D orientation.  A
+	# yaw-only volume would remain horizontal and diverge from the runtime
+	# loader's quaternion alignment.
+	layout["radiation_zones"] = [_zone("preview_radiation", "radiation", "corridor_01", "spine_01", [3, 0, 0], [4, 0, 0])]
 	var rooms: Array = layout.get("rooms", [])
 	if not rooms.is_empty() and rooms[0] is Dictionary:
 		var authored_room: Dictionary = rooms[0]

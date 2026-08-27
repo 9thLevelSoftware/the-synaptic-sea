@@ -161,6 +161,17 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if lb_after == null or lb_after.parent_ship != home_after:
 		_fail("travel_home did not re-dock the lifeboat to home (parent=%s)" % str(lb_after.parent_ship if lb_after != null else null))
 		return
+	# Regression for world-load hydration: persist a sealed home breach and verify
+	# the restored ShipInstance summary is applied to the live oxygen scene, not
+	# merely retained as data until the next travel transition.
+	if not playable.oxygen_state.seal_breach("home_breach"):
+		_fail("could not seal home breach before home-save regression")
+		return
+	var sealed_home_before_save := playable.get_oxygen_summary()
+	if not bool(sealed_home_before_save.get("breach_sealed", false)) \
+			or bool(sealed_home_before_save.get("breach_open", true)):
+		_fail("home breach did not become sealed before home save: %s" % str(sealed_home_before_save))
+		return
 	if not playable.request_save():
 		_fail("request_save on the home ship should succeed")
 		return
@@ -172,6 +183,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		return
 	if String(playable.get_current_ship().marker_id) != "":
 		_fail("current ship after home-saved load is not the home ship")
+		return
+	var sealed_home_after_load := playable.get_oxygen_summary()
+	if not bool(sealed_home_after_load.get("breach_sealed", false)) \
+			or bool(sealed_home_after_load.get("breach_open", true)) \
+			or not bool(playable.get_home_ship_for_validation().breach_environment_summary.get("breach_sealed", false)):
+		_fail("sealed home breach was not applied to live runtime after load: %s" % str(sealed_home_after_load))
 		return
 	# FIX 1 coverage: after a home-saved reload, the starting-ship gameplay roots
 	# must be re-attached under the coordinator so the home sim rebuilds in-tree.

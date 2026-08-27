@@ -11053,6 +11053,13 @@ func _apply_world_snapshot(ws) -> bool:
 	if home_ship != null:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
 		home_ship.breach_environment_summary = ws.home_breach_environment.duplicate(true)
+		# _apply_run_snapshot() has already rebuilt the home scene, so its initial
+		# _build_breach_zone(false) ran before the world-level home environment was
+		# restored. Rebuild the live oxygen zones now that the persisted summary is
+		# available; otherwise a sealed home save looks open in the runtime until a
+		# later travel transition happens to reapply the ShipInstance state.
+		if not ws.home_breach_environment.is_empty() and not away_from_start:
+			_build_breach_zone(false)
 		if not ws.home_ship_inventory.is_empty():
 			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
 		# Restore home-ship carts BEFORE spawning their controls so the CartStates

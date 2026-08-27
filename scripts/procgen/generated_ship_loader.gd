@@ -24,6 +24,7 @@ const ATMOSPHERE_VOLUME_HALF_WIDTH: float = CELL_SIZE * 0.5
 const ATMOSPHERE_VOLUME_HEIGHT: float = 2.5
 const OBJECTIVE_TRIGGER_RADIUS: float = 1.5
 const RADIATION_VOLUME_HALF_WIDTH: float = 1.25
+const RADIATION_VOLUME_AXIAL_END_PADDING: float = 1.0
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 
 var layout_doc: Dictionary = {}
@@ -1625,7 +1626,9 @@ func _add_radiation_zone_markers(source_layout: Dictionary, ship_root: Node3D) -
 		radiation_zone_markers.append(midpoint)
 		radiation_zone_specs.append(_normalize_zone_spec(zone))
 		radiation_zone_segments.append({"from": from_pos, "to": to_pos})
-		var length: float = maxf(2.0, from_pos.distance_to(to_pos) + 2.0)
+		var length: float = maxf(
+			RADIATION_VOLUME_AXIAL_END_PADDING * 2.0,
+			from_pos.distance_to(to_pos) + RADIATION_VOLUME_AXIAL_END_PADDING * 2.0)
 		ship_root.add_child(_make_oriented_trigger_volume(
 			"RadiationZone_%s" % str(zone.get("id", radiation_zone_markers.size() - 1)), midpoint,
 			Color(0.65, 0.2, 0.9, 0.3), Vector3(length, 2.5, 2.5), from_pos, to_pos))
@@ -1929,7 +1932,9 @@ func _point_in_radiation_box(point: Vector3, from_pos: Vector3, to_pos: Vector3,
 	if segment.length_squared() > 0.000001:
 		basis = Basis(Quaternion(Vector3.RIGHT, segment.normalized()))
 	var box_position := basis.inverse() * (point - midpoint)
-	var half_length := maxf(1.0, segment.length() * 0.5 + 1.0)
+	var half_length := maxf(
+		RADIATION_VOLUME_AXIAL_END_PADDING,
+		segment.length() * 0.5 + RADIATION_VOLUME_AXIAL_END_PADDING)
 	return absf(box_position.x) <= half_length \
 			and absf(box_position.y) <= half_width \
 			and absf(box_position.z) <= half_width
