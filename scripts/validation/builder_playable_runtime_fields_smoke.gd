@@ -150,6 +150,20 @@ func _validate() -> void:
 		_fail("vacuum-authored compartment did not drain field oxygen")
 		return
 	var derelict_breach_ids := breach_ids.duplicate()
+	# Rebuilding home breach nodes during travel_home must not reset the live
+	# hazard resource or the seal state. This models a player sealing the breach
+	# before a boarding/travel transition and verifies the rebuilt nodes receive
+	# the preserved scene state immediately.
+	playable.oxygen_state.apply_summary({
+		"hazard_kind": "oxygen",
+		"oxygen": 47.0,
+		"breach_open": true,
+		"breach_sealed": false,
+		"breach_zone_ids": breach_markers.map(func(_marker): return "playable_breach_a"),
+	})
+	if not playable.oxygen_state.seal_breach("playable_breach_a"):
+		_fail("could not seed sealed breach state before travel_home")
+		return
 	if not playable.travel_home():
 		_fail("could not return home after boarded runtime checks")
 		return
@@ -158,7 +172,15 @@ func _validate() -> void:
 	if home_breach_nodes.size() != expected_home_breaches:
 		_fail("return-home transition did not rebuild home breach zones")
 		return
+	var home_oxygen_summary := playable.get_oxygen_summary()
+	if absf(float(home_oxygen_summary.get("oxygen", 0.0)) - 47.0) > 0.001 \
+			or not bool(home_oxygen_summary.get("breach_sealed", false)):
+		_fail("travel_home rebuilt breach nodes but reset oxygen/sealed state")
+		return
 	for home_breach in home_breach_nodes:
+		if not bool(home_breach.get_meta("breach_zone_sealed", false)):
+			_fail("rebuilt home breach node did not reflect preserved sealed state")
+			return
 		if derelict_breach_ids.has(str(home_breach.get_meta("breach_zone_id", ""))):
 			_fail("derelict breach zone leaked into the home ship")
 			return

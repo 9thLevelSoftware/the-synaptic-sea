@@ -15,6 +15,10 @@ const REQUIRED_CHECKS: Array[String] = [
 	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
 	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
 ]
+const CANONICAL_MARKER_CHECKS: Array[String] = [
+	"collision", "navigation", "verticals", "objectives", "props", "loot", "fire", "arc",
+	"breach", "radiation", "atmosphere",
+]
 
 var loader
 var manifest_path := ""
@@ -82,12 +86,19 @@ func _validate_manifest(manifest: Dictionary) -> Array[String]:
 		_validate_hash(errors, _absolute_path(str(manifest.get("gameplay_slice_path", "")), base), str(manifest.get("gameplay_slice_hash", "")), "gameplay slice")
 		var layout := _json_file(_absolute_path(str(manifest.get("layout_path", "")), base))
 		var gameplay := _json_file(_absolute_path(str(manifest.get("gameplay_slice_path", "")), base))
+		var kit := _json_file(_absolute_path(str(manifest.get("kit_path", "")), base))
 		if str(layout.get("schema_version", "")) != str(manifest.get("layout_schema", "")):
 			errors.append("layout schema does not match manifest")
 		if str(gameplay.get("schema_version", "")) != str(manifest.get("gameplay_schema", "")):
 			errors.append("gameplay schema does not match manifest")
 		if str(layout.get("kit_id", "")) != str(manifest.get("kit_id", "")):
 			errors.append("layout kit_id does not match manifest")
+		var manifest_kit_id := str(manifest.get("kit_id", ""))
+		var kit_file_id := str(kit.get("kit_id", ""))
+		if kit_file_id != manifest_kit_id:
+			errors.append("kit kit_id does not match manifest")
+		if kit_file_id != str(layout.get("kit_id", "")):
+			errors.append("kit kit_id does not match layout")
 	return errors
 
 
@@ -110,39 +121,42 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		"props": loader.get_placed_prop_specs_copy().size() == _array(gameplay.get("placed_props", [])).size(),
 		"vertical_links": int(_ship_summary.get("vertical_link_count", -1)) == _array(layout.get("vertical_connections", [])).size(),
 	}
+	var hazard_materialization := _hazard_materialization_checks(layout)
+	for hazard_name in hazard_materialization:
+		checks[hazard_name] = bool(hazard_materialization[hazard_name])
+		if not bool(checks[hazard_name]):
+			errors.append("authored %s hazard was not fully materialized" % hazard_name)
 	var fire_specs: Array = loader.get_fire_zone_specs()
 	var fire_state = FireStateScript.new()
-	if not fire_specs.is_empty():
+	if bool(checks["fire"]) and not fire_specs.is_empty():
 		var fire_room := str(fire_specs[0].get("compartment_id", fire_specs[0].get("from_room", "authored_fire")))
 		fire_state.configure({"compartments": [fire_room]})
-		checks["fire"] = fire_state.ignite(fire_room, 1.0) and fire_state.is_burning(fire_room)
-	else:
-		checks["fire"] = true
+		checks["fire"] = bool(checks["fire"]) and fire_state.ignite(fire_room, 1.0) and fire_state.is_burning(fire_room)
 
 	var arc_specs: Array = loader.get_arc_zone_specs()
 	var arc_state = ArcStateScript.new()
 	arc_state.configure({"zone_ids": _zone_ids(arc_specs), "arcing_first": true})
 	var arc_ready: bool = arc_specs.is_empty() or arc_state.is_passability_blocked()
-	checks["arc"] = arc_ready
+	checks["arc"] = bool(checks["arc"]) and arc_ready
 	# Retain the legacy key for existing automation while exposing the authored
 	# hazard name used by the builder and the human-readable success marker.
-	checks["electrical"] = arc_ready
+	checks["electrical"] = checks["arc"]
 
 	var radiation_specs: Array = loader.get_radiation_zone_specs()
 	var radiation_state = RadiationStateScript.new()
 	radiation_state.configure({"in_radiation_zone": not radiation_specs.is_empty()})
 	radiation_state.tick(1.0)
-	checks["radiation"] = radiation_specs.is_empty() or radiation_state.radiation > 0.0
+	checks["radiation"] = bool(checks["radiation"]) and (radiation_specs.is_empty() or radiation_state.radiation > 0.0)
 
 	var breach_specs: Array = loader.get_breach_zone_specs()
 	var oxygen_state = OxygenStateScript.new()
 	oxygen_state.configure({"zone_ids": _zone_ids(breach_specs), "drain_rate": 6.0})
 	if not breach_specs.is_empty():
 		oxygen_state.tick(1.0, {"player_in_breach_zone": true})
-	checks["breach"] = breach_specs.is_empty() or (
+	checks["breach"] = bool(checks["breach"]) and (breach_specs.is_empty() or (
 		breach_specs.size() == loader.get_breach_zone_markers().size()
 		and oxygen_state.oxygen < oxygen_state.max_oxygen
-	)
+	))
 
 	checks["atmosphere"] = _exercise_atmosphere(layout)
 
@@ -151,6 +165,38 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		if not bool(checks[key]):
 			errors.append("runtime acceptance failed: %s" % key)
 	return {"ok": errors.is_empty(), "errors": errors, "checks": checks}
+
+
+func _hazard_materialization_checks(layout: Dictionary) -> Dictionary:
+	return {
+		"fire": _hazard_array_matches(layout.get("fire_zones", []), loader.get_fire_zone_specs()),
+		"arc": _hazard_array_matches(layout.get("arc_zones", []), loader.get_arc_zone_specs()),
+		"radiation": _hazard_array_matches(layout.get("radiation_zones", []), loader.get_radiation_zone_specs()),
+		"breach": _hazard_array_matches(layout.get("breach_zones", []), loader.get_breach_zone_specs()),
+	}
+
+
+func _hazard_array_matches(authored_variant: Variant, materialized: Array) -> bool:
+	if typeof(authored_variant) != TYPE_ARRAY:
+		return false
+	var authored: Array = authored_variant
+	if authored.size() != materialized.size():
+		return false
+	var authored_ids := _hazard_id_counts(authored)
+	var materialized_ids := _hazard_id_counts(materialized)
+	return authored_ids == materialized_ids
+
+
+func _hazard_id_counts(specs: Array) -> Dictionary:
+	var counts: Dictionary = {}
+	for spec_variant in specs:
+		if not spec_variant is Dictionary:
+			return {"<invalid>": 1}
+		var spec: Dictionary = spec_variant
+		var id := str(spec.get("id", spec.get("zone_id", "")))
+		if not id.is_empty():
+			counts[id] = int(counts.get(id, 0)) + 1
+	return counts
 
 
 func _navigation_path_exists(local_target: Vector3) -> bool:
@@ -317,7 +363,6 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		var ambient_temperature: float = float(atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
 		var extreme_temperature: bool = ambient_temperature < body_temperature.safe_min or ambient_temperature > body_temperature.safe_max
 		var temperature_before: float = body_temperature.temperature
-		body_temperature.in_extreme_zone = extreme_temperature
 		body_temperature.tick(30.0, {"ambient_temperature_c": ambient_temperature})
 		if extreme_temperature and (body_temperature.temperature == temperature_before or body_temperature.is_safe()):
 			return false
@@ -359,14 +404,19 @@ func _finish(ok: bool, errors: Array, checks: Dictionary = {}) -> void:
 			file.close()
 	print("%s %s" % [RESULT_MARKER, JSON.stringify(result)])
 	if ok:
-		var marker_parts: Array[String] = []
-		for key in REQUIRED_CHECKS:
-			marker_parts.append("%s=%s" % [key, "true" if bool(checks.get(key, false)) else "false"])
-		print("DERELICT BUILDER PREVIEW PASS %s" % " ".join(marker_parts))
+		print(_canonical_success_marker(checks))
 	if not ok:
 		push_error("DERELICT BUILDER PREVIEW FAIL %s" % "; ".join(errors))
 	if DisplayServer.get_name() == "headless" or not ok:
 		get_tree().quit(0 if ok else 1)
+
+
+func _canonical_success_marker(checks: Dictionary) -> String:
+	var marker_parts: Array[String] = []
+	for key in CANONICAL_MARKER_CHECKS:
+		var source_key := "structural_collision" if key == "collision" else ("vertical_links" if key == "verticals" else key)
+		marker_parts.append("%s=%s" % [key, "true" if bool(checks.get(source_key, false)) else "false"])
+	return "DERELICT BUILDER PREVIEW PASS %s" % " ".join(marker_parts)
 
 
 func _argument(name: String) -> String:

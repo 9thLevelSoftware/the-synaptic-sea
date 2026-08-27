@@ -8729,6 +8729,14 @@ func _check_vitals_death() -> void:
 func _build_breach_zone() -> void:
 	if oxygen_root == null:
 		return
+	# Rebuilding the scene nodes is a presentation change, not a new hazard
+	# state.  Boarding and travel_home both rebuild this root, so preserve the
+	# live oxygen/seal state while replacing the zone ids with the active
+	# loader's ids.  OxygenState.configure() intentionally resets a fresh
+	# configuration and must not be used as a transition reset here.
+	var previous_oxygen_summary: Dictionary = {}
+	if oxygen_state != null:
+		previous_oxygen_summary = oxygen_state.get_summary()
 	for child in oxygen_root.get_children():
 		oxygen_root.remove_child(child)
 		child.queue_free()
@@ -8769,6 +8777,11 @@ func _build_breach_zone() -> void:
 		"recovery_threshold": OxygenStateScript.DEFAULT_RECOVERY_THRESHOLD,
 		"safe_threshold": OxygenStateScript.DEFAULT_SAFE_THRESHOLD,
 	})
+	if not previous_oxygen_summary.is_empty():
+		# apply_summary also restores breach_open/breach_sealed and oxygen. Keep
+		# the newly resolved ids so a ship transition cannot leak old markers.
+		previous_oxygen_summary["breach_zone_ids"] = zone_ids.duplicate()
+		oxygen_state.apply_summary(previous_oxygen_summary)
 	for index in range(positions.size()):
 		var node := _create_breach_zone_node(positions[index], zone_ids[index])
 		oxygen_root.add_child(node)
@@ -8776,6 +8789,7 @@ func _build_breach_zone() -> void:
 	breach_zone_node = breach_zone_nodes[0]
 	unsafe_room_marker = _create_unsafe_room_marker(positions[0])
 	oxygen_root.add_child(unsafe_room_marker)
+	_apply_breach_zone_scene_state()
 
 
 func _active_breach_loader() -> Node3D:
