@@ -95,8 +95,6 @@ func _validate_hash(errors: Array[String], path: String, expected: String, label
 		errors.append("manifest has no %s hash" % label)
 		return
 	var content := FileAccess.get_file_as_string(path)
-	if content.ends_with("\n"):
-		content = content.trim_suffix("\n").trim_suffix("\r")
 	if _sha256(content) != expected:
 		errors.append("%s hash does not match manifest" % label)
 

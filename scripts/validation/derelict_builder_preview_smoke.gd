@@ -147,8 +147,6 @@ func _read_json(path: String) -> Dictionary:
 
 func _file_hash(path: String) -> String:
 	var content := FileAccess.get_file_as_string(path)
-	if content.ends_with("\n"):
-		content = content.trim_suffix("\n").trim_suffix("\r")
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update(content.to_utf8_buffer())
