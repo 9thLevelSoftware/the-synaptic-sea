@@ -48,6 +48,11 @@ func _initialize() -> void:
 		vented_room.erase("depressurized")
 		vented_room["vented"] = true
 		rooms[1] = vented_room
+	if rooms.size() > 2 and rooms[2] is Dictionary:
+		var irradiated_hot_room: Dictionary = rooms[2]
+		irradiated_hot_room["radiation_bp"] = 5000
+		irradiated_hot_room["temperature_c"] = 60
+		rooms[2] = irradiated_hot_room
 	layout["rooms"] = rooms
 	var loot: Array = gameplay.get("loot_containers", [])
 	if not loot.is_empty() and loot[0] is Dictionary:

@@ -2258,6 +2258,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
+	_build_breach_zone()
 	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
 	# Seeded BEFORE _build_breach_seal_points() so the seal-point builder sees
 	# variant breaches in the hull and creates player-interactable seal nodes.
@@ -6578,6 +6579,7 @@ func travel_home() -> bool:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
+	_build_breach_zone()
 	_build_breach_seal_points()
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
@@ -8610,6 +8612,12 @@ func _tick_survival_attrition(delta: float) -> void:
 	var in_hazard_env: bool = away_from_start or breach_open
 	var in_authored_radiation: Variant = null
 	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	var authored_atmosphere: Dictionary = {}
+	if is_instance_valid(authored_loader) \
+			and authored_loader.has_method("get_authored_atmosphere_at") \
+			and is_instance_valid(player) and player is Node3D:
+		authored_atmosphere = authored_loader.get_authored_atmosphere_at(
+			authored_loader.to_local((player as Node3D).global_position))
 	if away_from_start and is_instance_valid(authored_loader) \
 			and authored_loader.has_method("get_radiation_zone_specs") \
 			and authored_loader.has_method("get_radiation_zone_at"):
@@ -8666,13 +8674,25 @@ func _tick_survival_attrition(delta: float) -> void:
 	# Advance the environmental sources AFTER the vitals read (preserves prior order).
 	if radiation_state != null:
 		# Authored radiation zones replace the legacy ship-wide away hazard when
-		# they exist. Layouts without authored zones retain the prior behavior.
-		radiation_state.in_radiation_zone = bool(in_authored_radiation) \
-			if in_authored_radiation != null else in_hazard_env
+		# they exist. Room atmosphere radiation joins that same spatial signal;
+		# layouts without either authored source retain the prior behavior.
+		var atmosphere_radiation: Variant = null
+		if not authored_atmosphere.is_empty():
+			atmosphere_radiation = int(authored_atmosphere.get("radiation_bp", 0)) > 0
+		if in_authored_radiation != null or atmosphere_radiation != null:
+			radiation_state.in_radiation_zone = in_authored_radiation == true or atmosphere_radiation == true
+		else:
+			radiation_state.in_radiation_zone = in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
-		body_temperature_state.in_extreme_zone = in_hazard_env
-		body_temperature_state.tick(delta)
+		if not authored_atmosphere.is_empty():
+			var ambient_temperature := float(authored_atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
+			body_temperature_state.in_extreme_zone = ambient_temperature < body_temperature_state.safe_min \
+				or ambient_temperature > body_temperature_state.safe_max
+			body_temperature_state.tick(delta, {"ambient_temperature_c": ambient_temperature})
+		else:
+			body_temperature_state.in_extreme_zone = in_hazard_env
+			body_temperature_state.tick(delta)
 	if status_effects_state != null:
 		status_effects_state.tick(delta)
 
@@ -8715,14 +8735,16 @@ func _build_breach_zone() -> void:
 	breach_zone_node = null
 	breach_zone_nodes.clear()
 	unsafe_room_marker = null
+	var breach_loader := _active_breach_loader()
 	var positions: Array[Vector3] = []
 	var zone_ids: Array[String] = []
-	if loader != null and loader.has_method("get_breach_zone_markers"):
-		for marker in loader.get_breach_zone_markers():
+	if breach_loader != null and breach_loader.has_method("get_breach_zone_markers"):
+		for marker in breach_loader.get_breach_zone_markers():
 			if marker is Vector3 and marker != Vector3.INF:
-				positions.append(marker)
-	var specs: Array = loader.get_breach_zone_specs() \
-		if loader != null and loader.has_method("get_breach_zone_specs") else []
+				var marker_world: Vector3 = breach_loader.to_global(marker)
+				positions.append(oxygen_root.to_local(marker_world))
+	var specs: Array = breach_loader.get_breach_zone_specs() \
+		if breach_loader != null and breach_loader.has_method("get_breach_zone_specs") else []
 	for index in range(positions.size()):
 		var zone_id := "breach_%d" % index
 		if index < specs.size() and specs[index] is Dictionary:
@@ -8731,7 +8753,7 @@ func _build_breach_zone() -> void:
 				zone_id = authored_zone_id
 		zone_ids.append(zone_id)
 	if positions.is_empty():
-		positions.append(_resolve_breach_zone_world_position())
+		positions.append(_resolve_breach_zone_world_position(breach_loader))
 		zone_ids.append(BREACH_ZONE_FALLBACK_ID)
 	if oxygen_state == null:
 		oxygen_state = OxygenStateScript.new()
@@ -8755,13 +8777,22 @@ func _build_breach_zone() -> void:
 	unsafe_room_marker = _create_unsafe_room_marker(positions[0])
 	oxygen_root.add_child(unsafe_room_marker)
 
-func _resolve_breach_zone_world_position() -> Vector3:
-	if loader != null and loader.has_method("get_breach_zone_markers"):
-		var markers: Array = loader.get_breach_zone_markers()
+
+func _active_breach_loader() -> Node3D:
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root is Node3D \
+			and current_ship.scene_root.has_method("get_breach_zone_markers"):
+		return current_ship.scene_root as Node3D
+	return loader as Node3D if loader is Node3D and is_instance_valid(loader) else null
+
+
+func _resolve_breach_zone_world_position(breach_loader: Node3D = null) -> Vector3:
+	if breach_loader != null and breach_loader.has_method("get_breach_zone_markers"):
+		var markers: Array = breach_loader.get_breach_zone_markers()
 		if markers.size() > 0 and markers[0] is Vector3:
 			var candidate: Vector3 = markers[0]
 			if candidate != Vector3.INF:
-				return candidate
+				return oxygen_root.to_local(breach_loader.to_global(candidate))
 	# Fallback: midpoint between objective-3 and objective-4 interactable positions.
 	var obj3_pos: Vector3 = Vector3.INF
 	var obj4_pos: Vector3 = Vector3.INF

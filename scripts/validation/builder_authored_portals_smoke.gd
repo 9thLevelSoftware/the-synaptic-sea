@@ -49,18 +49,23 @@ func _initialize() -> void:
 		_fail("fixture materialized no locked structural portal")
 		return
 	actual_locked.set_validation_player_in_range(true)
+	var locked_visual := actual_locked.get_node_or_null("PortalVisual") as MeshInstance3D
 	var structural_collision_before: int = int(actual_locked.get_structural_blocker_collision_enabled_count())
 	var locked_flags := {str(actual_locked.required_flag()): true}
 	var unlocked: Dictionary = actual_locked.try_interact(locked_flags)
 	if structural_collision_before <= 0 or not bool(unlocked.get("open", false)) \
-			or actual_locked.get_structural_blocker_collision_enabled_count() != 0:
-		_fail("unlocking did not disable the full-width structural portal collision")
+			or actual_locked.get_structural_blocker_collision_enabled_count() != 0 \
+			or actual_locked.is_structural_blocker_visible() \
+			or locked_visual == null or locked_visual.visible:
+		_fail("unlocking did not disable structural collision and hide the portal visual")
 		return
 	if door == null:
 		door = _standalone("door", "door", loader)
 	door.set_validation_player_in_range(true)
 	var door_shape: CollisionShape3D = door.get_blocker_collision_shape()
-	if door_shape.disabled or not bool(door.try_interact({}).get("open", false)) or not door_shape.disabled:
+	var door_visual := door.get_node_or_null("PortalVisual") as MeshInstance3D
+	if door_shape.disabled or not bool(door.try_interact({}).get("open", false)) or not door_shape.disabled \
+			or door_visual == null or door_visual.visible:
 		_fail("door did not toggle collision state")
 		return
 	var locked = _standalone("locked", "locked", loader)
@@ -70,9 +75,11 @@ func _initialize() -> void:
 		return
 	var hatch = _standalone("hatch", "hatch", loader)
 	hatch.set_validation_player_in_range(true)
+	var hatch_visual := hatch.get_node_or_null("PortalVisual") as MeshInstance3D
 	var hatch_open: Dictionary = hatch.try_interact({})
 	var hatch_closed: Dictionary = hatch.try_interact({})
-	if not bool(hatch_open.get("open", false)) or bool(hatch_closed.get("open", true)):
+	if not bool(hatch_open.get("open", false)) or bool(hatch_closed.get("open", true)) \
+			or hatch_visual == null or not hatch_visual.visible:
 		_fail("hatch did not open and reseal")
 		return
 	var breach = _standalone("breach", "breach", loader)

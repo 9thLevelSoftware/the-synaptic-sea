@@ -20,6 +20,7 @@ var is_exterior := false
 var _player_in_range := false
 var _blocker: StaticBody3D
 var _structural_blocker: Node3D
+var _visual: MeshInstance3D
 
 func configure(spec: Dictionary, world_position: Vector3) -> void:
 	portal_spec = spec.duplicate(true)
@@ -75,6 +76,9 @@ func bind_structural_blocker(wrapper: Node3D) -> void:
 
 func get_structural_blocker_collision_enabled_count() -> int:
 	return _count_enabled_collision_shapes(_structural_blocker)
+
+func is_structural_blocker_visible() -> bool:
+	return is_instance_valid(_structural_blocker) and _structural_blocker.visible
 
 func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Dictionary:
 	if not _is_player_in_range(player_body):
@@ -137,6 +141,10 @@ func _apply_state() -> void:
 	var passable := is_open or is_unsafe
 	_set_collision_shapes_disabled(_blocker, passable)
 	_set_collision_shapes_disabled(_structural_blocker, passable)
+	if is_instance_valid(_structural_blocker):
+		_structural_blocker.visible = not passable
+	if is_instance_valid(_visual):
+		_visual.visible = not passable
 
 func _set_collision_shapes_disabled(node: Node, disabled: bool) -> void:
 	if not is_instance_valid(node):
@@ -168,6 +176,7 @@ func _ensure_visual() -> void:
 	material.emission_energy_multiplier = 0.25
 	mesh.material_override = material
 	add_child(mesh)
+	_visual = mesh
 
 func _kind_color() -> Color:
 	match portal_kind:

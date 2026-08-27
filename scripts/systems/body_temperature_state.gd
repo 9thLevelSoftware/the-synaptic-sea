@@ -26,10 +26,19 @@ func configure(config: Dictionary) -> void:
 	recovery_rate = _f(config, "recovery_rate", DEFAULT_RECOVERY_RATE)
 	in_extreme_zone = bool(config.get("in_extreme_zone", false))
 
-func tick(delta_seconds: float, _context: Dictionary = {}) -> bool:
+func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 	if delta_seconds <= 0.0:
 		return false
 	var changed: bool = false
+	if context.has("ambient_temperature_c"):
+		var ambient: float = float(context.get("ambient_temperature_c", DEFAULT_TEMPERATURE))
+		var ambient_diff: float = ambient - temperature
+		if absf(ambient_diff) > 0.01:
+			var ambient_rate: float = drain_rate if ambient < safe_min or ambient > safe_max else recovery_rate
+			var ambient_step: float = minf(absf(ambient_diff), ambient_rate * delta_seconds)
+			temperature += signf(ambient_diff) * ambient_step
+			changed = ambient_step > 0.0
+		return changed
 	if in_extreme_zone:
 		var drn: float = drain_rate * delta_seconds
 		if drn > 0.0:

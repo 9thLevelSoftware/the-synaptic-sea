@@ -6,6 +6,7 @@ const FireStateScript := preload("res://scripts/systems/fire_suppression_state.g
 const ArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
+const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 
@@ -305,6 +306,20 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		})
 		var should_drain := bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)) or int(atmosphere.get("oxygen_bp", 10000)) < 10000
 		if should_drain != (oxygen.oxygen < before):
+			return false
+		var radiation = RadiationStateScript.new()
+		radiation.configure({"in_radiation_zone": int(atmosphere.get("radiation_bp", 0)) > 0})
+		radiation.tick(1.0)
+		if (int(atmosphere.get("radiation_bp", 0)) > 0) != (radiation.radiation > 0.0):
+			return false
+		var body_temperature = BodyTemperatureStateScript.new()
+		body_temperature.configure({})
+		var ambient_temperature: float = float(atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
+		var extreme_temperature: bool = ambient_temperature < body_temperature.safe_min or ambient_temperature > body_temperature.safe_max
+		var temperature_before: float = body_temperature.temperature
+		body_temperature.in_extreme_zone = extreme_temperature
+		body_temperature.tick(30.0, {"ambient_temperature_c": ambient_temperature})
+		if extreme_temperature and (body_temperature.temperature == temperature_before or body_temperature.is_safe()):
 			return false
 	return true if authored else not _has_authored_atmosphere(layout)
 

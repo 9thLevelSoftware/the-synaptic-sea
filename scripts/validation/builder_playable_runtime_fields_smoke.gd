@@ -84,24 +84,32 @@ func _validate() -> void:
 	if not playable.radiation_state.in_radiation_zone or playable.radiation_state.radiation <= 0.0:
 		_fail("localized authored radiation did not reach the playable survival tick")
 		return
-	var original_loader = playable.loader
-	var breach_markers: Array[Vector3] = [local_player, local_player + Vector3(4.0, 0.0, 0.0)]
-	active_loader.breach_zone_markers = breach_markers
-	active_loader.breach_zone_specs = [
-		{"zone_id": "playable_breach_a", "kind": "hull_breach"},
-		{"zone_id": "playable_breach_b", "kind": "hull_breach"},
-	]
-	playable.loader = active_loader
-	playable._build_breach_zone()
-	playable.loader = original_loader
+	var breach_markers: Array[Vector3] = active_loader.get_breach_zone_markers()
+	if breach_markers.is_empty():
+		# This generated fixture has no authored breach by default. Inject two into
+		# the already-boarded loader and rebuild without swapping the home loader;
+		# this exercises active-loader selection and coordinate conversion directly.
+		breach_markers = [local_player, local_player + Vector3(4.0, 0.0, 0.0)]
+		active_loader.breach_zone_markers = breach_markers
+		active_loader.breach_zone_specs = [
+			{"zone_id": "playable_breach_a", "kind": "hull_breach"},
+			{"zone_id": "playable_breach_b", "kind": "hull_breach"},
+		]
+		playable._build_breach_zone()
 	var breach_nodes: Array[StaticBody3D] = playable.get_breach_zone_nodes()
-	if breach_nodes.size() != 2:
-		_fail("playable did not materialize every authored breach zone")
+	if breach_nodes.size() != breach_markers.size():
+		_fail("ship transition did not materialize every authored breach zone")
 		return
 	var breach_ids := {}
-	for breach_node in breach_nodes:
+	for index in range(breach_nodes.size()):
+		var breach_node: StaticBody3D = breach_nodes[index]
 		breach_ids[str(breach_node.get_meta("breach_zone_id", ""))] = true
-	if breach_ids.size() != 2 or playable.get_oxygen_summary().get("breach_zone_ids", []).size() != 2:
+		var expected_world: Vector3 = active_loader.to_global(breach_markers[index])
+		if breach_node.global_position.distance_to(expected_world) > 0.05:
+			_fail("boarded breach zone did not transform from loader-local coordinates")
+			return
+	if breach_ids.size() != breach_markers.size() \
+			or playable.get_oxygen_summary().get("breach_zone_ids", []).size() != breach_markers.size():
 		_fail("playable breach zones did not preserve stable authored IDs")
 		return
 
@@ -112,7 +120,23 @@ func _validate() -> void:
 	active_loader.authored_atmosphere_specs = [{
 		"room_id": "playable_test_room", "position": local_player,
 		"oxygen_bp": 10000, "depressurized": false,
+		"radiation_bp": 5000, "temperature_c": 60.0,
 	}]
+	active_loader.radiation_zone_markers.clear()
+	active_loader.radiation_zone_specs.clear()
+	playable.radiation_state.configure({"radiation": 0.0, "in_radiation_zone": false})
+	playable.body_temperature_state.configure({})
+	playable._tick_survival_attrition(30.0)
+	if not playable.radiation_state.in_radiation_zone or playable.radiation_state.radiation <= 0.0:
+		_fail("room radiation_bp did not reach RadiationState")
+		return
+	if not playable.body_temperature_state.in_extreme_zone or playable.body_temperature_state.is_safe():
+		_fail("room temperature_c did not reach BodyTemperatureState")
+		return
+	var safe_spec: Dictionary = active_loader.authored_atmosphere_specs[0]
+	safe_spec["radiation_bp"] = 0
+	safe_spec["temperature_c"] = 22.0
+	active_loader.authored_atmosphere_specs[0] = safe_spec
 	playable.oxygen_state.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
 	playable._refresh_oxygen_state(false, 1.0)
 	if playable.oxygen_state.oxygen < 99.999:
@@ -125,7 +149,20 @@ func _validate() -> void:
 	if playable.oxygen_state.oxygen >= 99.999 or playable.oxygen_state.effective_drain_rate <= 0.0:
 		_fail("vacuum-authored compartment did not drain field oxygen")
 		return
-	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true localized_radiation=true multiple_breaches=true authored_atmosphere=true")
+	var derelict_breach_ids := breach_ids.duplicate()
+	if not playable.travel_home():
+		_fail("could not return home after boarded runtime checks")
+		return
+	var expected_home_breaches := maxi(1, playable.loader.get_breach_zone_markers().size())
+	var home_breach_nodes: Array[StaticBody3D] = playable.get_breach_zone_nodes()
+	if home_breach_nodes.size() != expected_home_breaches:
+		_fail("return-home transition did not rebuild home breach zones")
+		return
+	for home_breach in home_breach_nodes:
+		if derelict_breach_ids.has(str(home_breach.get_meta("breach_zone_id", ""))):
+			_fail("derelict breach zone leaked into the home ship")
+			return
+	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
 	quit(0)
 
 
