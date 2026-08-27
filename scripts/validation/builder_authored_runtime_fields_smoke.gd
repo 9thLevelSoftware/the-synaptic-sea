@@ -91,8 +91,11 @@ func _initialize() -> void:
 	if not loader.get_radiation_zone_at(segment_midpoint + perpendicular * 1.5).is_empty():
 		_fail("radiation default query radius exceeded the materialized volume half-width")
 		return
+	if loader.get_radiation_zone_at(segment_midpoint + perpendicular * 1.2 + Vector3.UP * 1.2).is_empty():
+		_fail("radiation query rejected a visible box corner")
+		return
 	var outward: Vector3 = (radiation_to - radiation_from).normalized()
-	if not loader.get_radiation_zone_at(radiation_to + outward * 3.0).is_empty():
+	if not loader.get_radiation_zone_at(radiation_to + outward * 1.1).is_empty():
 		_fail("radiation query extended beyond the authored endpoint span")
 		return
 	var rad = RadiationStateScript.new()

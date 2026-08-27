@@ -1902,31 +1902,37 @@ func get_radiation_zone_segments() -> Array:
 
 func get_radiation_zone_at(local_position: Vector3, radius: float = RADIATION_VOLUME_HALF_WIDTH) -> Dictionary:
 	var best: Dictionary = {}
-	var best_distance: float = maxf(0.0, radius)
+	var best_distance: float = INF
+	var half_width := maxf(0.0, radius)
 	for index in range(radiation_zone_markers.size()):
-		var distance: float = INF
+		var contains := false
 		if index < radiation_zone_segments.size() and radiation_zone_segments[index] is Dictionary:
 			var segment: Dictionary = radiation_zone_segments[index]
 			var from_pos: Variant = segment.get("from", Vector3.INF)
 			var to_pos: Variant = segment.get("to", Vector3.INF)
 			if from_pos is Vector3 and to_pos is Vector3:
-				distance = _distance_to_segment(local_position, from_pos, to_pos)
-		if not is_finite(distance):
-			distance = local_position.distance_to(radiation_zone_markers[index])
-		if distance <= best_distance:
+				contains = _point_in_radiation_box(local_position, from_pos, to_pos, half_width)
+		else:
+			contains = local_position.distance_to(radiation_zone_markers[index]) <= half_width
+		var distance: float = local_position.distance_to(radiation_zone_markers[index])
+		if contains and distance <= best_distance:
 			best_distance = distance
 			if index < radiation_zone_specs.size() and radiation_zone_specs[index] is Dictionary:
 				best = (radiation_zone_specs[index] as Dictionary).duplicate(true)
 	return best
 
 
-func _distance_to_segment(point: Vector3, from_pos: Vector3, to_pos: Vector3) -> float:
-	var segment: Vector3 = to_pos - from_pos
-	var segment_length_squared: float = segment.length_squared()
-	if segment_length_squared <= 0.000001:
-		return point.distance_to(from_pos)
-	var projection: float = clampf((point - from_pos).dot(segment) / segment_length_squared, 0.0, 1.0)
-	return point.distance_to(from_pos + segment * projection)
+func _point_in_radiation_box(point: Vector3, from_pos: Vector3, to_pos: Vector3, half_width: float) -> bool:
+	var segment := to_pos - from_pos
+	var midpoint := (from_pos + to_pos) * 0.5
+	var basis := Basis.IDENTITY
+	if segment.length_squared() > 0.000001:
+		basis = Basis(Quaternion(Vector3.RIGHT, segment.normalized()))
+	var box_position := basis.inverse() * (point - midpoint)
+	var half_length := maxf(1.0, segment.length() * 0.5 + 1.0)
+	return absf(box_position.x) <= half_length \
+			and absf(box_position.y) <= half_width \
+			and absf(box_position.z) <= half_width
 
 
 func get_authored_atmosphere_at(local_position: Vector3) -> Dictionary:

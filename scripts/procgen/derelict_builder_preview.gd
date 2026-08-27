@@ -545,14 +545,7 @@ func _preview_player_in_radiation_zone() -> bool:
 	if preview_player == null:
 		return false
 	for zone in preview_radiation_zones:
-		if not is_instance_valid(zone):
-			continue
-		var local_position: Vector3 = zone.to_local(preview_player.global_position)
-		var collision := zone.get_node_or_null("BuilderPreviewRadiationCollision") as CollisionShape3D
-		var box_shape := collision.shape as BoxShape3D if collision != null else null
-		if box_shape != null and absf(local_position.x) <= box_shape.size.x * 0.5 \
-				and absf(local_position.y) <= box_shape.size.y * 0.5 \
-				and absf(local_position.z) <= box_shape.size.z * 0.5:
+		if is_instance_valid(zone) and _preview_player_in_specific_radiation_zone(zone):
 			return true
 	return false
 
@@ -560,12 +553,11 @@ func _preview_player_in_radiation_zone() -> bool:
 func _apply_preview_radiation_state() -> void:
 	if preview_radiation_state == null:
 		return
-	var in_zone: bool = preview_radiation_state.in_radiation_zone
 	var radiation_level: float = preview_radiation_state.radiation
 	for zone in preview_radiation_zones:
 		if not is_instance_valid(zone):
 			continue
-		zone.set_meta("radiation_zone_in_player", in_zone and _preview_player_in_specific_radiation_zone(zone))
+		zone.set_meta("radiation_zone_in_player", _preview_player_in_specific_radiation_zone(zone))
 		zone.set_meta("radiation_level", radiation_level)
 		zone.set_meta("radiation_health_drain_active", preview_radiation_state.get_health_drain_per_second() > 0.0)
 

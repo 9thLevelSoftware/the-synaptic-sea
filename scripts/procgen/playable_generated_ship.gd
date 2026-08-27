@@ -3591,7 +3591,9 @@ func _player_fire_intensity() -> float:
 		if not is_instance_valid(z) or not (z is Node3D):
 			continue
 		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
-			var compartment_id: String = str(z.get_meta("fire_compartment_id", cid))
+			var compartment_id: String = str(z.get_meta("fire_compartment_id", ""))
+			if compartment_id.is_empty():
+				continue
 			return _active_fire_state().get_intensity(compartment_id)
 	return 0.0
 
