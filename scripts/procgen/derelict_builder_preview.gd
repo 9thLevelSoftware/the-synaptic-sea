@@ -20,6 +20,7 @@ const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
 const NAVIGATION_SNAP_TOLERANCE := 0.75
 const PLAYER_SPAWN_HEIGHT := 0.2
 const PREVIEW_INTERACTION_RADIUS := 2.2
+const PREVIEW_HUD_HINT := "WASD / arrows: move    E / Enter / Space: interact"
 const PREVIEW_INPUT_BINDINGS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -242,10 +243,8 @@ func _structural_wrappers_have_collision(root: Node3D) -> bool:
 
 
 func _has_collision_shape(node: Node) -> bool:
-	if node is CollisionShape3D and (node as CollisionShape3D).shape != null:
-		return true
-	for child in node.get_children():
-		if _has_collision_shape(child):
+	for candidate in node.find_children("*", "CollisionShape3D", true, false):
+		if (candidate as CollisionShape3D).shape != null:
 			return true
 	return false
 
@@ -324,7 +323,7 @@ func _build_interaction_status() -> void:
 	_interaction_status = Label.new()
 	_interaction_status.name = "InteractionStatus"
 	_interaction_status.position = Vector2(18.0, 18.0)
-	_interaction_status.text = "WASD / arrows: move    E / Enter / Space: interact"
+	_interaction_status.text = PREVIEW_HUD_HINT
 	_interaction_status.add_theme_color_override("font_color", Color.WHITE)
 	_interaction_status.add_theme_color_override("font_shadow_color", Color.BLACK)
 	_interaction_status.add_theme_constant_override("shadow_offset_x", 2)
@@ -368,7 +367,7 @@ func _on_preview_interact_requested(player_body) -> void:
 
 func _set_interaction_status(message: String) -> void:
 	if is_instance_valid(_interaction_status):
-		_interaction_status.text = "%s\nWASD / arrows: move    E / Enter / Space: interact" % message
+		_interaction_status.text = "%s\n%s" % [message, PREVIEW_HUD_HINT]
 
 
 func _interactive_runtime_ready() -> bool:
@@ -377,8 +376,6 @@ func _interactive_runtime_ready() -> bool:
 	if not is_instance_valid(preview_camera_rig) or preview_camera_rig.follow_target != preview_player:
 		return false
 	if preview_camera_rig.camera == null or not preview_camera_rig.camera.current:
-		return false
-	if not preview_player.interact_requested.is_connected(_on_preview_interact_requested):
 		return false
 	for action_name in PREVIEW_INPUT_BINDINGS:
 		if not InputMap.has_action(str(action_name)) or InputMap.action_get_events(str(action_name)).is_empty():
@@ -449,11 +446,22 @@ func _exercise_vertical_links(layout: Dictionary) -> bool:
 	var navigation_map: RID = region.get_navigation_map()
 	for link_variant in links:
 		var link := link_variant as NavigationLink3D
-		if link == null:
+		if link == null or not link.enabled or link.navigation_layers == 0 or link.get_navigation_map() != navigation_map:
 			return false
+		var saved_states: Array = []
+		for other_variant in links:
+			var other := other_variant as NavigationLink3D
+			saved_states.append({"link": other, "enabled": other.enabled})
+			if other != link:
+				other.enabled = false
+		NavigationServer3D.map_force_update(navigation_map)
 		var start_world := link.to_global(link.start_position)
 		var end_world := link.to_global(link.end_position)
-		if not _navigation_path_between_world(navigation_map, start_world, end_world):
+		var link_ready := _navigation_path_between_world(navigation_map, start_world, end_world)
+		for state in saved_states:
+			(state["link"] as NavigationLink3D).enabled = bool(state["enabled"])
+		NavigationServer3D.map_force_update(navigation_map)
+		if not link_ready:
 			return false
 	return true
 
@@ -490,10 +498,12 @@ func _exercise_objectives() -> bool:
 		if not (volume_variant is GameplayObjectiveVolume):
 			return false
 		var volume := volume_variant as GameplayObjectiveVolume
-		if not _navigation_path_exists(loader.to_local(volume.global_position)):
-			return false
+		var was_completed := volume.completed
+		var objective_ready := _navigation_path_exists(loader.to_local(volume.global_position))
 		volume.complete()
-		if not volume.completed:
+		var completed := volume.completed
+		volume.completed = was_completed
+		if not objective_ready or not completed:
 			return false
 	return true
 
@@ -574,10 +584,14 @@ func _exercise_portals(layout: Dictionary) -> bool:
 	for portal in nodes:
 		if portal == null or not portal.has_method("try_interact"):
 			return false
+		var was_open: bool = portal.is_open
+		var was_unsafe: bool = portal.is_unsafe
 		portal.set_validation_player_in_range(true)
 		var shape: CollisionShape3D = portal.get_blocker_collision_shape()
 		if shape == null:
+			_restore_portal_state(portal, was_open, was_unsafe)
 			return false
+		var portal_ready := true
 		match str(portal.portal_kind):
 			"LOCKED":
 				var denied: Dictionary = portal.try_interact({})
@@ -586,17 +600,27 @@ func _exercise_portals(layout: Dictionary) -> bool:
 				flags[flag] = true
 				var opened: Dictionary = portal.try_interact(flags)
 				if str(denied.get("reason", "")) != "locked" or not bool(opened.get("open", false)) or not shape.disabled:
-					return false
+					portal_ready = false
 			"BREACH":
 				if not shape.disabled or not bool(portal.try_interact({}).get("unsafe", false)):
-					return false
+					portal_ready = false
 			_:
 				var before := shape.disabled
 				var opened: Dictionary = portal.try_interact({})
 				if bool(opened.get("ok", false)) and not portal.is_exterior:
 					if shape.disabled == before:
-						return false
+						portal_ready = false
+		_restore_portal_state(portal, was_open, was_unsafe)
+		if not portal_ready:
+			return false
 	return true
+
+
+func _restore_portal_state(portal: Area3D, was_open: bool, was_unsafe: bool) -> void:
+	portal.is_open = was_open
+	portal.is_unsafe = was_unsafe
+	portal.set_validation_player_in_range(false)
+	portal._apply_state()
 
 
 func _exercise_atmosphere(layout: Dictionary) -> bool:
