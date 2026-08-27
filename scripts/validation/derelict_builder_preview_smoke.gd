@@ -140,6 +140,9 @@ func _poll_child() -> void:
 			if not bool(checks.get("atmosphere_scene_consumer", false)):
 				_fail("preview atmosphere scene consumer was not spatially ticking authored room state")
 				return
+			if not bool(checks.get("atmosphere_probe_state_pristine", false)):
+				_fail("preview atmosphere acceptance probe mutated persistent oxygen/radiation/temperature state")
+				return
 			print("DERELICT BUILDER PREVIEW SMOKE PASS checks=%d bundle=%s" % [REQUIRED_CHECKS.size(), _bundle_dir])
 			quit(0)
 			return

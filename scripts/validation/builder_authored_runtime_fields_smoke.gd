@@ -128,6 +128,27 @@ func _initialize() -> void:
 	if oxygen.oxygen >= 100.0 or oxygen.effective_drain_rate <= 0.0:
 		_fail("authored atmosphere did not drive OxygenState")
 		return
+	var temperature_only_layout: Dictionary = layout.duplicate(true)
+	var temperature_only_room: Dictionary = temperature_only_layout["rooms"][0]
+	for omitted_field in ["atmosphere_bp", "oxygen_bp", "depressurized", "vented", "radiation_bp"]:
+		temperature_only_room.erase(omitted_field)
+	temperature_only_room["temperature_c"] = 45.0
+	temperature_only_layout["rooms"][0] = temperature_only_room
+	if not loader.load_from_documents(temperature_only_layout, kit, gameplay, true, {
+		"layout_path": LAYOUT_PATH, "kit_path": KIT_PATH, "gameplay_slice_path": GAMEPLAY_PATH,
+	}):
+		_fail("loader rejected temperature-only authored room")
+		return
+	var temperature_only_atmosphere: Dictionary = loader.get_authored_atmosphere_at(atmosphere_position)
+	var temperature_only_multiplier := loader.get_authored_atmosphere_drain_multiplier_at(atmosphere_position)
+	if str(temperature_only_atmosphere.get("room_id", "")) != room_id \
+			or float(temperature_only_atmosphere.get("temperature_c", NAN)) != 45.0:
+		_fail("temperature-only authored room was not materialized")
+		return
+	if temperature_only_atmosphere.has("oxygen_bp") or absf(temperature_only_multiplier - 1.0) > 0.001:
+		_fail("temperature-only atmosphere synthesized oxygen_bp=%s or changed field_drain_multiplier=%s" % [
+			str(temperature_only_atmosphere.get("oxygen_bp", "<omitted>")), str(temperature_only_multiplier)])
+		return
 	# Legacy authored rooms may declare only vented=true. That is an explicit
 	# depressurization and must not fall back to a nominal 100% oxygen room.
 	var saved_atmosphere_specs: Array = loader.authored_atmosphere_specs.duplicate(true)

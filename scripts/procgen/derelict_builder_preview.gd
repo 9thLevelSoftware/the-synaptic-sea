@@ -226,7 +226,10 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	checks["breach_scene_consumer"] = _exercise_preview_breach_runtime()
 	checks["breach"] = bool(checks["breach"]) and bool(checks["breach_scene_consumer"])
 
+	var atmosphere_probe_before := _preview_atmosphere_model_summaries()
 	checks["atmosphere"] = _exercise_atmosphere(layout)
+	var atmosphere_probe_after := _preview_atmosphere_model_summaries()
+	checks["atmosphere_probe_state_pristine"] = atmosphere_probe_before == atmosphere_probe_after
 	checks["atmosphere_scene_consumer"] = checks["atmosphere"] \
 			and preview_atmosphere_oxygen_state != null \
 			and preview_atmosphere_radiation_state != null \
@@ -1272,6 +1275,32 @@ func _restore_portal_state(portal: Area3D, was_unlocked: bool, was_open: bool, w
 
 
 func _exercise_atmosphere(layout: Dictionary) -> bool:
+	var saved_oxygen: Dictionary = preview_atmosphere_oxygen_state.get_summary() \
+			if preview_atmosphere_oxygen_state != null else {}
+	var saved_radiation: Dictionary = preview_atmosphere_radiation_state.get_summary() \
+			if preview_atmosphere_radiation_state != null else {}
+	var saved_temperature: Dictionary = preview_atmosphere_temperature_state.get_summary() \
+			if preview_atmosphere_temperature_state != null else {}
+	var saved_active := preview_atmosphere_active
+	var saved_summary := preview_atmosphere_summary.duplicate(true)
+	var accepted := _exercise_atmosphere_probe(layout)
+	if preview_atmosphere_oxygen_state != null:
+		preview_atmosphere_oxygen_state.apply_summary(saved_oxygen)
+		preview_atmosphere_oxygen_state.effective_drain_rate = float(saved_oxygen.get(
+				"effective_drain_rate", preview_atmosphere_oxygen_state.effective_drain_rate))
+	if preview_atmosphere_radiation_state != null:
+		preview_atmosphere_radiation_state.apply_summary(saved_radiation)
+	if preview_atmosphere_temperature_state != null:
+		preview_atmosphere_temperature_state.apply_summary(saved_temperature)
+	preview_atmosphere_active = saved_active
+	preview_atmosphere_summary = saved_summary
+	if preview_atmosphere_oxygen_state != null and preview_atmosphere_radiation_state != null \
+			and preview_atmosphere_temperature_state != null:
+		_apply_preview_atmosphere_state(saved_summary.get("atmosphere", {}))
+	return accepted
+
+
+func _exercise_atmosphere_probe(layout: Dictionary) -> bool:
 	var authored := false
 	var original_position: Vector3 = preview_player.global_position if preview_player != null else Vector3.ZERO
 	for room_variant in _array(layout.get("rooms", [])):
@@ -1292,7 +1321,7 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		var radiation_before: float = preview_atmosphere_radiation_state.radiation
 		var temperature_before: float = preview_atmosphere_temperature_state.temperature
 		_tick_preview_atmosphere(1.0)
-		var should_drain := bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)) or int(atmosphere.get("oxygen_bp", 10000)) < 10000
+		var should_drain: bool = loader.get_authored_atmosphere_drain_multiplier_at(center) > 0.001
 		if should_drain != (preview_atmosphere_oxygen_state.oxygen < oxygen_before):
 			preview_player.global_position = original_position
 			return false
@@ -1337,6 +1366,14 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 				or not _atmosphere_status.text.contains("Atmosphere: FIELD"):
 			return false
 	return true if authored else not _has_authored_atmosphere(layout)
+
+
+func _preview_atmosphere_model_summaries() -> Dictionary:
+	return {
+		"oxygen": preview_atmosphere_oxygen_state.get_summary() if preview_atmosphere_oxygen_state != null else {},
+		"radiation": preview_atmosphere_radiation_state.get_summary() if preview_atmosphere_radiation_state != null else {},
+		"temperature": preview_atmosphere_temperature_state.get_summary() if preview_atmosphere_temperature_state != null else {},
+	}
 
 
 func _build_preview_atmosphere_runtime() -> void:

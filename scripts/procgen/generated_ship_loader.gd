@@ -1657,11 +1657,12 @@ func _add_authored_atmosphere_volumes(source_layout: Dictionary, ship_root: Node
 		var spec: Dictionary = {
 			"room_id": room_id,
 			"position": position,
-			"oxygen_bp": int(room.get("atmosphere_bp", room.get("oxygen_bp", 10000))),
 			"depressurized": bool(room.get("depressurized", false)),
 			"vented": bool(room.get("vented", false)),
 			"radiation_bp": int(room.get("radiation_bp", 0)),
 		}
+		if room.has("atmosphere_bp") or room.has("oxygen_bp"):
+			spec["oxygen_bp"] = int(room.get("atmosphere_bp", room.get("oxygen_bp", 10000)))
 		if room.has("temperature_c"):
 			spec["temperature_c"] = float(room["temperature_c"])
 		authored_atmosphere_specs.append(spec)
@@ -1969,6 +1970,8 @@ func get_authored_atmosphere_drain_multiplier_at(local_position: Vector3) -> flo
 	# omit oxygen_bp and depressurized. Keep this semantic at the loader boundary
 	# so every runtime consumer observes the same hostile atmosphere.
 	if bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)):
+		return 1.0
+	if not atmosphere.has("oxygen_bp"):
 		return 1.0
 	var oxygen_bp: float = clampf(float(atmosphere.get("oxygen_bp", 10000)), 0.0, 10000.0)
 	return clampf(1.0 - oxygen_bp / 10000.0, 0.0, 1.0)
