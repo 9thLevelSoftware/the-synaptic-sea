@@ -67,6 +67,13 @@ var preview_oxygen_state
 var preview_breach_zones: Array[StaticBody3D] = []
 var preview_radiation_state
 var preview_radiation_zones: Array[Area3D] = []
+## Persistent consumers for authored room atmosphere. The loader supplies
+## spatial values; these models retain the player's accumulated effects.
+var preview_atmosphere_oxygen_state
+var preview_atmosphere_radiation_state
+var preview_atmosphere_temperature_state
+var preview_atmosphere_active := false
+var preview_atmosphere_summary: Dictionary = {}
 var preview_objective_controller
 var preview_objective_interactables: Array = []
 var _interaction_status: Label
@@ -125,7 +132,8 @@ func _process(delta: float) -> void:
 	var has_fire: bool = preview_fire_state != null and not preview_fire_zones.is_empty()
 	var has_breach: bool = preview_oxygen_state != null and not preview_breach_zones.is_empty()
 	var has_radiation: bool = preview_radiation_state != null and not preview_radiation_zones.is_empty()
-	if not has_arc and not has_fire and not has_breach and not has_radiation:
+	var has_atmosphere: bool = preview_atmosphere_oxygen_state != null
+	if not has_arc and not has_fire and not has_breach and not has_radiation and not has_atmosphere:
 		return
 	if has_arc:
 		preview_arc_state.tick(delta)
@@ -140,6 +148,8 @@ func _process(delta: float) -> void:
 		preview_radiation_state.configure({"in_radiation_zone": _preview_player_in_radiation_zone()})
 		preview_radiation_state.tick(delta)
 		_apply_preview_radiation_state()
+	if has_atmosphere:
+		_tick_preview_atmosphere(delta)
 
 
 func _validate_manifest(manifest: Dictionary) -> Array[String]:
@@ -216,6 +226,11 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	checks["breach"] = bool(checks["breach"]) and bool(checks["breach_scene_consumer"])
 
 	checks["atmosphere"] = _exercise_atmosphere(layout)
+	checks["atmosphere_scene_consumer"] = checks["atmosphere"] \
+			and preview_atmosphere_oxygen_state != null \
+			and preview_atmosphere_radiation_state != null \
+			and preview_atmosphere_temperature_state != null \
+			and has_meta("authored_atmosphere_runtime")
 
 	checks["portal_interaction"] = _exercise_portals(layout)
 	for key in REQUIRED_CHECKS:
@@ -299,6 +314,7 @@ func _setup_interactive_runtime() -> bool:
 	_build_preview_breach_runtime()
 	_build_preview_arc_runtime()
 	_build_preview_radiation_runtime()
+	_build_preview_atmosphere_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
 	return _interactive_runtime_ready()
@@ -1247,6 +1263,7 @@ func _restore_portal_state(portal: Area3D, was_unlocked: bool, was_open: bool, w
 
 func _exercise_atmosphere(layout: Dictionary) -> bool:
 	var authored := false
+	var original_position: Vector3 = preview_player.global_position if preview_player != null else Vector3.ZERO
 	for room_variant in _array(layout.get("rooms", [])):
 		if not (room_variant is Dictionary):
 			continue
@@ -1258,31 +1275,95 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		var atmosphere: Dictionary = loader.get_authored_atmosphere_at(center)
 		if atmosphere.is_empty():
 			return false
-		var multiplier: float = float(loader.get_authored_atmosphere_drain_multiplier_at(center))
-		var oxygen = OxygenStateScript.new()
-		oxygen.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
-		var before: float = oxygen.oxygen
-		oxygen.tick(1.0, {
-			"field_atmosphere": true,
-			"field_atmosphere_multiplier": multiplier,
-		})
+		if preview_atmosphere_oxygen_state == null or preview_atmosphere_radiation_state == null or preview_atmosphere_temperature_state == null or preview_player == null:
+			return false
+		preview_player.global_position = loader.to_global(center)
+		var oxygen_before: float = preview_atmosphere_oxygen_state.oxygen
+		var radiation_before: float = preview_atmosphere_radiation_state.radiation
+		var temperature_before: float = preview_atmosphere_temperature_state.temperature
+		_tick_preview_atmosphere(1.0)
 		var should_drain := bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)) or int(atmosphere.get("oxygen_bp", 10000)) < 10000
-		if should_drain != (oxygen.oxygen < before):
+		if should_drain != (preview_atmosphere_oxygen_state.oxygen < oxygen_before):
+			preview_player.global_position = original_position
 			return false
-		var radiation = RadiationStateScript.new()
-		radiation.configure({"in_radiation_zone": int(atmosphere.get("radiation_bp", 0)) > 0})
-		radiation.tick(1.0)
-		if (int(atmosphere.get("radiation_bp", 0)) > 0) != (radiation.radiation > 0.0):
+		if int(atmosphere.get("radiation_bp", 0)) > 0 and preview_atmosphere_radiation_state.radiation <= radiation_before:
+			preview_player.global_position = original_position
 			return false
-		var body_temperature = BodyTemperatureStateScript.new()
-		body_temperature.configure({})
 		var ambient_temperature: float = float(atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
-		var extreme_temperature: bool = ambient_temperature < body_temperature.safe_min or ambient_temperature > body_temperature.safe_max
-		var temperature_before: float = body_temperature.temperature
-		body_temperature.tick(30.0, {"ambient_temperature_c": ambient_temperature})
-		if extreme_temperature and (body_temperature.temperature == temperature_before or body_temperature.is_safe()):
+		var extreme_temperature: bool = ambient_temperature < preview_atmosphere_temperature_state.safe_min or ambient_temperature > preview_atmosphere_temperature_state.safe_max
+		if extreme_temperature and preview_atmosphere_temperature_state.temperature == temperature_before:
+			preview_player.global_position = original_position
+			return false
+		preview_player.global_position = original_position
+	if authored:
+		# Prove the same persistent models also respond when the player leaves all
+		# authored volumes. A distant loader-local point is guaranteed to be
+		# outside the finite room boxes in a validated layout.
+		var oxygen_before_exit: float = preview_atmosphere_oxygen_state.oxygen
+		var radiation_before_exit: float = preview_atmosphere_radiation_state.radiation
+		var temperature_before_exit: float = preview_atmosphere_temperature_state.temperature
+		preview_player.global_position = loader.to_global(Vector3(100000.0, 100000.0, 100000.0))
+		_tick_preview_atmosphere(1.0)
+		var oxygen_recovered: bool = oxygen_before_exit >= preview_atmosphere_oxygen_state.max_oxygen \
+				or preview_atmosphere_oxygen_state.oxygen > oxygen_before_exit
+		var radiation_decayed: bool = radiation_before_exit <= 0.0 \
+				or preview_atmosphere_radiation_state.radiation < radiation_before_exit
+		var temperature_offset_before := absf(temperature_before_exit - BodyTemperatureStateScript.DEFAULT_TEMPERATURE)
+		var temperature_recovered := temperature_offset_before <= 0.01 \
+				or absf(preview_atmosphere_temperature_state.temperature - BodyTemperatureStateScript.DEFAULT_TEMPERATURE) < temperature_offset_before
+		preview_player.global_position = original_position
+		if preview_atmosphere_active or not oxygen_recovered or not radiation_decayed or not temperature_recovered:
 			return false
 	return true if authored else not _has_authored_atmosphere(layout)
+
+
+func _build_preview_atmosphere_runtime() -> void:
+	preview_atmosphere_oxygen_state = null
+	preview_atmosphere_radiation_state = null
+	preview_atmosphere_temperature_state = null
+	preview_atmosphere_active = false
+	preview_atmosphere_summary = {}
+	if not is_instance_valid(loader) or loader.authored_atmosphere_specs.is_empty():
+		return
+	preview_atmosphere_oxygen_state = OxygenStateScript.new()
+	preview_atmosphere_oxygen_state.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
+	preview_atmosphere_radiation_state = RadiationStateScript.new()
+	preview_atmosphere_radiation_state.configure({})
+	preview_atmosphere_temperature_state = BodyTemperatureStateScript.new()
+	preview_atmosphere_temperature_state.configure({})
+
+
+func _tick_preview_atmosphere(delta: float) -> void:
+	if preview_player == null or preview_atmosphere_oxygen_state == null:
+		return
+	var local_position: Vector3 = loader.to_local(preview_player.global_position)
+	var atmosphere: Dictionary = loader.get_authored_atmosphere_at(local_position)
+	preview_atmosphere_active = not atmosphere.is_empty()
+	var multiplier: float = loader.get_authored_atmosphere_drain_multiplier_at(local_position)
+	preview_atmosphere_oxygen_state.tick(delta, {
+		"field_atmosphere": preview_atmosphere_active,
+		"field_atmosphere_multiplier": multiplier,
+	})
+	preview_atmosphere_radiation_state.configure({
+		"radiation": preview_atmosphere_radiation_state.radiation,
+		"in_radiation_zone": preview_atmosphere_active and int(atmosphere.get("radiation_bp", 0)) > 0,
+	})
+	preview_atmosphere_radiation_state.tick(delta)
+	var ambient_temperature := float(atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE)) \
+			if preview_atmosphere_active else BodyTemperatureStateScript.DEFAULT_TEMPERATURE
+	preview_atmosphere_temperature_state.tick(delta, {"ambient_temperature_c": ambient_temperature})
+	_apply_preview_atmosphere_state(atmosphere)
+
+
+func _apply_preview_atmosphere_state(atmosphere: Dictionary) -> void:
+	preview_atmosphere_summary = {
+		"active": preview_atmosphere_active,
+		"atmosphere": atmosphere.duplicate(true),
+		"oxygen": preview_atmosphere_oxygen_state.get_summary(),
+		"radiation": preview_atmosphere_radiation_state.get_summary(),
+		"temperature": preview_atmosphere_temperature_state.get_summary(),
+	}
+	set_meta("authored_atmosphere_runtime", preview_atmosphere_summary.duplicate(true))
 
 
 func _room_has_authored_atmosphere(room: Dictionary) -> bool:
