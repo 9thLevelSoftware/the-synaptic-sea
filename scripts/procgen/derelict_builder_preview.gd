@@ -113,13 +113,14 @@ func _process(delta: float) -> void:
 	# The builder preview is a real playable scene, so authored arcs and fires
 	# continue synchronizing while the user walks around instead of being
 	# represented only by a one-shot acceptance model.
-	if preview_arc_state == null or preview_arc_zones.is_empty():
-		if preview_fire_state == null or preview_fire_zones.is_empty():
-			return
-	if preview_arc_state != null and not preview_arc_zones.is_empty():
+	var has_arc: bool = preview_arc_state != null and not preview_arc_zones.is_empty()
+	var has_fire: bool = preview_fire_state != null and not preview_fire_zones.is_empty()
+	if not has_arc and not has_fire:
+		return
+	if has_arc:
 		preview_arc_state.tick(delta)
 		_apply_preview_arc_state()
-	if preview_fire_state != null and not preview_fire_zones.is_empty():
+	if has_fire:
 		preview_fire_state.tick(delta, {})
 		_apply_preview_fire_state()
 
@@ -355,6 +356,7 @@ func _build_preview_fire_runtime() -> void:
 	var compartments: Array[String] = []
 	if specs.size() != markers.size():
 		return
+	var fire_material := _preview_fire_material()
 	for index in range(specs.size()):
 		if not (specs[index] is Dictionary) or markers[index] == Vector3.INF:
 			continue
@@ -391,7 +393,7 @@ func _build_preview_fire_runtime() -> void:
 		mesh.radius = PREVIEW_FIRE_SIZE.x * 0.5
 		mesh.height = PREVIEW_FIRE_SIZE.y
 		visual.mesh = mesh
-		visual.material_override = _preview_fire_material()
+		visual.material_override = fire_material
 		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		visual.position = Vector3(0.0, PREVIEW_FIRE_SIZE.y * 0.5, 0.0)
 		zone.add_child(visual)
