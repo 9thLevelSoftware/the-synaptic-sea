@@ -145,18 +145,7 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		and oxygen_state.oxygen < oxygen_state.max_oxygen
 	)
 
-	var atmosphere_checked := false
-	for room_variant in _array(layout.get("rooms", [])):
-		if not (room_variant is Dictionary):
-			continue
-		var room: Dictionary = room_variant
-		if not room.has("atmosphere_bp") and not room.has("oxygen_bp") and not room.has("depressurized"):
-			continue
-		var center: Vector3 = loader.get_room_center(str(room.get("id", "")))
-		var atmosphere: Dictionary = loader.get_authored_atmosphere_at(center)
-		atmosphere_checked = not atmosphere.is_empty()
-		break
-	checks["atmosphere"] = atmosphere_checked or not _has_authored_atmosphere(layout)
+	checks["atmosphere"] = _exercise_atmosphere(layout)
 
 	checks["portal_interaction"] = _exercise_portals(layout)
 	for key in ["fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction"]:
@@ -297,6 +286,37 @@ func _exercise_portals(layout: Dictionary) -> bool:
 	return true
 
 
+func _exercise_atmosphere(layout: Dictionary) -> bool:
+	var authored := false
+	for room_variant in _array(layout.get("rooms", [])):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		if not _room_has_authored_atmosphere(room):
+			continue
+		authored = true
+		var center: Vector3 = loader.get_room_center(str(room.get("id", "")))
+		var atmosphere: Dictionary = loader.get_authored_atmosphere_at(center)
+		if atmosphere.is_empty():
+			return false
+		var multiplier: float = float(loader.get_authored_atmosphere_drain_multiplier_at(center))
+		var oxygen = OxygenStateScript.new()
+		oxygen.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
+		var before: float = oxygen.oxygen
+		oxygen.tick(1.0, {
+			"field_atmosphere": true,
+			"field_atmosphere_multiplier": multiplier,
+		})
+		var should_drain := bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)) or int(atmosphere.get("oxygen_bp", 10000)) < 10000
+		if should_drain != (oxygen.oxygen < before):
+			return false
+	return true if authored else not _has_authored_atmosphere(layout)
+
+
+func _room_has_authored_atmosphere(room: Dictionary) -> bool:
+	return room.has("atmosphere_bp") or room.has("oxygen_bp") or room.has("depressurized") or room.has("vented") or room.has("radiation_bp") or room.has("temperature_c")
+
+
 func _structural_portal_count(layout: Dictionary) -> int:
 	var plan: Variant = layout.get("structural_plan", {})
 	if not (plan is Dictionary):
@@ -381,6 +401,6 @@ func _zone_ids(specs: Array) -> Array[String]:
 
 func _has_authored_atmosphere(layout: Dictionary) -> bool:
 	for room_variant in _array(layout.get("rooms", [])):
-		if room_variant is Dictionary and (room_variant.has("atmosphere_bp") or room_variant.has("oxygen_bp") or room_variant.has("depressurized")):
+		if room_variant is Dictionary and _room_has_authored_atmosphere(room_variant as Dictionary):
 			return true
 	return false

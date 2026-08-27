@@ -44,7 +44,13 @@ func _initialize() -> void:
 		authored_room["oxygen_bp"] = 10000
 		authored_room["depressurized"] = false
 		rooms[0] = authored_room
-		layout["rooms"] = rooms
+	if rooms.size() > 1 and rooms[1] is Dictionary:
+		var vented_room: Dictionary = rooms[1]
+		vented_room.erase("oxygen_bp")
+		vented_room.erase("depressurized")
+		vented_room["vented"] = true
+		rooms[1] = vented_room
+	layout["rooms"] = rooms
 	var loot: Array = gameplay.get("loot_containers", [])
 	if not loot.is_empty() and loot[0] is Dictionary:
 		var authored_loot: Dictionary = loot[0]

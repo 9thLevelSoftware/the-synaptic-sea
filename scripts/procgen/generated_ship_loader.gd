@@ -1721,8 +1721,23 @@ func _add_authored_portal_runtime_nodes(source_layout: Dictionary, ship_root: No
 		portal.name = "AuthoredPortal_%s" % str(source.get("id", index))
 		portal.configure(spec, endpoint_midpoint)
 		ship_root.add_child(portal)
+		if portal.portal_kind == "LOCKED":
+			var structural_blocker := _find_structural_portal_blocker(ship_root, str(spec.get("edge_key", "")))
+			if structural_blocker != null:
+				portal.bind_structural_blocker(structural_blocker)
 		authored_portal_specs.append(spec)
 		authored_portal_nodes.append(portal)
+
+
+func _find_structural_portal_blocker(ship_root: Node3D, edge_key: String) -> Node3D:
+	if ship_root == null or edge_key.is_empty():
+		return null
+	for child in ship_root.get_children():
+		if child is Node3D \
+				and str(child.get_meta("structural_edge_key", "")) == edge_key \
+				and str(child.get_meta("module_kind", "")) == "doorway_frame_blocked_1x1":
+			return child as Node3D
+	return null
 
 
 ## Materialize builder-authored visuals only. Structural doors and vertical
@@ -1865,7 +1880,10 @@ func get_authored_atmosphere_drain_multiplier_at(local_position: Vector3) -> flo
 	var atmosphere: Dictionary = get_authored_atmosphere_at(local_position)
 	if atmosphere.is_empty():
 		return 1.0
-	if bool(atmosphere.get("depressurized", false)):
+	# A vented compartment is depressurized even when older authored documents
+	# omit oxygen_bp and depressurized. Keep this semantic at the loader boundary
+	# so every runtime consumer observes the same hostile atmosphere.
+	if bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)):
 		return 1.0
 	var oxygen_bp: float = clampf(float(atmosphere.get("oxygen_bp", 10000)), 0.0, 10000.0)
 	return clampf(1.0 - oxygen_bp / 10000.0, 0.0, 1.0)

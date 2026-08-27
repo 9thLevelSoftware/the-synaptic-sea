@@ -70,6 +70,19 @@ func _initialize() -> void:
 	if oxygen.oxygen >= 100.0 or oxygen.effective_drain_rate <= 0.0:
 		_fail("authored atmosphere did not drive OxygenState")
 		return
+	# Legacy authored rooms may declare only vented=true. That is an explicit
+	# depressurization and must not fall back to a nominal 100% oxygen room.
+	var saved_atmosphere_specs: Array = loader.authored_atmosphere_specs.duplicate(true)
+	loader.authored_atmosphere_specs = [{"room_id": "vented_legacy", "position": position, "vented": true}]
+	var vented_multiplier := loader.get_authored_atmosphere_drain_multiplier_at(position)
+	loader.authored_atmosphere_specs = saved_atmosphere_specs
+	if vented_multiplier != 1.0:
+		_fail("vented atmosphere without oxygen_bp was not treated as depressurized")
+	var vented_oxygen = OxygenStateScript.new()
+	vented_oxygen.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
+	vented_oxygen.tick(1.0, {"field_atmosphere": true, "field_atmosphere_multiplier": vented_multiplier})
+	if vented_oxygen.oxygen >= 100.0:
+		_fail("vented atmosphere without oxygen_bp did not drain OxygenState")
 	print("BUILDER AUTHORED RUNTIME FIELDS PASS radiation=true atmosphere=true room=%s oxygen_bp=2500" % room_id)
 	loader.free()
 	quit(0)

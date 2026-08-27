@@ -9,6 +9,9 @@ func _initialize() -> void:
 	if not _stamp_exterior_portal(layout):
 		_fail("fixture has no exterior structural edge for portal coverage")
 		return
+	if not _stamp_locked_portal(layout):
+		_fail("fixture has no structural door for locked portal coverage")
+		return
 	var loader := LoaderScript.new()
 	get_root().add_child(loader)
 	if not loader.load_from_documents(layout, kit, gameplay, false):
@@ -21,12 +24,15 @@ func _initialize() -> void:
 		return
 	var actual_exterior = null
 	var door = null
+	var actual_locked = null
 	for node in nodes:
 		if node.get_blocker_collision_shape() == null:
 			_fail("portal missing blocker collision")
 			return
 		if bool(node.is_exterior):
 			actual_exterior = node
+		elif str(node.portal_kind) == "LOCKED":
+			actual_locked = node
 		elif str(node.portal_kind) == "DOOR":
 			door = node
 	if actual_exterior == null:
@@ -38,6 +44,17 @@ func _initialize() -> void:
 		exterior_flags[str(actual_exterior.required_flag())] = true
 	if not bool(actual_exterior.try_interact(exterior_flags).get("exterior", false)):
 		_fail("materialized exterior portal was not observable")
+		return
+	if actual_locked == null:
+		_fail("fixture materialized no locked structural portal")
+		return
+	actual_locked.set_validation_player_in_range(true)
+	var structural_collision_before: int = int(actual_locked.get_structural_blocker_collision_enabled_count())
+	var locked_flags := {str(actual_locked.required_flag()): true}
+	var unlocked: Dictionary = actual_locked.try_interact(locked_flags)
+	if structural_collision_before <= 0 or not bool(unlocked.get("open", false)) \
+			or actual_locked.get_structural_blocker_collision_enabled_count() != 0:
+		_fail("unlocking did not disable the full-width structural portal collision")
 		return
 	if door == null:
 		door = _standalone("door", "door", loader)
@@ -73,7 +90,7 @@ func _initialize() -> void:
 	})
 	if not is_equal_approx(absf(oriented.rotation_degrees.y), 90.0):
 		_fail("east-west portal blocker was not rotated to its authored edge")
-	print("BUILDER AUTHORED PORTALS PASS authored=%d door=true locked=true hatch=true breach=true exterior=true orientation=true" % nodes.size())
+	print("BUILDER AUTHORED PORTALS PASS authored=%d door=true locked=true structural_unlock=true hatch=true breach=true exterior=true orientation=true" % nodes.size())
 	quit(0)
 
 func _standalone(id: String, kind: String, parent: Node, extra: Dictionary = {}) -> Node:
@@ -125,6 +142,31 @@ func _stamp_exterior_portal(layout: Dictionary) -> bool:
 			(raw as Dictionary)["placement_required"] = true
 			return true
 	return false
+
+
+func _stamp_locked_portal(layout: Dictionary) -> bool:
+	var plan: Dictionary = layout.get("structural_plan", {}) as Dictionary
+	var edges: Dictionary = plan.get("edges", {}) as Dictionary
+	var selected_key := ""
+	for key in edges:
+		var edge: Dictionary = edges[key] as Dictionary
+		if str(edge.get("kind", "")) == "DOOR" and not bool(edge.get("exterior", false)):
+			selected_key = str(key)
+			edge["kind"] = "LOCKED"
+			edge["state"] = "LOCKED"
+			edge["module_id"] = "doorway_frame_blocked_1x1"
+			break
+	if selected_key.is_empty():
+		return false
+	var placements: Array = plan.get("placements", []) as Array
+	for raw in placements:
+		if raw is Dictionary and str((raw as Dictionary).get("edge_key", (raw as Dictionary).get("key", ""))) == selected_key:
+			(raw as Dictionary)["kind"] = "LOCKED"
+			(raw as Dictionary)["state"] = "LOCKED"
+			(raw as Dictionary)["module_id"] = "doorway_frame_blocked_1x1"
+			return true
+	return false
+
 
 func _fail(reason: String) -> void:
 	push_error("BUILDER AUTHORED PORTALS FAIL %s" % reason)

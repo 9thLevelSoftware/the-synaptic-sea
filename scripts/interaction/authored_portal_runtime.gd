@@ -19,6 +19,7 @@ var is_unsafe := false
 var is_exterior := false
 var _player_in_range := false
 var _blocker: StaticBody3D
+var _structural_blocker: Node3D
 
 func configure(spec: Dictionary, world_position: Vector3) -> void:
 	portal_spec = spec.duplicate(true)
@@ -67,6 +68,13 @@ func get_blocker_collision_shape() -> CollisionShape3D:
 		if child is CollisionShape3D:
 			return child as CollisionShape3D
 	return null
+
+func bind_structural_blocker(wrapper: Node3D) -> void:
+	_structural_blocker = wrapper
+	_apply_state()
+
+func get_structural_blocker_collision_enabled_count() -> int:
+	return _count_enabled_collision_shapes(_structural_blocker)
 
 func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Dictionary:
 	if not _is_player_in_range(player_body):
@@ -126,11 +134,25 @@ func _ensure_blocker() -> void:
 	add_child(_blocker)
 
 func _apply_state() -> void:
-	if not is_instance_valid(_blocker):
+	var passable := is_open or is_unsafe
+	_set_collision_shapes_disabled(_blocker, passable)
+	_set_collision_shapes_disabled(_structural_blocker, passable)
+
+func _set_collision_shapes_disabled(node: Node, disabled: bool) -> void:
+	if not is_instance_valid(node):
 		return
-	for child in _blocker.get_children():
-		if child is CollisionShape3D:
-			(child as CollisionShape3D).disabled = is_open or is_unsafe
+	if node is CollisionShape3D:
+		(node as CollisionShape3D).disabled = disabled
+	for child in node.get_children():
+		_set_collision_shapes_disabled(child, disabled)
+
+func _count_enabled_collision_shapes(node: Node) -> int:
+	if not is_instance_valid(node):
+		return 0
+	var count := 1 if node is CollisionShape3D and not (node as CollisionShape3D).disabled else 0
+	for child in node.get_children():
+		count += _count_enabled_collision_shapes(child)
+	return count
 
 func _ensure_visual() -> void:
 	var mesh := MeshInstance3D.new()
