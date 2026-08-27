@@ -11,14 +11,26 @@ const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd"
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
+const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
 # Navigation snapping is allowed to absorb tiny authoring/mesh quantization
 # differences, but a distant point must not be treated as walkable.
 const NAVIGATION_SNAP_TOLERANCE := 0.75
+const PLAYER_SPAWN_HEIGHT := 0.2
+const PREVIEW_INTERACTION_RADIUS := 2.2
+const PREVIEW_INPUT_BINDINGS := {
+	"move_forward": [KEY_W, KEY_UP],
+	"move_back": [KEY_S, KEY_DOWN],
+	"move_left": [KEY_A, KEY_LEFT],
+	"move_right": [KEY_D, KEY_RIGHT],
+	"interact": [KEY_E, KEY_ENTER, KEY_SPACE, KEY_KP_ENTER],
+}
 const REQUIRED_CHECKS: Array[String] = [
 	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
 	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
+	"interactive_player",
 ]
 const CANONICAL_MARKER_CHECKS: Array[String] = [
 	"collision", "navigation", "verticals", "objectives", "props", "loot", "fire", "arc",
@@ -31,6 +43,12 @@ var result_path := ""
 var _ship_summary: Dictionary = {}
 var _source_hash := ""
 var _kit_id := ""
+var preview_player
+var preview_camera_rig
+var preview_inventory
+var preview_loot_containers: Array = []
+var _interaction_status: Label
+var _interactive_ready := false
 
 
 func _ready() -> void:
@@ -70,7 +88,10 @@ func _ready() -> void:
 	if not await _wait_for_navigation_sync():
 		_finish(false, ["navigation map did not synchronize"])
 		return
-	var acceptance := _exercise_runtime(_json_file(layout_path), _json_file(gameplay_path))
+	var layout_doc := _json_file(layout_path)
+	var gameplay_doc := _json_file(gameplay_path)
+	_interactive_ready = _setup_interactive_runtime()
+	var acceptance := _exercise_runtime(layout_doc, gameplay_doc)
 	_finish(bool(acceptance.get("ok", false)), acceptance.get("errors", []), acceptance.get("checks", {}))
 
 
@@ -125,6 +146,7 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		"loot": _exercise_loot(gameplay),
 		"props": loader.get_placed_prop_specs_copy().size() == _array(gameplay.get("placed_props", [])).size(),
 		"vertical_links": _exercise_vertical_links(layout),
+		"interactive_player": _interactive_ready and _interactive_runtime_ready(),
 	}
 	var hazard_materialization := _hazard_materialization_checks(layout)
 	for hazard_name in hazard_materialization:
@@ -226,6 +248,142 @@ func _has_collision_shape(node: Node) -> bool:
 		if _has_collision_shape(child):
 			return true
 	return false
+
+
+func _setup_interactive_runtime() -> bool:
+	if not is_instance_valid(loader) or loader.structural_root == null:
+		return false
+	_ensure_preview_input_actions()
+	preview_inventory = InventoryStateScript.new()
+	preview_player = PlayerControllerScript.new()
+	preview_player.name = "PreviewPlayerController"
+	add_child(preview_player)
+	preview_player.teleport_to(
+		loader.to_global(loader.get_start_transform().origin) + Vector3.UP * PLAYER_SPAWN_HEIGHT)
+	preview_player.interact_requested.connect(_on_preview_interact_requested)
+
+	preview_camera_rig = IsoCameraRigScript.new()
+	preview_camera_rig.name = "PreviewIsoCameraRig"
+	add_child(preview_camera_rig)
+	preview_camera_rig.set_follow_target(preview_player)
+	preview_camera_rig.make_current()
+	_build_interactive_loot()
+	_build_interaction_status()
+	return _interactive_runtime_ready()
+
+
+func _ensure_preview_input_actions() -> void:
+	for action_name_variant in PREVIEW_INPUT_BINDINGS:
+		var action_name := str(action_name_variant)
+		if not InputMap.has_action(action_name):
+			InputMap.add_action(action_name)
+		var existing: Dictionary = {}
+		for event in InputMap.action_get_events(action_name):
+			if event is InputEventKey:
+				existing[int((event as InputEventKey).keycode)] = true
+		for keycode_variant in PREVIEW_INPUT_BINDINGS[action_name]:
+			var keycode := int(keycode_variant)
+			if existing.has(keycode):
+				continue
+			var input_event := InputEventKey.new()
+			input_event.keycode = keycode
+			InputMap.action_add_event(action_name, input_event)
+			existing[keycode] = true
+
+
+func _build_interactive_loot() -> void:
+	preview_loot_containers.clear()
+	var tables := LootRollerScript.load_tables()
+	for spec_variant in loader.get_loot_container_specs_copy():
+		if not spec_variant is Dictionary:
+			continue
+		var spec: Dictionary = spec_variant
+		var container_id := str(spec.get("id", ""))
+		var position_variant: Variant = spec.get("position", Vector3.INF)
+		if container_id.is_empty() or not position_variant is Vector3:
+			continue
+		var container = LootContainerScript.new()
+		container.configure(
+			container_id,
+			str(spec.get("loot_table", "generic_crate")),
+			"derelict_builder_preview:%s" % container_id,
+			preview_inventory,
+			tables,
+			position_variant,
+			1.8,
+			spec,
+		)
+		loader.add_child(container)
+		preview_loot_containers.append(container)
+
+
+func _build_interaction_status() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "PreviewInstructions"
+	add_child(layer)
+	_interaction_status = Label.new()
+	_interaction_status.name = "InteractionStatus"
+	_interaction_status.position = Vector2(18.0, 18.0)
+	_interaction_status.text = "WASD / arrows: move    E / Enter / Space: interact"
+	_interaction_status.add_theme_color_override("font_color", Color.WHITE)
+	_interaction_status.add_theme_color_override("font_shadow_color", Color.BLACK)
+	_interaction_status.add_theme_constant_override("shadow_offset_x", 2)
+	_interaction_status.add_theme_constant_override("shadow_offset_y", 2)
+	layer.add_child(_interaction_status)
+
+
+func _on_preview_interact_requested(player_body) -> void:
+	for portal in loader.get_authored_portal_nodes():
+		if not is_instance_valid(portal) or not portal.has_method("try_interact"):
+			continue
+		var result: Dictionary = portal.try_interact({}, player_body)
+		if bool(result.get("ok", false)):
+			_set_interaction_status("Portal %s: %s" % [
+				str(result.get("portal_id", "")),
+				"open" if bool(result.get("open", false)) else str(result.get("reason", "closed")),
+			])
+			return
+		if str(result.get("reason", "")) == "locked":
+			_set_interaction_status("Locked portal: requires %s" % str(result.get("needs", "key")))
+			return
+	for container in preview_loot_containers:
+		if is_instance_valid(container) and container.try_interact(player_body):
+			_set_interaction_status("Searched loot container %s" % str(container.container_id))
+			return
+	var nearest_objective = null
+	var nearest_distance := PREVIEW_INTERACTION_RADIUS
+	for objective in loader.objective_volumes:
+		if not is_instance_valid(objective) or bool(objective.get("completed")):
+			continue
+		var distance := (objective as Node3D).global_position.distance_to(player_body.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest_objective = objective
+	if nearest_objective != null:
+		nearest_objective.complete()
+		_set_interaction_status("Completed objective %s" % str(nearest_objective.get("objective_id")))
+		return
+	_set_interaction_status("Nothing in interaction range")
+
+
+func _set_interaction_status(message: String) -> void:
+	if is_instance_valid(_interaction_status):
+		_interaction_status.text = "%s\nWASD / arrows: move    E / Enter / Space: interact" % message
+
+
+func _interactive_runtime_ready() -> bool:
+	if not is_instance_valid(preview_player) or not preview_player is CharacterBody3D:
+		return false
+	if not is_instance_valid(preview_camera_rig) or preview_camera_rig.follow_target != preview_player:
+		return false
+	if preview_camera_rig.camera == null or not preview_camera_rig.camera.current:
+		return false
+	if not preview_player.interact_requested.is_connected(_on_preview_interact_requested):
+		return false
+	for action_name in PREVIEW_INPUT_BINDINGS:
+		if not InputMap.has_action(str(action_name)) or InputMap.action_get_events(str(action_name)).is_empty():
+			return false
+	return true
 
 
 func _radiation_spatial_query_ready(specs: Array) -> bool:
