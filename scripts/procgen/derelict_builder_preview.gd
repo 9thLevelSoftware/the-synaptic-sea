@@ -77,6 +77,7 @@ var preview_atmosphere_summary: Dictionary = {}
 var preview_objective_controller
 var preview_objective_interactables: Array = []
 var _interaction_status: Label
+var _atmosphere_status: Label
 var _interactive_ready := false
 
 
@@ -230,6 +231,7 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 			and preview_atmosphere_oxygen_state != null \
 			and preview_atmosphere_radiation_state != null \
 			and preview_atmosphere_temperature_state != null \
+			and is_instance_valid(_atmosphere_status) \
 			and has_meta("authored_atmosphere_runtime")
 
 	checks["portal_interaction"] = _exercise_portals(layout)
@@ -932,6 +934,14 @@ func _build_interaction_status() -> void:
 	_interaction_status.add_theme_constant_override("shadow_offset_x", 2)
 	_interaction_status.add_theme_constant_override("shadow_offset_y", 2)
 	layer.add_child(_interaction_status)
+	_atmosphere_status = Label.new()
+	_atmosphere_status.name = "AtmosphereStatus"
+	_atmosphere_status.position = Vector2(18.0, 70.0)
+	_atmosphere_status.add_theme_color_override("font_color", Color.WHITE)
+	_atmosphere_status.add_theme_color_override("font_shadow_color", Color.BLACK)
+	_atmosphere_status.add_theme_constant_override("shadow_offset_x", 2)
+	_atmosphere_status.add_theme_constant_override("shadow_offset_y", 2)
+	layer.add_child(_atmosphere_status)
 
 
 func _on_preview_interact_requested(player_body) -> void:
@@ -1294,6 +1304,13 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		if extreme_temperature and preview_atmosphere_temperature_state.temperature == temperature_before:
 			preview_player.global_position = original_position
 			return false
+		if not is_instance_valid(_atmosphere_status) \
+				or not _atmosphere_status.text.contains("Atmosphere: AUTHORED") \
+				or not _atmosphere_status.text.contains("Oxygen:") \
+				or not _atmosphere_status.text.contains("Radiation:") \
+				or not _atmosphere_status.text.contains("Temperature:"):
+			preview_player.global_position = original_position
+			return false
 		preview_player.global_position = original_position
 	if authored:
 		# Prove the same persistent models also respond when the player leaves all
@@ -1304,15 +1321,20 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		var temperature_before_exit: float = preview_atmosphere_temperature_state.temperature
 		preview_player.global_position = loader.to_global(Vector3(100000.0, 100000.0, 100000.0))
 		_tick_preview_atmosphere(1.0)
-		var oxygen_recovered: bool = oxygen_before_exit >= preview_atmosphere_oxygen_state.max_oxygen \
-				or preview_atmosphere_oxygen_state.oxygen > oxygen_before_exit
+		var oxygen_drained: bool = oxygen_before_exit <= 0.0 \
+				or preview_atmosphere_oxygen_state.oxygen < oxygen_before_exit
 		var radiation_decayed: bool = radiation_before_exit <= 0.0 \
 				or preview_atmosphere_radiation_state.radiation < radiation_before_exit
 		var temperature_offset_before := absf(temperature_before_exit - BodyTemperatureStateScript.DEFAULT_TEMPERATURE)
 		var temperature_recovered := temperature_offset_before <= 0.01 \
 				or absf(preview_atmosphere_temperature_state.temperature - BodyTemperatureStateScript.DEFAULT_TEMPERATURE) < temperature_offset_before
 		preview_player.global_position = original_position
-		if preview_atmosphere_active or not oxygen_recovered or not radiation_decayed or not temperature_recovered:
+		if preview_atmosphere_active \
+				or not oxygen_drained \
+				or not radiation_decayed \
+				or not temperature_recovered \
+				or not is_instance_valid(_atmosphere_status) \
+				or not _atmosphere_status.text.contains("Atmosphere: FIELD"):
 			return false
 	return true if authored else not _has_authored_atmosphere(layout)
 
@@ -1341,7 +1363,7 @@ func _tick_preview_atmosphere(delta: float) -> void:
 	preview_atmosphere_active = not atmosphere.is_empty()
 	var multiplier: float = loader.get_authored_atmosphere_drain_multiplier_at(local_position)
 	preview_atmosphere_oxygen_state.tick(delta, {
-		"field_atmosphere": preview_atmosphere_active,
+		"field_atmosphere": true,
 		"field_atmosphere_multiplier": multiplier,
 	})
 	preview_atmosphere_radiation_state.configure({
@@ -1364,6 +1386,15 @@ func _apply_preview_atmosphere_state(atmosphere: Dictionary) -> void:
 		"temperature": preview_atmosphere_temperature_state.get_summary(),
 	}
 	set_meta("authored_atmosphere_runtime", preview_atmosphere_summary.duplicate(true))
+	if is_instance_valid(_atmosphere_status):
+		_atmosphere_status.text = "Atmosphere: %s\nOxygen: %.1f / %.1f\nRadiation: %.1f / %.1f\nTemperature: %.1f C" % [
+			"AUTHORED" if preview_atmosphere_active else "FIELD",
+			preview_atmosphere_oxygen_state.oxygen,
+			preview_atmosphere_oxygen_state.max_oxygen,
+			preview_atmosphere_radiation_state.radiation,
+			preview_atmosphere_radiation_state.max_radiation,
+			preview_atmosphere_temperature_state.temperature,
+		]
 
 
 func _room_has_authored_atmosphere(room: Dictionary) -> bool:
