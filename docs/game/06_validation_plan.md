@@ -86,6 +86,42 @@ Expected:
 
 `seed=` on the same line is informational. Do not pin `seed=42`.
 
+## Derelict builder manifest runtime preview (REQ-PCG-BUILDER-001)
+
+Feature: `docs/game/features/derelict_builder_runtime_preview.md`. The preview is local/offline and enters through `GeneratedShipLoader`; it must instantiate actual wrappers and runtime consumers.
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+MANIFEST="${DERELICT_BUILDER_MANIFEST:?set DERELICT_BUILDER_MANIFEST to a validated derelict_builder_bundle manifest}"
+"$GODOT" --headless --path "$ROOT" res://scenes/procgen/derelict_builder_preview.tscn -- --manifest "$MANIFEST"
+```
+
+Expected marker:
+
+`DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`
+
+The smoke also writes machine-readable result JSON and exits non-zero for manifest/path/load/validation/runtime failures. `legion status --json` currently reports `migration_required` for `.legion/tmp`; no live board card was created for this change.
+
+The self-contained regression smoke, which constructs a temporary fixture bundle and launches the scene above, is:
+
+```bash
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_builder_preview_smoke.gd
+```
+
+Expected marker: `DERELICT BUILDER PREVIEW SMOKE PASS`.
+
+Runtime-consumer regressions:
+
+```bash
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/builder_authored_portals_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/builder_placed_props_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/builder_authored_runtime_fields_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/builder_playable_runtime_fields_smoke.gd
+```
+
+These require clean `BUILDER AUTHORED PORTALS PASS`, `BUILDER PLACED PROPS PASS`, `BUILDER AUTHORED RUNTIME FIELDS PASS`, and `BUILDER PLAYABLE RUNTIME FIELDS PASS` markers with no unexpected Godot errors or warnings.
+
 ## Regression bundle
 
 ```bash

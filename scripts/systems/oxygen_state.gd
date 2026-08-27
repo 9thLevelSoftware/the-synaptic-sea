@@ -116,6 +116,7 @@ func configure(config: Dictionary) -> void:
 func tick(delta_seconds: float, context = null) -> bool:
 	var player_in_breach_zone: bool = false
 	var field_atmosphere: bool = false
+	var field_atmosphere_multiplier: float = 1.0
 	var fire_oxygen_drain: float = 0.0  # Fire B2: extra O2/s from active fires
 	if context is bool:
 		# Legacy positional form: tick(delta, bool). Preserved so the
@@ -126,12 +127,14 @@ func tick(delta_seconds: float, context = null) -> bool:
 			player_in_breach_zone = bool(context["player_in_breach_zone"])
 		if context.has("field_atmosphere"):
 			field_atmosphere = bool(context["field_atmosphere"])
+		if context.has("field_atmosphere_multiplier"):
+			field_atmosphere_multiplier = clampf(float(context["field_atmosphere_multiplier"]), 0.0, 1.0)
 		if context.has("fire_oxygen_drain"):
 			fire_oxygen_drain = maxf(0.0, float(context["fire_oxygen_drain"]))
 	last_player_in_breach_zone = player_in_breach_zone or field_atmosphere
 	if delta_seconds <= 0.0:
 		effective_drain_rate = drain_rate * (
-			_compute_field_drain_multiplier() if field_atmosphere else _compute_drain_multiplier()
+			_compute_field_drain_multiplier() * field_atmosphere_multiplier if field_atmosphere else _compute_drain_multiplier()
 		)
 		return false
 	var changed: bool = false
@@ -143,7 +146,7 @@ func tick(delta_seconds: float, context = null) -> bool:
 	)
 	if draining:
 		var multiplier: float = (
-			_compute_field_drain_multiplier() if field_atmosphere else _compute_drain_multiplier()
+			_compute_field_drain_multiplier() * field_atmosphere_multiplier if field_atmosphere else _compute_drain_multiplier()
 		)
 		effective_drain_rate = drain_rate * multiplier
 		var drained: float = effective_drain_rate * delta_seconds

@@ -1744,3 +1744,21 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN
 
+---
+
+# Derelict builder runtime preview
+
+## REQ-PCG-BUILDER-001: Builder bundles must pass the real local runtime preview
+
+- Source: `features/derelict_builder_runtime_preview.md`, ADR-0057
+- Type: technical / gameplay
+- Priority: must
+- Status: Approved
+- Rationale: A builder export is not working until the Synaptic Sea loads the authored area through `GeneratedShipLoader` and observes its runtime behavior.
+- Acceptance criteria:
+  - A validated `derelict_builder_bundle` manifest resolves layout, gameplay-slice, and kit paths relative to the manifest, while preserving an absolute kit path.
+  - Actual structural wrappers provide collision and navigation; vertical links, objectives, authored props, loot, fire, arc, breach, radiation, and authored atmosphere have observable consumers.
+  - Missing or unsupported runtime semantics fail readiness and produce machine-readable result JSON plus a non-zero exit code.
+- Verification:
+  - Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`.
+

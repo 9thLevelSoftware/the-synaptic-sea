@@ -6131,6 +6131,33 @@ func _try_bypass_nearest_hatch() -> bool:
 	return false
 
 
+func _try_authored_portal_interact(player_body: PlayerController) -> bool:
+	if not is_instance_valid(player_body) or current_ship == null:
+		return false
+	var active_loader = current_ship.scene_root
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_authored_portal_nodes"):
+		return false
+	var flags: Dictionary = utility_item_state.active_flags if utility_item_state != null else {}
+	for portal in active_loader.get_authored_portal_nodes():
+		if not is_instance_valid(portal) or not portal.has_method("try_interact"):
+			continue
+		var result: Dictionary = portal.try_interact(flags, player_body)
+		if bool(result.get("ok", false)):
+			if str(portal.portal_kind) == "LOCKED" and bool(result.get("open", false)) \
+					and utility_item_state != null:
+				utility_item_state.consume_flag(str(portal.required_flag()))
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(
+					AudioEventSeamScript.SFX_DOOR_OPEN if bool(result.get("open", false)) \
+					else AudioEventSeamScript.SFX_DOOR_CLOSE,
+					portal.global_position)
+			return true
+		if str(result.get("reason", "")) == "locked":
+			_emit_hatch_bypass_denied_sfx()
+			return true
+	return false
+
+
 func _emit_hatch_bypass_denied_sfx() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
@@ -7842,6 +7869,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for lc in loot_containers:
 			if is_instance_valid(lc) and lc.try_interact(player_body):
 				return
+		# Builder-authored doors/hatches/breaches live on the active loader and
+		# participate in the same player interaction request as other derelict affordances.
+		if _try_authored_portal_interact(player_body):
+			return
 		# Domain 5: sealed hatch bypass (lockpick/hack_chip flag required).
 		if _try_bypass_nearest_hatch():
 			return
@@ -8576,6 +8607,16 @@ func _tick_survival_attrition(delta: float) -> void:
 	# a derelict OR when the hub hull is breached. Mirrors radiation's prior in_rad.
 	var breach_open: bool = oxygen_state != null and oxygen_state.get_summary().get("breach_open", false)
 	var in_hazard_env: bool = away_from_start or breach_open
+	var in_authored_radiation: Variant = null
+	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if away_from_start and is_instance_valid(authored_loader) \
+			and authored_loader.has_method("get_radiation_zone_specs") \
+			and authored_loader.has_method("get_radiation_zone_at"):
+		var authored_radiation_specs: Array = authored_loader.get_radiation_zone_specs()
+		if not authored_radiation_specs.is_empty() and is_instance_valid(player) and player is Node3D:
+			var authored_radiation: Dictionary = authored_loader.get_radiation_zone_at(
+				authored_loader.to_local((player as Node3D).global_position))
+			in_authored_radiation = not authored_radiation.is_empty()
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8623,7 +8664,10 @@ func _tick_survival_attrition(delta: float) -> void:
 	_check_vitals_death()
 	# Advance the environmental sources AFTER the vitals read (preserves prior order).
 	if radiation_state != null:
-		radiation_state.in_radiation_zone = in_hazard_env
+		# Authored radiation zones replace the legacy ship-wide away hazard when
+		# they exist. Layouts without authored zones retain the prior behavior.
+		radiation_state.in_radiation_zone = bool(in_authored_radiation) \
+			if in_authored_radiation != null else in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
 		body_temperature_state.in_extreme_zone = in_hazard_env
@@ -8806,8 +8850,17 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	if afs_o2 != null and afs_o2.has_method("get_total_intensity"):
 		fire_o2 = FIRE_OXYGEN_DRAIN_PER_INTENSITY * float(afs_o2.get_total_intensity())
 	if _is_field_suit_pressure_active():
+		var authored_atmosphere_multiplier: float = 1.0
+		var atmosphere_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+		if is_instance_valid(atmosphere_loader) \
+				and atmosphere_loader.has_method("get_authored_atmosphere_drain_multiplier_at") \
+				and is_instance_valid(player) and player is Node3D:
+			authored_atmosphere_multiplier = float(
+				atmosphere_loader.get_authored_atmosphere_drain_multiplier_at(
+					atmosphere_loader.to_local((player as Node3D).global_position)))
 		oxygen_state.tick(delta_seconds, {
 			"field_atmosphere": true,
+			"field_atmosphere_multiplier": authored_atmosphere_multiplier,
 			"player_in_breach_zone": false,
 			"fire_oxygen_drain": fire_o2,
 		})
