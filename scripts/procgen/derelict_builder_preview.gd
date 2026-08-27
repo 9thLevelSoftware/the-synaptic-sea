@@ -119,7 +119,7 @@ func _validate_hash(errors: Array[String], path: String, expected: String, label
 func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var checks := {
-		"structural_collision": loader.count_collision_shapes() > 0,
+		"structural_collision": loader.structural_root != null and _structural_wrappers_have_collision(loader.structural_root),
 		"navigation": _navigation_path_exists(loader.get_goal_position()),
 		"objectives": _exercise_objectives(),
 		"loot": _exercise_loot(gameplay),
@@ -203,6 +203,29 @@ func _hazard_id_counts(specs: Array) -> Dictionary:
 		if not id.is_empty():
 			counts[id] = int(counts.get(id, 0)) + 1
 	return counts
+
+
+func _structural_wrappers_have_collision(root: Node3D) -> bool:
+	if root == null:
+		return false
+	var wrappers: Array[Node] = root.find_children("*", "Node3D", true, false)
+	var required_count := 0
+	for candidate in wrappers:
+		if not candidate.has_meta("structural_kind"):
+			continue
+		required_count += 1
+		if not _has_collision_shape(candidate):
+			return false
+	return required_count > 0
+
+
+func _has_collision_shape(node: Node) -> bool:
+	if node is CollisionShape3D and (node as CollisionShape3D).shape != null:
+		return true
+	for child in node.get_children():
+		if _has_collision_shape(child):
+			return true
+	return false
 
 
 func _radiation_spatial_query_ready(specs: Array) -> bool:

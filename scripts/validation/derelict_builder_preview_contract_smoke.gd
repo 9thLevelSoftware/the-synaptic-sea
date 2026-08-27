@@ -20,6 +20,19 @@ func _initialize() -> void:
 	unwritable_preview.result_path = ProjectSettings.globalize_path(_root.path_join("missing_result_dir/result.json"))
 	if unwritable_preview._write_result({"ok": true}):
 		_fail("unwritable preview result path was accepted")
+	var collision_preview := PreviewScript.new()
+	var structural_root := Node3D.new()
+	var missing_collision_wrapper := Node3D.new()
+	missing_collision_wrapper.set_meta("structural_kind", "FLOOR")
+	structural_root.add_child(missing_collision_wrapper)
+	if collision_preview._structural_wrappers_have_collision(structural_root):
+		_fail("structural wrapper without collision was accepted")
+	var collision_shape := CollisionShape3D.new()
+	collision_shape.shape = BoxShape3D.new()
+	missing_collision_wrapper.add_child(collision_shape)
+	if not collision_preview._structural_wrappers_have_collision(structural_root):
+		_fail("structural wrapper collision was not recognized")
+	structural_root.free()
 	var source_path := _write("source.json", {"document_kind": "golden_area"})
 	var layout_path := _write("layout.json", {"schema_version": "layout", "kit_id": "kit_a"})
 	var gameplay_path := _write("gameplay.json", {"schema_version": "gameplay"})
