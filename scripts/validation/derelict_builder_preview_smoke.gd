@@ -125,6 +125,9 @@ func _poll_child() -> void:
 				if not bool(checks.get(check, false)):
 					_fail("preview core check failed: %s" % check)
 					return
+			if not bool(checks.get("fire_scene_consumer", false)):
+				_fail("preview fire scene consumer was not burning and visible")
+				return
 			print("DERELICT BUILDER PREVIEW SMOKE PASS checks=%d bundle=%s" % [REQUIRED_CHECKS.size(), _bundle_dir])
 			quit(0)
 			return

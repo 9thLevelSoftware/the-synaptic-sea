@@ -26,6 +26,8 @@ const PREVIEW_HUD_HINT := "WASD / arrows: move    E / Enter / Space: interact"
 const PREVIEW_ARC_COLLISION_SIZE := Vector3(2.6, 2.2, 1.6)
 const PREVIEW_ARC_DISCHARGED_COLOR := Color(0.35, 0.85, 1.0, 0.35)
 const PREVIEW_ARC_ARCING_COLOR := Color(0.95, 0.32, 1.0, 0.82)
+const PREVIEW_FIRE_SIZE := Vector3(1.8, 1.2, 1.8)
+const PREVIEW_FIRE_COLOR := Color(1.0, 0.28, 0.05, 0.82)
 const PREVIEW_INPUT_BINDINGS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -55,6 +57,8 @@ var preview_inventory
 var preview_loot_containers: Array = []
 var preview_arc_state
 var preview_arc_zones: Array[StaticBody3D] = []
+var preview_fire_state
+var preview_fire_zones: Array[Area3D] = []
 var preview_objective_controller
 var preview_objective_interactables: Array = []
 var _interaction_status: Label
@@ -106,13 +110,18 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The builder preview is a real playable scene, so authored arcs continue
-	# cycling while the user walks around instead of being represented only by
-	# a one-shot acceptance model.
+	# The builder preview is a real playable scene, so authored arcs and fires
+	# continue synchronizing while the user walks around instead of being
+	# represented only by a one-shot acceptance model.
 	if preview_arc_state == null or preview_arc_zones.is_empty():
-		return
-	preview_arc_state.tick(delta)
-	_apply_preview_arc_state()
+		if preview_fire_state == null or preview_fire_zones.is_empty():
+			return
+	if preview_arc_state != null and not preview_arc_zones.is_empty():
+		preview_arc_state.tick(delta)
+		_apply_preview_arc_state()
+	if preview_fire_state != null and not preview_fire_zones.is_empty():
+		preview_fire_state.tick(delta, {})
+		_apply_preview_fire_state()
 
 
 func _validate_manifest(manifest: Dictionary) -> Array[String]:
@@ -173,12 +182,8 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		checks[hazard_name] = bool(hazard_materialization[hazard_name])
 		if not bool(checks[hazard_name]):
 			errors.append("authored %s hazard was not fully materialized" % hazard_name)
-	var fire_specs: Array = loader.get_fire_zone_specs()
-	var fire_state = FireStateScript.new()
-	if bool(checks["fire"]) and not fire_specs.is_empty():
-		var fire_room := str(fire_specs[0].get("compartment_id", fire_specs[0].get("from_room", "authored_fire")))
-		fire_state.configure({"compartments": [fire_room]})
-		checks["fire"] = bool(checks["fire"]) and fire_state.ignite(fire_room, 1.0) and fire_state.is_burning(fire_room)
+	checks["fire_scene_consumer"] = _exercise_preview_fire_runtime()
+	checks["fire"] = bool(checks["fire"]) and bool(checks["fire_scene_consumer"])
 
 	var arc_ready: bool = _exercise_preview_arc_runtime()
 	checks["arc"] = bool(checks["arc"]) and arc_ready
@@ -283,6 +288,7 @@ func _setup_interactive_runtime() -> bool:
 	preview_camera_rig.set_follow_target(preview_player)
 	preview_camera_rig.make_current()
 	_build_preview_objective_runtime()
+	_build_preview_fire_runtime()
 	_build_preview_arc_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
@@ -337,6 +343,118 @@ func _on_preview_objective_completed(
 		_objective_type: String, _room_id: String, step_id: String) -> void:
 	if preview_objective_controller != null:
 		preview_objective_controller.complete(sequence, step_id)
+
+
+func _build_preview_fire_runtime() -> void:
+	preview_fire_zones.clear()
+	preview_fire_state = FireStateScript.new()
+	if not is_instance_valid(loader):
+		return
+	var specs: Array = loader.get_fire_zone_specs()
+	var markers: Array[Vector3] = loader.get_fire_zone_markers()
+	var compartments: Array[String] = []
+	if specs.size() != markers.size():
+		return
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary) or markers[index] == Vector3.INF:
+			continue
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_fire_%d" % index)))
+		var compartment_id := str(spec.get("compartment_id", spec.get("from_room", zone_id)))
+		if compartment_id.is_empty():
+			continue
+		if not compartments.has(compartment_id):
+			compartments.append(compartment_id)
+		var zone := Area3D.new()
+		zone.name = "BuilderPreviewFire_%s" % zone_id
+		# Match the production fire consumer: retain a spatial lookup shape while
+		# keeping the visual hazard passable and non-monitoring.
+		zone.monitoring = false
+		zone.monitorable = false
+		zone.position = markers[index]
+		zone.collision_layer = 0
+		zone.collision_mask = 0
+		zone.set_meta("fire_zone_id", zone_id)
+		zone.set_meta("fire_zone_kind", str(spec.get("kind", "fire")))
+		zone.set_meta("fire_compartment_id", compartment_id)
+		zone.set_meta("fire_zone_passable", true)
+		zone.set_meta("fire_zone_visible", true)
+		var collision := CollisionShape3D.new()
+		collision.name = "BuilderPreviewFireCollision"
+		var sphere := SphereShape3D.new()
+		sphere.radius = 2.0
+		collision.shape = sphere
+		zone.add_child(collision)
+		var visual := MeshInstance3D.new()
+		visual.name = "BuilderPreviewFireVisual"
+		var mesh := SphereMesh.new()
+		mesh.radius = PREVIEW_FIRE_SIZE.x * 0.5
+		mesh.height = PREVIEW_FIRE_SIZE.y
+		visual.mesh = mesh
+		visual.material_override = _preview_fire_material()
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		visual.position = Vector3(0.0, PREVIEW_FIRE_SIZE.y * 0.5, 0.0)
+		zone.add_child(visual)
+		loader.add_child(zone)
+		preview_fire_zones.append(zone)
+	preview_fire_state.configure({"compartments": compartments})
+	for zone in preview_fire_zones:
+		preview_fire_state.ignite(str(zone.get_meta("fire_compartment_id")), 1.0)
+	_apply_preview_fire_state()
+
+
+func _preview_fire_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = PREVIEW_FIRE_COLOR
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.08, 0.0)
+	material.emission_energy_multiplier = 1.5
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+func _apply_preview_fire_state() -> void:
+	if preview_fire_state == null:
+		return
+	for zone in preview_fire_zones:
+		if not is_instance_valid(zone):
+			continue
+		var compartment_id := str(zone.get_meta("fire_compartment_id", ""))
+		var burning: bool = preview_fire_state.is_burning(compartment_id)
+		zone.set_meta("fire_zone_burning", burning)
+		zone.set_meta("fire_zone_intensity", preview_fire_state.get_intensity(compartment_id))
+		zone.set_meta("fire_zone_visible", burning)
+		for child in zone.get_children():
+			if child is MeshInstance3D:
+				(child as MeshInstance3D).visible = burning
+
+
+func _exercise_preview_fire_runtime() -> bool:
+	var specs: Array = loader.get_fire_zone_specs()
+	if specs.is_empty():
+		return true
+	if preview_fire_state == null or preview_fire_zones.size() != specs.size():
+		return false
+	for index in range(specs.size()):
+		if not (specs[index] is Dictionary):
+			return false
+		var spec: Dictionary = specs[index]
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_fire_%d" % index)))
+		var matches := preview_fire_zones.filter(func(zone: Area3D) -> bool: return str(zone.get_meta("fire_zone_id", "")) == zone_id)
+		if matches.size() != 1:
+			return false
+		var zone: Area3D = matches[0]
+		var collision := zone.get_node_or_null("BuilderPreviewFireCollision") as CollisionShape3D
+		var visual := zone.get_node_or_null("BuilderPreviewFireVisual") as MeshInstance3D
+		if not zone.get_meta("fire_zone_passable", false) or not zone.get_meta("fire_zone_visible", false):
+			return false
+		if zone.monitoring or zone.monitorable or collision == null or collision.shape == null or visual == null or visual.mesh == null:
+			return false
+		if not preview_fire_state.is_burning(str(zone.get_meta("fire_compartment_id", ""))):
+			return false
+	return true
 
 
 func _build_preview_arc_runtime() -> void:
