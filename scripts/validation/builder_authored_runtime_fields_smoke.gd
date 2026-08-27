@@ -25,13 +25,15 @@ func _initialize() -> void:
 		_fail("fixture has no floor placements")
 		return
 	var position := _vec3(placements[0].get("position", []))
+	var from_cell := _cell3(placements[0])
+	var to_cell: Array = [2, 0, 0]
 	layout["radiation_zones"] = [{
 		"id": "builder_radiation_01",
 		"kind": "radiation",
 		"from_room": room_id,
-		"to_room": room_id,
-		"from_cell": _cell3(placements[0]),
-		"to_cell": _cell3(placements[0]),
+		"to_room": "corridor_01",
+		"from_cell": from_cell,
+		"to_cell": to_cell,
 	}]
 
 	var loader = LoaderScript.new()
@@ -49,6 +51,24 @@ func _initialize() -> void:
 	var queried_radiation: Dictionary = loader.get_radiation_zone_at(radiation_markers[0])
 	if str(queried_radiation.get("zone_id", "")) != "builder_radiation_01":
 		_fail("radiation spatial query missed its authored volume")
+		return
+	var radiation_segments: Array = loader.get_radiation_zone_segments()
+	if radiation_segments.size() != 1 or not radiation_segments[0] is Dictionary:
+		_fail("radiation zone endpoint segment was not materialized")
+		return
+	var radiation_segment: Dictionary = radiation_segments[0]
+	var radiation_from: Vector3 = radiation_segment["from"]
+	var radiation_to: Vector3 = radiation_segment["to"]
+	if radiation_from.distance_to(radiation_to) <= 5.0:
+		_fail("radiation regression segment was not longer than five meters")
+		return
+	for endpoint in [radiation_from, radiation_to, radiation_from.lerp(radiation_to, 0.5)]:
+		if loader.get_radiation_zone_at(endpoint, 0.1).is_empty():
+			_fail("radiation query missed a point on the authored endpoint segment")
+			return
+	var outward: Vector3 = (radiation_to - radiation_from).normalized()
+	if not loader.get_radiation_zone_at(radiation_to + outward * 3.0).is_empty():
+		_fail("radiation query extended beyond the authored endpoint span")
 		return
 	var rad = RadiationStateScript.new()
 	rad.configure({"in_radiation_zone": not queried_radiation.is_empty()})

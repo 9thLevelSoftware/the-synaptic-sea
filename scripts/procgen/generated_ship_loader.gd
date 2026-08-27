@@ -38,6 +38,7 @@ var arc_zone_markers: Array[Vector3] = []
 var arc_zone_specs: Array = []
 var radiation_zone_markers: Array[Vector3] = []
 var radiation_zone_specs: Array = []
+var radiation_zone_segments: Array = []
 var authored_atmosphere_specs: Array = []
 var authored_atmosphere_volumes: Array[Area3D] = []
 var placed_prop_specs: Array = []
@@ -74,6 +75,7 @@ func clear_loaded_ship() -> void:
 	arc_zone_specs = []
 	radiation_zone_markers = []
 	radiation_zone_specs = []
+	radiation_zone_segments = []
 	authored_atmosphere_specs = []
 	authored_atmosphere_volumes = []
 	placed_prop_specs = []
@@ -1611,6 +1613,7 @@ func _add_radiation_zone_markers(source_layout: Dictionary, ship_root: Node3D) -
 		var midpoint: Vector3 = (from_pos + to_pos) * 0.5
 		radiation_zone_markers.append(midpoint)
 		radiation_zone_specs.append(_normalize_zone_spec(zone))
+		radiation_zone_segments.append({"from": from_pos, "to": to_pos})
 		var length: float = maxf(2.0, from_pos.distance_to(to_pos) + 2.0)
 		ship_root.add_child(_make_trigger_volume(
 			"RadiationZone_%s" % str(zone.get("id", radiation_zone_markers.size() - 1)), midpoint,
@@ -1853,16 +1856,37 @@ func get_radiation_zone_specs() -> Array:
 	return radiation_zone_specs.duplicate(true)
 
 
+func get_radiation_zone_segments() -> Array:
+	return radiation_zone_segments.duplicate(true)
+
+
 func get_radiation_zone_at(local_position: Vector3, radius: float = 2.5) -> Dictionary:
 	var best: Dictionary = {}
 	var best_distance: float = maxf(0.0, radius)
 	for index in range(radiation_zone_markers.size()):
-		var distance: float = local_position.distance_to(radiation_zone_markers[index])
+		var distance: float = INF
+		if index < radiation_zone_segments.size() and radiation_zone_segments[index] is Dictionary:
+			var segment: Dictionary = radiation_zone_segments[index]
+			var from_pos: Variant = segment.get("from", Vector3.INF)
+			var to_pos: Variant = segment.get("to", Vector3.INF)
+			if from_pos is Vector3 and to_pos is Vector3:
+				distance = _distance_to_segment(local_position, from_pos, to_pos)
+		if not is_finite(distance):
+			distance = local_position.distance_to(radiation_zone_markers[index])
 		if distance <= best_distance:
 			best_distance = distance
 			if index < radiation_zone_specs.size() and radiation_zone_specs[index] is Dictionary:
 				best = (radiation_zone_specs[index] as Dictionary).duplicate(true)
 	return best
+
+
+func _distance_to_segment(point: Vector3, from_pos: Vector3, to_pos: Vector3) -> float:
+	var segment: Vector3 = to_pos - from_pos
+	var segment_length_squared: float = segment.length_squared()
+	if segment_length_squared <= 0.000001:
+		return point.distance_to(from_pos)
+	var projection: float = clampf((point - from_pos).dot(segment) / segment_length_squared, 0.0, 1.0)
+	return point.distance_to(from_pos + segment * projection)
 
 
 func get_authored_atmosphere_at(local_position: Vector3) -> Dictionary:

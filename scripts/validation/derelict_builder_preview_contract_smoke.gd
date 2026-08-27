@@ -7,9 +7,10 @@ var _root := ""
 
 func _initialize() -> void:
 	var loot_tables := PreviewScript.LootRollerScript.load_tables()
-	if not PreviewScript.new()._loot_table_can_roll("generic_crate", loot_tables):
+	var preview_loot := PreviewScript.LootDistributionScript.roll("generic_crate", "preview_contract", loot_tables, {})
+	if preview_loot.is_empty():
 		_fail("authoritative loot catalog rejected generic_crate")
-	if PreviewScript.new()._loot_table_can_roll("missing_preview_table", loot_tables):
+	if not PreviewScript.LootDistributionScript.roll("missing_preview_table", "preview_contract", loot_tables, {}).is_empty():
 		_fail("missing loot table reference was accepted")
 	_root = "user://derelict_builder_preview_contract_%d" % Time.get_ticks_usec()
 	if not DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_root)) in [OK, ERR_ALREADY_EXISTS]:

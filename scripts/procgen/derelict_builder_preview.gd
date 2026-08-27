@@ -13,6 +13,9 @@ const LootDistributionScript := preload("res://scripts/systems/loot_distribution
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
+# Navigation snapping is allowed to absorb tiny authoring/mesh quantization
+# differences, but a distant point must not be treated as walkable.
+const NAVIGATION_SNAP_TOLERANCE := 0.75
 const REQUIRED_CHECKS: Array[String] = [
 	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
 	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
@@ -121,7 +124,7 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		"objectives": _exercise_objectives(),
 		"loot": _exercise_loot(gameplay),
 		"props": loader.get_placed_prop_specs_copy().size() == _array(gameplay.get("placed_props", [])).size(),
-		"vertical_links": int(_ship_summary.get("vertical_link_count", -1)) == _array(layout.get("vertical_connections", [])).size(),
+		"vertical_links": _exercise_vertical_links(layout),
 	}
 	var hazard_materialization := _hazard_materialization_checks(layout)
 	for hazard_name in hazard_materialization:
@@ -212,14 +215,44 @@ func _navigation_path_exists(local_target: Vector3) -> bool:
 		return false
 	var start_world: Vector3 = loader.to_global(loader.get_start_transform().origin)
 	var target_world: Vector3 = loader.to_global(local_target)
+	return _navigation_path_between_world(navigation_map, start_world, target_world)
+
+
+func _navigation_path_between_world(navigation_map: RID, start_world: Vector3, target_world: Vector3) -> bool:
+	if not navigation_map.is_valid():
+		return false
 	var start_on_map := NavigationServer3D.map_get_closest_point(navigation_map, start_world)
 	var target_on_map := NavigationServer3D.map_get_closest_point(navigation_map, target_world)
+	if start_world.distance_to(start_on_map) > NAVIGATION_SNAP_TOLERANCE \
+			or target_world.distance_to(target_on_map) > NAVIGATION_SNAP_TOLERANCE:
+		return false
 	var path := NavigationServer3D.map_get_path(navigation_map, start_on_map, target_on_map, true)
 	if path.size() >= 2:
 		return true
 	# A one-room document may intentionally use the same start and goal. Only
 	# that authored coincidence may accept a zero-length navigation path.
-	return start_world.distance_to(target_world) <= 0.05 and start_on_map.distance_to(target_on_map) <= 0.05
+	return start_world.distance_to(target_world) <= 0.05
+
+
+func _exercise_vertical_links(layout: Dictionary) -> bool:
+	var authored_links := _array(layout.get("vertical_connections", []))
+	var expected_count := authored_links.size()
+	var links: Array[Node] = loader.structural_root.find_children("VerticalLink_*", "NavigationLink3D", true, false)
+	if int(_ship_summary.get("vertical_link_count", -1)) != expected_count or links.size() != expected_count:
+		return false
+	var region := loader.structural_root.find_child("GameplayNavigationRegion", true, false) as NavigationRegion3D
+	if region == null:
+		return expected_count == 0
+	var navigation_map: RID = region.get_navigation_map()
+	for link_variant in links:
+		var link := link_variant as NavigationLink3D
+		if link == null:
+			return false
+		var start_world := link.to_global(link.start_position)
+		var end_world := link.to_global(link.end_position)
+		if not _navigation_path_between_world(navigation_map, start_world, end_world):
+			return false
+	return true
 
 
 func _wait_for_navigation_sync() -> bool:
@@ -279,21 +312,22 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 		var has_authored_contents: bool = spec.has("contents") and typeof(spec.get("contents")) == TYPE_ARRAY
 		var table_id := str(spec.get("loot_table", ""))
 		var seed_source := "derelict_builder_preview"
-		if not has_authored_contents:
-			if not _loot_table_can_roll(table_id, loot_tables):
-				return false
-			# Verify that the authoritative distribution path produces an observable
-			# grant for this authored table before accepting the interaction.
-			if LootDistributionScript.roll(table_id, seed_source, loot_tables, spec).is_empty():
-				return false
 		var expected_contents: Array = LootContainerScript.normalized_contents(spec) if spec.has("contents") else []
-		var expected_roll: Array = [] if has_authored_contents else LootDistributionScript.roll(table_id, seed_source, loot_tables, spec)
+		# Roll table-backed loot once here to establish the deterministic expected
+		# grant. The container uses the same seed and catalog for the runtime roll.
+		var expected_roll: Array = []
+		if not has_authored_contents:
+			expected_roll = LootDistributionScript.roll(table_id, seed_source, loot_tables, spec)
+			# An unknown, empty, or invalid table is not a runnable authored branch.
+			if expected_roll.is_empty():
+				return false
 		var inventory = InventoryStateScript.new()
 		var inventory_before: Dictionary = {}
-		for entry_variant in expected_roll:
-			if entry_variant is Dictionary:
-				var entry: Dictionary = entry_variant
-				inventory_before[str(entry.get("item_id", ""))] = 0
+		if not has_authored_contents:
+			for entry_variant in expected_roll:
+				if entry_variant is Dictionary:
+					var entry: Dictionary = entry_variant
+					inventory_before[str(entry.get("item_id", ""))] = 0
 		var container = LootContainerScript.new()
 		var player := Node3D.new()
 		add_child(container)
@@ -328,30 +362,6 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 		if not accepted:
 			return false
 	return true
-
-
-func _loot_table_can_roll(table_id: String, loot_tables: Dictionary) -> bool:
-	if table_id.is_empty() or not loot_tables.has(table_id):
-		return false
-	var table_variant: Variant = loot_tables.get(table_id)
-	if not (table_variant is Dictionary):
-		return false
-	var table: Dictionary = table_variant
-	var entries_variant: Variant = table.get("entries", [])
-	if not (entries_variant is Array) or (entries_variant as Array).is_empty():
-		return false
-	for entry_variant in entries_variant as Array:
-		if not (entry_variant is Dictionary):
-			continue
-		var entry: Dictionary = entry_variant
-		if str(entry.get("item_id", "")).is_empty() or float(entry.get("weight", 1.0)) <= 0.0:
-			continue
-		if int(entry.get("qty_max", entry.get("qty_min", 1))) <= 0:
-			continue
-		return true
-	return false
-
-
 func _exercise_portals(layout: Dictionary) -> bool:
 	var nodes: Array[Area3D] = loader.get_authored_portal_nodes()
 	if nodes.size() != _structural_portal_count(layout):
