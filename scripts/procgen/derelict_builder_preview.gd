@@ -226,9 +226,9 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	checks["breach_scene_consumer"] = _exercise_preview_breach_runtime()
 	checks["breach"] = bool(checks["breach"]) and bool(checks["breach_scene_consumer"])
 
-	var atmosphere_probe_before := _preview_atmosphere_model_summaries()
+	var atmosphere_probe_before := _preview_atmosphere_handoff_state()
 	checks["atmosphere"] = _exercise_atmosphere(layout)
-	var atmosphere_probe_after := _preview_atmosphere_model_summaries()
+	var atmosphere_probe_after := _preview_atmosphere_handoff_state()
 	checks["atmosphere_probe_state_pristine"] = atmosphere_probe_before == atmosphere_probe_after
 	checks["atmosphere_scene_consumer"] = checks["atmosphere"] \
 			and preview_atmosphere_oxygen_state != null \
@@ -322,6 +322,10 @@ func _setup_interactive_runtime() -> bool:
 	_build_preview_atmosphere_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
+	if preview_atmosphere_oxygen_state != null:
+		# Prime player-facing atmosphere state without advancing any survival
+		# model, so acceptance can restore an exact interactive handoff snapshot.
+		_tick_preview_atmosphere(0.0)
 	return _interactive_runtime_ready()
 
 
@@ -1283,6 +1287,9 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 			if preview_atmosphere_temperature_state != null else {}
 	var saved_active := preview_atmosphere_active
 	var saved_summary := preview_atmosphere_summary.duplicate(true)
+	var saved_has_runtime_metadata := has_meta("authored_atmosphere_runtime")
+	var saved_runtime_metadata: Variant = get_meta("authored_atmosphere_runtime", null)
+	var saved_status_text := _atmosphere_status.text if is_instance_valid(_atmosphere_status) else ""
 	var accepted := _exercise_atmosphere_probe(layout)
 	if preview_atmosphere_oxygen_state != null:
 		preview_atmosphere_oxygen_state.apply_summary(saved_oxygen)
@@ -1294,9 +1301,12 @@ func _exercise_atmosphere(layout: Dictionary) -> bool:
 		preview_atmosphere_temperature_state.apply_summary(saved_temperature)
 	preview_atmosphere_active = saved_active
 	preview_atmosphere_summary = saved_summary
-	if preview_atmosphere_oxygen_state != null and preview_atmosphere_radiation_state != null \
-			and preview_atmosphere_temperature_state != null:
-		_apply_preview_atmosphere_state(saved_summary.get("atmosphere", {}))
+	if saved_has_runtime_metadata:
+		set_meta("authored_atmosphere_runtime", saved_runtime_metadata)
+	elif has_meta("authored_atmosphere_runtime"):
+		remove_meta("authored_atmosphere_runtime")
+	if is_instance_valid(_atmosphere_status):
+		_atmosphere_status.text = saved_status_text
 	return accepted
 
 
@@ -1368,11 +1378,16 @@ func _exercise_atmosphere_probe(layout: Dictionary) -> bool:
 	return true if authored else not _has_authored_atmosphere(layout)
 
 
-func _preview_atmosphere_model_summaries() -> Dictionary:
+func _preview_atmosphere_handoff_state() -> Dictionary:
 	return {
 		"oxygen": preview_atmosphere_oxygen_state.get_summary() if preview_atmosphere_oxygen_state != null else {},
 		"radiation": preview_atmosphere_radiation_state.get_summary() if preview_atmosphere_radiation_state != null else {},
 		"temperature": preview_atmosphere_temperature_state.get_summary() if preview_atmosphere_temperature_state != null else {},
+		"active": preview_atmosphere_active,
+		"summary": preview_atmosphere_summary.duplicate(true),
+		"has_runtime_metadata": has_meta("authored_atmosphere_runtime"),
+		"runtime_metadata": get_meta("authored_atmosphere_runtime", null),
+		"status_text": _atmosphere_status.text if is_instance_valid(_atmosphere_status) else "",
 	}
 
 
