@@ -77,6 +77,11 @@ var pending_corpse_loot: Array = []
 # revisited derelict remembers which passages are already open.
 var bypassed_hatch_ids: Array = []
 
+# Authored portal interaction state. Unlock identity is separate from open state
+# so a consumed lock remains free to reopen after it is closed and rebuilt.
+var authored_unlocked_portal_ids: Array = []
+var authored_open_portal_ids: Array = []
+
 # Task 06: per-ship combat/threat persistence. The live ThreatManager node belongs to
 # the coordinator; this summary lets traveled ships free/rebuild scene roots without
 # losing threat positions, detection memory, or the last combat result.
@@ -151,6 +156,10 @@ func get_summary() -> Dictionary:
 		result["pending_corpse_loot"] = pending_corpse_loot.duplicate(true)
 	if not bypassed_hatch_ids.is_empty():
 		result["bypassed_hatches"] = bypassed_hatch_ids.duplicate()
+	if not authored_unlocked_portal_ids.is_empty():
+		result["authored_unlocked_portals"] = authored_unlocked_portal_ids.duplicate()
+	if not authored_open_portal_ids.is_empty():
+		result["authored_open_portals"] = authored_open_portal_ids.duplicate()
 	if not combat_summary.is_empty():
 		result["combat"] = combat_summary.duplicate(true)
 	if access != null:
@@ -222,6 +231,16 @@ func apply_summary(summary) -> bool:
 		bypassed_hatch_ids = []
 		for hid in (bypassed_variant as Array):
 			bypassed_hatch_ids.append(String(hid))
+	var unlocked_portals_variant: Variant = summary.get("authored_unlocked_portals", null)
+	if typeof(unlocked_portals_variant) == TYPE_ARRAY:
+		authored_unlocked_portal_ids = []
+		for portal_id in (unlocked_portals_variant as Array):
+			authored_unlocked_portal_ids.append(String(portal_id))
+	var open_portals_variant: Variant = summary.get("authored_open_portals", null)
+	if typeof(open_portals_variant) == TYPE_ARRAY:
+		authored_open_portal_ids = []
+		for portal_id in (open_portals_variant as Array):
+			authored_open_portal_ids.append(String(portal_id))
 	var combat_variant: Variant = summary.get("combat", null)
 	if typeof(combat_variant) == TYPE_DICTIONARY:
 		combat_summary = (combat_variant as Dictionary).duplicate(true)

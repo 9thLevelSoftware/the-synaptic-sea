@@ -15,6 +15,7 @@ var portal_id := ""
 var portal_kind := DOOR
 var portal_spec: Dictionary = {}
 var is_open := false
+var is_unlocked := false
 var is_unsafe := false
 var is_exterior := false
 var _player_in_range := false
@@ -30,6 +31,7 @@ func configure(spec: Dictionary, world_position: Vector3) -> void:
 		portal_kind = LOCKED
 	is_exterior = bool(spec.get("exterior", false))
 	is_unsafe = portal_kind == BREACH
+	is_unlocked = portal_kind != LOCKED
 	is_open = portal_kind == BREACH or (is_exterior and portal_kind not in [DOOR, LOCKED, HATCH])
 	position = world_position
 	var from_position: Variant = spec.get("from_position", Vector3.INF)
@@ -62,6 +64,13 @@ func required_flag() -> String:
 	var lock_kind := str(portal_spec.get("lock_kind", portal_spec.get("lock", "mechanical"))).to_lower()
 	return "hack_chip" if lock_kind in ["electronic", "hack", "hack_chip"] else "lockpick"
 
+
+func restore_persistent_state(unlocked: bool, open: bool) -> void:
+	if portal_kind == LOCKED:
+		is_unlocked = unlocked
+	is_open = (open and (portal_kind != LOCKED or is_unlocked)) or portal_kind == BREACH
+	_apply_state()
+
 func get_blocker_collision_shape() -> CollisionShape3D:
 	if not is_instance_valid(_blocker):
 		return null
@@ -87,17 +96,23 @@ func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Di
 		is_unsafe = true
 		emit_signal("unsafe_triggered", portal_id)
 		return {"ok": true, "unsafe": true, "reason": "unsafe_breach", "portal_id": portal_id}
+	var unlocked_now := false
 	if portal_kind == LOCKED:
 		if is_open:
 			is_open = false
 			_apply_state()
 			emit_signal("portal_state_changed", portal_id, false)
 			return {"ok": true, "open": false, "portal_id": portal_id}
-		var flag := required_flag()
-		if not active_flags.has(flag) or not bool(active_flags.get(flag, false)):
-			return {"ok": false, "reason": "locked", "needs": flag, "portal_id": portal_id}
+		if not is_unlocked:
+			var flag := required_flag()
+			if not _has_active_flag(active_flags, flag):
+				return {"ok": false, "reason": "locked", "needs": flag, "portal_id": portal_id}
+			is_unlocked = true
+			unlocked_now = true
 	if portal_kind in [DOOR, LOCKED, HATCH]:
 		var toggle_result := _toggle_open()
+		if unlocked_now:
+			toggle_result["unlocked_now"] = true
 		if is_exterior and bool(toggle_result.get("open", false)):
 			toggle_result["exterior"] = true
 			emit_signal("exterior_exit_triggered", portal_id)
@@ -106,6 +121,15 @@ func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Di
 		emit_signal("exterior_exit_triggered", portal_id)
 		return {"ok": true, "exterior": true, "portal_id": portal_id}
 	return _toggle_open()
+
+
+func _has_active_flag(active_flags: Dictionary, flag: String) -> bool:
+	if not active_flags.has(flag):
+		return false
+	var value: Variant = active_flags.get(flag, false)
+	if value is Dictionary:
+		return int((value as Dictionary).get("count", 1)) > 0
+	return value is bool and bool(value)
 
 func _toggle_open() -> Dictionary:
 	is_open = not is_open

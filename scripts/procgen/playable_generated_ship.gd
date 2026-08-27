@@ -2258,6 +2258,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
 	current_occupancy = piloted_ship if piloted_ship != null else inst
+	_restore_authored_portal_states()
 	_build_derelict_objectives()
 	_build_loot_containers()
 	_build_sealed_hatches()
@@ -2935,7 +2936,7 @@ func _build_derelict_objectives() -> void:
 					continue
 				var step: Dictionary = step_variant
 				var step_position: Variant = step.get("position", Vector3.INF)
-				if not (step_position is Vector3):
+				if not (step_position is Vector3) or step_position == Vector3.INF:
 					continue
 				var step_interactable = InteractableScript.new()
 				step_interactable.configure_from_step(spec, step, step_position, 1.8)
@@ -6168,7 +6169,8 @@ func _try_authored_portal_interact(player_body: PlayerController) -> bool:
 			continue
 		var result: Dictionary = portal.try_interact(flags, player_body)
 		if bool(result.get("ok", false)):
-			if str(portal.portal_kind) == "LOCKED" and bool(result.get("open", false)) \
+			_record_authored_portal_state(portal, result)
+			if str(portal.portal_kind) == "LOCKED" and bool(result.get("unlocked_now", false)) \
 					and utility_item_state != null:
 				utility_item_state.consume_flag(str(portal.required_flag()))
 			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -6183,6 +6185,36 @@ func _try_authored_portal_interact(player_body: PlayerController) -> bool:
 			_emit_hatch_bypass_denied_sfx()
 			return true
 	return false
+
+
+func _record_authored_portal_state(portal: Node, result: Dictionary) -> void:
+	if current_ship == null or portal == null:
+		return
+	var portal_id := str(portal.get("portal_id"))
+	if portal_id.is_empty():
+		return
+	if bool(result.get("unlocked_now", false)) \
+			and not current_ship.authored_unlocked_portal_ids.has(portal_id):
+		current_ship.authored_unlocked_portal_ids.append(portal_id)
+	if result.has("open"):
+		if bool(result.get("open", false)):
+			if not current_ship.authored_open_portal_ids.has(portal_id):
+				current_ship.authored_open_portal_ids.append(portal_id)
+		else:
+			current_ship.authored_open_portal_ids.erase(portal_id)
+
+
+func _restore_authored_portal_states() -> void:
+	if current_ship == null or not is_instance_valid(current_ship.scene_root) \
+			or not current_ship.scene_root.has_method("get_authored_portal_nodes"):
+		return
+	for portal in current_ship.scene_root.get_authored_portal_nodes():
+		if not is_instance_valid(portal) or not portal.has_method("restore_persistent_state"):
+			continue
+		var portal_id := str(portal.get("portal_id"))
+		portal.restore_persistent_state(
+			current_ship.authored_unlocked_portal_ids.has(portal_id),
+			current_ship.authored_open_portal_ids.has(portal_id))
 
 
 func _emit_hatch_bypass_denied_sfx() -> void:

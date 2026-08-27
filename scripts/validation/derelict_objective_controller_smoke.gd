@@ -86,12 +86,37 @@ func _initialize() -> void:
 		_fail("restored: objective 2 not complete after completion")
 		return
 
+	# Legacy saves authored before junction step counts were materialized can
+	# contain required_steps=1. Reconfiguration must migrate that record to the
+	# current authored count without losing already-completed step IDs.
+	var legacy = ControllerScript.create()
+	legacy.apply_summary({
+		"progress": {
+			2: {
+				"objective_type": "restore_systems",
+				"required_steps": 1,
+				"completed_step_ids": ["primary_coupling"],
+				"complete": true,
+			},
+		},
+	})
+	legacy.configure(specs)
+	var migrated: Dictionary = legacy.get_step_progress(2)
+	if int(migrated.get("required_steps", 0)) != 2 \
+			or int(migrated.get("completed_steps", 0)) != 1 \
+			or bool(migrated.get("complete", true)):
+		_fail("legacy repair-junction summary was not reconciled to authored steps")
+		return
+	if not legacy.complete(2, "secondary_coupling") or not legacy.is_objective_complete(2):
+		_fail("migrated repair junction did not complete on its remaining authored step")
+		return
+
 	# apply_summary rejects null/empty.
 	if restored.apply_summary(null) or restored.apply_summary({}):
 		_fail("apply_summary should reject null/empty")
 		return
 
-	print("DERELICT OBJECTIVE CONTROLLER PASS configure=true cleared_on_goal=true round_trip=true")
+	print("DERELICT OBJECTIVE CONTROLLER PASS configure=true cleared_on_goal=true round_trip=true legacy_step_migration=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

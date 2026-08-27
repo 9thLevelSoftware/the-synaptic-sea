@@ -2,6 +2,7 @@ extends SceneTree
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const AuthoredPortalRuntimeScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 const TIMEOUT_FRAMES := 360
 
 var main_node: Node
@@ -84,6 +85,56 @@ func _validate() -> void:
 	if not portal.is_exterior and str(portal.portal_kind) != "BREACH" \
 			and portal_shape.disabled == portal_shape_disabled_before:
 		_fail("playable authored portal interaction did not change collision")
+		return
+
+	# Spending the last bypass charge on an authored locked portal must persist
+	# both its unlocked identity and open state through ShipInstance save/rebuild.
+	var locked_portal = AuthoredPortalRuntimeScript.new()
+	locked_portal.configure({
+		"id": "playable_persistent_lock", "kind": "LOCKED",
+		"lock_kind": "mechanical", "exterior": false,
+	}, local_player)
+	active_loader.add_child(locked_portal)
+	active_loader.authored_portal_nodes.clear()
+	active_loader.authored_portal_nodes.append(locked_portal)
+	locked_portal.set_validation_player_in_range(true)
+	playable.utility_item_state.active_flags["lockpick"] = {
+		"item_id": "lockpick_set", "count": 1,
+	}
+	if not playable._try_authored_portal_interact(playable.player):
+		_fail("playable authored lock did not accept its utility charge")
+		return
+	if playable.utility_item_state.active_flags.has("lockpick"):
+		_fail("playable authored lock did not consume the last utility charge")
+		return
+	var active_ship = playable.get_current_ship()
+	var persisted_ship = ShipInstanceScript.create(
+		active_ship.ship_id, active_ship.marker_id, active_ship.blueprint,
+		active_ship.systems_manager, active_ship.scene_root)
+	if not persisted_ship.apply_summary(active_ship.get_summary()) \
+			or not persisted_ship.authored_unlocked_portal_ids.has("playable_persistent_lock") \
+			or not persisted_ship.authored_open_portal_ids.has("playable_persistent_lock"):
+		_fail("ShipInstance did not round-trip authored portal persistence")
+		return
+	active_ship.authored_unlocked_portal_ids = persisted_ship.authored_unlocked_portal_ids.duplicate()
+	active_ship.authored_open_portal_ids = persisted_ship.authored_open_portal_ids.duplicate()
+	var rebuilt_locked = AuthoredPortalRuntimeScript.new()
+	rebuilt_locked.configure({
+		"id": "playable_persistent_lock", "kind": "LOCKED",
+		"lock_kind": "mechanical", "exterior": false,
+	}, local_player)
+	active_loader.add_child(rebuilt_locked)
+	active_loader.authored_portal_nodes.clear()
+	active_loader.authored_portal_nodes.append(rebuilt_locked)
+	playable._restore_authored_portal_states()
+	if not rebuilt_locked.is_unlocked or not rebuilt_locked.is_open:
+		_fail("boarded rebuild did not restore authored portal state")
+		return
+	rebuilt_locked.set_validation_player_in_range(true)
+	if not playable._try_authored_portal_interact(playable.player) \
+			or not playable._try_authored_portal_interact(playable.player) \
+			or not rebuilt_locked.is_open:
+		_fail("restored authored lock could not close and reopen without another charge")
 		return
 
 	# Boarded repair junctions must use one production Interactable per authored
@@ -287,7 +338,7 @@ func _validate() -> void:
 		if derelict_breach_ids.has(str(home_breach.get_meta("breach_zone_id", ""))):
 			_fail("derelict breach zone leaked into the home ship")
 			return
-	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true exterior_exit=true multi_step_objective=true multiple_arcs=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
+	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true authored_portal_persistence=true exterior_exit=true multi_step_objective=true multiple_arcs=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
 	quit(0)
 
 

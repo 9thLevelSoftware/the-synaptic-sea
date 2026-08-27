@@ -27,11 +27,10 @@ static func create() -> DerelictObjectiveController:
 func is_configured() -> bool:
 	return reach_goal_sequence != 0 or not progress.get_summary().is_empty()
 
-## Registers the generated objective set. First-visit only: idempotent once configured
-## so re-boarding a derelict (or building interactables after a restore) preserves progress.
+## Registers or reconciles the generated objective set. Reconciliation preserves
+## restored completion IDs while migrating legacy placeholder step counts to the
+## current authored contract.
 func configure(objective_specs: Array) -> void:
-	if is_configured():
-		return
 	for spec_variant in objective_specs:
 		if typeof(spec_variant) != TYPE_DICTIONARY:
 			continue
@@ -43,7 +42,7 @@ func configure(objective_specs: Array) -> void:
 		var steps_variant: Variant = spec.get("steps", [])
 		if str(spec.get("kind", "single")) == "repair_junction" and steps_variant is Array:
 			required_steps = maxi(1, (steps_variant as Array).size())
-		progress.register_objective(sequence, str(spec.get("type", "objective")), required_steps)
+		progress.reconcile_objective(sequence, str(spec.get("type", "objective")), required_steps)
 		if str(spec.get("id", "")) == REACH_GOAL_ID:
 			reach_goal_sequence = sequence
 

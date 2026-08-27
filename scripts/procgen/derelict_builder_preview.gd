@@ -314,7 +314,7 @@ func _build_preview_objective_runtime() -> void:
 					continue
 				var step: Dictionary = step_variant
 				var step_position: Variant = step.get("position", Vector3.INF)
-				if not (step_position is Vector3):
+				if not (step_position is Vector3) or step_position == Vector3.INF:
 					continue
 				var step_interactable = InteractableScript.new()
 				step_interactable.configure_from_step(spec, step, step_position, PREVIEW_INTERACTION_RADIUS)
@@ -680,7 +680,7 @@ func _exercise_objectives() -> bool:
 		var spec: Dictionary = spec_variant
 		var steps: Variant = spec.get("steps", [])
 		expected_interactions += (steps as Array).size() \
-			if str(spec.get("kind", "single")) == "repair_junction" and steps is Array \
+			if str(spec.get("kind", "single")) == "repair_junction" and steps is Array and steps.size() > 1 \
 			else 1
 	var accepted := preview_objective_interactables.size() == expected_interactions
 	for interactable in preview_objective_interactables:
