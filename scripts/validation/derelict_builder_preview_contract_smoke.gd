@@ -20,6 +20,7 @@ func _initialize() -> void:
 	unwritable_preview.result_path = ProjectSettings.globalize_path(_root.path_join("missing_result_dir/result.json"))
 	if unwritable_preview._write_result({"ok": true}):
 		_fail("unwritable preview result path was accepted")
+	unwritable_preview.free()
 	var collision_preview := PreviewScript.new()
 	var structural_root := Node3D.new()
 	var missing_collision_wrapper := Node3D.new()
@@ -33,6 +34,7 @@ func _initialize() -> void:
 	if not collision_preview._structural_wrappers_have_collision(structural_root):
 		_fail("structural wrapper collision was not recognized")
 	structural_root.free()
+	collision_preview.free()
 	var source_path := _write("source.json", {"document_kind": "golden_area"})
 	var layout_path := _write("layout.json", {"schema_version": "layout", "kit_id": "kit_a"})
 	var gameplay_path := _write("gameplay.json", {"schema_version": "gameplay"})
@@ -71,6 +73,7 @@ func _initialize() -> void:
 	if marker != expected:
 		_fail("canonical marker changed: %s" % marker)
 		return
+	preview.free()
 	print("DERELICT BUILDER PREVIEW CONTRACT PASS kit_identity=true marker=true")
 	quit(0)
 

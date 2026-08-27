@@ -12,6 +12,7 @@ func _initialize() -> void:
 		_fail("dropped authored hazards were accepted as empty")
 	if preview._hazard_array_matches(authored, [{"id": "fire_01"}, {"id": "other"}]):
 		_fail("wrong materialized hazard ID was accepted")
+	preview.free()
 	print("DERELICT BUILDER HAZARD MATERIALIZATION PASS")
 	quit(0)
 

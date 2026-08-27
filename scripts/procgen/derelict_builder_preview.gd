@@ -21,6 +21,9 @@ const NAVIGATION_SNAP_TOLERANCE := 0.75
 const PLAYER_SPAWN_HEIGHT := 0.2
 const PREVIEW_INTERACTION_RADIUS := 2.2
 const PREVIEW_HUD_HINT := "WASD / arrows: move    E / Enter / Space: interact"
+const PREVIEW_ARC_COLLISION_SIZE := Vector3(2.6, 2.2, 1.6)
+const PREVIEW_ARC_DISCHARGED_COLOR := Color(0.35, 0.85, 1.0, 0.35)
+const PREVIEW_ARC_ARCING_COLOR := Color(0.95, 0.32, 1.0, 0.82)
 const PREVIEW_INPUT_BINDINGS := {
 	"move_forward": [KEY_W, KEY_UP],
 	"move_back": [KEY_S, KEY_DOWN],
@@ -48,6 +51,8 @@ var preview_player
 var preview_camera_rig
 var preview_inventory
 var preview_loot_containers: Array = []
+var preview_arc_state
+var preview_arc_zones: Array[StaticBody3D] = []
 var _interaction_status: Label
 var _interactive_ready := false
 
@@ -94,6 +99,16 @@ func _ready() -> void:
 	_interactive_ready = _setup_interactive_runtime()
 	var acceptance := _exercise_runtime(layout_doc, gameplay_doc)
 	_finish(bool(acceptance.get("ok", false)), acceptance.get("errors", []), acceptance.get("checks", {}))
+
+
+func _process(delta: float) -> void:
+	# The builder preview is a real playable scene, so authored arcs continue
+	# cycling while the user walks around instead of being represented only by
+	# a one-shot acceptance model.
+	if preview_arc_state == null or preview_arc_zones.is_empty():
+		return
+	preview_arc_state.tick(delta)
+	_apply_preview_arc_state()
 
 
 func _validate_manifest(manifest: Dictionary) -> Array[String]:
@@ -161,10 +176,7 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 		fire_state.configure({"compartments": [fire_room]})
 		checks["fire"] = bool(checks["fire"]) and fire_state.ignite(fire_room, 1.0) and fire_state.is_burning(fire_room)
 
-	var arc_specs: Array = loader.get_arc_zone_specs()
-	var arc_state = ArcStateScript.new()
-	arc_state.configure({"zone_ids": _zone_ids(arc_specs), "arcing_first": true})
-	var arc_ready: bool = arc_specs.is_empty() or arc_state.is_passability_blocked()
+	var arc_ready: bool = _exercise_preview_arc_runtime()
 	checks["arc"] = bool(checks["arc"]) and arc_ready
 	# Retain the legacy key for existing automation while exposing the authored
 	# hazard name used by the builder and the human-readable success marker.
@@ -266,9 +278,117 @@ func _setup_interactive_runtime() -> bool:
 	add_child(preview_camera_rig)
 	preview_camera_rig.set_follow_target(preview_player)
 	preview_camera_rig.make_current()
+	_build_preview_arc_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
 	return _interactive_runtime_ready()
+
+
+func _build_preview_arc_runtime() -> void:
+	preview_arc_zones.clear()
+	preview_arc_state = null
+	if not is_instance_valid(loader):
+		return
+	var specs: Array = loader.get_arc_zone_specs()
+	var markers: Array[Vector3] = loader.get_arc_zone_markers()
+	if specs.is_empty() or markers.size() != specs.size():
+		return
+	preview_arc_state = ArcStateScript.new()
+	preview_arc_state.configure({"zone_ids": _zone_ids(specs)})
+	for index in range(specs.size()):
+		var spec: Dictionary = specs[index] if specs[index] is Dictionary else {}
+		var zone_id := str(spec.get("id", spec.get("zone_id", "preview_arc_%d" % index)))
+		var zone := StaticBody3D.new()
+		zone.name = "BuilderPreviewElectricalArc_%s" % zone_id
+		zone.position = markers[index]
+		zone.collision_layer = 1
+		zone.collision_mask = 1
+		zone.set_meta("arc_zone_id", zone_id)
+		zone.set_meta("arc_zone_kind", "electrical_arc")
+		zone.set_meta("arc_zone_phase", "DISCHARGED")
+		zone.set_meta("arc_zone_passability_blocked", false)
+
+		var collision := CollisionShape3D.new()
+		collision.name = "BuilderPreviewArcCollision"
+		var box_shape := BoxShape3D.new()
+		box_shape.size = PREVIEW_ARC_COLLISION_SIZE
+		collision.shape = box_shape
+		collision.position = Vector3(0.0, PREVIEW_ARC_COLLISION_SIZE.y * 0.5, 0.0)
+		collision.disabled = true
+		zone.add_child(collision)
+
+		var visual := MeshInstance3D.new()
+		visual.name = "BuilderPreviewArcVisual"
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = PREVIEW_ARC_COLLISION_SIZE
+		visual.mesh = box_mesh
+		visual.position = collision.position
+		visual.material_override = _preview_arc_material(false)
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		zone.add_child(visual)
+		loader.add_child(zone)
+		preview_arc_zones.append(zone)
+	_apply_preview_arc_state()
+
+
+func _preview_arc_material(is_arcing: bool) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = PREVIEW_ARC_ARCING_COLOR if is_arcing else PREVIEW_ARC_DISCHARGED_COLOR
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+func _apply_preview_arc_state() -> void:
+	if preview_arc_state == null:
+		return
+	var summary: Dictionary = preview_arc_state.get_summary()
+	var arcing := bool(summary.get("arcing", false))
+	var phase := str(summary.get("state", "DISCHARGED"))
+	for zone in preview_arc_zones:
+		if not is_instance_valid(zone):
+			continue
+		if str(zone.get_meta("arc_zone_phase", "")) == phase:
+			continue
+		zone.set_meta("arc_zone_phase", phase)
+		zone.set_meta("arc_zone_passability_blocked", arcing)
+		for child in zone.get_children():
+			if child is CollisionShape3D:
+				(child as CollisionShape3D).disabled = not arcing
+			elif child is MeshInstance3D and child.name == "BuilderPreviewArcVisual":
+				var visual := child as MeshInstance3D
+				var material := visual.material_override as StandardMaterial3D
+				if material != null:
+					material.albedo_color = PREVIEW_ARC_ARCING_COLOR if arcing else PREVIEW_ARC_DISCHARGED_COLOR
+
+
+func _exercise_preview_arc_runtime() -> bool:
+	var specs: Array = loader.get_arc_zone_specs()
+	if specs.is_empty():
+		return true
+	if preview_arc_state == null or preview_arc_zones.size() != specs.size():
+		return false
+	# Drive the attached scene consumer into its dangerous phase and inspect the
+	# actual collision/visual nodes. Restore the normal discharged-first cycle
+	# before handing control to the interactive preview.
+	preview_arc_state.configure({"zone_ids": _zone_ids(specs), "arcing_first": true})
+	_apply_preview_arc_state()
+	for zone in preview_arc_zones:
+		if not is_instance_valid(zone) or str(zone.get_meta("arc_zone_phase", "")) != "ARCING":
+			return false
+		var collision_found := false
+		var visual_found := false
+		for child in zone.get_children():
+			if child is CollisionShape3D:
+				collision_found = (child as CollisionShape3D).shape != null and not (child as CollisionShape3D).disabled
+			elif child is MeshInstance3D and child.name == "BuilderPreviewArcVisual":
+				visual_found = (child as MeshInstance3D).mesh != null
+		if not collision_found or not visual_found:
+			return false
+	preview_arc_state.configure({"zone_ids": _zone_ids(specs)})
+	_apply_preview_arc_state()
+	return true
 
 
 func _ensure_preview_input_actions() -> void:
