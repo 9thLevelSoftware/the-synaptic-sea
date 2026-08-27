@@ -19,6 +19,7 @@ signal load_failed(reason: String)
 const CELL_SIZE: float = 4.0
 const FLOOR_Y_OFFSET: float = 0.12
 const OBJECTIVE_TRIGGER_RADIUS: float = 1.5
+const RADIATION_VOLUME_HALF_WIDTH: float = 1.25
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 
 var layout_doc: Dictionary = {}
@@ -43,6 +44,7 @@ var authored_atmosphere_specs: Array = []
 var authored_atmosphere_volumes: Array[Area3D] = []
 var placed_prop_specs: Array = []
 var placed_prop_nodes: Array[Node3D] = []
+var placed_prop_errors: Array[String] = []
 var authored_portal_specs: Array = []
 var authored_portal_nodes: Array[Area3D] = []
 var start_position: Vector3 = Vector3.INF
@@ -80,6 +82,7 @@ func clear_loaded_ship() -> void:
 	authored_atmosphere_volumes = []
 	placed_prop_specs = []
 	placed_prop_nodes = []
+	placed_prop_errors = []
 	authored_portal_specs = []
 	authored_portal_nodes = []
 	start_position = Vector3.INF
@@ -296,6 +299,10 @@ func get_placed_prop_specs_copy() -> Array:
 
 func get_placed_prop_nodes() -> Array[Node3D]:
 	return placed_prop_nodes.duplicate()
+
+
+func get_placed_prop_errors() -> Array[String]:
+	return placed_prop_errors.duplicate()
 
 func get_authored_portal_specs_copy() -> Array:
 	return authored_portal_specs.duplicate(true)
@@ -1757,6 +1764,7 @@ func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dict
 	var raw_variant: Variant = source_gameplay.get("placed_props", [])
 	if typeof(raw_variant) != TYPE_ARRAY or ship_root == null:
 		return
+	var prop_catalog: Dictionary = GameplayPropFactoryScript.load_catalog().get("props", {}) as Dictionary
 	for raw_prop in (raw_variant as Array):
 		if typeof(raw_prop) != TYPE_DICTIONARY:
 			continue
@@ -1778,6 +1786,9 @@ func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dict
 			continue
 		var position: Vector3 = _room_cell_world(room, cell)
 		if position == Vector3.INF:
+			continue
+		if not prop_catalog.has(prop_id):
+			placed_prop_errors.append("unknown authored placed prop visual_id '%s'" % prop_id)
 			continue
 		var quarter_turns: int = 0
 		if authored.has("quarter_turn"):
@@ -1870,7 +1881,7 @@ func get_radiation_zone_segments() -> Array:
 	return radiation_zone_segments.duplicate(true)
 
 
-func get_radiation_zone_at(local_position: Vector3, radius: float = 2.5) -> Dictionary:
+func get_radiation_zone_at(local_position: Vector3, radius: float = RADIATION_VOLUME_HALF_WIDTH) -> Dictionary:
 	var best: Dictionary = {}
 	var best_distance: float = maxf(0.0, radius)
 	for index in range(radiation_zone_markers.size()):

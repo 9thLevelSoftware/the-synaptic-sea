@@ -20,6 +20,12 @@ func _initialize() -> void:
 	room["atmosphere_bp"] = 2500
 	room["depressurized"] = true
 	var room_id := str(room.get("id", ""))
+	gameplay["placed_props"] = [{
+		"id": "unknown_builder_prop",
+		"visual_id": "not_in_authoritative_prop_catalog",
+		"room_id": room_id,
+		"cell": [0, 0, 0],
+	}]
 	var placements: Array = layout.get("structural_plan", {}).get("floor_placements", [])
 	if placements.is_empty():
 		_fail("fixture has no floor placements")
@@ -52,6 +58,9 @@ func _initialize() -> void:
 	if str(queried_radiation.get("zone_id", "")) != "builder_radiation_01":
 		_fail("radiation spatial query missed its authored volume")
 		return
+	if loader.get_placed_prop_errors().is_empty() or not loader.get_placed_prop_specs_copy().is_empty():
+		_fail("unknown placed prop was counted as a materialized catalog prop")
+		return
 	var radiation_segments: Array = loader.get_radiation_zone_segments()
 	if radiation_segments.size() != 1 or not radiation_segments[0] is Dictionary:
 		_fail("radiation zone endpoint segment was not materialized")
@@ -74,6 +83,14 @@ func _initialize() -> void:
 		if loader.get_radiation_zone_at(endpoint, 0.1).is_empty():
 			_fail("radiation query missed a point on the authored endpoint segment")
 			return
+	var perpendicular := Vector3(-(radiation_to - radiation_from).z, 0.0, (radiation_to - radiation_from).x).normalized()
+	var segment_midpoint := radiation_from.lerp(radiation_to, 0.5)
+	if loader.get_radiation_zone_at(segment_midpoint + perpendicular * 1.2).is_empty():
+		_fail("radiation default query radius was narrower than the materialized volume")
+		return
+	if not loader.get_radiation_zone_at(segment_midpoint + perpendicular * 1.5).is_empty():
+		_fail("radiation default query radius exceeded the materialized volume half-width")
+		return
 	var outward: Vector3 = (radiation_to - radiation_from).normalized()
 	if not loader.get_radiation_zone_at(radiation_to + outward * 3.0).is_empty():
 		_fail("radiation query extended beyond the authored endpoint span")
@@ -125,11 +142,6 @@ func _vec3(value: Variant) -> Vector3:
 	if value is Array and value.size() >= 3:
 		return Vector3(float(value[0]), float(value[1]), float(value[2]))
 	return Vector3.ZERO
-
-
-func _cell3(placement: Dictionary) -> Array:
-	var cell: Array = placement.get("cell", [0, 0])
-	return [int(cell[0]), int(cell[1]), int(placement.get("deck", 0))]
 
 
 func _fail(message: String) -> void:

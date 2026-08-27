@@ -156,6 +156,7 @@ func _validate() -> void:
 	safe_room_spec["room_id"] = "playable_safe_room"
 	safe_room_spec["position"] = safe_room_position
 	safe_room_spec["radiation_bp"] = 0
+	safe_room_spec["temperature_c"] = 22.0
 	active_loader.authored_atmosphere_specs = [hazardous_room_spec, safe_room_spec]
 	active_loader.radiation_zone_markers.clear()
 	active_loader.radiation_zone_specs.clear()
@@ -164,6 +165,9 @@ func _validate() -> void:
 	playable._tick_survival_attrition(1.0)
 	if playable.radiation_state.in_radiation_zone:
 		_fail("radiation from an authored room leaked into a safe authored room")
+		return
+	if playable.body_temperature_state.in_extreme_zone:
+		_fail("temperature from an authored room leaked into a safe authored room")
 		return
 	var derelict_breach_ids := breach_ids.duplicate()
 	# Rebuilding home breach nodes during travel_home must not reset the live

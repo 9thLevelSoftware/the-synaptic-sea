@@ -8612,6 +8612,7 @@ func _tick_survival_attrition(delta: float) -> void:
 	var in_hazard_env: bool = away_from_start or breach_open
 	var in_authored_radiation: Variant = null
 	var has_authored_radiation_source := false
+	var has_authored_temperature_source := false
 	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
 	var authored_atmosphere: Dictionary = {}
 	if is_instance_valid(authored_loader) \
@@ -8632,10 +8633,12 @@ func _tick_survival_attrition(delta: float) -> void:
 		var authored_atmosphere_specs: Variant = authored_loader.get("authored_atmosphere_specs")
 		if authored_atmosphere_specs is Array:
 			for authored_spec_variant in authored_atmosphere_specs:
-				if authored_spec_variant is Dictionary \
-						and int((authored_spec_variant as Dictionary).get("radiation_bp", 0)) > 0:
-					has_authored_radiation_source = true
-					break
+				if authored_spec_variant is Dictionary:
+					var authored_spec: Dictionary = authored_spec_variant
+					if int(authored_spec.get("radiation_bp", 0)) > 0:
+						has_authored_radiation_source = true
+					if authored_spec.has("temperature_c"):
+						has_authored_temperature_source = true
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8695,7 +8698,7 @@ func _tick_survival_attrition(delta: float) -> void:
 			radiation_state.in_radiation_zone = in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
-		if not authored_atmosphere.is_empty():
+		if has_authored_temperature_source or not authored_atmosphere.is_empty():
 			var ambient_temperature := float(authored_atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
 			body_temperature_state.in_extreme_zone = ambient_temperature < body_temperature_state.safe_min \
 				or ambient_temperature > body_temperature_state.safe_max
