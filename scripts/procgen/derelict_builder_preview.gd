@@ -1332,7 +1332,8 @@ func _exercise_atmosphere_probe(layout: Dictionary) -> bool:
 		var temperature_before: float = preview_atmosphere_temperature_state.temperature
 		_tick_preview_atmosphere(1.0)
 		var should_drain: bool = loader.get_authored_atmosphere_drain_multiplier_at(center) > 0.001
-		if should_drain != (preview_atmosphere_oxygen_state.oxygen < oxygen_before):
+		if not _atmosphere_oxygen_probe_satisfied(
+				should_drain, oxygen_before, preview_atmosphere_oxygen_state.oxygen):
 			preview_player.global_position = original_position
 			return false
 		if int(atmosphere.get("radiation_bp", 0)) > 0 and preview_atmosphere_radiation_state.radiation <= radiation_before:
@@ -1376,6 +1377,16 @@ func _exercise_atmosphere_probe(layout: Dictionary) -> bool:
 				or not _atmosphere_status.text.contains("Atmosphere: FIELD"):
 			return false
 	return true if authored else not _has_authored_atmosphere(layout)
+
+
+static func _atmosphere_oxygen_probe_satisfied(
+		should_drain: bool, oxygen_before: float, oxygen_after: float) -> bool:
+	# A hostile authored room still satisfies the probe after an earlier room
+	# has exhausted the shared disposable model, but the probe must never permit
+	# oxygen to recover. Above zero, preserve the strict drain/no-drain check.
+	if oxygen_before <= 0.001:
+		return oxygen_after <= oxygen_before
+	return should_drain == (oxygen_after < oxygen_before)
 
 
 func _preview_atmosphere_handoff_state() -> Dictionary:
