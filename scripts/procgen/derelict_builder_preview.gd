@@ -779,11 +779,12 @@ func _exercise_portals(layout: Dictionary) -> bool:
 		if portal == null or not portal.has_method("try_interact"):
 			return false
 		var was_open: bool = portal.is_open
+		var was_unlocked: bool = portal.is_unlocked
 		var was_unsafe: bool = portal.is_unsafe
 		portal.set_validation_player_in_range(true)
 		var shape: CollisionShape3D = portal.get_blocker_collision_shape()
 		if shape == null:
-			_restore_portal_state(portal, was_open, was_unsafe)
+			_restore_portal_state(portal, was_unlocked, was_open, was_unsafe)
 			return false
 		var portal_ready := true
 		var exterior_result: Dictionary = {}
@@ -818,13 +819,14 @@ func _exercise_portals(layout: Dictionary) -> bool:
 				or not portal.is_open \
 				or not shape.disabled):
 			portal_ready = false
-		_restore_portal_state(portal, was_open, was_unsafe)
+		_restore_portal_state(portal, was_unlocked, was_open, was_unsafe)
 		if not portal_ready:
 			return false
 	return true
 
 
-func _restore_portal_state(portal: Area3D, was_open: bool, was_unsafe: bool) -> void:
+func _restore_portal_state(portal: Area3D, was_unlocked: bool, was_open: bool, was_unsafe: bool) -> void:
+	portal.is_unlocked = was_unlocked
 	portal.is_open = was_open
 	portal.is_unsafe = was_unsafe
 	portal.set_validation_player_in_range(false)

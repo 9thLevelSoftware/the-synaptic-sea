@@ -6197,7 +6197,11 @@ func _record_authored_portal_state(portal: Node, result: Dictionary) -> void:
 			and not current_ship.authored_unlocked_portal_ids.has(portal_id):
 		current_ship.authored_unlocked_portal_ids.append(portal_id)
 	if result.has("open"):
-		if bool(result.get("open", false)):
+		# Exterior portals are a one-way exit action, not a persistent hull
+		# mutation.  Do not make a revisited derelict spawn with its exit already
+		# open (and therefore bypass the authored interaction); an unlocked
+		# exterior lock still keeps its unlocked identity via the branch above.
+		if bool(result.get("open", false)) and not bool(portal.get("is_exterior")):
 			if not current_ship.authored_open_portal_ids.has(portal_id):
 				current_ship.authored_open_portal_ids.append(portal_id)
 		else:
@@ -8696,12 +8700,14 @@ func _tick_survival_attrition(delta: float) -> void:
 		var authored_atmosphere_specs: Variant = authored_loader.get("authored_atmosphere_specs")
 		if authored_atmosphere_specs is Array:
 			for authored_spec_variant in authored_atmosphere_specs:
-				if authored_spec_variant is Dictionary:
-					var authored_spec: Dictionary = authored_spec_variant
-					if int(authored_spec.get("radiation_bp", 0)) > 0:
-						has_authored_radiation_source = true
-					if authored_spec.has("temperature_c"):
-						has_authored_temperature_source = true
+				if authored_spec_variant is Dictionary \
+						and int((authored_spec_variant as Dictionary).get("radiation_bp", 0)) > 0:
+					has_authored_radiation_source = true
+	if not authored_atmosphere.is_empty() and authored_atmosphere.has("temperature_c"):
+		# Only the atmosphere at the player's current position is a real
+		# authored thermal source.  Other rooms' pressure/radiation fields must
+		# not suppress the legacy derelict thermal hazard here.
+		has_authored_temperature_source = true
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8761,7 +8767,7 @@ func _tick_survival_attrition(delta: float) -> void:
 			radiation_state.in_radiation_zone = in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
-		if has_authored_temperature_source or not authored_atmosphere.is_empty():
+		if has_authored_temperature_source:
 			var ambient_temperature := float(authored_atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
 			body_temperature_state.in_extreme_zone = ambient_temperature < body_temperature_state.safe_min \
 				or ambient_temperature > body_temperature_state.safe_max

@@ -1,6 +1,7 @@
 extends SceneTree
 
 const PreviewScript := preload("res://scripts/procgen/derelict_builder_preview.gd")
+const PortalScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
 
 var _root := ""
 
@@ -12,6 +13,16 @@ func _initialize() -> void:
 		_fail("authoritative loot catalog rejected generic_crate")
 	if not PreviewScript.LootDistributionScript.roll("missing_preview_table", "preview_contract", loot_tables, {}).is_empty():
 		_fail("missing loot table reference was accepted")
+	var portal_preview := PreviewScript.new()
+	var locked_portal := PortalScript.new()
+	locked_portal.configure({"id": "preview_locked", "kind": "LOCKED"}, Vector3.ZERO)
+	locked_portal.is_unlocked = true
+	locked_portal.is_open = true
+	portal_preview._restore_portal_state(locked_portal, false, false, false)
+	if locked_portal.is_unlocked or locked_portal.is_open or locked_portal.is_unsafe:
+		_fail("portal acceptance restore did not restore locked state")
+	locked_portal.free()
+	portal_preview.free()
 	_root = "user://derelict_builder_preview_contract_%d" % Time.get_ticks_usec()
 	if not DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_root)) in [OK, ERR_ALREADY_EXISTS]:
 		_fail("could not create temporary contract directory")

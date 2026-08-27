@@ -288,6 +288,27 @@ func _validate() -> void:
 	if playable.body_temperature_state.in_extreme_zone:
 		_fail("temperature from an authored room leaked into a safe authored room")
 		return
+	# Pressure/oxygen and radiation-only atmosphere records do not define a
+	# thermal source.  The legacy derelict thermal hazard must remain active
+	# rather than treating an omitted temperature as nominal recovery.
+	active_loader.authored_atmosphere_specs = [{
+		"room_id": "playable_pressure_only", "position": safe_room_position,
+		"oxygen_bp": 10000, "depressurized": false,
+	}]
+	playable.body_temperature_state.configure({})
+	playable._tick_survival_attrition(1.0)
+	if not playable.body_temperature_state.in_extreme_zone:
+		_fail("pressure-only atmosphere incorrectly synthesized thermal recovery")
+		return
+	active_loader.authored_atmosphere_specs = [{
+		"room_id": "playable_radiation_only", "position": safe_room_position,
+		"radiation_bp": 5000,
+	}]
+	playable.body_temperature_state.configure({})
+	playable._tick_survival_attrition(1.0)
+	if not playable.body_temperature_state.in_extreme_zone:
+		_fail("radiation-only atmosphere incorrectly synthesized thermal recovery")
+		return
 	var derelict_breach_ids := breach_ids.duplicate()
 	# Rebuilding home breach nodes during travel_home must not reset the live
 	# hazard resource or the seal state. This models a player sealing the breach
@@ -320,6 +341,9 @@ func _validate() -> void:
 	exterior_portal.set_validation_player_in_range(true)
 	if not playable._try_authored_portal_interact(playable.player) or playable.away_from_start:
 		_fail("authored exterior portal did not execute the production return-home consequence")
+		return
+	if active_ship.authored_open_portal_ids.has(str(exterior_portal.get("portal_id"))):
+		_fail("exterior exit incorrectly persisted as open across a revisit")
 		return
 	var expected_home_breaches := maxi(1, playable.loader.get_breach_zone_markers().size())
 	var home_breach_nodes: Array[StaticBody3D] = playable.get_breach_zone_nodes()
