@@ -18,6 +18,8 @@ signal load_failed(reason: String)
 
 const CELL_SIZE: float = 4.0
 const FLOOR_Y_OFFSET: float = 0.12
+const ATMOSPHERE_VOLUME_HALF_WIDTH: float = CELL_SIZE * 0.5
+const ATMOSPHERE_VOLUME_HEIGHT: float = 2.5
 const OBJECTIVE_TRIGGER_RADIUS: float = 1.5
 const RADIATION_VOLUME_HALF_WIDTH: float = 1.25
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
@@ -1654,8 +1656,9 @@ func _add_authored_atmosphere_volumes(source_layout: Dictionary, ship_root: Node
 			"depressurized": bool(room.get("depressurized", false)),
 			"vented": bool(room.get("vented", false)),
 			"radiation_bp": int(room.get("radiation_bp", 0)),
-			"temperature_c": float(room.get("temperature_c", 20.0)),
 		}
+		if room.has("temperature_c"):
+			spec["temperature_c"] = float(room.get("temperature_c", 20.0))
 		authored_atmosphere_specs.append(spec)
 		var volume := _make_trigger_volume(
 			"AuthoredAtmosphere_%s_%d" % [room_id, authored_atmosphere_specs.size() - 1], position,
@@ -1920,8 +1923,12 @@ func get_authored_atmosphere_at(local_position: Vector3) -> Dictionary:
 		var placement_position: Variant = spec.get("position", Vector3.INF)
 		if not (placement_position is Vector3):
 			continue
-		var distance: float = local_position.distance_to(placement_position)
-		if distance < best_distance and distance <= CELL_SIZE * 0.75:
+		var delta: Vector3 = local_position - placement_position
+		var within_box := absf(delta.x) <= ATMOSPHERE_VOLUME_HALF_WIDTH \
+			and delta.y >= 0.0 and delta.y <= ATMOSPHERE_VOLUME_HEIGHT \
+			and absf(delta.z) <= ATMOSPHERE_VOLUME_HALF_WIDTH
+		var distance: float = delta.length_squared()
+		if within_box and distance < best_distance:
 			best_distance = distance
 			best = spec.duplicate(true)
 	return best

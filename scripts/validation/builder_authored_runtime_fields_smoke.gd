@@ -102,15 +102,25 @@ func _initialize() -> void:
 		_fail("authored radiation did not drive RadiationState")
 		return
 
-	var atmosphere: Dictionary = loader.get_authored_atmosphere_at(position)
+	var atmosphere_position := position + Vector3.UP * 0.12
+	var atmosphere: Dictionary = loader.get_authored_atmosphere_at(atmosphere_position)
 	if str(atmosphere.get("room_id", "")) != room_id or int(atmosphere.get("oxygen_bp", -1)) != 2500:
 		_fail("authored atmosphere did not resolve to its room")
+		return
+	if atmosphere.has("temperature_c"):
+		_fail("authored atmosphere synthesized an omitted temperature_c")
+		return
+	if loader.get_authored_atmosphere_at(atmosphere_position + Vector3(1.9, 1.2, 1.9)).is_empty():
+		_fail("authored atmosphere query missed a point inside its materialized box")
+		return
+	if not loader.get_authored_atmosphere_at(atmosphere_position + Vector3(2.1, 0.5, -2.1)).is_empty():
+		_fail("authored atmosphere query leaked beyond its materialized box")
 		return
 	var oxygen = OxygenStateScript.new()
 	oxygen.configure({"max_oxygen": 100.0, "drain_rate": 8.0})
 	oxygen.tick(1.0, {
 		"field_atmosphere": true,
-		"field_atmosphere_multiplier": loader.get_authored_atmosphere_drain_multiplier_at(position),
+		"field_atmosphere_multiplier": loader.get_authored_atmosphere_drain_multiplier_at(atmosphere_position),
 	})
 	if oxygen.oxygen >= 100.0 or oxygen.effective_drain_rate <= 0.0:
 		_fail("authored atmosphere did not drive OxygenState")
