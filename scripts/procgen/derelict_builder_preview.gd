@@ -149,9 +149,10 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 
 	var radiation_specs: Array = loader.get_radiation_zone_specs()
 	var radiation_state = RadiationStateScript.new()
-	radiation_state.configure({"in_radiation_zone": not radiation_specs.is_empty()})
+	var radiation_spatially_ready := _radiation_spatial_query_ready(radiation_specs)
+	radiation_state.configure({"in_radiation_zone": radiation_spatially_ready})
 	radiation_state.tick(1.0)
-	checks["radiation"] = bool(checks["radiation"]) and (radiation_specs.is_empty() or radiation_state.radiation > 0.0)
+	checks["radiation"] = bool(checks["radiation"]) and (radiation_specs.is_empty() or (radiation_spatially_ready and radiation_state.radiation > 0.0))
 
 	var breach_specs: Array = loader.get_breach_zone_specs()
 	var oxygen_state = OxygenStateScript.new()
@@ -202,6 +203,25 @@ func _hazard_id_counts(specs: Array) -> Dictionary:
 		if not id.is_empty():
 			counts[id] = int(counts.get(id, 0)) + 1
 	return counts
+
+
+func _radiation_spatial_query_ready(specs: Array) -> bool:
+	if specs.is_empty():
+		return true
+	var markers: Array[Vector3] = loader.get_radiation_zone_markers()
+	if markers.size() != specs.size():
+		return false
+	for index in range(specs.size()):
+		if not specs[index] is Dictionary:
+			return false
+		var queried: Dictionary = loader.get_radiation_zone_at(markers[index])
+		if queried.is_empty():
+			return false
+		var authored_id := str((specs[index] as Dictionary).get("id", (specs[index] as Dictionary).get("zone_id", "")))
+		var queried_id := str(queried.get("id", queried.get("zone_id", "")))
+		if authored_id.is_empty() or queried_id != authored_id:
+			return false
+	return true
 
 
 func _navigation_path_exists(local_target: Vector3) -> bool:
@@ -453,27 +473,38 @@ func _structural_portal_count(layout: Dictionary) -> int:
 
 
 func _finish(ok: bool, errors: Array, checks: Dictionary = {}) -> void:
+	var result_errors: Array = errors.duplicate()
 	var result := {
 		"ok": ok,
 		"manifest_path": manifest_path,
 		"source_hash": _source_hash,
 		"kit_id": _kit_id,
-		"errors": errors,
+		"errors": result_errors,
 		"checks": checks,
 		"completed_at_utc": Time.get_datetime_string_from_system(true, true),
 	}
-	if not result_path.is_empty():
-		var file := FileAccess.open(result_path, FileAccess.WRITE)
-		if file != null:
-			file.store_string(JSON.stringify(result, "\t") + "\n")
-			file.close()
+	if not result_path.is_empty() and not _write_result(result):
+		ok = false
+		result["ok"] = false
+		result_errors.append("could not write preview result: %s" % result_path)
+		result["errors"] = result_errors
 	print("%s %s" % [RESULT_MARKER, JSON.stringify(result)])
 	if ok:
 		print(_canonical_success_marker(checks))
 	if not ok:
-		push_error("DERELICT BUILDER PREVIEW FAIL %s" % "; ".join(errors))
+		push_error("DERELICT BUILDER PREVIEW FAIL %s" % "; ".join(result_errors))
 	if DisplayServer.get_name() == "headless" or not ok:
 		get_tree().quit(0 if ok else 1)
+
+
+func _write_result(result: Dictionary) -> bool:
+	var file := FileAccess.open(result_path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(result, "\t") + "\n")
+	var write_error := file.get_error()
+	file.close()
+	return write_error == OK
 
 
 func _canonical_success_marker(checks: Dictionary) -> String:

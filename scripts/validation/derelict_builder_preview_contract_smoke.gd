@@ -16,6 +16,10 @@ func _initialize() -> void:
 	if not DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_root)) in [OK, ERR_ALREADY_EXISTS]:
 		_fail("could not create temporary contract directory")
 		return
+	var unwritable_preview := PreviewScript.new()
+	unwritable_preview.result_path = ProjectSettings.globalize_path(_root.path_join("missing_result_dir/result.json"))
+	if unwritable_preview._write_result({"ok": true}):
+		_fail("unwritable preview result path was accepted")
 	var source_path := _write("source.json", {"document_kind": "golden_area"})
 	var layout_path := _write("layout.json", {"schema_version": "layout", "kit_id": "kit_a"})
 	var gameplay_path := _write("gameplay.json", {"schema_version": "gameplay"})
