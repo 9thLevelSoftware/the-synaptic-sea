@@ -8611,6 +8611,7 @@ func _tick_survival_attrition(delta: float) -> void:
 	var breach_open: bool = oxygen_state != null and oxygen_state.get_summary().get("breach_open", false)
 	var in_hazard_env: bool = away_from_start or breach_open
 	var in_authored_radiation: Variant = null
+	var has_authored_radiation_source := false
 	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
 	var authored_atmosphere: Dictionary = {}
 	if is_instance_valid(authored_loader) \
@@ -8618,14 +8619,23 @@ func _tick_survival_attrition(delta: float) -> void:
 			and is_instance_valid(player) and player is Node3D:
 		authored_atmosphere = authored_loader.get_authored_atmosphere_at(
 			authored_loader.to_local((player as Node3D).global_position))
-	if away_from_start and is_instance_valid(authored_loader) \
+	if is_instance_valid(authored_loader) \
 			and authored_loader.has_method("get_radiation_zone_specs") \
 			and authored_loader.has_method("get_radiation_zone_at"):
 		var authored_radiation_specs: Array = authored_loader.get_radiation_zone_specs()
+		has_authored_radiation_source = not authored_radiation_specs.is_empty()
 		if not authored_radiation_specs.is_empty() and is_instance_valid(player) and player is Node3D:
 			var authored_radiation: Dictionary = authored_loader.get_radiation_zone_at(
 				authored_loader.to_local((player as Node3D).global_position))
 			in_authored_radiation = not authored_radiation.is_empty()
+	if is_instance_valid(authored_loader):
+		var authored_atmosphere_specs: Variant = authored_loader.get("authored_atmosphere_specs")
+		if authored_atmosphere_specs is Array:
+			for authored_spec_variant in authored_atmosphere_specs:
+				if authored_spec_variant is Dictionary \
+						and int((authored_spec_variant as Dictionary).get("radiation_bp", 0)) > 0:
+					has_authored_radiation_source = true
+					break
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8679,7 +8689,7 @@ func _tick_survival_attrition(delta: float) -> void:
 		var atmosphere_radiation: Variant = null
 		if not authored_atmosphere.is_empty():
 			atmosphere_radiation = int(authored_atmosphere.get("radiation_bp", 0)) > 0
-		if in_authored_radiation != null or atmosphere_radiation != null:
+		if has_authored_radiation_source:
 			radiation_state.in_radiation_zone = in_authored_radiation == true or atmosphere_radiation == true
 		else:
 			radiation_state.in_radiation_zone = in_hazard_env

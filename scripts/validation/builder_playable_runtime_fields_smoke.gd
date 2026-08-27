@@ -149,6 +149,22 @@ func _validate() -> void:
 	if playable.oxygen_state.oxygen >= 99.999 or playable.oxygen_state.effective_drain_rate <= 0.0:
 		_fail("vacuum-authored compartment did not drain field oxygen")
 		return
+	var safe_room_position := local_player + Vector3(20.0, 0.0, 0.0)
+	var hazardous_room_spec: Dictionary = active_loader.authored_atmosphere_specs[0].duplicate(true)
+	hazardous_room_spec["radiation_bp"] = 5000
+	var safe_room_spec: Dictionary = hazardous_room_spec.duplicate(true)
+	safe_room_spec["room_id"] = "playable_safe_room"
+	safe_room_spec["position"] = safe_room_position
+	safe_room_spec["radiation_bp"] = 0
+	active_loader.authored_atmosphere_specs = [hazardous_room_spec, safe_room_spec]
+	active_loader.radiation_zone_markers.clear()
+	active_loader.radiation_zone_specs.clear()
+	playable.player.global_position = active_loader.to_global(safe_room_position)
+	playable.radiation_state.configure({"radiation": 0.0, "in_radiation_zone": false})
+	playable._tick_survival_attrition(1.0)
+	if playable.radiation_state.in_radiation_zone:
+		_fail("radiation from an authored room leaked into a safe authored room")
+		return
 	var derelict_breach_ids := breach_ids.duplicate()
 	# Rebuilding home breach nodes during travel_home must not reset the live
 	# hazard resource or the seal state. This models a player sealing the breach
