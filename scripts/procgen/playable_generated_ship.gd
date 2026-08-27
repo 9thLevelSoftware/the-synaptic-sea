@@ -323,6 +323,7 @@ var fire_zone_nodes: Dictionary = {}
 # zone build/clear lifecycle and the interact dispatcher precedence.
 var fire_suppression_points: Array = []
 var extinguisher_recharge_port  # ExtinguisherRechargePort
+const FireCompartmentResolverScript := preload("res://scripts/procgen/fire_compartment_resolver.gd")
 const FIRE_COMPARTMENT_SYSTEM := {
 	"bridge": "navigation",
 	"engineering": "power",
@@ -332,16 +333,7 @@ const FIRE_COMPARTMENT_SYSTEM := {
 # Maps a room ROLE to the hull/fire compartment it belongs to. Only these
 # compartments exist (data/ship_systems/hull_compartments.json + FIRE_COMPARTMENT_SYSTEM),
 # so variant hazards on other roles are loot/dressing-only.
-const COMPARTMENT_FOR_ROLE := {
-	"bridge": "bridge",
-	"cockpit": "bridge",
-	"engineering": "engineering",
-	"reactor": "engineering",
-	"engine_bay": "engineering",
-	"hydroponics": "hydroponics",
-	"cargo": "cargo",
-	"storage": "cargo",
-}
+const COMPARTMENT_FOR_ROLE := FireCompartmentResolverScript.COMPARTMENT_FOR_ROLE
 const RoomVariantSelectorHazardScript := preload("res://scripts/procgen/room_variant_selector.gd")
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
@@ -395,6 +387,7 @@ var route_gate_nodes: Array = []
 var oxygen_state: OxygenState
 var oxygen_root: Node3D
 var breach_zone_node: StaticBody3D
+var breach_zone_nodes: Array[StaticBody3D] = []
 var unsafe_room_marker: Label3D
 # --- Inventory / Tool pickup integration -------------------------------------
 # REQ-007: a single ToolPickup carrying the portable_oxygen_pump lives in a
@@ -500,6 +493,9 @@ var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
 var arc_zone_resolved_room_id: String = ""
+var arc_zone_nodes: Array[StaticBody3D] = []
+var arc_zone_labels: Array[Label3D] = []
+var arc_zone_resolved_room_ids: Array[String] = []
 var objective_progress_state: ObjectiveProgressState
 var sequence_interactables: Dictionary = {}
 # REQ-012: current-run save/load state.
@@ -625,8 +621,9 @@ func _apply_world_label_scale() -> void:
 				_apply_pixel_size_to_label(child, 0.003)
 	if unsafe_room_marker != null:
 		_apply_pixel_size_to_label(unsafe_room_marker, 0.0035)
-	if arc_zone_label != null:
-		_apply_pixel_size_to_label(arc_zone_label, 0.0035)
+	for label in arc_zone_labels:
+		if is_instance_valid(label):
+			_apply_pixel_size_to_label(label, 0.0035)
 
 func _apply_pixel_size_to_label(label: Node, base_pixel_size: float) -> void:
 	if not (label is Label3D):
@@ -2206,7 +2203,7 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 ## Does NOT re-home the player — callers position the player afterwards.
 ## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
 ## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
-func _attach_derelict_active(inst, new_root: Node3D) -> void:
+func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: float = -1.0) -> void:
 	# Live Persistent Ships Phase 4: fast-forward the absent ship's sim by elapsed world_time
 	# before activating it. First visit: dt=0 (seeded), no-op. Revisit: applies the absence.
 	_catch_up_ship(inst)
@@ -2254,10 +2251,12 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
 	current_occupancy = piloted_ship if piloted_ship != null else inst
+	_restore_authored_portal_states()
 	_build_derelict_objectives()
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
+	_build_breach_zone(false, preserved_player_oxygen)
 	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
 	# Seeded BEFORE _build_breach_seal_points() so the seal-point builder sees
 	# variant breaches in the hull and creates player-interactable seal nodes.
@@ -2919,25 +2918,44 @@ func _build_derelict_objectives() -> void:
 		var sequence: int = int(spec.get("sequence", 0))
 		if sequence <= 0:
 			continue
-		var position_variant: Variant = spec.get("position", Vector3.INF)
-		if typeof(position_variant) != TYPE_VECTOR3:
-			continue
 		# Record salvage objective loot tables for grant on completion.
 		if str(spec.get("type", "")) == "salvage":
 			_salvage_loot_tables[str(spec.get("id", ""))] = str(spec.get("loot_table", "salvage_cargo"))
-		var interactable = InteractableScript.new()
-		interactable.configure_from_objective(spec, position_variant, 1.8)
-		interactable.interaction_completed.connect(_on_derelict_interactable_completed)
-		# Restore: a persisted-complete objective reads as done and cannot be re-fired
-		# (try_interact returns false when completed).
-		if controller.is_objective_complete(sequence):
-			interactable.completed = true
-			interactable.set_active(false)
-		# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
-		# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
-		# automatically when the derelict scene_root is freed on departure.
-		current_ship.scene_root.add_child(interactable)
-		derelict_interactables.append(interactable)
+		var steps_variant: Variant = spec.get("steps", [])
+		var steps: Array = steps_variant if steps_variant is Array else []
+		if str(spec.get("kind", "single")) == "repair_junction" and steps.size() > 1:
+			for step_variant in steps:
+				if not (step_variant is Dictionary):
+					continue
+				var step: Dictionary = step_variant
+				var step_position: Variant = step.get("position", Vector3.INF)
+				if not (step_position is Vector3) or step_position == Vector3.INF:
+					continue
+				var step_interactable = InteractableScript.new()
+				step_interactable.configure_from_step(spec, step, step_position, 1.8)
+				step_interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+				if controller.is_step_complete(sequence, str(step.get("step_id", ""))):
+					step_interactable.completed = true
+					step_interactable.set_active(false)
+				current_ship.scene_root.add_child(step_interactable)
+				derelict_interactables.append(step_interactable)
+		else:
+			var position_variant: Variant = spec.get("position", Vector3.INF)
+			if not (position_variant is Vector3):
+				continue
+			var interactable = InteractableScript.new()
+			interactable.configure_from_objective(spec, position_variant, 1.8)
+			interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+			# Restore: a persisted-complete objective reads as done and cannot be re-fired
+			# (try_interact returns false when completed).
+			if controller.is_objective_complete(sequence):
+				interactable.completed = true
+				interactable.set_active(false)
+			# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
+			# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
+			# automatically when the derelict scene_root is freed on departure.
+			current_ship.scene_root.add_child(interactable)
+			derelict_interactables.append(interactable)
 	# Show the derelict's objectives in the HUD while aboard, then reflect any
 	# persisted/restored completion (set_objectives resets the tracker's completed
 	# set, so this must run after it).
@@ -3310,12 +3328,7 @@ func _variant_hazard_compartments(kind: String) -> Array:
 ## Maps an authored compartment_id or room role onto a live hull/fire compartment.
 ## Unmapped roles (airlock, corridor, …) return "" — visual overlay only.
 func _mapped_authored_compartment_id(raw: String) -> String:
-	var token: String = raw.strip_edges()
-	if token.is_empty():
-		return ""
-	if FIRE_COMPARTMENT_SYSTEM.has(token):
-		return token
-	return str(COMPARTMENT_FOR_ROLE.get(token, ""))
+	return FireCompartmentResolverScript.from_token(raw)
 
 func _append_zone_dicts(out: Array, raw: Variant) -> void:
 	if not (raw is Array):
@@ -3340,15 +3353,31 @@ func _authored_hazard_zone_dicts(zone_key: String) -> Array:
 			_append_zone_dicts(out, root.get_fire_zone_specs())
 	return out
 
-## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones
-## that carry a mapped compartment_id. Zones without that field stay visual-only
-## so existing goldens (link shape, no cid) do not suddenly ignite.
+func _authored_fire_layout_sources() -> Array:
+	var sources: Array = []
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
+		sources.append(current_ship.built_layout)
+	var root = current_ship.scene_root if current_ship != null else null
+	if is_instance_valid(root) and typeof(root.get("layout_doc")) == TYPE_DICTIONARY:
+		sources.append(root.layout_doc)
+	return sources
+
+## Resolve a normal link-shaped authored fire record onto the boarded fire
+## model. Explicit compartment ids win; otherwise the destination and source
+## room ids are mapped through their authored room roles.
+func _authored_fire_compartment_id(zone: Dictionary) -> String:
+	return FireCompartmentResolverScript.from_zone(zone, _authored_fire_layout_sources())
+
+## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones.
+## Fire links may resolve through room ids; invalid or unmapped records remain
+## visual-only instead of inventing a preview-only compartment.
 func _authored_mapped_hazard_compartments(kind: String) -> Array:
 	var zone_key: String = "fire_zones" if kind == "fire" else "breach_zones"
 	var found: Dictionary = {}
 	for zone_v in _authored_hazard_zone_dicts(zone_key):
 		var zone: Dictionary = zone_v
-		var cid: String = _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
+		var cid: String = _authored_fire_compartment_id(zone) if kind == "fire" \
+			else _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
 		if cid.is_empty():
 			continue
 		found[cid] = true
@@ -3563,7 +3592,10 @@ func _player_fire_intensity() -> float:
 		if not is_instance_valid(z) or not (z is Node3D):
 			continue
 		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
-			return _active_fire_state().get_intensity(str(cid))
+			var compartment_id: String = str(z.get_meta("fire_compartment_id", ""))
+			if compartment_id.is_empty():
+				continue
+			return _active_fire_state().get_intensity(compartment_id)
 	return 0.0
 
 ## M7-B Task 8: applies fire degradation to the ship system housed in each burning
@@ -4953,8 +4985,8 @@ func _build_fire_zones() -> void:
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty() and layout_zones.is_empty():
 		return
-	var assigned: Dictionary = {}
 	var claimed: Dictionary = {}
+	var mapped_rows: Dictionary = {}
 	for cid in burning:
 		var cid_s: String = str(cid)
 		for zi in range(layout_zones.size()):
@@ -4962,67 +4994,74 @@ func _build_fire_zones() -> void:
 				continue
 			var row: Dictionary = layout_zones[zi]
 			var spec: Dictionary = row["spec"] if row.get("spec") is Dictionary else {}
-			var spec_cid: String = _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
+			var spec_cid: String = _authored_fire_compartment_id(spec)
 			if spec_cid.is_empty() or spec_cid != cid_s:
 				continue
-			assigned[cid_s] = {"position": row["position"], "spec": spec}
+			# Keep every authored marker for a compartment. A room may have
+			# multiple fire links (for example two cargo-hold sources), and each
+			# source needs its own spatially queryable runtime node.
+			if not mapped_rows.has(cid_s):
+				mapped_rows[cid_s] = []
+			(mapped_rows[cid_s] as Array).append({"position": row["position"], "spec": spec})
 			claimed[zi] = true
-			break
 	var leftover_idx: int = 0
 	var fallback_i: int = 0
 	for cid in burning:
 		var cid_s: String = str(cid)
-		var pos: Vector3
-		var layout_spec: Dictionary = {}
-		if assigned.has(cid_s):
-			pos = assigned[cid_s]["position"]
-			layout_spec = assigned[cid_s]["spec"]
-		else:
+		var placements: Array = mapped_rows.get(cid_s, [])
+		if placements.is_empty():
 			while leftover_idx < layout_zones.size() and (
 					claimed.has(leftover_idx) or not _fire_layout_zone_mapped_cid(layout_zones[leftover_idx]).is_empty()):
 				leftover_idx += 1
 			if leftover_idx < layout_zones.size():
 				var row: Dictionary = layout_zones[leftover_idx]
-				pos = row["position"]
-				layout_spec = row["spec"] if row.get("spec") is Dictionary else {}
+				placements.append({"position": row["position"], "spec": row["spec"] if row.get("spec") is Dictionary else {}})
 				claimed[leftover_idx] = true
 				leftover_idx += 1
 			else:
 				if positions.is_empty():
 					continue
-				pos = positions[fallback_i % positions.size()]
+				placements.append({"position": positions[fallback_i % positions.size()], "spec": {}})
 				fallback_i += 1
-		var zone := Area3D.new()
-		zone.name = "FireZone_%s" % str(cid)
-		# Passable: monitoring/monitorable off — these are visual + lookup nodes,
-		# NOT collision blockers. The player must be able to walk into a fire.
-		zone.monitoring = false
-		zone.monitorable = false
-		zone.set_meta("fire_compartment_id", str(cid))
-		if not layout_spec.is_empty():
-			zone.set_meta("fire_zone_layout_id", str(layout_spec.get("zone_id", "")))
-			zone.set_meta("fire_zone_layout_kind", str(layout_spec.get("kind", "")))
-		zone.position = pos
-		var shape := CollisionShape3D.new()
-		var sphere := SphereShape3D.new()
-		sphere.radius = 2.0
-		shape.shape = sphere
-		zone.add_child(shape)
-		var visual := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(1.2, 1.2, 1.2)
-		visual.mesh = box
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.95, 0.3, 0.05, 0.65)
-		mat.emission_enabled = true
-		mat.emission = Color(1.0, 0.4, 0.1)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		visual.material_override = mat
-		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		zone.add_child(visual)
-		_attach_zone_to_active_ship(zone)
-		fire_zone_nodes[str(cid)] = zone
+		for placement_i in range(placements.size()):
+			var placement: Dictionary = placements[placement_i]
+			var pos: Vector3 = placement["position"]
+			var layout_spec: Dictionary = placement["spec"] if placement.get("spec") is Dictionary else {}
+			var zone := Area3D.new()
+			zone.name = "FireZone_%s_%d" % [str(cid), placement_i]
+			# Passable: monitoring/monitorable off — these are visual + lookup nodes,
+			# NOT collision blockers. The player must be able to walk into a fire.
+			zone.monitoring = false
+			zone.monitorable = false
+			zone.set_meta("fire_compartment_id", cid_s)
+			zone.set_meta("fire_zone_marker_index", placement_i)
+			if not layout_spec.is_empty():
+				zone.set_meta("fire_zone_layout_id", str(layout_spec.get("zone_id", "")))
+				zone.set_meta("fire_zone_layout_kind", str(layout_spec.get("kind", "")))
+			zone.position = pos
+			var shape := CollisionShape3D.new()
+			var sphere := SphereShape3D.new()
+			sphere.radius = 2.0
+			shape.shape = sphere
+			zone.add_child(shape)
+			var visual := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(1.2, 1.2, 1.2)
+			visual.mesh = box
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.95, 0.3, 0.05, 0.65)
+			mat.emission_enabled = true
+			mat.emission = Color(1.0, 0.4, 0.1)
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			visual.material_override = mat
+			visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			zone.add_child(visual)
+			_attach_zone_to_active_ship(zone)
+			# Preserve the historical compartment key for existing consumers; use
+			# deterministic suffixes for additional authored markers.
+			var zone_key: String = cid_s if placement_i == 0 else "%s#%d" % [cid_s, placement_i]
+			fire_zone_nodes[zone_key] = zone
 
 # Layout-declared fire zones of the BOARDED derelict, as [{position, spec}]
 # pairs in the derelict's own frame. Mirrors _active_arc_loader's away-branch
@@ -5055,7 +5094,7 @@ func _fire_layout_zone_mapped_cid(row: Variant) -> String:
 	if not (row is Dictionary):
 		return ""
 	var spec: Dictionary = (row as Dictionary)["spec"] if (row as Dictionary).get("spec") is Dictionary else {}
-	return _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
+	return _authored_fire_compartment_id(spec)
 
 func _attach_zone_to_active_ship(node: Node) -> void:
 	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -5117,7 +5156,9 @@ func _refresh_fire_zones() -> void:
 			burning[str(cid)] = true
 	var rendered := {}
 	for cid in fire_zone_nodes:
-		rendered[str(cid)] = true
+		var zone = fire_zone_nodes[cid]
+		if is_instance_valid(zone) and zone.has_meta("fire_compartment_id"):
+			rendered[str(zone.get_meta("fire_compartment_id"))] = true
 	# Compare as sorted sets so a different key order does not force a needless rebuild.
 	var burning_keys: Array = burning.keys()
 	burning_keys.sort()
@@ -6132,6 +6173,70 @@ func _try_bypass_nearest_hatch() -> bool:
 	return false
 
 
+func _try_authored_portal_interact(player_body: PlayerController) -> bool:
+	if not is_instance_valid(player_body) or current_ship == null:
+		return false
+	var active_loader = current_ship.scene_root
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_authored_portal_nodes"):
+		return false
+	var flags: Dictionary = utility_item_state.active_flags if utility_item_state != null else {}
+	for portal in active_loader.get_authored_portal_nodes():
+		if not is_instance_valid(portal) or not portal.has_method("try_interact"):
+			continue
+		var result: Dictionary = portal.try_interact(flags, player_body)
+		if bool(result.get("ok", false)):
+			_record_authored_portal_state(portal, result)
+			if str(portal.portal_kind) == "LOCKED" and bool(result.get("unlocked_now", false)) \
+					and utility_item_state != null:
+				utility_item_state.consume_flag(str(portal.required_flag()))
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(
+					AudioEventSeamScript.SFX_DOOR_OPEN if bool(result.get("open", false)) \
+					else AudioEventSeamScript.SFX_DOOR_CLOSE,
+					portal.global_position)
+			if bool(result.get("exterior", false)):
+				return travel_home()
+			return true
+		if str(result.get("reason", "")) == "locked":
+			_emit_hatch_bypass_denied_sfx()
+			return true
+	return false
+
+
+func _record_authored_portal_state(portal: Node, result: Dictionary) -> void:
+	if current_ship == null or portal == null:
+		return
+	var portal_id := str(portal.get("portal_id"))
+	if portal_id.is_empty():
+		return
+	if bool(result.get("unlocked_now", false)) \
+			and not current_ship.authored_unlocked_portal_ids.has(portal_id):
+		current_ship.authored_unlocked_portal_ids.append(portal_id)
+	if result.has("open"):
+		# Exterior portals are a one-way exit action, not a persistent hull
+		# mutation.  Do not make a revisited derelict spawn with its exit already
+		# open (and therefore bypass the authored interaction); an unlocked
+		# exterior lock still keeps its unlocked identity via the branch above.
+		if bool(result.get("open", false)) and not bool(portal.get("is_exterior")):
+			if not current_ship.authored_open_portal_ids.has(portal_id):
+				current_ship.authored_open_portal_ids.append(portal_id)
+		else:
+			current_ship.authored_open_portal_ids.erase(portal_id)
+
+
+func _restore_authored_portal_states() -> void:
+	if current_ship == null or not is_instance_valid(current_ship.scene_root) \
+			or not current_ship.scene_root.has_method("get_authored_portal_nodes"):
+		return
+	for portal in current_ship.scene_root.get_authored_portal_nodes():
+		if not is_instance_valid(portal) or not portal.has_method("restore_persistent_state"):
+			continue
+		var portal_id := str(portal.get("portal_id"))
+		portal.restore_persistent_state(
+			current_ship.authored_unlocked_portal_ids.has(portal_id),
+			current_ship.authored_open_portal_ids.has(portal_id))
+
+
 func _emit_hatch_bypass_denied_sfx() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
@@ -6304,9 +6409,15 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 	if current_ship == null:
 		return
 	var controller = current_ship.get_objective_controller()
-	controller.complete(sequence)
+	if not controller.complete(sequence, step_id):
+		return
 	# Reflect the completion (and run-complete on clear) in the HUD.
 	_refresh_derelict_tracker()
+	# A repair junction reports each successful step through this same handler,
+	# but objective-level rewards, training, and completion fire only once after
+	# the controller confirms the full authored sequence.
+	if not controller.is_objective_complete(sequence):
+		return
 	# Sub-project #3: grant salvage-point loot on objective completion (once only —
 	# the interactable cannot re-fire after completed = true).
 	if objective_type == "salvage" and _salvage_loot_tables.has(objective_id):
@@ -6394,6 +6505,8 @@ func travel_to(marker) -> Dictionary:
 	if piloted_ship != null and current_occupancy != piloted_ship:
 		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
+	var player_oxygen_before_transition := float(oxygen_state.get_summary().get("oxygen", -1.0)) \
+		if oxygen_state != null else -1.0
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
@@ -6446,6 +6559,7 @@ func travel_to(marker) -> Dictionary:
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
@@ -6479,7 +6593,7 @@ func travel_to(marker) -> Dictionary:
 		visited_ships[mid] = inst
 		_seed_ship_models(inst)
 
-	_attach_derelict_active(inst, new_root)
+	_attach_derelict_active(inst, new_root, player_oxygen_before_transition)
 	_configure_threat_runtime_for_current_ship()
 	# Phase 5b Task 5: NO player teleport into the derelict. The player rides the
 	# piloted ship, which docked flush to the target; _attach_derelict_active carried
@@ -6502,8 +6616,11 @@ func travel_to(marker) -> Dictionary:
 func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
+	var player_oxygen_before_transition := float(oxygen_state.get_summary().get("oxygen", -1.0)) \
+		if oxygen_state != null else -1.0
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
@@ -6551,6 +6668,7 @@ func travel_home() -> bool:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
+	_build_breach_zone(false, player_oxygen_before_transition)
 	_build_breach_seal_points()
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
@@ -7057,6 +7175,18 @@ func _sync_current_ship_arc_summary() -> void:
 	if current_ship == null or electrical_arc_state == null:
 		return
 	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
+
+func _sync_current_ship_breach_environment() -> void:
+	if current_ship == null or oxygen_state == null:
+		return
+	var summary := oxygen_state.get_summary()
+	current_ship.breach_environment_summary = {
+		"hazard_kind": "oxygen",
+		"breach_open": bool(summary.get("breach_open", false)),
+		"breach_sealed": bool(summary.get("breach_sealed", false)),
+		"passability_blocked": bool(summary.get("passability_blocked", false)),
+		"breach_zone_ids": (summary.get("breach_zone_ids", []) as Array).duplicate(),
+	}
 
 ## PKG-D6.1: flush live module integrity + component placement onto the leaving ship
 ## so regenerate-from-seed geometry can re-apply strip/damage state on revisit.
@@ -7581,7 +7711,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
 	_refresh_route_control_from_ship_systems()
-	_build_breach_zone()
+	_build_breach_zone(false)
 	# REQ-007: spawn the portable oxygen pump pickup now that the player,
 	# interactables, and breach zone exist. The pickup is parented to
 	# tool_pickup_root and reads its world position from a side room
@@ -7835,6 +7965,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		if is_instance_valid(t) and t.try_login(player_body):
 			return
 	if away_from_start:
+		# Fire suppression has emergency precedence: a co-located repair or breach
+		# handler may soft-deny while the active fire point can still save the room.
+		for fp in fire_suppression_points:
+			if is_instance_valid(fp) and fp.try_start(player_body):
+				return
 		# Sub-project #4: try repair points before loot/objectives.
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
@@ -7843,16 +7978,16 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for sp in breach_seal_points:
 			if is_instance_valid(sp) and sp.try_start(player_body):
 				return
-		# M7-B: fire suppression points share the survival-critical precedence.
-		for fp in fire_suppression_points:
-			if is_instance_valid(fp) and fp.try_start(player_body):
-				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
 		for lc in loot_containers:
 			if is_instance_valid(lc) and lc.try_interact(player_body):
 				return
+		# Builder-authored doors/hatches/breaches live on the active loader and
+		# participate in the same player interaction request as other derelict affordances.
+		if _try_authored_portal_interact(player_body):
+			return
 		# Domain 5: sealed hatch bypass (lockpick/hack_chip flag required).
 		if _try_bypass_nearest_hatch():
 			return
@@ -7879,6 +8014,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 		_emit_interact_miss_sfx()
 		return
+	# Fire suppression has emergency precedence: a co-located repair or breach
+	# handler may soft-deny while the active fire point can still save the room.
+	for fp in fire_suppression_points:
+		if is_instance_valid(fp) and fp.try_start(player_body):
+			return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.try_start(player_body):
@@ -7886,10 +8026,6 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
 	for sp in breach_seal_points:
 		if is_instance_valid(sp) and sp.try_start(player_body):
-			return
-	# M7-B: fire suppression points share the survival-critical precedence.
-	for fp in fire_suppression_points:
-		if is_instance_valid(fp) and fp.try_start(player_body):
 			return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
@@ -8587,6 +8723,38 @@ func _tick_survival_attrition(delta: float) -> void:
 	# a derelict OR when the hub hull is breached. Mirrors radiation's prior in_rad.
 	var breach_open: bool = oxygen_state != null and oxygen_state.get_summary().get("breach_open", false)
 	var in_hazard_env: bool = away_from_start or breach_open
+	var in_authored_radiation: Variant = null
+	var has_authored_radiation_source := false
+	var has_authored_temperature_source := false
+	var in_authored_temperature_source := false
+	var authored_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	var authored_atmosphere: Dictionary = {}
+	if is_instance_valid(authored_loader) \
+			and authored_loader.has_method("get_authored_atmosphere_at") \
+			and is_instance_valid(player) and player is Node3D:
+		authored_atmosphere = authored_loader.get_authored_atmosphere_at(
+			authored_loader.to_local((player as Node3D).global_position))
+	if is_instance_valid(authored_loader) \
+			and authored_loader.has_method("get_radiation_zone_specs") \
+			and authored_loader.has_method("get_radiation_zone_at"):
+		var authored_radiation_specs: Array = authored_loader.get_radiation_zone_specs()
+		has_authored_radiation_source = not authored_radiation_specs.is_empty()
+		if not authored_radiation_specs.is_empty() and is_instance_valid(player) and player is Node3D:
+			var authored_radiation: Dictionary = authored_loader.get_radiation_zone_at(
+				authored_loader.to_local((player as Node3D).global_position))
+			in_authored_radiation = not authored_radiation.is_empty()
+	if is_instance_valid(authored_loader):
+		var authored_atmosphere_specs: Variant = authored_loader.get("authored_atmosphere_specs")
+		if authored_atmosphere_specs is Array:
+			for authored_spec_variant in authored_atmosphere_specs:
+				if authored_spec_variant is Dictionary:
+					var authored_spec: Dictionary = authored_spec_variant
+					if int(authored_spec.get("radiation_bp", 0)) > 0:
+						has_authored_radiation_source = true
+					if authored_spec.has("temperature_c"):
+						has_authored_temperature_source = true
+	if not authored_atmosphere.is_empty() and authored_atmosphere.has("temperature_c"):
+		in_authored_temperature_source = true
 	# Assemble the vitals context from current source state (pre-tick).
 	var temp_mult: float = 1.0
 	if body_temperature_state != null:
@@ -8634,11 +8802,31 @@ func _tick_survival_attrition(delta: float) -> void:
 	_check_vitals_death()
 	# Advance the environmental sources AFTER the vitals read (preserves prior order).
 	if radiation_state != null:
-		radiation_state.in_radiation_zone = in_hazard_env
+		# Authored radiation zones replace the legacy ship-wide away hazard when
+		# they exist. Room atmosphere radiation joins that same spatial signal;
+		# layouts without either authored source retain the prior behavior.
+		var atmosphere_radiation: Variant = null
+		if not authored_atmosphere.is_empty():
+			atmosphere_radiation = int(authored_atmosphere.get("radiation_bp", 0)) > 0
+		if has_authored_radiation_source:
+			radiation_state.in_radiation_zone = in_authored_radiation == true or atmosphere_radiation == true
+		else:
+			radiation_state.in_radiation_zone = in_hazard_env
 		radiation_state.tick(delta)
 	if body_temperature_state != null:
-		body_temperature_state.in_extreme_zone = in_hazard_env
-		body_temperature_state.tick(delta)
+		if in_authored_temperature_source:
+			var ambient_temperature := float(authored_atmosphere.get("temperature_c", BodyTemperatureStateScript.DEFAULT_TEMPERATURE))
+			body_temperature_state.in_extreme_zone = ambient_temperature < body_temperature_state.safe_min \
+				or ambient_temperature > body_temperature_state.safe_max
+			body_temperature_state.tick(delta, {"ambient_temperature_c": ambient_temperature})
+		elif has_authored_temperature_source:
+			# A room-scoped authored temperature replaces the legacy ship-wide
+			# away hazard. Outside its volume the player recovers toward nominal.
+			body_temperature_state.in_extreme_zone = false
+			body_temperature_state.tick(delta)
+		else:
+			body_temperature_state.in_extreme_zone = in_hazard_env
+			body_temperature_state.tick(delta)
 	if status_effects_state != null:
 		status_effects_state.tick(delta)
 
@@ -8672,15 +8860,45 @@ func _check_vitals_death() -> void:
 	if vitals_state.is_incapacitated():
 		end_run("death")
 
-func _build_breach_zone() -> void:
+func _build_breach_zone(
+		preserve_active_environment: bool = true,
+		preserved_player_oxygen: float = -1.0) -> void:
 	if oxygen_root == null:
 		return
+	# Rebuilding the scene nodes is a presentation change, not a new hazard
+	# state.  Boarding and travel_home both rebuild this root, so preserve the
+	# live oxygen/seal state while replacing the zone ids with the active
+	# loader's ids.  OxygenState.configure() intentionally resets a fresh
+	# configuration and must not be used as a transition reset here.
+	var previous_oxygen_summary: Dictionary = {}
+	if oxygen_state != null:
+		previous_oxygen_summary = oxygen_state.get_summary()
 	for child in oxygen_root.get_children():
 		oxygen_root.remove_child(child)
 		child.queue_free()
 	breach_zone_node = null
+	breach_zone_nodes.clear()
 	unsafe_room_marker = null
-	var world_position: Vector3 = _resolve_breach_zone_world_position()
+	var breach_loader := _active_breach_loader()
+	var positions: Array[Vector3] = []
+	var zone_ids: Array[String] = []
+	if breach_loader != null and breach_loader.has_method("get_breach_zone_markers"):
+		for marker in breach_loader.get_breach_zone_markers():
+			if marker is Vector3 and marker != Vector3.INF:
+				var marker_world: Vector3 = breach_loader.to_global(marker)
+				positions.append(oxygen_root.to_local(marker_world))
+	var specs: Array = breach_loader.get_breach_zone_specs() \
+		if breach_loader != null and breach_loader.has_method("get_breach_zone_specs") else []
+	for index in range(positions.size()):
+		var zone_id := "breach_%d" % index
+		if index < specs.size() and specs[index] is Dictionary:
+			var authored_zone_id := str((specs[index] as Dictionary).get("zone_id", (specs[index] as Dictionary).get("id", "")))
+			if not authored_zone_id.is_empty():
+				zone_id = authored_zone_id
+		zone_ids.append(zone_id)
+	if positions.is_empty():
+		positions.append(_resolve_breach_zone_world_position(breach_loader))
+		zone_ids.append(BREACH_ZONE_FALLBACK_ID)
 	if oxygen_state == null:
 		oxygen_state = OxygenStateScript.new()
 	# Per ADR-0005 HazardStateContract: configure() takes a Dictionary so
@@ -8688,25 +8906,54 @@ func _build_breach_zone() -> void:
 	# reads max_oxygen / drain_rate / regen_rate / recovery_threshold /
 	# safe_threshold plus the zone_ids array.
 	oxygen_state.configure({
-		"zone_ids": [BREACH_ZONE_FALLBACK_ID],
+		"zone_ids": zone_ids,
 		"max_oxygen": OxygenStateScript.DEFAULT_MAX_OXYGEN,
 		"drain_rate": OxygenStateScript.DEFAULT_DRAIN_RATE,
 		"regen_rate": OxygenStateScript.DEFAULT_REGEN_RATE,
 		"recovery_threshold": OxygenStateScript.DEFAULT_RECOVERY_THRESHOLD,
 		"safe_threshold": OxygenStateScript.DEFAULT_SAFE_THRESHOLD,
 	})
-	breach_zone_node = _create_breach_zone_node(world_position)
-	oxygen_root.add_child(breach_zone_node)
-	unsafe_room_marker = _create_unsafe_room_marker(world_position)
+	if not previous_oxygen_summary.is_empty():
+		# Player oxygen follows the player between ships. Environmental state is
+		# preserved only for an in-place rebuild; transitions restore it from the
+		# newly active ShipInstance instead of leaking the previous hull's seal.
+		if preserve_active_environment:
+			previous_oxygen_summary["breach_zone_ids"] = zone_ids.duplicate()
+			oxygen_state.apply_summary(previous_oxygen_summary)
+		else:
+			var player_oxygen := preserved_player_oxygen if preserved_player_oxygen >= 0.0 \
+				else float(previous_oxygen_summary.get("oxygen", oxygen_state.oxygen))
+			oxygen_state.apply_summary({"hazard_kind": "oxygen", "oxygen": player_oxygen})
+			if current_ship != null and not current_ship.breach_environment_summary.is_empty():
+				var active_environment: Dictionary = current_ship.breach_environment_summary.duplicate(true)
+				active_environment["hazard_kind"] = "oxygen"
+				active_environment["breach_zone_ids"] = zone_ids.duplicate()
+				oxygen_state.apply_summary(active_environment)
+	for index in range(positions.size()):
+		var node := _create_breach_zone_node(positions[index], zone_ids[index])
+		oxygen_root.add_child(node)
+		breach_zone_nodes.append(node)
+	breach_zone_node = breach_zone_nodes[0]
+	unsafe_room_marker = _create_unsafe_room_marker(positions[0])
 	oxygen_root.add_child(unsafe_room_marker)
+	_apply_breach_zone_scene_state()
 
-func _resolve_breach_zone_world_position() -> Vector3:
-	if loader != null and loader.has_method("get_breach_zone_markers"):
-		var markers: Array = loader.get_breach_zone_markers()
+
+func _active_breach_loader() -> Node3D:
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root is Node3D \
+			and current_ship.scene_root.has_method("get_breach_zone_markers"):
+		return current_ship.scene_root as Node3D
+	return loader as Node3D if loader is Node3D and is_instance_valid(loader) else null
+
+
+func _resolve_breach_zone_world_position(breach_loader: Node3D = null) -> Vector3:
+	if breach_loader != null and breach_loader.has_method("get_breach_zone_markers"):
+		var markers: Array = breach_loader.get_breach_zone_markers()
 		if markers.size() > 0 and markers[0] is Vector3:
 			var candidate: Vector3 = markers[0]
 			if candidate != Vector3.INF:
-				return candidate
+				return oxygen_root.to_local(breach_loader.to_global(candidate))
 	# Fallback: midpoint between objective-3 and objective-4 interactable positions.
 	var obj3_pos: Vector3 = Vector3.INF
 	var obj4_pos: Vector3 = Vector3.INF
@@ -8726,13 +8973,13 @@ func _resolve_breach_zone_world_position() -> Vector3:
 		return Vector3.ZERO
 	return (obj3_pos + obj4_pos) * 0.5
 
-func _create_breach_zone_node(world_position: Vector3) -> StaticBody3D:
+func _create_breach_zone_node(world_position: Vector3, zone_id: String = BREACH_ZONE_FALLBACK_ID) -> StaticBody3D:
 	var zone: StaticBody3D = StaticBody3D.new()
-	zone.name = "BreachZone_OxygenCorridor"
+	zone.name = "BreachZone_%s" % zone_id.validate_node_name()
 	zone.position = world_position
 	zone.collision_layer = 1
 	zone.collision_mask = 1
-	zone.set_meta("breach_zone_id", BREACH_ZONE_FALLBACK_ID)
+	zone.set_meta("breach_zone_id", zone_id)
 	zone.set_meta("breach_zone_kind", "oxygen_breach")
 	zone.set_meta("breach_zone_open", true)
 	zone.set_meta("breach_zone_sealed", false)
@@ -8817,8 +9064,17 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	if afs_o2 != null and afs_o2.has_method("get_total_intensity"):
 		fire_o2 = FIRE_OXYGEN_DRAIN_PER_INTENSITY * float(afs_o2.get_total_intensity())
 	if _is_field_suit_pressure_active():
+		var authored_atmosphere_multiplier: float = 1.0
+		var atmosphere_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+		if is_instance_valid(atmosphere_loader) \
+				and atmosphere_loader.has_method("get_authored_atmosphere_drain_multiplier_at") \
+				and is_instance_valid(player) and player is Node3D:
+			authored_atmosphere_multiplier = float(
+				atmosphere_loader.get_authored_atmosphere_drain_multiplier_at(
+					atmosphere_loader.to_local((player as Node3D).global_position)))
 		oxygen_state.tick(delta_seconds, {
 			"field_atmosphere": true,
+			"field_atmosphere_multiplier": authored_atmosphere_multiplier,
 			"player_in_breach_zone": false,
 			"fire_oxygen_drain": fire_o2,
 		})
@@ -8885,22 +9141,25 @@ func get_player_vitals_lines() -> PackedStringArray:
 	return vitals_model.get_status_lines()
 
 func _apply_breach_zone_scene_state() -> void:
-	if oxygen_state == null or breach_zone_node == null:
+	if oxygen_state == null or breach_zone_nodes.is_empty():
 		return
 	var summary: Dictionary = oxygen_state.get_summary()
 	var breach_open: bool = bool(summary.get("breach_open", false))
 	var breach_sealed: bool = bool(summary.get("breach_sealed", false))
 	var passability_blocked: bool = bool(summary.get("passability_blocked", false))
-	breach_zone_node.set_meta("breach_zone_open", breach_open)
-	breach_zone_node.set_meta("breach_zone_sealed", breach_sealed)
-	breach_zone_node.set_meta("breach_zone_passability_blocked", passability_blocked)
 	# Per the feature spec: the breach zone is passable while the player has
 	# oxygen above the recovery threshold; once oxygen hits zero, the
 	# collision is enabled to block forward traversal until oxygen recovers.
 	# Once sealed (objective 2), the corridor is safe and collision is off.
 	var collision_enabled: bool = breach_open and passability_blocked
-	_set_breach_zone_collision_enabled(breach_zone_node, collision_enabled)
-	_update_breach_zone_visual(breach_zone_node, breach_open, passability_blocked)
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("breach_zone_open", breach_open)
+		zone.set_meta("breach_zone_sealed", breach_sealed)
+		zone.set_meta("breach_zone_passability_blocked", passability_blocked)
+		_set_breach_zone_collision_enabled(zone, collision_enabled)
+		_update_breach_zone_visual(zone, breach_open, passability_blocked)
 	if unsafe_room_marker != null:
 		unsafe_room_marker.visible = breach_open and not breach_sealed
 
@@ -8937,26 +9196,38 @@ func get_oxygen_summary() -> Dictionary:
 func get_breach_zone_node() -> Node:
 	return breach_zone_node
 
+
+func get_breach_zone_nodes() -> Array[StaticBody3D]:
+	return breach_zone_nodes.duplicate()
+
+
 func get_breach_zone_collision_enabled_count() -> int:
-	if breach_zone_node == null:
-		return 0
-	for child in breach_zone_node.get_children():
-		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
-			return 1
-	return 0
+	var enabled_count := 0
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		for child in zone.get_children():
+			if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
+				enabled_count += 1
+	return enabled_count
 
 func is_player_in_breach_zone() -> bool:
-	if breach_zone_node == null or player == null:
+	if breach_zone_nodes.is_empty() or player == null:
 		return false
 	if not (player is Node3D):
 		return false
-	var zone_pos: Vector3 = breach_zone_node.global_position
 	var player_pos: Vector3 = (player as Node3D).global_position
-	var dx: float = player_pos.x - zone_pos.x
-	var dz: float = player_pos.z - zone_pos.z
-	# Use a horizontal proximity radius (the corridor is wider than tall; using
-	# 3D distance would falsely report "in zone" when the player is one floor up).
-	return (dx * dx + dz * dz) <= (BREACH_ZONE_PROXIMITY_RADIUS * BREACH_ZONE_PROXIMITY_RADIUS)
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		var zone_pos: Vector3 = zone.global_position
+		var dx: float = player_pos.x - zone_pos.x
+		var dz: float = player_pos.z - zone_pos.z
+		# Use a horizontal proximity radius (the corridor is wider than tall; using
+		# 3D distance would falsely report "in zone" when the player is one floor up).
+		if (dx * dx + dz * dz) <= (BREACH_ZONE_PROXIMITY_RADIUS * BREACH_ZONE_PROXIMITY_RADIUS):
+			return true
+	return false
 
 func _activate_current_objective() -> void:
 	for interactable_variant in interactables:
@@ -9051,9 +9322,12 @@ func _build_arc_zone() -> void:
 		arc_root.remove_child(child)
 		child.queue_free()
 	# Derelict arc nodes parent under the derelict's scene_root (freed with it
-	# on departure), so also clear by handle in case the previous zone lives
+	# on departure), so also clear by handle in case previous zones live
 	# outside arc_root.
-	for stale in [arc_zone_node, arc_zone_label]:
+	var stale_nodes: Array = []
+	stale_nodes.append_array(arc_zone_nodes)
+	stale_nodes.append_array(arc_zone_labels)
+	for stale in stale_nodes:
 		if stale != null and is_instance_valid(stale):
 			if stale.get_parent() != null:
 				stale.get_parent().remove_child(stale)
@@ -9061,6 +9335,9 @@ func _build_arc_zone() -> void:
 	arc_zone_node = null
 	arc_zone_label = null
 	arc_zone_resolved_room_id = ""
+	arc_zone_nodes.clear()
+	arc_zone_labels.clear()
+	arc_zone_resolved_room_ids.clear()
 	# Per ADR-0005: configure() is called even when no markers exist so
 	# the model state is always coherent (DISCHARGED, time_in_state == 0.0,
 	# passability_blocked == false). This is the FRESH state the smoke
@@ -9072,32 +9349,39 @@ func _build_arc_zone() -> void:
 		"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
-	var resolution: Dictionary = _resolve_arc_zone_world_position()
-	var world_position: Vector3 = resolution.get("position", Vector3.INF)
-	arc_zone_resolved_room_id = str(resolution.get("room_id", ""))
-	# No marker and no fallback -> skip arc setup. Refresh later will
-	# stay a no-op because arc_zone_node / arc_zone_label are null.
-	if world_position == Vector3.INF:
+	var resolutions: Array[Dictionary] = _resolve_arc_zone_world_positions()
+	# No markers and no fallback -> skip arc setup. Refresh later remains a no-op.
+	if resolutions.is_empty():
 		return
-	var zone_id: String = str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID))
-	if zone_id.is_empty():
-		zone_id = ARC_ZONE_FALLBACK_ID
+	var zone_ids: Array[String] = []
+	for resolution in resolutions:
+		zone_ids.append(str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID)))
 	electrical_arc_state.configure({
-		"zone_ids": [zone_id],
+		"zone_ids": zone_ids,
 		"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
-	arc_zone_node = _create_arc_zone_node(zone_id, world_position)
-	arc_zone_label = _create_arc_zone_label(world_position)
-	# Away: parent under the derelict's scene_root so the zone inherits the
-	# dock offset and is freed with the derelict (loot-container pattern).
-	# Home: keep the original arc_root parent.
-	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
-		current_ship.scene_root.add_child(arc_zone_node)
-		current_ship.scene_root.add_child(arc_zone_label)
-	else:
-		arc_root.add_child(arc_zone_node)
-		arc_root.add_child(arc_zone_label)
+	for resolution in resolutions:
+		var world_position: Vector3 = resolution.get("position", Vector3.INF)
+		var zone_id: String = str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID))
+		var room_id: String = str(resolution.get("room_id", ""))
+		var zone := _create_arc_zone_node(zone_id, world_position, room_id)
+		var label := _create_arc_zone_label(world_position)
+		arc_zone_nodes.append(zone)
+		arc_zone_labels.append(label)
+		arc_zone_resolved_room_ids.append(room_id)
+		# Away: parent under the derelict's scene_root so each zone inherits the
+		# dock offset and is freed with the derelict. Home uses arc_root.
+		if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(zone)
+			current_ship.scene_root.add_child(label)
+		else:
+			arc_root.add_child(zone)
+			arc_root.add_child(label)
+	# Preserve singular accessors as compatibility aliases for older smokes and UI.
+	arc_zone_node = arc_zone_nodes[0]
+	arc_zone_label = arc_zone_labels[0]
+	arc_zone_resolved_room_id = arc_zone_resolved_room_ids[0]
 
 # The loader whose arc markers drive the CURRENT context: the boarded
 # derelict's own loader root when away (Tranche 1 audit fix — derelict arc
@@ -9110,21 +9394,38 @@ func _active_arc_loader() -> Node:
 	return loader if (loader is Node and is_instance_valid(loader)) else null
 
 func _resolve_arc_zone_world_position() -> Dictionary:
+	var resolutions := _resolve_arc_zone_world_positions()
+	return resolutions[0] if not resolutions.is_empty() else {
+		"position": Vector3.INF, "room_id": "", "zone_id": "",
+	}
+
+
+func _resolve_arc_zone_world_positions() -> Array[Dictionary]:
+	var resolved: Array[Dictionary] = []
 	var arc_loader: Node = _active_arc_loader()
-	if arc_loader != null and arc_loader.has_method("get_arc_zone_markers"):
-		var markers: Array = arc_loader.call("get_arc_zone_markers")
-		if markers.size() > 0 and markers[0] is Vector3:
-			var candidate: Vector3 = markers[0]
-			if candidate != Vector3.INF:
-				return {
-					"position": candidate,
-					"room_id": _resolved_arc_marker_room_id(),
-					"zone_id": _resolved_arc_marker_zone_id(),
-				}
+	if arc_loader == null or not arc_loader.has_method("get_arc_zone_markers") \
+			or not arc_loader.has_method("get_arc_zone_specs"):
+		return resolved
+	var markers: Array = arc_loader.call("get_arc_zone_markers")
+	var specs: Array = arc_loader.call("get_arc_zone_specs")
+	if markers.size() != specs.size():
+		return resolved
+	for index in range(markers.size()):
+		if not (markers[index] is Vector3) or markers[index] == Vector3.INF:
+			continue
+		var spec: Dictionary = specs[index] if specs[index] is Dictionary else {}
+		var zone_id := str(spec.get("id", spec.get("zone_id", "")))
+		if zone_id.is_empty():
+			zone_id = ARC_ZONE_FALLBACK_ID if index == 0 else "%s_%d" % [ARC_ZONE_FALLBACK_ID, index]
+		resolved.append({
+			"position": markers[index],
+			"room_id": str(spec.get("to_room", spec.get("from_room", ""))),
+			"zone_id": zone_id,
+		})
 	# No fallback room is injected per hazard_type_3.md (placement is
 	# template-specific). An empty arc_zones array means the template
 	# does not include this hazard; skip arc setup cleanly.
-	return {"position": Vector3.INF, "room_id": "", "zone_id": ""}
+	return resolved
 
 # Returns the `to_room` of the first arc_zones marker the loader exposes,
 # or "" if no marker is present. Mirrors _resolved_marker_room_id() for
@@ -9164,7 +9465,7 @@ func _resolved_arc_marker_zone_id() -> String:
 			return zone_id
 	return ""
 
-func _create_arc_zone_node(zone_id: String, world_position: Vector3) -> StaticBody3D:
+func _create_arc_zone_node(zone_id: String, world_position: Vector3, resolved_room_id: String = "") -> StaticBody3D:
 	var zone: StaticBody3D = StaticBody3D.new()
 	zone.name = "ElectricalArcZone_NonCriticalLink"
 	zone.position = world_position
@@ -9174,7 +9475,7 @@ func _create_arc_zone_node(zone_id: String, world_position: Vector3) -> StaticBo
 	zone.set_meta("arc_zone_kind", "electrical_arc")
 	zone.set_meta("arc_zone_phase", "DISCHARGED")
 	zone.set_meta("arc_zone_passability_blocked", false)
-	zone.set_meta("arc_zone_resolved_room_id", arc_zone_resolved_room_id)
+	zone.set_meta("arc_zone_resolved_room_id", resolved_room_id)
 
 	var collision_shape: CollisionShape3D = CollisionShape3D.new()
 	collision_shape.name = "ArcZoneCollisionShape3D"
@@ -9230,23 +9531,27 @@ func _refresh_arc_state(force_initial: bool) -> void:
 	# When no arc zone was built (template has no arc marker), keep the
 	# model in DISCHARGED so its summary remains coherent for save/load
 	# but skip scene-state application entirely.
-	if arc_zone_node == null:
+	if arc_zone_nodes.is_empty():
 		return
 	_apply_arc_zone_scene_state()
 
 func _apply_arc_zone_scene_state() -> void:
-	if electrical_arc_state == null or arc_zone_node == null:
+	if electrical_arc_state == null or arc_zone_nodes.is_empty():
 		return
 	var summary: Dictionary = electrical_arc_state.get_summary()
 	var arcing: bool = bool(summary.get("arcing", false))
 	var state_text: String = str(summary.get("state", "DISCHARGED"))
-	arc_zone_node.set_meta("arc_zone_phase", state_text)
-	arc_zone_node.set_meta("arc_zone_passability_blocked", arcing)
-	_set_arc_zone_collision_enabled(arc_zone_node, arcing)
-	_update_arc_zone_visual(arc_zone_node, arcing)
-	if arc_zone_label != null:
-		arc_zone_label.text = ARC_ZONE_LABEL_TEXT_ARCING if arcing else ARC_ZONE_LABEL_TEXT_DISCHARGED
-		arc_zone_label.modulate = ARC_ZONE_VISUAL_COLOR_ARCING if arcing else ARC_ZONE_VISUAL_COLOR_DISCHARGED
+	for zone in arc_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("arc_zone_phase", state_text)
+		zone.set_meta("arc_zone_passability_blocked", arcing)
+		_set_arc_zone_collision_enabled(zone, arcing)
+		_update_arc_zone_visual(zone, arcing)
+	for label in arc_zone_labels:
+		if is_instance_valid(label):
+			label.text = ARC_ZONE_LABEL_TEXT_ARCING if arcing else ARC_ZONE_LABEL_TEXT_DISCHARGED
+			label.modulate = ARC_ZONE_VISUAL_COLOR_ARCING if arcing else ARC_ZONE_VISUAL_COLOR_DISCHARGED
 
 func _set_arc_zone_collision_enabled(zone: Node, enabled: bool) -> void:
 	for child in zone.get_children():
@@ -9278,16 +9583,21 @@ func get_arc_summary() -> Dictionary:
 func get_arc_zone_node() -> Node:
 	return arc_zone_node
 
+func get_arc_zone_nodes() -> Array[StaticBody3D]:
+	return arc_zone_nodes.duplicate()
+
 func get_arc_zone_resolved_room_id() -> String:
 	return arc_zone_resolved_room_id
 
 func get_arc_zone_collision_enabled_count() -> int:
-	if arc_zone_node == null:
-		return 0
-	for child in arc_zone_node.get_children():
-		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
-			return 1
-	return 0
+	var enabled_count := 0
+	for zone in arc_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		for child in zone.get_children():
+			if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
+				enabled_count += 1
+	return enabled_count
 
 func teleport_player_to_arc_zone_for_validation() -> bool:
 	if player == null or arc_zone_node == null:
@@ -10520,6 +10830,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
@@ -10539,6 +10850,7 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		ws.home_breach_environment = home_ship.breach_environment_summary.duplicate(true)
 		var home_cart_dicts: Array = []
 		for c in home_ship.get_carts():
 			home_cart_dicts.append(c.get_summary())
@@ -10751,6 +11063,14 @@ func _apply_world_snapshot(ws) -> bool:
 	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
 	if home_ship != null:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		home_ship.breach_environment_summary = ws.home_breach_environment.duplicate(true)
+		# _apply_run_snapshot() has already rebuilt the home scene, so its initial
+		# _build_breach_zone(false) ran before the world-level home environment was
+		# restored. Rebuild the live oxygen zones now that the persisted summary is
+		# available; otherwise a sealed home save looks open in the runtime until a
+		# later travel transition happens to reapply the ShipInstance state.
+		if not ws.home_breach_environment.is_empty() and not away_from_start:
+			_build_breach_zone(false)
 		if not ws.home_ship_inventory.is_empty():
 			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
 		# Restore home-ship carts BEFORE spawning their controls so the CartStates
@@ -11313,9 +11633,13 @@ func _reset_runtime_for_reload() -> void:
 	if objective_progress_state != null:
 		objective_progress_state.reset()
 	breach_zone_node = null
+	breach_zone_nodes.clear()
 	unsafe_room_marker = null
 	arc_zone_node = null
 	arc_zone_label = null
+	arc_zone_nodes.clear()
+	arc_zone_labels.clear()
+	arc_zone_resolved_room_ids.clear()
 	tool_pickup = null
 	arc_zone_resolved_room_id = ""
 	# REQ-014: drop the second ToolPickup reference so a fresh load

@@ -29,6 +29,31 @@ func register_objective(sequence: int, objective_type: String, required_steps: i
 		"calibrator_applied": false,
 	}
 
+
+## Reconciles restored progress with the current authored contract. Legacy
+## summaries may carry a one-step placeholder for a junction that now exposes
+## multiple authored steps; preserve completed IDs and calibrator use while
+## recomputing the authoritative requirement and completion state.
+func reconcile_objective(sequence: int, objective_type: String, authored_steps: int) -> void:
+	if sequence <= 0:
+		return
+	var required_steps := maxi(1, authored_steps)
+	if not _objectives.has(sequence):
+		register_objective(sequence, objective_type, required_steps)
+		return
+	var objective: Dictionary = _objectives[sequence]
+	var calibrator_applied := bool(objective.get("calibrator_applied", false))
+	if calibrator_applied:
+		required_steps = maxi(1, required_steps - 1)
+	var completed_ids: Array = objective.get("completed_step_ids", []).duplicate()
+	objective["objective_type"] = objective_type
+	objective["required_steps"] = required_steps
+	objective["completed_step_ids"] = completed_ids
+	objective["completed_steps"] = completed_ids.size()
+	objective["complete"] = completed_ids.size() >= required_steps
+	objective["calibrator_applied"] = calibrator_applied
+	_objectives[sequence] = objective
+
 ## REQ-014: reduces the registered required_steps of a sequence by one
 ## (clamped at 1) and marks `calibrator_applied` so the reduction is
 ## idempotent across repeated application attempts and is preserved by

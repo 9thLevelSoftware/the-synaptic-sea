@@ -149,6 +149,13 @@ func _validate() -> void:
 		_fail("expected burning_before=[%s], got %s" % [cid_b, str(burning_before)]); return
 
 	# --- Leave: travel home ---
+	# Extinguishing happens on the host derelict. Re-board the piloted ship before
+	# travel so this persistence smoke honors the same physical-travel precondition
+	# as the production interaction path.
+	playable.board_piloted_ship_for_validation()
+	playable.recompute_occupancy()
+	if playable.get_current_occupancy_for_validation() != playable.piloted_ship:
+		_fail("could not re-board piloted ship before travel_home"); return
 	var went_home: bool = playable.travel_home()
 	if not went_home:
 		_fail("travel_home() returned false"); return
@@ -158,7 +165,7 @@ func _validate() -> void:
 	# --- Revisit: travel to the SAME derelict ---
 	var res2: Dictionary = playable.travel_to_marker_id(marker_id)
 	if not bool(res2.get("success", false)):
-		_fail("revisit travel_to_marker_id('%s') failed" % marker_id); return
+		_fail("revisit travel_to_marker_id('%s') failed: %s" % [marker_id, str(res2)]); return
 	if not playable.away_from_start:
 		_fail("away_from_start not true after revisit"); return
 

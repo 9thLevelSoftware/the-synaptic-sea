@@ -9,6 +9,7 @@ const CELL_SIZE: float = 4.0
 
 var loader: Node3D
 var finished: bool = false
+var doors_opened: bool = false
 
 
 func _initialize() -> void:
@@ -30,6 +31,17 @@ func _initialize() -> void:
 
 func _probe() -> void:
 	if finished:
+		return
+	if not doors_opened:
+		for portal in loader.get_authored_portal_nodes():
+			if str(portal.portal_kind).to_upper() != "DOOR":
+				continue
+			portal.set_validation_player_in_range(true)
+			var result: Dictionary = portal.try_interact({})
+			if not bool(result.get("ok", false)) or not bool(result.get("open", false)):
+				_fail("authored DOOR did not open before passability probe: %s" % str(portal.portal_id))
+				return
+		doors_opened = true
 		return
 	var layout: Dictionary = loader.layout_doc
 	var plan_variant: Variant = layout.get("structural_plan", null)
@@ -140,14 +152,22 @@ func _expected_sizes(module_id: String) -> Array[Vector3]:
 	return []
 
 
-func _collision_box_sizes(node: Node) -> Array[Vector3]:
+func _collision_box_sizes(node: Node, accumulated_basis: Basis = Basis.IDENTITY, skip_node_basis: bool = true) -> Array[Vector3]:
 	var sizes: Array[Vector3] = []
+	var basis := accumulated_basis
+	if node is Node3D and not skip_node_basis:
+		basis = accumulated_basis * (node as Node3D).transform.basis
 	if node is CollisionShape3D:
 		var shape: Shape3D = (node as CollisionShape3D).shape
 		if shape is BoxShape3D:
-			sizes.append((shape as BoxShape3D).size)
+			var raw := (shape as BoxShape3D).size
+			var effective := Vector3(
+				absf(basis.x.x) * raw.x + absf(basis.y.x) * raw.y + absf(basis.z.x) * raw.z,
+				absf(basis.x.y) * raw.x + absf(basis.y.y) * raw.y + absf(basis.z.y) * raw.z,
+				absf(basis.x.z) * raw.x + absf(basis.y.z) * raw.y + absf(basis.z.z) * raw.z)
+			sizes.append(effective)
 	for child in node.get_children():
-		sizes.append_array(_collision_box_sizes(child))
+		sizes.append_array(_collision_box_sizes(child, basis, false))
 	return sizes
 
 

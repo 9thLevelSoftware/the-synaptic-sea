@@ -83,6 +83,20 @@ func _initialize() -> void:
 	assert((rt_hc.home_ship_carts as Array).size() == 1, "home_ship_carts survived round-trip")
 	assert(str(rt_hc.home_ship_carts[0].get("cart_id", "")) == "cart_home", "cart entry intact")
 
+	# --- home breach environment round-trip (additive, no version bump) ---
+	var ws_breach = WorldSnapshotScript.new()
+	ws_breach.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_breach.godot_version = godot_version
+	ws_breach.home_breach_environment = {
+		"hazard_kind": "oxygen", "breach_open": false, "breach_sealed": true,
+		"breach_zone_ids": ["home_breach"],
+	}
+	var rt_breach = WorldSnapshotScript.from_dict(
+		ws_breach.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_breach != null, "home breach environment snapshot round-trips")
+	assert(bool(rt_breach.home_breach_environment.get("breach_sealed", false)),
+		"home breach environment survived round-trip")
+
 	# --- run_id round-trip (slot-ownership rework, additive, no version bump) ---
 	var ws_rid = WorldSnapshotScript.new()
 	ws_rid.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
