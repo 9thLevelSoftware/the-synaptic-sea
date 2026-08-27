@@ -50,9 +50,10 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	# I1 coverage: put the player at a KNOWN home position before traveling away,
 	# so travel_to captures it into _home_player_position. After an away-save +
 	# fresh-process reload, travel_home() must return the player here (not origin).
-	var known_home_pos: Vector3 = Vector3(5.0, 1.5, -3.0)
-	if playable.player != null and playable.player is Node3D:
-		(playable.player as Node3D).global_position = known_home_pos
+	playable.board_piloted_ship_for_validation()
+	playable.recompute_occupancy()
+	var known_home_pos: Vector3 = (playable.player as Node3D).global_position \
+		if playable.player != null and playable.player is Node3D else Vector3.ZERO
 
 	# Travel to a derelict and mutate its systems to a recognisable state.
 	var world = playable.get_synaptic_sea_world()

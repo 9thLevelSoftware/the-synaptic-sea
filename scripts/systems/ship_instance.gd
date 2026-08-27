@@ -104,6 +104,9 @@ var fire_seeded: bool = false
 # derelict. Persisted so a revisit/reload does NOT re-breach compartments the player
 # already sealed. Set even when the variant scan yields no breaches.
 var breach_seeded: bool = false
+# Scene-level breach environment belongs to this ship; player oxygen remains
+# coordinator-owned so it follows the player between hulls.
+var breach_environment_summary: Dictionary = {}
 
 # Live Persistent Ships Phase 2a: per-ship structural state, mirroring `fire`. The
 # coordinator configures these from tuning before seeding/use. hull holds breach/health
@@ -184,6 +187,8 @@ func get_summary() -> Dictionary:
 		result["fire_seeded"] = true
 	if breach_seeded:
 		result["breach_seeded"] = true
+	if not breach_environment_summary.is_empty():
+		result["breach_environment"] = breach_environment_summary.duplicate(true)
 	if has_hull():
 		result["hull"] = hull.get_summary()
 	if web != null and (not web.attached_to_web or web.coverage > 0.0):
@@ -269,6 +274,9 @@ func apply_summary(summary) -> bool:
 		arc_summary = (arc_variant as Dictionary).duplicate(true)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	breach_seeded = bool(summary.get("breach_seeded", breach_seeded))
+	var breach_environment_variant: Variant = summary.get("breach_environment", null)
+	if typeof(breach_environment_variant) == TYPE_DICTIONARY:
+		breach_environment_summary = (breach_environment_variant as Dictionary).duplicate(true)
 	var hull_summary: Variant = summary.get("hull", null)
 	if typeof(hull_summary) == TYPE_DICTIONARY and not (hull_summary as Dictionary).is_empty():
 		get_hull().apply_summary(hull_summary as Dictionary)

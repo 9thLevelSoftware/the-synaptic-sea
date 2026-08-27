@@ -17,6 +17,7 @@ var unique_item_summary: Dictionary = {}        # UniqueItemState.get_summary()
 var home_looted_containers: Array = []          # home ship's searched loot-container ids
 var home_ship_inventory: Dictionary = {}        # home ship's ShipInventory.get_summary()
 var home_ship_carts: Array = []                  # home ship's [CartState.get_summary()...]
+var home_breach_environment: Dictionary = {}     # home ShipInstance breach environment only
 var player_equipment: Dictionary = {}           # EquipmentState.get_summary()
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
 var current_location: String = ""               # "" = home ship, else marker_id
@@ -49,6 +50,7 @@ func to_dict() -> Dictionary:
 		"home_looted_containers": home_looted_containers.duplicate(),
 		"home_ship_inventory": home_ship_inventory.duplicate(true),
 		"home_ship_carts": home_ship_carts.duplicate(true),
+		"home_breach_environment": home_breach_environment.duplicate(true),
 		"player_equipment": player_equipment.duplicate(true),
 		"visited_ships": visited_ships.duplicate(true),
 		"current_location": current_location,
@@ -95,6 +97,7 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	ws.home_ship_inventory = _deep_copy_dict(dict.get("home_ship_inventory", {}))
 	var hc_variant: Variant = dict.get("home_ship_carts", [])
 	ws.home_ship_carts = (hc_variant as Array).duplicate(true) if hc_variant is Array else []
+	ws.home_breach_environment = _deep_copy_dict(dict.get("home_breach_environment", {}))
 	ws.player_equipment = _deep_copy_dict(dict.get("player_equipment", {}))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
 	ws.current_location = str(dict.get("current_location", ""))

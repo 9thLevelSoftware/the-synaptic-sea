@@ -322,6 +322,7 @@ var fire_zone_nodes: Dictionary = {}
 # zone build/clear lifecycle and the interact dispatcher precedence.
 var fire_suppression_points: Array = []
 var extinguisher_recharge_port  # ExtinguisherRechargePort
+const FireCompartmentResolverScript := preload("res://scripts/procgen/fire_compartment_resolver.gd")
 const FIRE_COMPARTMENT_SYSTEM := {
 	"bridge": "navigation",
 	"engineering": "power",
@@ -331,16 +332,7 @@ const FIRE_COMPARTMENT_SYSTEM := {
 # Maps a room ROLE to the hull/fire compartment it belongs to. Only these
 # compartments exist (data/ship_systems/hull_compartments.json + FIRE_COMPARTMENT_SYSTEM),
 # so variant hazards on other roles are loot/dressing-only.
-const COMPARTMENT_FOR_ROLE := {
-	"bridge": "bridge",
-	"cockpit": "bridge",
-	"engineering": "engineering",
-	"reactor": "engineering",
-	"engine_bay": "engineering",
-	"hydroponics": "hydroponics",
-	"cargo": "cargo",
-	"storage": "cargo",
-}
+const COMPARTMENT_FOR_ROLE := FireCompartmentResolverScript.COMPARTMENT_FOR_ROLE
 const RoomVariantSelectorHazardScript := preload("res://scripts/procgen/room_variant_selector.gd")
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
@@ -2210,7 +2202,7 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 ## Does NOT re-home the player — callers position the player afterwards.
 ## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
 ## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
-func _attach_derelict_active(inst, new_root: Node3D) -> void:
+func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: float = -1.0) -> void:
 	# Live Persistent Ships Phase 4: fast-forward the absent ship's sim by elapsed world_time
 	# before activating it. First visit: dt=0 (seeded), no-op. Revisit: applies the absence.
 	_catch_up_ship(inst)
@@ -2263,7 +2255,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
-	_build_breach_zone()
+	_build_breach_zone(false, preserved_player_oxygen)
 	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
 	# Seeded BEFORE _build_breach_seal_points() so the seal-point builder sees
 	# variant breaches in the hull and creates player-interactable seal nodes.
@@ -3335,12 +3327,7 @@ func _variant_hazard_compartments(kind: String) -> Array:
 ## Maps an authored compartment_id or room role onto a live hull/fire compartment.
 ## Unmapped roles (airlock, corridor, …) return "" — visual overlay only.
 func _mapped_authored_compartment_id(raw: String) -> String:
-	var token: String = raw.strip_edges()
-	if token.is_empty():
-		return ""
-	if FIRE_COMPARTMENT_SYSTEM.has(token):
-		return token
-	return str(COMPARTMENT_FOR_ROLE.get(token, ""))
+	return FireCompartmentResolverScript.from_token(raw)
 
 func _append_zone_dicts(out: Array, raw: Variant) -> void:
 	if not (raw is Array):
@@ -3365,43 +3352,20 @@ func _authored_hazard_zone_dicts(zone_key: String) -> Array:
 			_append_zone_dicts(out, root.get_fire_zone_specs())
 	return out
 
-func _mapped_authored_room_compartment(room_id: String) -> String:
-	var token := room_id.strip_edges()
-	if token.is_empty():
-		return ""
+func _authored_fire_layout_sources() -> Array:
 	var sources: Array = []
 	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
-		sources.append(current_ship.built_layout.get("rooms", []))
+		sources.append(current_ship.built_layout)
 	var root = current_ship.scene_root if current_ship != null else null
 	if is_instance_valid(root) and typeof(root.get("layout_doc")) == TYPE_DICTIONARY:
-		sources.append(root.layout_doc.get("rooms", []))
-	for rooms_variant in sources:
-		if not (rooms_variant is Array):
-			continue
-		for room_variant in rooms_variant:
-			if not (room_variant is Dictionary):
-				continue
-			var room: Dictionary = room_variant
-			if str(room.get("id", "")) != token:
-				continue
-			return _mapped_authored_compartment_id(str(room.get("room_role", room.get("role", ""))))
-	return ""
+		sources.append(root.layout_doc)
+	return sources
 
 ## Resolve a normal link-shaped authored fire record onto the boarded fire
 ## model. Explicit compartment ids win; otherwise the destination and source
 ## room ids are mapped through their authored room roles.
 func _authored_fire_compartment_id(zone: Dictionary) -> String:
-	var explicit := _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
-	if not explicit.is_empty():
-		return explicit
-	for endpoint_key in ["to_room", "from_room"]:
-		var endpoint := str(zone.get(endpoint_key, ""))
-		var mapped := _mapped_authored_compartment_id(endpoint)
-		if mapped.is_empty():
-			mapped = _mapped_authored_room_compartment(endpoint)
-		if not mapped.is_empty():
-			return mapped
-	return ""
+	return FireCompartmentResolverScript.from_zone(zone, _authored_fire_layout_sources())
 
 ## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones.
 ## Fire links may resolve through room ids; invalid or unmapped records remain
@@ -6528,6 +6492,8 @@ func travel_to(marker) -> Dictionary:
 	if piloted_ship != null and current_occupancy != piloted_ship:
 		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
+	var player_oxygen_before_transition := float(oxygen_state.get_summary().get("oxygen", -1.0)) \
+		if oxygen_state != null else -1.0
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
@@ -6580,6 +6546,7 @@ func travel_to(marker) -> Dictionary:
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
@@ -6613,7 +6580,7 @@ func travel_to(marker) -> Dictionary:
 		visited_ships[mid] = inst
 		_seed_ship_models(inst)
 
-	_attach_derelict_active(inst, new_root)
+	_attach_derelict_active(inst, new_root, player_oxygen_before_transition)
 	_configure_threat_runtime_for_current_ship()
 	# Phase 5b Task 5: NO player teleport into the derelict. The player rides the
 	# piloted ship, which docked flush to the target; _attach_derelict_active carried
@@ -6636,8 +6603,11 @@ func travel_to(marker) -> Dictionary:
 func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
+	var player_oxygen_before_transition := float(oxygen_state.get_summary().get("oxygen", -1.0)) \
+		if oxygen_state != null else -1.0
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
@@ -6685,7 +6655,7 @@ func travel_home() -> bool:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
-	_build_breach_zone()
+	_build_breach_zone(false, player_oxygen_before_transition)
 	_build_breach_seal_points()
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
@@ -7192,6 +7162,18 @@ func _sync_current_ship_arc_summary() -> void:
 	if current_ship == null or electrical_arc_state == null:
 		return
 	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
+
+func _sync_current_ship_breach_environment() -> void:
+	if current_ship == null or oxygen_state == null:
+		return
+	var summary := oxygen_state.get_summary()
+	current_ship.breach_environment_summary = {
+		"hazard_kind": "oxygen",
+		"breach_open": bool(summary.get("breach_open", false)),
+		"breach_sealed": bool(summary.get("breach_sealed", false)),
+		"passability_blocked": bool(summary.get("passability_blocked", false)),
+		"breach_zone_ids": (summary.get("breach_zone_ids", []) as Array).duplicate(),
+	}
 
 ## PKG-D6.1: flush live module integrity + component placement onto the leaving ship
 ## so regenerate-from-seed geometry can re-apply strip/damage state on revisit.
@@ -7715,7 +7697,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
 	_refresh_route_control_from_ship_systems()
-	_build_breach_zone()
+	_build_breach_zone(false)
 	# REQ-007: spawn the portable oxygen pump pickup now that the player,
 	# interactables, and breach zone exist. The pickup is parented to
 	# tool_pickup_root and reads its world position from a side room
@@ -8855,7 +8837,9 @@ func _check_vitals_death() -> void:
 	if vitals_state.is_incapacitated():
 		end_run("death")
 
-func _build_breach_zone() -> void:
+func _build_breach_zone(
+		preserve_active_environment: bool = true,
+		preserved_player_oxygen: float = -1.0) -> void:
 	if oxygen_root == null:
 		return
 	# Rebuilding the scene nodes is a presentation change, not a new hazard
@@ -8907,10 +8891,21 @@ func _build_breach_zone() -> void:
 		"safe_threshold": OxygenStateScript.DEFAULT_SAFE_THRESHOLD,
 	})
 	if not previous_oxygen_summary.is_empty():
-		# apply_summary also restores breach_open/breach_sealed and oxygen. Keep
-		# the newly resolved ids so a ship transition cannot leak old markers.
-		previous_oxygen_summary["breach_zone_ids"] = zone_ids.duplicate()
-		oxygen_state.apply_summary(previous_oxygen_summary)
+		# Player oxygen follows the player between ships. Environmental state is
+		# preserved only for an in-place rebuild; transitions restore it from the
+		# newly active ShipInstance instead of leaking the previous hull's seal.
+		if preserve_active_environment:
+			previous_oxygen_summary["breach_zone_ids"] = zone_ids.duplicate()
+			oxygen_state.apply_summary(previous_oxygen_summary)
+		else:
+			var player_oxygen := preserved_player_oxygen if preserved_player_oxygen >= 0.0 \
+				else float(previous_oxygen_summary.get("oxygen", oxygen_state.oxygen))
+			oxygen_state.apply_summary({"hazard_kind": "oxygen", "oxygen": player_oxygen})
+			if current_ship != null and not current_ship.breach_environment_summary.is_empty():
+				var active_environment: Dictionary = current_ship.breach_environment_summary.duplicate(true)
+				active_environment["hazard_kind"] = "oxygen"
+				active_environment["breach_zone_ids"] = zone_ids.duplicate()
+				oxygen_state.apply_summary(active_environment)
 	for index in range(positions.size()):
 		var node := _create_breach_zone_node(positions[index], zone_ids[index])
 		oxygen_root.add_child(node)
@@ -10812,6 +10807,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
@@ -10831,6 +10827,7 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		ws.home_breach_environment = home_ship.breach_environment_summary.duplicate(true)
 		var home_cart_dicts: Array = []
 		for c in home_ship.get_carts():
 			home_cart_dicts.append(c.get_summary())
@@ -11043,6 +11040,7 @@ func _apply_world_snapshot(ws) -> bool:
 	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
 	if home_ship != null:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		home_ship.breach_environment_summary = ws.home_breach_environment.duplicate(true)
 		if not ws.home_ship_inventory.is_empty():
 			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
 		# Restore home-ship carts BEFORE spawning their controls so the CartStates

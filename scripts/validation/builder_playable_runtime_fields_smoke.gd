@@ -38,6 +38,16 @@ func _validate() -> void:
 		if system != null:
 			for subcomponent in system.subcomponents:
 				playable.get_ship_systems_manager().force_repair(system_id, subcomponent.subcomponent_id)
+	# Home and derelict breach environments are independent, while suit oxygen
+	# follows the player. Seal home before boarding to catch cross-ship leakage.
+	playable.oxygen_state.apply_summary({"hazard_kind": "oxygen", "oxygen": 91.0})
+	if not playable.oxygen_state.seal_breach("home_breach"):
+		_fail("could not seed sealed home breach before boarding")
+		return
+	var seeded_home_oxygen := playable.get_oxygen_summary()
+	if absf(float(seeded_home_oxygen.get("oxygen", 0.0)) - 91.0) > 0.001:
+		_fail("could not seed home player oxygen: %s" % str(seeded_home_oxygen))
+		return
 	var world = playable.get_synaptic_sea_world()
 	var boarded := false
 	for marker in world.markers_in_range(playable.scanner_state.range_radius).slice(0, 4):
@@ -46,6 +56,12 @@ func _validate() -> void:
 			break
 	if not boarded or playable.get_current_ship() == null:
 		_fail("could not board a generated derelict")
+		return
+	var boarded_oxygen_summary := playable.get_oxygen_summary()
+	if absf(float(boarded_oxygen_summary.get("oxygen", 0.0)) - 91.0) > 0.001 \
+			or not bool(boarded_oxygen_summary.get("breach_open", false)) \
+			or bool(boarded_oxygen_summary.get("breach_sealed", true)):
+		_fail("sealed home breach leaked into freshly boarded derelict: %s" % str(boarded_oxygen_summary))
 		return
 	# The travel smoke validates the derelict branch directly; clear any stale
 	# lifeboat occupancy so the same field-suit pressure gate used while walking
@@ -319,10 +335,8 @@ func _validate() -> void:
 		_fail("radiation-only atmosphere incorrectly synthesized thermal recovery")
 		return
 	var derelict_breach_ids := breach_ids.duplicate()
-	# Rebuilding home breach nodes during travel_home must not reset the live
-	# hazard resource or the seal state. This models a player sealing the breach
-	# before a boarding/travel transition and verifies the rebuilt nodes receive
-	# the preserved scene state immediately.
+	# Leave the derelict breach open while lowering player oxygen. Returning home
+	# must preserve the oxygen but restore home's independently sealed environment.
 	playable.oxygen_state.apply_summary({
 		"hazard_kind": "oxygen",
 		"oxygen": 47.0,
@@ -330,9 +344,6 @@ func _validate() -> void:
 		"breach_sealed": false,
 		"breach_zone_ids": breach_markers.map(func(_marker): return "playable_breach_a"),
 	})
-	if not playable.oxygen_state.seal_breach("playable_breach_a"):
-		_fail("could not seed sealed breach state before travel_home")
-		return
 	var exterior_portal = null
 	for candidate in active_loader.get_authored_portal_nodes():
 		if candidate.is_exterior and str(candidate.portal_kind) != "BREACH":
@@ -362,7 +373,7 @@ func _validate() -> void:
 	var home_oxygen_summary := playable.get_oxygen_summary()
 	if absf(float(home_oxygen_summary.get("oxygen", 0.0)) - 47.0) > 0.001 \
 			or not bool(home_oxygen_summary.get("breach_sealed", false)):
-		_fail("travel_home rebuilt breach nodes but reset oxygen/sealed state")
+		_fail("travel_home did not preserve oxygen and restore the sealed home breach")
 		return
 	for home_breach in home_breach_nodes:
 		if not bool(home_breach.get_meta("breach_zone_sealed", false)):
@@ -371,6 +382,20 @@ func _validate() -> void:
 		if derelict_breach_ids.has(str(home_breach.get_meta("breach_zone_id", ""))):
 			_fail("derelict breach zone leaked into the home ship")
 			return
+	# Revisit the same derelict and verify its independently open environment is
+	# restored instead of inheriting home's sealed state.
+	playable.board_piloted_ship_for_validation()
+	playable.recompute_occupancy()
+	var revisit_result: Dictionary = playable.travel_to_marker_id(str(active_ship.marker_id))
+	if not bool(revisit_result.get("success", false)):
+		_fail("could not revisit derelict for breach isolation: %s" % str(revisit_result))
+		return
+	var revisited_oxygen_summary := playable.get_oxygen_summary()
+	if absf(float(revisited_oxygen_summary.get("oxygen", 0.0)) - 47.0) > 0.001 \
+			or not bool(revisited_oxygen_summary.get("breach_open", false)) \
+			or bool(revisited_oxygen_summary.get("breach_sealed", true)):
+		_fail("revisited derelict did not restore its independent breach environment")
+		return
 	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true authored_portal_persistence=true exterior_exit=true multi_step_objective=true multiple_arcs=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
 	quit(0)
 
