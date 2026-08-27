@@ -84,6 +84,26 @@ func _validate() -> void:
 	if not playable.radiation_state.in_radiation_zone or playable.radiation_state.radiation <= 0.0:
 		_fail("localized authored radiation did not reach the playable survival tick")
 		return
+	var original_loader = playable.loader
+	var breach_markers: Array[Vector3] = [local_player, local_player + Vector3(4.0, 0.0, 0.0)]
+	active_loader.breach_zone_markers = breach_markers
+	active_loader.breach_zone_specs = [
+		{"zone_id": "playable_breach_a", "kind": "hull_breach"},
+		{"zone_id": "playable_breach_b", "kind": "hull_breach"},
+	]
+	playable.loader = active_loader
+	playable._build_breach_zone()
+	playable.loader = original_loader
+	var breach_nodes: Array[StaticBody3D] = playable.get_breach_zone_nodes()
+	if breach_nodes.size() != 2:
+		_fail("playable did not materialize every authored breach zone")
+		return
+	var breach_ids := {}
+	for breach_node in breach_nodes:
+		breach_ids[str(breach_node.get_meta("breach_zone_id", ""))] = true
+	if breach_ids.size() != 2 or playable.get_oxygen_summary().get("breach_zone_ids", []).size() != 2:
+		_fail("playable breach zones did not preserve stable authored IDs")
+		return
 
 	var fire_state = playable.get_current_ship().get_fire()
 	if fire_state != null:
@@ -105,7 +125,7 @@ func _validate() -> void:
 	if playable.oxygen_state.oxygen >= 99.999 or playable.oxygen_state.effective_drain_rate <= 0.0:
 		_fail("vacuum-authored compartment did not drain field oxygen")
 		return
-	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true localized_radiation=true authored_atmosphere=true")
+	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true localized_radiation=true multiple_breaches=true authored_atmosphere=true")
 	quit(0)
 
 

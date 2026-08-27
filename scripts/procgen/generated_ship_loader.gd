@@ -31,6 +31,7 @@ var landmark_nodes: Array[Node3D] = []
 var blocked_route_nodes: Array[Node3D] = []
 var visible_vertical_transition_nodes: Array[Node3D] = []
 var breach_zone_markers: Array[Vector3] = []
+var breach_zone_specs: Array = []
 var fire_zone_markers: Array[Vector3] = []
 var fire_zone_specs: Array = []
 var arc_zone_markers: Array[Vector3] = []
@@ -66,6 +67,7 @@ func clear_loaded_ship() -> void:
 	blocked_route_nodes = []
 	visible_vertical_transition_nodes = []
 	breach_zone_markers = []
+	breach_zone_specs = []
 	fire_zone_markers = []
 	fire_zone_specs = []
 	arc_zone_markers = []
@@ -1121,6 +1123,10 @@ func get_breach_zone_markers() -> Array[Vector3]:
 	return breach_zone_markers.duplicate()
 
 
+func get_breach_zone_specs() -> Array:
+	return breach_zone_specs.duplicate(true)
+
+
 func get_fire_zone_markers() -> Array[Vector3]:
 	return fire_zone_markers.duplicate()
 
@@ -1986,7 +1992,11 @@ func _add_breach_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void
 			to_pos = _room_center_for_blocked_link(zone, "to_room", layout_doc)
 		if from_pos == Vector3.INF or to_pos == Vector3.INF:
 			continue
-		breach_zone_markers.append((from_pos + to_pos) * 0.5)
+		var midpoint: Vector3 = (from_pos + to_pos) * 0.5
+		breach_zone_markers.append(midpoint)
+		var spec: Dictionary = _normalize_zone_spec(zone)
+		spec["position"] = midpoint
+		breach_zone_specs.append(spec)
 
 
 func _room_center_for_blocked_link(link: Dictionary, room_key: String, layout_doc: Dictionary) -> Vector3:

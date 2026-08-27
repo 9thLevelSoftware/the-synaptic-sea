@@ -6,6 +6,8 @@ const FireStateScript := preload("res://scripts/systems/fire_suppression_state.g
 const ArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
+const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
+const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
 
@@ -47,6 +49,12 @@ func _ready() -> void:
 	add_child(loader)
 	if not loader.load_from_paths(layout_path, kit_path, gameplay_path, true):
 		_finish(false, ["GeneratedShipLoader rejected the bundle"])
+		return
+	# Navigation maps synchronize asynchronously after regions and links enter
+	# the tree. Do not let an unsynchronized map return empty/default points that
+	# could make a path check pass accidentally.
+	if not await _wait_for_navigation_sync():
+		_finish(false, ["navigation map did not synchronize"])
 		return
 	var acceptance := _exercise_runtime(_json_file(layout_path), _json_file(gameplay_path))
 	_finish(bool(acceptance.get("ok", false)), acceptance.get("errors", []), acceptance.get("checks", {}))
@@ -93,9 +101,9 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var checks := {
 		"structural_collision": loader.count_collision_shapes() > 0,
-		"navigation": loader.structural_root != null and loader.structural_root.find_child("GameplayNavigationRegion", true, false) is NavigationRegion3D,
-		"objectives": not loader.get_objective_specs_copy().is_empty(),
-		"loot": loader.get_loot_container_specs_copy().size() == _array(gameplay.get("loot_containers", [])).size(),
+		"navigation": _navigation_path_exists(loader.get_goal_position()),
+		"objectives": _exercise_objectives(),
+		"loot": _exercise_loot(gameplay),
 		"props": loader.get_placed_prop_specs_copy().size() == _array(gameplay.get("placed_props", [])).size(),
 		"vertical_links": int(_ship_summary.get("vertical_link_count", -1)) == _array(layout.get("vertical_connections", [])).size(),
 	}
@@ -115,7 +123,11 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	var arc_specs: Array = loader.get_arc_zone_specs()
 	var arc_state = ArcStateScript.new()
 	arc_state.configure({"zone_ids": _zone_ids(arc_specs), "arcing_first": true})
-	checks["electrical"] = arc_specs.is_empty() or arc_state.is_passability_blocked()
+	var arc_ready: bool = arc_specs.is_empty() or arc_state.is_passability_blocked()
+	checks["arc"] = arc_ready
+	# Retain the legacy key for existing automation while exposing the authored
+	# hazard name used by the builder and the human-readable success marker.
+	checks["electrical"] = arc_ready
 
 	var radiation_specs: Array = loader.get_radiation_zone_specs()
 	var radiation_state = RadiationStateScript.new()
@@ -123,12 +135,15 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	radiation_state.tick(1.0)
 	checks["radiation"] = radiation_specs.is_empty() or radiation_state.radiation > 0.0
 
-	var breach_specs: Array = _array(layout.get("breach_zones", []))
+	var breach_specs: Array = loader.get_breach_zone_specs()
 	var oxygen_state = OxygenStateScript.new()
 	oxygen_state.configure({"zone_ids": _zone_ids(breach_specs), "drain_rate": 6.0})
 	if not breach_specs.is_empty():
 		oxygen_state.tick(1.0, {"player_in_breach_zone": true})
-	checks["breach"] = breach_specs.is_empty() or oxygen_state.oxygen < oxygen_state.max_oxygen
+	checks["breach"] = breach_specs.is_empty() or (
+		breach_specs.size() == loader.get_breach_zone_markers().size()
+		and oxygen_state.oxygen < oxygen_state.max_oxygen
+	)
 
 	var atmosphere_checked := false
 	for room_variant in _array(layout.get("rooms", [])):
@@ -144,10 +159,89 @@ func _exercise_runtime(layout: Dictionary, gameplay: Dictionary) -> Dictionary:
 	checks["atmosphere"] = atmosphere_checked or not _has_authored_atmosphere(layout)
 
 	checks["portal_interaction"] = _exercise_portals(layout)
-	for key in ["fire", "electrical", "radiation", "breach", "atmosphere", "portal_interaction"]:
+	for key in ["fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction"]:
 		if not bool(checks[key]):
 			errors.append("runtime behavior failed: %s" % key)
 	return {"ok": errors.is_empty(), "errors": errors, "checks": checks}
+
+
+func _navigation_path_exists(local_target: Vector3) -> bool:
+	if loader.structural_root == null:
+		return false
+	var region := loader.structural_root.find_child("GameplayNavigationRegion", true, false) as NavigationRegion3D
+	if region == null:
+		return false
+	var navigation_map: RID = region.get_navigation_map()
+	if not navigation_map.is_valid() or NavigationServer3D.map_get_iteration_id(navigation_map) <= 0:
+		return false
+	var start_world: Vector3 = loader.to_global(loader.get_start_transform().origin)
+	var target_world: Vector3 = loader.to_global(local_target)
+	var start_on_map := NavigationServer3D.map_get_closest_point(navigation_map, start_world)
+	var target_on_map := NavigationServer3D.map_get_closest_point(navigation_map, target_world)
+	var path := NavigationServer3D.map_get_path(navigation_map, start_on_map, target_on_map, true)
+	return path.size() >= 2 or start_on_map.distance_to(target_on_map) <= 0.05
+
+
+func _wait_for_navigation_sync() -> bool:
+	if loader.structural_root == null:
+		return false
+	var region := loader.structural_root.find_child("GameplayNavigationRegion", true, false) as NavigationRegion3D
+	if region == null:
+		return false
+	var navigation_map: RID = region.get_navigation_map()
+	for _frame in range(120):
+		if navigation_map.is_valid() and NavigationServer3D.map_get_iteration_id(navigation_map) > 0:
+			return true
+		await get_tree().physics_frame
+	return false
+
+
+func _exercise_objectives() -> bool:
+	var specs: Array = loader.get_objective_specs_copy()
+	var volumes: Array = loader.objective_volumes
+	if specs.is_empty() or volumes.size() != specs.size():
+		return false
+	for volume_variant in volumes:
+		if not (volume_variant is GameplayObjectiveVolume):
+			return false
+		var volume := volume_variant as GameplayObjectiveVolume
+		if not _navigation_path_exists(loader.to_local(volume.global_position)):
+			return false
+		volume.complete()
+		if not volume.completed:
+			return false
+	return true
+
+
+func _exercise_loot(gameplay: Dictionary) -> bool:
+	var specs: Array = loader.get_loot_container_specs_copy()
+	if specs.is_empty() or specs.size() != _array(gameplay.get("loot_containers", [])).size():
+		return false
+	var spec: Dictionary = specs[0]
+	var contents: Array = _array(spec.get("contents", []))
+	if contents.is_empty() or not (contents[0] is Dictionary):
+		return false
+	var first_stack: Dictionary = contents[0]
+	var item_id := str(first_stack.get("item_id", ""))
+	var quantity := int(first_stack.get("qty", first_stack.get("quantity", 0)))
+	if item_id.is_empty() or quantity <= 0:
+		return false
+	var inventory = InventoryStateScript.new()
+	var container = LootContainerScript.new()
+	var player := Node3D.new()
+	add_child(container)
+	add_child(player)
+	container.configure(
+		str(spec.get("id", "preview_loot")), str(spec.get("loot_table", "")),
+		"derelict_builder_preview", inventory, {}, Vector3.ZERO, 1.8, spec
+	)
+	container.set_validation_player_in_range(player)
+	var before: int = inventory.get_quantity(item_id)
+	var interacted: bool = container.try_interact(player)
+	var accepted: bool = interacted and container.searched and inventory.get_quantity(item_id) == before + quantity
+	container.queue_free()
+	player.queue_free()
+	return accepted
 
 
 func _exercise_portals(layout: Dictionary) -> bool:

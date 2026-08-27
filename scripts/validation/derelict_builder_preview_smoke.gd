@@ -7,7 +7,7 @@ const PREVIEW_SCENE := "res://scenes/procgen/derelict_builder_preview.tscn"
 const TIMEOUT_SECONDS := 45.0
 const REQUIRED_CHECKS := [
 	"structural_collision", "navigation", "objectives", "props", "loot", "vertical_links",
-	"fire", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
+	"fire", "arc", "electrical", "radiation", "breach", "atmosphere", "portal_interaction",
 ]
 
 var _child_pid := -1
@@ -28,6 +28,29 @@ func _initialize() -> void:
 	if layout.is_empty() or gameplay.is_empty() or kit.is_empty():
 		_fail("coherent fixture is unavailable")
 		return
+	# Exercise every authored runtime consumer with representative data. The
+	# golden fixture intentionally omits some optional hazards, which previously
+	# let acceptance succeed through "not applicable" branches alone.
+	layout["fire_zones"] = [_zone("preview_fire", "timed_fire", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0])]
+	layout["arc_zones"] = [_zone("preview_arc", "electrical_arc", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0])]
+	layout["breach_zones"] = [
+		_zone("preview_breach_airlock", "hull_breach", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0]),
+		_zone("preview_breach_ramp", "hull_breach", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0]),
+	]
+	layout["radiation_zones"] = [_zone("preview_radiation", "radiation", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0])]
+	var rooms: Array = layout.get("rooms", [])
+	if not rooms.is_empty() and rooms[0] is Dictionary:
+		var authored_room: Dictionary = rooms[0]
+		authored_room["oxygen_bp"] = 10000
+		authored_room["depressurized"] = false
+		rooms[0] = authored_room
+		layout["rooms"] = rooms
+	var loot: Array = gameplay.get("loot_containers", [])
+	if not loot.is_empty() and loot[0] is Dictionary:
+		var authored_loot: Dictionary = loot[0]
+		authored_loot["contents"] = [{"item_id": "scrap_metal", "qty": 2}]
+		loot[0] = authored_loot
+		gameplay["loot_containers"] = loot
 	var layout_path := _write_json("layout.json", layout)
 	var gameplay_path := _write_json("gameplay_slice.json", gameplay)
 	var kit_path := _write_json("kit.json", kit)
@@ -126,6 +149,20 @@ func _file_hash(path: String) -> String:
 	context.start(HashingContext.HASH_SHA256)
 	context.update(content.to_utf8_buffer())
 	return context.finish().hex_encode()
+
+
+func _zone(id: String, kind: String, from_room: String, to_room: String, from_cell: Array, to_cell: Array) -> Dictionary:
+	return {
+		"id": id,
+		"kind": kind,
+		"from_room": from_room,
+		"to_room": to_room,
+		"from_cell": from_cell,
+		"to_cell": to_cell,
+		"module_id": "",
+		"compartment_id": from_room,
+		"rationale": "builder runtime preview smoke",
+	}
 
 
 func _fail(message: String) -> void:

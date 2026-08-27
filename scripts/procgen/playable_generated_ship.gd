@@ -394,6 +394,7 @@ var route_gate_nodes: Array = []
 var oxygen_state: OxygenState
 var oxygen_root: Node3D
 var breach_zone_node: StaticBody3D
+var breach_zone_nodes: Array[StaticBody3D] = []
 var unsafe_room_marker: Label3D
 # --- Inventory / Tool pickup integration -------------------------------------
 # REQ-007: a single ToolPickup carrying the portable_oxygen_pump lives in a
@@ -8712,8 +8713,26 @@ func _build_breach_zone() -> void:
 		oxygen_root.remove_child(child)
 		child.queue_free()
 	breach_zone_node = null
+	breach_zone_nodes.clear()
 	unsafe_room_marker = null
-	var world_position: Vector3 = _resolve_breach_zone_world_position()
+	var positions: Array[Vector3] = []
+	var zone_ids: Array[String] = []
+	if loader != null and loader.has_method("get_breach_zone_markers"):
+		for marker in loader.get_breach_zone_markers():
+			if marker is Vector3 and marker != Vector3.INF:
+				positions.append(marker)
+	var specs: Array = loader.get_breach_zone_specs() \
+		if loader != null and loader.has_method("get_breach_zone_specs") else []
+	for index in range(positions.size()):
+		var zone_id := "breach_%d" % index
+		if index < specs.size() and specs[index] is Dictionary:
+			var authored_zone_id := str((specs[index] as Dictionary).get("zone_id", (specs[index] as Dictionary).get("id", "")))
+			if not authored_zone_id.is_empty():
+				zone_id = authored_zone_id
+		zone_ids.append(zone_id)
+	if positions.is_empty():
+		positions.append(_resolve_breach_zone_world_position())
+		zone_ids.append(BREACH_ZONE_FALLBACK_ID)
 	if oxygen_state == null:
 		oxygen_state = OxygenStateScript.new()
 	# Per ADR-0005 HazardStateContract: configure() takes a Dictionary so
@@ -8721,16 +8740,19 @@ func _build_breach_zone() -> void:
 	# reads max_oxygen / drain_rate / regen_rate / recovery_threshold /
 	# safe_threshold plus the zone_ids array.
 	oxygen_state.configure({
-		"zone_ids": [BREACH_ZONE_FALLBACK_ID],
+		"zone_ids": zone_ids,
 		"max_oxygen": OxygenStateScript.DEFAULT_MAX_OXYGEN,
 		"drain_rate": OxygenStateScript.DEFAULT_DRAIN_RATE,
 		"regen_rate": OxygenStateScript.DEFAULT_REGEN_RATE,
 		"recovery_threshold": OxygenStateScript.DEFAULT_RECOVERY_THRESHOLD,
 		"safe_threshold": OxygenStateScript.DEFAULT_SAFE_THRESHOLD,
 	})
-	breach_zone_node = _create_breach_zone_node(world_position)
-	oxygen_root.add_child(breach_zone_node)
-	unsafe_room_marker = _create_unsafe_room_marker(world_position)
+	for index in range(positions.size()):
+		var node := _create_breach_zone_node(positions[index], zone_ids[index])
+		oxygen_root.add_child(node)
+		breach_zone_nodes.append(node)
+	breach_zone_node = breach_zone_nodes[0]
+	unsafe_room_marker = _create_unsafe_room_marker(positions[0])
 	oxygen_root.add_child(unsafe_room_marker)
 
 func _resolve_breach_zone_world_position() -> Vector3:
@@ -8759,13 +8781,13 @@ func _resolve_breach_zone_world_position() -> Vector3:
 		return Vector3.ZERO
 	return (obj3_pos + obj4_pos) * 0.5
 
-func _create_breach_zone_node(world_position: Vector3) -> StaticBody3D:
+func _create_breach_zone_node(world_position: Vector3, zone_id: String = BREACH_ZONE_FALLBACK_ID) -> StaticBody3D:
 	var zone: StaticBody3D = StaticBody3D.new()
-	zone.name = "BreachZone_OxygenCorridor"
+	zone.name = "BreachZone_%s" % zone_id.validate_node_name()
 	zone.position = world_position
 	zone.collision_layer = 1
 	zone.collision_mask = 1
-	zone.set_meta("breach_zone_id", BREACH_ZONE_FALLBACK_ID)
+	zone.set_meta("breach_zone_id", zone_id)
 	zone.set_meta("breach_zone_kind", "oxygen_breach")
 	zone.set_meta("breach_zone_open", true)
 	zone.set_meta("breach_zone_sealed", false)
@@ -8927,22 +8949,25 @@ func get_player_vitals_lines() -> PackedStringArray:
 	return vitals_model.get_status_lines()
 
 func _apply_breach_zone_scene_state() -> void:
-	if oxygen_state == null or breach_zone_node == null:
+	if oxygen_state == null or breach_zone_nodes.is_empty():
 		return
 	var summary: Dictionary = oxygen_state.get_summary()
 	var breach_open: bool = bool(summary.get("breach_open", false))
 	var breach_sealed: bool = bool(summary.get("breach_sealed", false))
 	var passability_blocked: bool = bool(summary.get("passability_blocked", false))
-	breach_zone_node.set_meta("breach_zone_open", breach_open)
-	breach_zone_node.set_meta("breach_zone_sealed", breach_sealed)
-	breach_zone_node.set_meta("breach_zone_passability_blocked", passability_blocked)
 	# Per the feature spec: the breach zone is passable while the player has
 	# oxygen above the recovery threshold; once oxygen hits zero, the
 	# collision is enabled to block forward traversal until oxygen recovers.
 	# Once sealed (objective 2), the corridor is safe and collision is off.
 	var collision_enabled: bool = breach_open and passability_blocked
-	_set_breach_zone_collision_enabled(breach_zone_node, collision_enabled)
-	_update_breach_zone_visual(breach_zone_node, breach_open, passability_blocked)
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("breach_zone_open", breach_open)
+		zone.set_meta("breach_zone_sealed", breach_sealed)
+		zone.set_meta("breach_zone_passability_blocked", passability_blocked)
+		_set_breach_zone_collision_enabled(zone, collision_enabled)
+		_update_breach_zone_visual(zone, breach_open, passability_blocked)
 	if unsafe_room_marker != null:
 		unsafe_room_marker.visible = breach_open and not breach_sealed
 
@@ -8979,26 +9004,38 @@ func get_oxygen_summary() -> Dictionary:
 func get_breach_zone_node() -> Node:
 	return breach_zone_node
 
+
+func get_breach_zone_nodes() -> Array[StaticBody3D]:
+	return breach_zone_nodes.duplicate()
+
+
 func get_breach_zone_collision_enabled_count() -> int:
-	if breach_zone_node == null:
-		return 0
-	for child in breach_zone_node.get_children():
-		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
-			return 1
-	return 0
+	var enabled_count := 0
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		for child in zone.get_children():
+			if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
+				enabled_count += 1
+	return enabled_count
 
 func is_player_in_breach_zone() -> bool:
-	if breach_zone_node == null or player == null:
+	if breach_zone_nodes.is_empty() or player == null:
 		return false
 	if not (player is Node3D):
 		return false
-	var zone_pos: Vector3 = breach_zone_node.global_position
 	var player_pos: Vector3 = (player as Node3D).global_position
-	var dx: float = player_pos.x - zone_pos.x
-	var dz: float = player_pos.z - zone_pos.z
-	# Use a horizontal proximity radius (the corridor is wider than tall; using
-	# 3D distance would falsely report "in zone" when the player is one floor up).
-	return (dx * dx + dz * dz) <= (BREACH_ZONE_PROXIMITY_RADIUS * BREACH_ZONE_PROXIMITY_RADIUS)
+	for zone in breach_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		var zone_pos: Vector3 = zone.global_position
+		var dx: float = player_pos.x - zone_pos.x
+		var dz: float = player_pos.z - zone_pos.z
+		# Use a horizontal proximity radius (the corridor is wider than tall; using
+		# 3D distance would falsely report "in zone" when the player is one floor up).
+		if (dx * dx + dz * dz) <= (BREACH_ZONE_PROXIMITY_RADIUS * BREACH_ZONE_PROXIMITY_RADIUS):
+			return true
+	return false
 
 func _activate_current_objective() -> void:
 	for interactable_variant in interactables:
@@ -11355,6 +11392,7 @@ func _reset_runtime_for_reload() -> void:
 	if objective_progress_state != null:
 		objective_progress_state.reset()
 	breach_zone_node = null
+	breach_zone_nodes.clear()
 	unsafe_room_marker = null
 	arc_zone_node = null
 	arc_zone_label = null
