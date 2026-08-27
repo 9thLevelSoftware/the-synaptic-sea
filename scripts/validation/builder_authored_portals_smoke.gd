@@ -12,6 +12,9 @@ func _initialize() -> void:
 	if not _stamp_locked_portal(layout):
 		_fail("fixture has no structural door for locked portal coverage")
 		return
+	if not _stamp_hatch_portal(layout):
+		_fail("fixture has no structural edge for hatch portal coverage")
+		return
 	var loader := LoaderScript.new()
 	get_root().add_child(loader)
 	if not loader.load_from_documents(layout, kit, gameplay, false):
@@ -25,6 +28,7 @@ func _initialize() -> void:
 	var actual_exterior = null
 	var door = null
 	var actual_locked = null
+	var actual_hatch = null
 	for node in nodes:
 		if node.get_blocker_collision_shape() == null:
 			_fail("portal missing blocker collision")
@@ -33,6 +37,8 @@ func _initialize() -> void:
 			actual_exterior = node
 		elif str(node.portal_kind) == "LOCKED":
 			actual_locked = node
+		elif str(node.portal_kind) == "HATCH":
+			actual_hatch = node
 		elif str(node.portal_kind) == "DOOR":
 			door = node
 	if actual_exterior == null:
@@ -47,6 +53,28 @@ func _initialize() -> void:
 		return
 	if actual_locked == null:
 		_fail("fixture materialized no locked structural portal")
+		return
+	if actual_hatch == null:
+		_fail("fixture materialized no hatch structural portal")
+		return
+	actual_hatch.set_validation_player_in_range(true)
+	var hatch_visual := actual_hatch.get_node_or_null("PortalVisual") as MeshInstance3D
+	var hatch_collision_before: int = int(actual_hatch.get_structural_blocker_collision_enabled_count())
+	var hatch_open: Dictionary = actual_hatch.try_interact({})
+	var hatch_collision_open: int = int(actual_hatch.get_structural_blocker_collision_enabled_count())
+	var hatch_visible_open: bool = actual_hatch.is_structural_blocker_visible()
+	var hatch_visual_open: bool = hatch_visual != null and hatch_visual.visible
+	var hatch_closed: Dictionary = actual_hatch.try_interact({})
+	var hatch_collision_closed: int = int(actual_hatch.get_structural_blocker_collision_enabled_count())
+	var hatch_visible_closed: bool = actual_hatch.is_structural_blocker_visible()
+	if hatch_collision_before <= 0 or not bool(hatch_open.get("open", false)) \
+			or hatch_collision_open != 0 \
+			or hatch_visible_open \
+			or hatch_visual == null or hatch_visual_open \
+			or bool(hatch_closed.get("open", true)) \
+			or hatch_collision_closed <= 0 \
+			or not hatch_visible_closed:
+		_fail("hatch interaction did not disable and re-seal structural collision")
 		return
 	actual_locked.set_validation_player_in_range(true)
 	var locked_visual := actual_locked.get_node_or_null("PortalVisual") as MeshInstance3D
@@ -75,11 +103,11 @@ func _initialize() -> void:
 		return
 	var hatch = _standalone("hatch", "hatch", loader)
 	hatch.set_validation_player_in_range(true)
-	var hatch_visual := hatch.get_node_or_null("PortalVisual") as MeshInstance3D
-	var hatch_open: Dictionary = hatch.try_interact({})
-	var hatch_closed: Dictionary = hatch.try_interact({})
-	if not bool(hatch_open.get("open", false)) or bool(hatch_closed.get("open", true)) \
-			or hatch_visual == null or not hatch_visual.visible:
+	var hatch_visual_standalone := hatch.get_node_or_null("PortalVisual") as MeshInstance3D
+	var hatch_open_standalone: Dictionary = hatch.try_interact({})
+	var hatch_closed_standalone: Dictionary = hatch.try_interact({})
+	if not bool(hatch_open_standalone.get("open", false)) or bool(hatch_closed_standalone.get("open", true)) \
+			or hatch_visual_standalone == null or not hatch_visual_standalone.visible:
 		_fail("hatch did not open and reseal")
 		return
 	var breach = _standalone("breach", "breach", loader)
@@ -97,6 +125,16 @@ func _initialize() -> void:
 	})
 	if not is_equal_approx(absf(oriented.rotation_degrees.y), 90.0):
 		_fail("east-west portal blocker was not rotated to its authored edge")
+	var structural_count_before_overlay: int = loader.count_collision_shapes()
+	var overlay := Area3D.new()
+	var overlay_shape := CollisionShape3D.new()
+	overlay_shape.shape = BoxShape3D.new()
+	overlay.add_child(overlay_shape)
+	loader.structural_root.add_child(overlay)
+	if loader.count_collision_shapes() != structural_count_before_overlay:
+		_fail("structural collision readiness counted a runtime overlay shape")
+	loader.structural_root.remove_child(overlay)
+	overlay.free()
 	print("BUILDER AUTHORED PORTALS PASS authored=%d door=true locked=true structural_unlock=true hatch=true breach=true exterior=true orientation=true" % nodes.size())
 	quit(0)
 
@@ -171,6 +209,36 @@ func _stamp_locked_portal(layout: Dictionary) -> bool:
 			(raw as Dictionary)["kind"] = "LOCKED"
 			(raw as Dictionary)["state"] = "LOCKED"
 			(raw as Dictionary)["module_id"] = "doorway_frame_blocked_1x1"
+			return true
+	return false
+
+
+func _stamp_hatch_portal(layout: Dictionary) -> bool:
+	var plan: Dictionary = layout.get("structural_plan", {}) as Dictionary
+	var edges: Dictionary = plan.get("edges", {}) as Dictionary
+	var selected_key := ""
+	for key in edges:
+		var edge: Dictionary = edges[key] as Dictionary
+		if str(edge.get("kind", "")) == "SOLID" and not bool(edge.get("exterior", false)):
+			selected_key = str(key)
+			edge["kind"] = "HATCH"
+			edge["state"] = "HATCH"
+			edge["module_id"] = "bulkhead_portal_2x1"
+			edge["portal"] = true
+			edge["wrapper_required"] = true
+			edge["placement_required"] = true
+			break
+	if selected_key.is_empty():
+		return false
+	var placements: Array = plan.get("placements", []) as Array
+	for raw in placements:
+		if raw is Dictionary and str((raw as Dictionary).get("edge_key", (raw as Dictionary).get("key", ""))) == selected_key:
+			(raw as Dictionary)["kind"] = "HATCH"
+			(raw as Dictionary)["state"] = "HATCH"
+			(raw as Dictionary)["module_id"] = "bulkhead_portal_2x1"
+			(raw as Dictionary)["portal"] = true
+			(raw as Dictionary)["wrapper_required"] = true
+			(raw as Dictionary)["placement_required"] = true
 			return true
 	return false
 

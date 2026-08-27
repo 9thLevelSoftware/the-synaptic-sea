@@ -9,6 +9,8 @@ const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
+const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
+const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
 const REQUIRED_CHECKS: Array[String] = [
@@ -264,23 +266,54 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 	var specs: Array = loader.get_loot_container_specs_copy()
 	if specs.is_empty() or specs.size() != _array(gameplay.get("loot_containers", [])).size():
 		return false
+	# PlayableGeneratedShip and the builder preview must resolve table-only loot
+	# against the same shipped catalog. Passing an empty catalog lets a bad table
+	# reference search successfully while granting nothing.
+	var loot_tables: Dictionary = LootRollerScript.load_tables()
+	if loot_tables.is_empty():
+		return false
 	for spec_variant in specs:
 		if not (spec_variant is Dictionary):
 			return false
 		var spec: Dictionary = spec_variant
+		var has_authored_contents: bool = spec.has("contents") and typeof(spec.get("contents")) == TYPE_ARRAY
+		var table_id := str(spec.get("loot_table", ""))
+		var seed_source := "derelict_builder_preview"
+		if not has_authored_contents:
+			if not _loot_table_can_roll(table_id, loot_tables):
+				return false
+			# Verify that the authoritative distribution path produces an observable
+			# grant for this authored table before accepting the interaction.
+			if LootDistributionScript.roll(table_id, seed_source, loot_tables, spec).is_empty():
+				return false
 		var expected_contents: Array = LootContainerScript.normalized_contents(spec) if spec.has("contents") else []
+		var expected_roll: Array = [] if has_authored_contents else LootDistributionScript.roll(table_id, seed_source, loot_tables, spec)
 		var inventory = InventoryStateScript.new()
+		var inventory_before: Dictionary = {}
+		for entry_variant in expected_roll:
+			if entry_variant is Dictionary:
+				var entry: Dictionary = entry_variant
+				inventory_before[str(entry.get("item_id", ""))] = 0
 		var container = LootContainerScript.new()
 		var player := Node3D.new()
 		add_child(container)
 		add_child(player)
 		container.configure(
-			str(spec.get("id", "preview_loot")), str(spec.get("loot_table", "")),
-			"derelict_builder_preview", inventory, {}, Vector3.ZERO, 1.8, spec
+			str(spec.get("id", "preview_loot")), table_id,
+			seed_source, inventory, loot_tables, Vector3.ZERO, 1.8, spec
 		)
 		container.set_validation_player_in_range(player)
 		var interacted: bool = container.try_interact(player)
 		var accepted: bool = interacted and container.searched
+		if not has_authored_contents:
+			for entry_variant in expected_roll:
+				if not (entry_variant is Dictionary):
+					accepted = false
+					continue
+				var entry: Dictionary = entry_variant
+				var item_id := str(entry.get("item_id", ""))
+				if item_id.is_empty() or inventory.get_quantity(item_id) <= int(inventory_before.get(item_id, 0)):
+					accepted = false
 		for stack_variant in expected_contents:
 			if not (stack_variant is Dictionary):
 				accepted = false
@@ -295,6 +328,28 @@ func _exercise_loot(gameplay: Dictionary) -> bool:
 		if not accepted:
 			return false
 	return true
+
+
+func _loot_table_can_roll(table_id: String, loot_tables: Dictionary) -> bool:
+	if table_id.is_empty() or not loot_tables.has(table_id):
+		return false
+	var table_variant: Variant = loot_tables.get(table_id)
+	if not (table_variant is Dictionary):
+		return false
+	var table: Dictionary = table_variant
+	var entries_variant: Variant = table.get("entries", [])
+	if not (entries_variant is Array) or (entries_variant as Array).is_empty():
+		return false
+	for entry_variant in entries_variant as Array:
+		if not (entry_variant is Dictionary):
+			continue
+		var entry: Dictionary = entry_variant
+		if str(entry.get("item_id", "")).is_empty() or float(entry.get("weight", 1.0)) <= 0.0:
+			continue
+		if int(entry.get("qty_max", entry.get("qty_min", 1))) <= 0:
+			continue
+		return true
+	return false
 
 
 func _exercise_portals(layout: Dictionary) -> bool:

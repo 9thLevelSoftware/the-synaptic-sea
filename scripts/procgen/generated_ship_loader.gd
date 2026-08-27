@@ -305,17 +305,21 @@ func get_authored_portal_nodes() -> Array[Area3D]:
 func count_collision_shapes() -> int:
 	if structural_root == null:
 		return 0
-	return _count_collision_shapes_recursive(structural_root)
+	# Only structural wrapper collisions represent the generated ship's
+	# collision contract.  Portal blockers, hazard volumes, and marker shapes
+	# are also children of StructuralRoot but are runtime overlays.
+	return _count_collision_shapes_recursive(structural_root, false)
 
 
-func _count_collision_shapes_recursive(node: Node) -> int:
+func _count_collision_shapes_recursive(node: Node, in_structural_wrapper: bool) -> int:
 	var count: int = 0
-	if node is CollisionShape3D:
+	var structural_context := in_structural_wrapper or node.has_meta("structural_kind")
+	if structural_context and node is CollisionShape3D:
 		var collision_shape: CollisionShape3D = node
 		if collision_shape.shape != null:
 			count += 1
 	for child in node.get_children():
-		count += _count_collision_shapes_recursive(child)
+		count += _count_collision_shapes_recursive(child, structural_context)
 	return count
 
 
@@ -1721,21 +1725,23 @@ func _add_authored_portal_runtime_nodes(source_layout: Dictionary, ship_root: No
 		portal.name = "AuthoredPortal_%s" % str(source.get("id", index))
 		portal.configure(spec, endpoint_midpoint)
 		ship_root.add_child(portal)
-		if portal.portal_kind == "LOCKED":
-			var structural_blocker := _find_structural_portal_blocker(ship_root, str(spec.get("edge_key", "")))
+		if portal.portal_kind == "LOCKED" or portal.portal_kind == "HATCH":
+			var structural_blocker := _find_structural_portal_blocker(
+				ship_root, str(spec.get("edge_key", "")), portal.portal_kind)
 			if structural_blocker != null:
 				portal.bind_structural_blocker(structural_blocker)
 		authored_portal_specs.append(spec)
 		authored_portal_nodes.append(portal)
 
 
-func _find_structural_portal_blocker(ship_root: Node3D, edge_key: String) -> Node3D:
+func _find_structural_portal_blocker(ship_root: Node3D, edge_key: String, portal_kind: String) -> Node3D:
 	if ship_root == null or edge_key.is_empty():
 		return null
+	var expected_module := "doorway_frame_blocked_1x1" if portal_kind == "LOCKED" else "bulkhead_portal_2x1"
 	for child in ship_root.get_children():
 		if child is Node3D \
 				and str(child.get_meta("structural_edge_key", "")) == edge_key \
-				and str(child.get_meta("module_kind", "")) == "doorway_frame_blocked_1x1":
+				and str(child.get_meta("module_kind", "")) == expected_module:
 			return child as Node3D
 	return null
 

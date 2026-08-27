@@ -6,6 +6,11 @@ var _root := ""
 
 
 func _initialize() -> void:
+	var loot_tables := PreviewScript.LootRollerScript.load_tables()
+	if not PreviewScript.new()._loot_table_can_roll("generic_crate", loot_tables):
+		_fail("authoritative loot catalog rejected generic_crate")
+	if PreviewScript.new()._loot_table_can_roll("missing_preview_table", loot_tables):
+		_fail("missing loot table reference was accepted")
 	_root = "user://derelict_builder_preview_contract_%d" % Time.get_ticks_usec()
 	if not DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_root)) in [OK, ERR_ALREADY_EXISTS]:
 		_fail("could not create temporary contract directory")
