@@ -30,7 +30,10 @@ func _initialize() -> void:
 	# golden fixture intentionally omits some optional hazards, which previously
 	# let acceptance succeed through "not applicable" branches alone.
 	layout["fire_zones"] = [_zone("preview_fire", "timed_fire", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0])]
-	layout["arc_zones"] = [_zone("preview_arc", "electrical_arc", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0])]
+	layout["arc_zones"] = [
+		_zone("preview_arc_a", "electrical_arc", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0]),
+		_zone("preview_arc_b", "electrical_arc", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0]),
+	]
 	layout["breach_zones"] = [
 		_zone("preview_breach_airlock", "hull_breach", "airlock_01", "corridor_01", [1, 0, 0], [2, 0, 0]),
 		_zone("preview_breach_ramp", "hull_breach", "corridor_01", "ramp_01", [3, 0, 0], [4, 0, 0]),

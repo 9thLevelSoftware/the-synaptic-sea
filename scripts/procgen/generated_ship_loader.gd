@@ -1660,7 +1660,7 @@ func _add_authored_atmosphere_volumes(source_layout: Dictionary, ship_root: Node
 			"radiation_bp": int(room.get("radiation_bp", 0)),
 		}
 		if room.has("temperature_c"):
-			spec["temperature_c"] = float(room.get("temperature_c", 20.0))
+			spec["temperature_c"] = float(room["temperature_c"])
 		authored_atmosphere_specs.append(spec)
 		var volume := _make_trigger_volume(
 			"AuthoredAtmosphere_%s_%d" % [room_id, authored_atmosphere_specs.size() - 1], position,

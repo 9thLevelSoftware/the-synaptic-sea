@@ -87,14 +87,6 @@ func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Di
 		is_unsafe = true
 		emit_signal("unsafe_triggered", portal_id)
 		return {"ok": true, "unsafe": true, "reason": "unsafe_breach", "portal_id": portal_id}
-	if is_exterior:
-		emit_signal("exterior_exit_triggered", portal_id)
-		if portal_kind not in [LOCKED, HATCH]:
-			if portal_kind == DOOR:
-				var exterior_result := _toggle_open()
-				exterior_result["exterior"] = true
-				return exterior_result
-			return {"ok": true, "exterior": true, "portal_id": portal_id}
 	if portal_kind == LOCKED:
 		if is_open:
 			is_open = false
@@ -104,6 +96,15 @@ func try_interact(active_flags: Dictionary = {}, player_body: Node = null) -> Di
 		var flag := required_flag()
 		if not active_flags.has(flag) or not bool(active_flags.get(flag, false)):
 			return {"ok": false, "reason": "locked", "needs": flag, "portal_id": portal_id}
+	if portal_kind in [DOOR, LOCKED, HATCH]:
+		var toggle_result := _toggle_open()
+		if is_exterior and bool(toggle_result.get("open", false)):
+			toggle_result["exterior"] = true
+			emit_signal("exterior_exit_triggered", portal_id)
+		return toggle_result
+	if is_exterior:
+		emit_signal("exterior_exit_triggered", portal_id)
+		return {"ok": true, "exterior": true, "portal_id": portal_id}
 	return _toggle_open()
 
 func _toggle_open() -> Dictionary:

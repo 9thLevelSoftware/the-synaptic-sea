@@ -500,6 +500,9 @@ var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
 var arc_zone_resolved_room_id: String = ""
+var arc_zone_nodes: Array[StaticBody3D] = []
+var arc_zone_labels: Array[Label3D] = []
+var arc_zone_resolved_room_ids: Array[String] = []
 var objective_progress_state: ObjectiveProgressState
 var sequence_interactables: Dictionary = {}
 # REQ-012: current-run save/load state.
@@ -625,8 +628,9 @@ func _apply_world_label_scale() -> void:
 				_apply_pixel_size_to_label(child, 0.003)
 	if unsafe_room_marker != null:
 		_apply_pixel_size_to_label(unsafe_room_marker, 0.0035)
-	if arc_zone_label != null:
-		_apply_pixel_size_to_label(arc_zone_label, 0.0035)
+	for label in arc_zone_labels:
+		if is_instance_valid(label):
+			_apply_pixel_size_to_label(label, 0.0035)
 
 func _apply_pixel_size_to_label(label: Node, base_pixel_size: float) -> void:
 	if not (label is Label3D):
@@ -2920,25 +2924,44 @@ func _build_derelict_objectives() -> void:
 		var sequence: int = int(spec.get("sequence", 0))
 		if sequence <= 0:
 			continue
-		var position_variant: Variant = spec.get("position", Vector3.INF)
-		if typeof(position_variant) != TYPE_VECTOR3:
-			continue
 		# Record salvage objective loot tables for grant on completion.
 		if str(spec.get("type", "")) == "salvage":
 			_salvage_loot_tables[str(spec.get("id", ""))] = str(spec.get("loot_table", "salvage_cargo"))
-		var interactable = InteractableScript.new()
-		interactable.configure_from_objective(spec, position_variant, 1.8)
-		interactable.interaction_completed.connect(_on_derelict_interactable_completed)
-		# Restore: a persisted-complete objective reads as done and cannot be re-fired
-		# (try_interact returns false when completed).
-		if controller.is_objective_complete(sequence):
-			interactable.completed = true
-			interactable.set_active(false)
-		# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
-		# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
-		# automatically when the derelict scene_root is freed on departure.
-		current_ship.scene_root.add_child(interactable)
-		derelict_interactables.append(interactable)
+		var steps_variant: Variant = spec.get("steps", [])
+		var steps: Array = steps_variant if steps_variant is Array else []
+		if str(spec.get("kind", "single")) == "repair_junction" and steps.size() > 1:
+			for step_variant in steps:
+				if not (step_variant is Dictionary):
+					continue
+				var step: Dictionary = step_variant
+				var step_position: Variant = step.get("position", Vector3.INF)
+				if not (step_position is Vector3):
+					continue
+				var step_interactable = InteractableScript.new()
+				step_interactable.configure_from_step(spec, step, step_position, 1.8)
+				step_interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+				if controller.is_step_complete(sequence, str(step.get("step_id", ""))):
+					step_interactable.completed = true
+					step_interactable.set_active(false)
+				current_ship.scene_root.add_child(step_interactable)
+				derelict_interactables.append(step_interactable)
+		else:
+			var position_variant: Variant = spec.get("position", Vector3.INF)
+			if not (position_variant is Vector3):
+				continue
+			var interactable = InteractableScript.new()
+			interactable.configure_from_objective(spec, position_variant, 1.8)
+			interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+			# Restore: a persisted-complete objective reads as done and cannot be re-fired
+			# (try_interact returns false when completed).
+			if controller.is_objective_complete(sequence):
+				interactable.completed = true
+				interactable.set_active(false)
+			# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
+			# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
+			# automatically when the derelict scene_root is freed on departure.
+			current_ship.scene_root.add_child(interactable)
+			derelict_interactables.append(interactable)
 	# Show the derelict's objectives in the HUD while aboard, then reflect any
 	# persisted/restored completion (set_objectives resets the tracker's completed
 	# set, so this must run after it).
@@ -6153,6 +6176,8 @@ func _try_authored_portal_interact(player_body: PlayerController) -> bool:
 					AudioEventSeamScript.SFX_DOOR_OPEN if bool(result.get("open", false)) \
 					else AudioEventSeamScript.SFX_DOOR_CLOSE,
 					portal.global_position)
+			if bool(result.get("exterior", false)):
+				return travel_home()
 			return true
 		if str(result.get("reason", "")) == "locked":
 			_emit_hatch_bypass_denied_sfx()
@@ -6332,9 +6357,15 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 	if current_ship == null:
 		return
 	var controller = current_ship.get_objective_controller()
-	controller.complete(sequence)
+	if not controller.complete(sequence, step_id):
+		return
 	# Reflect the completion (and run-complete on clear) in the HUD.
 	_refresh_derelict_tracker()
+	# A repair junction reports each successful step through this same handler,
+	# but objective-level rewards, training, and completion fire only once after
+	# the controller confirms the full authored sequence.
+	if not controller.is_objective_complete(sequence):
+		return
 	# Sub-project #3: grant salvage-point loot on objective completion (once only —
 	# the interactable cannot re-fire after completed = true).
 	if objective_type == "salvage" and _salvage_loot_tables.has(objective_id):
@@ -9188,9 +9219,12 @@ func _build_arc_zone() -> void:
 		arc_root.remove_child(child)
 		child.queue_free()
 	# Derelict arc nodes parent under the derelict's scene_root (freed with it
-	# on departure), so also clear by handle in case the previous zone lives
+	# on departure), so also clear by handle in case previous zones live
 	# outside arc_root.
-	for stale in [arc_zone_node, arc_zone_label]:
+	var stale_nodes: Array = []
+	stale_nodes.append_array(arc_zone_nodes)
+	stale_nodes.append_array(arc_zone_labels)
+	for stale in stale_nodes:
 		if stale != null and is_instance_valid(stale):
 			if stale.get_parent() != null:
 				stale.get_parent().remove_child(stale)
@@ -9198,6 +9232,9 @@ func _build_arc_zone() -> void:
 	arc_zone_node = null
 	arc_zone_label = null
 	arc_zone_resolved_room_id = ""
+	arc_zone_nodes.clear()
+	arc_zone_labels.clear()
+	arc_zone_resolved_room_ids.clear()
 	# Per ADR-0005: configure() is called even when no markers exist so
 	# the model state is always coherent (DISCHARGED, time_in_state == 0.0,
 	# passability_blocked == false). This is the FRESH state the smoke
@@ -9209,32 +9246,39 @@ func _build_arc_zone() -> void:
 		"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
-	var resolution: Dictionary = _resolve_arc_zone_world_position()
-	var world_position: Vector3 = resolution.get("position", Vector3.INF)
-	arc_zone_resolved_room_id = str(resolution.get("room_id", ""))
-	# No marker and no fallback -> skip arc setup. Refresh later will
-	# stay a no-op because arc_zone_node / arc_zone_label are null.
-	if world_position == Vector3.INF:
+	var resolutions: Array[Dictionary] = _resolve_arc_zone_world_positions()
+	# No markers and no fallback -> skip arc setup. Refresh later remains a no-op.
+	if resolutions.is_empty():
 		return
-	var zone_id: String = str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID))
-	if zone_id.is_empty():
-		zone_id = ARC_ZONE_FALLBACK_ID
+	var zone_ids: Array[String] = []
+	for resolution in resolutions:
+		zone_ids.append(str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID)))
 	electrical_arc_state.configure({
-		"zone_ids": [zone_id],
+		"zone_ids": zone_ids,
 		"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
-	arc_zone_node = _create_arc_zone_node(zone_id, world_position)
-	arc_zone_label = _create_arc_zone_label(world_position)
-	# Away: parent under the derelict's scene_root so the zone inherits the
-	# dock offset and is freed with the derelict (loot-container pattern).
-	# Home: keep the original arc_root parent.
-	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
-		current_ship.scene_root.add_child(arc_zone_node)
-		current_ship.scene_root.add_child(arc_zone_label)
-	else:
-		arc_root.add_child(arc_zone_node)
-		arc_root.add_child(arc_zone_label)
+	for resolution in resolutions:
+		var world_position: Vector3 = resolution.get("position", Vector3.INF)
+		var zone_id: String = str(resolution.get("zone_id", ARC_ZONE_FALLBACK_ID))
+		var room_id: String = str(resolution.get("room_id", ""))
+		var zone := _create_arc_zone_node(zone_id, world_position, room_id)
+		var label := _create_arc_zone_label(world_position)
+		arc_zone_nodes.append(zone)
+		arc_zone_labels.append(label)
+		arc_zone_resolved_room_ids.append(room_id)
+		# Away: parent under the derelict's scene_root so each zone inherits the
+		# dock offset and is freed with the derelict. Home uses arc_root.
+		if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(zone)
+			current_ship.scene_root.add_child(label)
+		else:
+			arc_root.add_child(zone)
+			arc_root.add_child(label)
+	# Preserve singular accessors as compatibility aliases for older smokes and UI.
+	arc_zone_node = arc_zone_nodes[0]
+	arc_zone_label = arc_zone_labels[0]
+	arc_zone_resolved_room_id = arc_zone_resolved_room_ids[0]
 
 # The loader whose arc markers drive the CURRENT context: the boarded
 # derelict's own loader root when away (Tranche 1 audit fix — derelict arc
@@ -9247,21 +9291,38 @@ func _active_arc_loader() -> Node:
 	return loader if (loader is Node and is_instance_valid(loader)) else null
 
 func _resolve_arc_zone_world_position() -> Dictionary:
+	var resolutions := _resolve_arc_zone_world_positions()
+	return resolutions[0] if not resolutions.is_empty() else {
+		"position": Vector3.INF, "room_id": "", "zone_id": "",
+	}
+
+
+func _resolve_arc_zone_world_positions() -> Array[Dictionary]:
+	var resolved: Array[Dictionary] = []
 	var arc_loader: Node = _active_arc_loader()
-	if arc_loader != null and arc_loader.has_method("get_arc_zone_markers"):
-		var markers: Array = arc_loader.call("get_arc_zone_markers")
-		if markers.size() > 0 and markers[0] is Vector3:
-			var candidate: Vector3 = markers[0]
-			if candidate != Vector3.INF:
-				return {
-					"position": candidate,
-					"room_id": _resolved_arc_marker_room_id(),
-					"zone_id": _resolved_arc_marker_zone_id(),
-				}
+	if arc_loader == null or not arc_loader.has_method("get_arc_zone_markers") \
+			or not arc_loader.has_method("get_arc_zone_specs"):
+		return resolved
+	var markers: Array = arc_loader.call("get_arc_zone_markers")
+	var specs: Array = arc_loader.call("get_arc_zone_specs")
+	if markers.size() != specs.size():
+		return resolved
+	for index in range(markers.size()):
+		if not (markers[index] is Vector3) or markers[index] == Vector3.INF:
+			continue
+		var spec: Dictionary = specs[index] if specs[index] is Dictionary else {}
+		var zone_id := str(spec.get("id", spec.get("zone_id", "")))
+		if zone_id.is_empty():
+			zone_id = ARC_ZONE_FALLBACK_ID if index == 0 else "%s_%d" % [ARC_ZONE_FALLBACK_ID, index]
+		resolved.append({
+			"position": markers[index],
+			"room_id": str(spec.get("to_room", spec.get("from_room", ""))),
+			"zone_id": zone_id,
+		})
 	# No fallback room is injected per hazard_type_3.md (placement is
 	# template-specific). An empty arc_zones array means the template
 	# does not include this hazard; skip arc setup cleanly.
-	return {"position": Vector3.INF, "room_id": "", "zone_id": ""}
+	return resolved
 
 # Returns the `to_room` of the first arc_zones marker the loader exposes,
 # or "" if no marker is present. Mirrors _resolved_marker_room_id() for
@@ -9301,7 +9362,7 @@ func _resolved_arc_marker_zone_id() -> String:
 			return zone_id
 	return ""
 
-func _create_arc_zone_node(zone_id: String, world_position: Vector3) -> StaticBody3D:
+func _create_arc_zone_node(zone_id: String, world_position: Vector3, resolved_room_id: String = "") -> StaticBody3D:
 	var zone: StaticBody3D = StaticBody3D.new()
 	zone.name = "ElectricalArcZone_NonCriticalLink"
 	zone.position = world_position
@@ -9311,7 +9372,7 @@ func _create_arc_zone_node(zone_id: String, world_position: Vector3) -> StaticBo
 	zone.set_meta("arc_zone_kind", "electrical_arc")
 	zone.set_meta("arc_zone_phase", "DISCHARGED")
 	zone.set_meta("arc_zone_passability_blocked", false)
-	zone.set_meta("arc_zone_resolved_room_id", arc_zone_resolved_room_id)
+	zone.set_meta("arc_zone_resolved_room_id", resolved_room_id)
 
 	var collision_shape: CollisionShape3D = CollisionShape3D.new()
 	collision_shape.name = "ArcZoneCollisionShape3D"
@@ -9367,23 +9428,27 @@ func _refresh_arc_state(force_initial: bool) -> void:
 	# When no arc zone was built (template has no arc marker), keep the
 	# model in DISCHARGED so its summary remains coherent for save/load
 	# but skip scene-state application entirely.
-	if arc_zone_node == null:
+	if arc_zone_nodes.is_empty():
 		return
 	_apply_arc_zone_scene_state()
 
 func _apply_arc_zone_scene_state() -> void:
-	if electrical_arc_state == null or arc_zone_node == null:
+	if electrical_arc_state == null or arc_zone_nodes.is_empty():
 		return
 	var summary: Dictionary = electrical_arc_state.get_summary()
 	var arcing: bool = bool(summary.get("arcing", false))
 	var state_text: String = str(summary.get("state", "DISCHARGED"))
-	arc_zone_node.set_meta("arc_zone_phase", state_text)
-	arc_zone_node.set_meta("arc_zone_passability_blocked", arcing)
-	_set_arc_zone_collision_enabled(arc_zone_node, arcing)
-	_update_arc_zone_visual(arc_zone_node, arcing)
-	if arc_zone_label != null:
-		arc_zone_label.text = ARC_ZONE_LABEL_TEXT_ARCING if arcing else ARC_ZONE_LABEL_TEXT_DISCHARGED
-		arc_zone_label.modulate = ARC_ZONE_VISUAL_COLOR_ARCING if arcing else ARC_ZONE_VISUAL_COLOR_DISCHARGED
+	for zone in arc_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		zone.set_meta("arc_zone_phase", state_text)
+		zone.set_meta("arc_zone_passability_blocked", arcing)
+		_set_arc_zone_collision_enabled(zone, arcing)
+		_update_arc_zone_visual(zone, arcing)
+	for label in arc_zone_labels:
+		if is_instance_valid(label):
+			label.text = ARC_ZONE_LABEL_TEXT_ARCING if arcing else ARC_ZONE_LABEL_TEXT_DISCHARGED
+			label.modulate = ARC_ZONE_VISUAL_COLOR_ARCING if arcing else ARC_ZONE_VISUAL_COLOR_DISCHARGED
 
 func _set_arc_zone_collision_enabled(zone: Node, enabled: bool) -> void:
 	for child in zone.get_children():
@@ -9415,16 +9480,21 @@ func get_arc_summary() -> Dictionary:
 func get_arc_zone_node() -> Node:
 	return arc_zone_node
 
+func get_arc_zone_nodes() -> Array[StaticBody3D]:
+	return arc_zone_nodes.duplicate()
+
 func get_arc_zone_resolved_room_id() -> String:
 	return arc_zone_resolved_room_id
 
 func get_arc_zone_collision_enabled_count() -> int:
-	if arc_zone_node == null:
-		return 0
-	for child in arc_zone_node.get_children():
-		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
-			return 1
-	return 0
+	var enabled_count := 0
+	for zone in arc_zone_nodes:
+		if not is_instance_valid(zone):
+			continue
+		for child in zone.get_children():
+			if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
+				enabled_count += 1
+	return enabled_count
 
 func teleport_player_to_arc_zone_for_validation() -> bool:
 	if player == null or arc_zone_node == null:
@@ -11454,6 +11524,9 @@ func _reset_runtime_for_reload() -> void:
 	unsafe_room_marker = null
 	arc_zone_node = null
 	arc_zone_label = null
+	arc_zone_nodes.clear()
+	arc_zone_labels.clear()
+	arc_zone_resolved_room_ids.clear()
 	tool_pickup = null
 	arc_zone_resolved_room_id = ""
 	# REQ-014: drop the second ToolPickup reference so a fresh load

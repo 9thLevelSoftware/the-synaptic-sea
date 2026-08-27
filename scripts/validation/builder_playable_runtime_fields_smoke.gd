@@ -1,6 +1,7 @@
 extends SceneTree
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
+const AuthoredPortalRuntimeScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
 const TIMEOUT_FRAMES := 360
 
 var main_node: Node
@@ -61,11 +62,19 @@ func _validate() -> void:
 	if portals.is_empty():
 		_fail("boarded derelict materialized no authored portal interactions")
 		return
-	var portal = portals[0]
+	var portal = null
 	for candidate in portals:
-		if str(candidate.portal_kind) == "DOOR":
+		if str(candidate.portal_kind) == "DOOR" and not candidate.is_exterior:
 			portal = candidate
 			break
+	if portal == null:
+		for candidate in portals:
+			if not candidate.is_exterior and str(candidate.portal_kind) != "BREACH":
+				portal = candidate
+				break
+	if portal == null:
+		_fail("boarded derelict has no non-exterior portal for collision validation")
+		return
 	portal.set_validation_player_in_range(true)
 	var portal_shape: CollisionShape3D = portal.get_blocker_collision_shape()
 	var portal_shape_disabled_before := portal_shape.disabled
@@ -76,6 +85,65 @@ func _validate() -> void:
 			and portal_shape.disabled == portal_shape_disabled_before:
 		_fail("playable authored portal interaction did not change collision")
 		return
+
+	# Boarded repair junctions must use one production Interactable per authored
+	# step and complete their controller sequence only after the last step.
+	active_loader.objective_specs = [{
+		"id": "playable_repair_junction", "sequence": 1,
+		"type": "restore_systems", "kind": "repair_junction",
+		"room_id": "playable_test_room", "position": local_player,
+		"steps": [
+			{"step_id": "primary_coupling", "position": local_player},
+			{"step_id": "secondary_coupling", "position": local_player + Vector3(1.0, 0.0, 0.0)},
+		],
+	}]
+	playable.get_current_ship().objective_controller = null
+	playable._build_derelict_objectives()
+	if playable.derelict_interactables.size() != 2:
+		_fail("boarded repair junction did not materialize every authored step")
+		return
+	var derelict_controller = playable.get_current_ship().get_objective_controller()
+	for index in range(playable.derelict_interactables.size()):
+		var step_interactable = playable.derelict_interactables[index]
+		step_interactable.set_validation_player_in_range(playable.player)
+		if not step_interactable.try_interact(playable.player):
+			_fail("boarded repair-junction step was not interactable")
+			return
+		if index == 0 and derelict_controller.is_objective_complete(1):
+			_fail("boarded repair junction completed after only its first step")
+			return
+	if not derelict_controller.is_objective_complete(1):
+		_fail("boarded repair junction did not complete after every step")
+		return
+
+	# The production arc consumer must materialize every authored marker, not
+	# only the first one that the builder preview happened to validate.
+	var authored_arc_markers: Array[Vector3] = [
+		local_player + Vector3(2.0, 0.0, 0.0),
+		local_player + Vector3(6.0, 0.0, 0.0),
+	]
+	active_loader.arc_zone_markers = authored_arc_markers
+	active_loader.arc_zone_specs = [
+		{"id": "playable_arc_a", "zone_id": "playable_arc_a", "to_room": "room_a"},
+		{"id": "playable_arc_b", "zone_id": "playable_arc_b", "to_room": "room_b"},
+	]
+	playable._build_arc_zone()
+	if not playable.has_method("get_arc_zone_nodes"):
+		_fail("production runtime exposes no plural arc scene consumers")
+		return
+	var arc_nodes: Array = playable.call("get_arc_zone_nodes")
+	if arc_nodes.size() != authored_arc_markers.size():
+		_fail("production runtime did not materialize every authored arc")
+		return
+	for index in range(arc_nodes.size()):
+		var arc_node: Node3D = arc_nodes[index]
+		if str(arc_node.get_meta("arc_zone_id", "")) != str(active_loader.arc_zone_specs[index].get("id", "")):
+			_fail("production arc consumer lost its authored stable ID")
+			return
+		var expected_arc_world: Vector3 = active_loader.to_global(authored_arc_markers[index])
+		if arc_node.global_position.distance_to(expected_arc_world) > 0.05:
+			_fail("production arc consumer used the wrong authored marker position")
+			return
 	var localized_markers: Array[Vector3] = [local_player]
 	active_loader.radiation_zone_markers = localized_markers
 	active_loader.radiation_zone_specs = [{"zone_id": "playable_radiation", "kind": "radiation"}]
@@ -184,8 +252,23 @@ func _validate() -> void:
 	if not playable.oxygen_state.seal_breach("playable_breach_a"):
 		_fail("could not seed sealed breach state before travel_home")
 		return
-	if not playable.travel_home():
-		_fail("could not return home after boarded runtime checks")
+	var exterior_portal = null
+	for candidate in active_loader.get_authored_portal_nodes():
+		if candidate.is_exterior and str(candidate.portal_kind) != "BREACH":
+			exterior_portal = candidate
+			break
+	if exterior_portal == null:
+		exterior_portal = AuthoredPortalRuntimeScript.new()
+		exterior_portal.configure({"id": "playable_exterior_exit", "kind": "DOOR", "exterior": true}, local_player)
+		active_loader.add_child(exterior_portal)
+	# Isolate the coordinator consequence under test. An earlier portal was put
+	# into forced validation range above and would otherwise consume the same
+	# interaction before this exterior portal can return its exit result.
+	active_loader.authored_portal_nodes.clear()
+	active_loader.authored_portal_nodes.append(exterior_portal)
+	exterior_portal.set_validation_player_in_range(true)
+	if not playable._try_authored_portal_interact(playable.player) or playable.away_from_start:
+		_fail("authored exterior portal did not execute the production return-home consequence")
 		return
 	var expected_home_breaches := maxi(1, playable.loader.get_breach_zone_markers().size())
 	var home_breach_nodes: Array[StaticBody3D] = playable.get_breach_zone_nodes()
@@ -204,7 +287,7 @@ func _validate() -> void:
 		if derelict_breach_ids.has(str(home_breach.get_meta("breach_zone_id", ""))):
 			_fail("derelict breach zone leaked into the home ship")
 			return
-	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
+	print("BUILDER PLAYABLE RUNTIME FIELDS PASS boarded=true portal_interaction=true exterior_exit=true multi_step_objective=true multiple_arcs=true localized_radiation=true multiple_breaches=true authored_atmosphere=true atmosphere_survival=true transition_breaches=true")
 	quit(0)
 
 

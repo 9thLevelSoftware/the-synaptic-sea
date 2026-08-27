@@ -13,6 +13,8 @@ const LootDistributionScript := preload("res://scripts/systems/loot_distribution
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
+const InteractableScript := preload("res://scripts/interaction/interactable.gd")
+const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
 
 const RESULT_MARKER := "DERELICT_BUILDER_PREVIEW_RESULT"
 # Navigation snapping is allowed to absorb tiny authoring/mesh quantization
@@ -53,6 +55,8 @@ var preview_inventory
 var preview_loot_containers: Array = []
 var preview_arc_state
 var preview_arc_zones: Array[StaticBody3D] = []
+var preview_objective_controller
+var preview_objective_interactables: Array = []
 var _interaction_status: Label
 var _interactive_ready := false
 
@@ -278,10 +282,61 @@ func _setup_interactive_runtime() -> bool:
 	add_child(preview_camera_rig)
 	preview_camera_rig.set_follow_target(preview_player)
 	preview_camera_rig.make_current()
+	_build_preview_objective_runtime()
 	_build_preview_arc_runtime()
 	_build_interactive_loot()
 	_build_interaction_status()
 	return _interactive_runtime_ready()
+
+
+func _build_preview_objective_runtime() -> void:
+	for interactable in preview_objective_interactables:
+		if is_instance_valid(interactable):
+			var parent_node: Node = interactable.get_parent()
+			if parent_node != null:
+				parent_node.remove_child(interactable)
+			interactable.free()
+	preview_objective_interactables.clear()
+	preview_objective_controller = DerelictObjectiveControllerScript.create()
+	if not is_instance_valid(loader):
+		return
+	var specs: Array = loader.get_objective_specs_copy()
+	preview_objective_controller.configure(specs)
+	for spec_variant in specs:
+		if not (spec_variant is Dictionary):
+			continue
+		var spec: Dictionary = spec_variant
+		var steps_variant: Variant = spec.get("steps", [])
+		var steps: Array = steps_variant if steps_variant is Array else []
+		if str(spec.get("kind", "single")) == "repair_junction" and steps.size() > 1:
+			for step_variant in steps:
+				if not (step_variant is Dictionary):
+					continue
+				var step: Dictionary = step_variant
+				var step_position: Variant = step.get("position", Vector3.INF)
+				if not (step_position is Vector3):
+					continue
+				var step_interactable = InteractableScript.new()
+				step_interactable.configure_from_step(spec, step, step_position, PREVIEW_INTERACTION_RADIUS)
+				step_interactable.interaction_completed.connect(_on_preview_objective_completed)
+				loader.add_child(step_interactable)
+				preview_objective_interactables.append(step_interactable)
+		else:
+			var position_variant: Variant = spec.get("position", Vector3.INF)
+			if not (position_variant is Vector3):
+				continue
+			var interactable = InteractableScript.new()
+			interactable.configure_from_objective(spec, position_variant, PREVIEW_INTERACTION_RADIUS)
+			interactable.interaction_completed.connect(_on_preview_objective_completed)
+			loader.add_child(interactable)
+			preview_objective_interactables.append(interactable)
+
+
+func _on_preview_objective_completed(
+		_interaction_id: String, _objective_id: String, sequence: int,
+		_objective_type: String, _room_id: String, step_id: String) -> void:
+	if preview_objective_controller != null:
+		preview_objective_controller.complete(sequence, step_id)
 
 
 func _build_preview_arc_runtime() -> void:
@@ -471,7 +526,7 @@ func _on_preview_interact_requested(player_body) -> void:
 			return
 	var nearest_objective = null
 	var nearest_distance := PREVIEW_INTERACTION_RADIUS
-	for objective in loader.objective_volumes:
+	for objective in preview_objective_interactables:
 		if not is_instance_valid(objective) or bool(objective.get("completed")):
 			continue
 		var distance := (objective as Node3D).global_position.distance_to(player_body.global_position)
@@ -479,9 +534,13 @@ func _on_preview_interact_requested(player_body) -> void:
 			nearest_distance = distance
 			nearest_objective = objective
 	if nearest_objective != null:
-		nearest_objective.complete()
-		_set_interaction_status("Completed objective %s" % str(nearest_objective.get("objective_id")))
-		return
+		if nearest_objective.try_interact(player_body):
+			var step_id := str(nearest_objective.get("step_id"))
+			_set_interaction_status("Completed %s" % [
+				"step %s" % step_id if not step_id.is_empty() \
+				else "objective %s" % str(nearest_objective.get("objective_id")),
+			])
+			return
 	_set_interaction_status("Nothing in interaction range")
 
 
@@ -611,21 +670,36 @@ func _wait_for_navigation_sync() -> bool:
 
 func _exercise_objectives() -> bool:
 	var specs: Array = loader.get_objective_specs_copy()
-	var volumes: Array = loader.objective_volumes
-	if specs.is_empty() or volumes.size() != specs.size():
+	if specs.is_empty() or preview_objective_controller == null \
+			or preview_objective_interactables.is_empty():
 		return false
-	for volume_variant in volumes:
-		if not (volume_variant is GameplayObjectiveVolume):
-			return false
-		var volume := volume_variant as GameplayObjectiveVolume
-		var was_completed := volume.completed
-		var objective_ready := _navigation_path_exists(loader.to_local(volume.global_position))
-		volume.complete()
-		var completed := volume.completed
-		volume.completed = was_completed
-		if not objective_ready or not completed:
-			return false
-	return true
+	var expected_interactions := 0
+	for spec_variant in specs:
+		if not (spec_variant is Dictionary):
+			continue
+		var spec: Dictionary = spec_variant
+		var steps: Variant = spec.get("steps", [])
+		expected_interactions += (steps as Array).size() \
+			if str(spec.get("kind", "single")) == "repair_junction" and steps is Array \
+			else 1
+	var accepted := preview_objective_interactables.size() == expected_interactions
+	for interactable in preview_objective_interactables:
+		if not is_instance_valid(interactable) or not (interactable is Node3D):
+			accepted = false
+			continue
+		if not _navigation_path_exists(loader.to_local((interactable as Node3D).global_position)):
+			accepted = false
+		interactable.set_validation_player_in_range(preview_player)
+		if not interactable.try_interact(preview_player):
+			accepted = false
+	for spec_variant in specs:
+		if spec_variant is Dictionary and not preview_objective_controller.is_objective_complete(
+				int((spec_variant as Dictionary).get("sequence", 0))):
+			accepted = false
+	# Acceptance must not consume the interactive preview. Rebuild the same
+	# production interactable/controller flow in its pristine state for the user.
+	_build_preview_objective_runtime()
+	return accepted
 
 
 func _exercise_loot(gameplay: Dictionary) -> bool:
@@ -712,6 +786,11 @@ func _exercise_portals(layout: Dictionary) -> bool:
 			_restore_portal_state(portal, was_open, was_unsafe)
 			return false
 		var portal_ready := true
+		var exterior_result: Dictionary = {}
+		var exit_signal := {"emitted": false}
+		var exit_callback := func(_portal_id: String) -> void: exit_signal["emitted"] = true
+		if portal.is_exterior and portal.has_signal("exterior_exit_triggered"):
+			portal.connect("exterior_exit_triggered", exit_callback, CONNECT_ONE_SHOT)
 		match str(portal.portal_kind):
 			"LOCKED":
 				var denied: Dictionary = portal.try_interact({})
@@ -719,6 +798,7 @@ func _exercise_portals(layout: Dictionary) -> bool:
 				var flags := {}
 				flags[flag] = true
 				var opened: Dictionary = portal.try_interact(flags)
+				exterior_result = opened
 				if str(denied.get("reason", "")) != "locked" or not bool(opened.get("open", false)) or not shape.disabled:
 					portal_ready = false
 			"BREACH":
@@ -727,9 +807,17 @@ func _exercise_portals(layout: Dictionary) -> bool:
 			_:
 				var before := shape.disabled
 				var opened: Dictionary = portal.try_interact({})
+				exterior_result = opened
 				if bool(opened.get("ok", false)) and not portal.is_exterior:
 					if shape.disabled == before:
 						portal_ready = false
+		var requires_exit: bool = bool(portal.is_exterior) and str(portal.portal_kind) != "BREACH"
+		if requires_exit and (
+				not bool(exterior_result.get("exterior", false)) \
+				or not bool(exit_signal.get("emitted", false)) \
+				or not portal.is_open \
+				or not shape.disabled):
+			portal_ready = false
 		_restore_portal_state(portal, was_open, was_unsafe)
 		if not portal_ready:
 			return false
