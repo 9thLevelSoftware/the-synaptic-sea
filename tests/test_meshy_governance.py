@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import typing
 from pathlib import Path
 
@@ -586,3 +587,31 @@ def test_atomic_write_preserves_primary_error_when_cleanup_unlink_fails(
     assert not target.exists()
     monkeypatch.setattr(governance.os, "replace", real_replace)
     assert list(target.parent.glob(".*.tmp"))
+
+
+def test_credit_lock_is_pinned_private_nonblocking_and_times_out(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    deadline = time.monotonic() + 1.0
+
+    with governance.credit_lock(root, deadline):
+        lock_path = root / STAGING / "_credit.lock"
+        assert lock_path.is_file()
+        assert lock_path.stat().st_mode & 0o777 == 0o600
+        with pytest.raises(TimeoutError, match="credit lock"):
+            with governance.credit_lock(root, time.monotonic() + 0.02):
+                pass
+
+    lock_path = root / STAGING / "_credit.lock"
+    assert lock_path.is_file()
+    assert lock_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_credit_lock_rejects_symlink_and_requires_fcntl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = make_project(tmp_path)
+    lock_path = root / STAGING / "_credit.lock"
+    outside = tmp_path / "outside.lock"
+    outside.write_bytes(b"outside")
+    lock_path.symlink_to(outside)
+    with pytest.raises((OSError, ValueError), match="symlink|lock"):
+        with governance.credit_lock(root, time.monotonic() + 1.0):
+            pass

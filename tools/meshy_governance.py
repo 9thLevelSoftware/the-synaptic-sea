@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import fcntl
 import hashlib
 import inspect
 import json
@@ -23,11 +24,14 @@ import math
 import os
 import secrets
 import stat
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 
 
 STAGING_RELATIVE = Path("assets/_staging/meshy")
+CREDIT_LOCK_RELATIVE = STAGING_RELATIVE / "_credit.lock"
 PROTECTED_RUNTIME_RELATIVE_PATHS = (
     Path("assets/imported"),
     Path("data/combat"),
@@ -1273,13 +1277,104 @@ def atomic_write_json(
     _atomic_write_payload(path, canonical_json_bytes(value), project_root, allowed_root, mode=mode)
 
 
+@contextmanager
+def credit_lock(
+    root: Union[str, os.PathLike],
+    deadline: float,
+    clock: Optional[Callable[[], float]] = None,
+) -> Iterator[None]:
+    """Hold the process-wide Meshy credit lock through a monotonic deadline.
+
+    The lock leaf is opened relative to a pinned, no-follow directory
+    descriptor.  Acquisition is deliberately non-blocking so the caller can
+    enforce the operation deadline.  There is no pathname-based fallback: a
+    platform without the required descriptor and ``flock`` primitives fails
+    closed.
+    """
+
+    if (
+        not isinstance(deadline, (int, float))
+        or isinstance(deadline, bool)
+        or not math.isfinite(float(deadline))
+    ):
+        raise ValueError("credit lock deadline must be finite")
+    clock_fn = clock or time.monotonic
+    physical = physical_project_root(root)
+    lock_path = physical / CREDIT_LOCK_RELATIVE
+    if lock_path.name != "_credit.lock":  # pragma: no cover - defensive invariant
+        raise OSError("credit lock path is invalid")
+    _reject_symlink_components_below(physical, lock_path, "Meshy credit lock")
+    identities = _snapshot_identities(lock_path, "Meshy credit lock")
+    parent_fd: Optional[int] = None
+    lock_fd: Optional[int] = None
+    acquired = False
+    try:
+        if clock_fn() >= float(deadline):
+            raise TimeoutError("Meshy credit lock deadline exceeded")
+        parent_fd = _open_pinned_parent(lock_path, identities, _pinned_directory_flags())
+        lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        expected_lock = identities.get(lock_path.parts)
+        if expected_lock is None:
+            lock_flags |= os.O_EXCL
+        if hasattr(os, "O_CLOEXEC"):
+            lock_flags |= os.O_CLOEXEC
+        try:
+            lock_fd = os.open(lock_path.name, lock_flags, 0o600, dir_fd=parent_fd)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise OSError("Meshy credit lock must not be a symlink") from exc
+            if exc.errno == errno.EEXIST and expected_lock is None:
+                raise OSError("Meshy credit lock appeared during validation") from exc
+            raise OSError("Meshy credit lock could not be opened safely") from exc
+        info = os.fstat(lock_fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise OSError("Meshy credit lock must be a regular file")
+        if expected_lock is not None:
+            _check_fd_identity(lock_fd, expected_lock, "Meshy credit lock")
+        os.fchmod(lock_fd, 0o600)
+        os.fsync(lock_fd)
+        while True:
+            if clock_fn() >= float(deadline):
+                raise TimeoutError("Meshy credit lock deadline exceeded")
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN):
+                    raise OSError("Meshy credit lock acquisition failed") from exc
+                remaining = float(deadline) - clock_fn()
+                if remaining <= 0:
+                    raise TimeoutError("Meshy credit lock deadline exceeded")
+                time.sleep(min(0.01, remaining))
+        yield
+    finally:
+        if lock_fd is not None:
+            if acquired:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+        if parent_fd is not None:
+            try:
+                os.close(parent_fd)
+            except OSError:
+                pass
+
+
 __all__ = [
     "STAGING_RELATIVE",
+    "CREDIT_LOCK_RELATIVE",
     "PROTECTED_RUNTIME_RELATIVE_PATHS",
     "ProtectedSurfaceRecord",
     "atomic_publish_directory",
     "atomic_write_bytes",
     "atomic_write_json",
+    "credit_lock",
     "canonical_json_bytes",
     "file_sha256",
     "governed_task_path",

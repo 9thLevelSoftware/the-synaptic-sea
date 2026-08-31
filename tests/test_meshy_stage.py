@@ -10,6 +10,7 @@ import pickle
 import struct
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -1003,8 +1004,163 @@ def test_r2b1_rejects_duplicate_provider_task_ids(
         generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
     assert len(client.created_tasks) == 2
     journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
-    assert journal["tasks"][1]["task_id"] == "same-task"
+    assert journal["tasks"][1]["task_id"] is None
+    assert journal["tasks"][1]["collision_task_id"] == "same-task"
     assert journal["tasks"][1]["state"] == "FAILED"
+    assert stage_module.validate_batch_journal(journal) == []
+
+
+def test_r2b1_global_credit_lock_serializes_shared_account(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    account = {"balance": 20, "lock": threading.Lock()}
+    barrier = threading.Barrier(2)
+
+    class SharedAccount(FakeMeshyClient):
+        def get_balance(self) -> int:
+            with account["lock"]:
+                return account["balance"]
+
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            with account["lock"]:
+                if account["balance"] < 5:
+                    raise RuntimeError("shared balance exhausted")
+                account["balance"] -= 5
+            return super().create_task(endpoint, payload)
+
+    results = []
+
+    def run() -> None:
+        client = SharedAccount()
+        barrier.wait(timeout=5)
+        try:
+            result = generate_batch(
+                valid_contract, tmp_path, client, 20, **_generation_kwargs(tmp_path)
+            )
+            results.append(("ok", result))
+        except Exception as exc:
+            results.append(("error", exc))
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert all(not thread.is_alive() for thread in threads)
+    assert [result[0] for result in results].count("ok") == 1
+    assert [result[0] for result in results].count("error") == 1
+    assert account["balance"] == 0
+
+
+def test_r2b1_generation_loader_binds_all_adjacent_artifacts_and_journal(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    task_dir = next(
+        path
+        for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir()
+        if path.name != "_batches"
+    )
+    generation_path = task_dir / "generation.json"
+    journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
+    generation = stage_module.load_generation_record(generation_path)
+    assert generation["batch_id"] == journal_path.stem
+    assert generation["task_index"] == 0
+    assert generation["approved_credits"] == 100
+    assert generation["contract_artifact_sha256"] == _sha256(task_dir / "contract.json")
+    assert generation["pricing_artifact_sha256"] == _sha256(task_dir / "pricing.json")
+
+    for name, payload in (
+        ("contract.json", {"asset_id": "tampered"}),
+        ("prompt-packet.json", {"prompt_profile_id": "tampered"}),
+        ("pricing.json", {"pricing_id": "tampered"}),
+        ("source_front.png", b"tampered"),
+        ("review.json", {"asset_id": "tampered", "task_id": task_dir.name}),
+    ):
+        original = (task_dir / name).read_bytes()
+        try:
+            if isinstance(payload, bytes):
+                (task_dir / name).write_bytes(payload)
+            else:
+                (task_dir / name).write_bytes(canonical_json_bytes(payload))
+            with pytest.raises(ValueError, match="bind|match|hash|artifact|review|contract|prompt|pricing|source"):
+                stage_module.load_generation_record(generation_path, journal_path=journal_path)
+        finally:
+            (task_dir / name).write_bytes(original)
+
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    journal["tasks"][0]["index"] = 1
+    assert stage_module.validate_batch_journal(journal)
+
+
+def test_r2b1_journal_validator_rejects_forged_state_credit_and_collision_fields(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+
+    forged = json.loads(json.dumps(journal))
+    forged["tasks"][0]["state"] = "PENDING"
+    assert stage_module.validate_batch_journal(forged)
+
+    forged = json.loads(json.dumps(journal))
+    forged["cumulative_consumed_credits"] = 999999
+    assert stage_module.validate_batch_journal(forged)
+
+    forged = json.loads(json.dumps(journal))
+    forged["state"] = "FAILED"
+    assert stage_module.validate_batch_journal(forged)
+
+    forged = json.loads(json.dumps(journal))
+    forged["tasks"][0]["task_id"] = None
+    forged["tasks"][0]["collision_task_id"] = "unknown-provider-task"
+    forged["tasks"][0]["state"] = "FAILED"
+    forged["tasks"][0]["error"] = "collision"
+    assert stage_module.validate_batch_journal(forged)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("target_polycount", "not-an-int"),
+        ("should_texture", True),
+        ("target_formats", ["obj"]),
+        ("image_url", {"view": "front", "basename": "front.png", "media_type": "image/png", "byte_size": 1, "sha256": "0" * 64, "extra": True}),
+    ],
+)
+def test_r2b1_generation_validator_rejects_forged_request_fields(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract, field: str, value: object
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    task_dir = next(path for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir() if path.name != "_batches")
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    generation["request"][field] = value
+    assert stage_module.validate_generation_record(generation)
+
+
+def test_r2b1_error_evidence_is_fully_redacted_and_still_valid(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    secret_error = "/Users/christopherwilloughby/private/ref.png data:image/png;base64,QUJD https://provider.invalid/?q=secret Bearer secret"
+
+    class FailingPoll(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            raise RuntimeError(secret_error)
+
+    client = FailingPoll()
+    with pytest.raises(RuntimeError):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    task_dir = _stage_asset_root(tmp_path, valid_contract.asset_id) / client.created_tasks[0]
+    generation_path = task_dir / "generation.json"
+    journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
+    generation_bytes = generation_path.read_bytes()
+    journal_bytes = journal_path.read_bytes()
+    for forbidden in ("/Users/christopherwilloughby", "data:image", "base64,QUJD", "https://", "Bearer secret", "provider.invalid"):
+        assert forbidden.encode("utf-8") not in generation_bytes
+        assert forbidden.encode("utf-8") not in journal_bytes
+    assert stage_module.validate_generation_record(json.loads(generation_bytes)) == []
+    assert stage_module.validate_batch_journal(json.loads(journal_bytes)) == []
 
 
 def test_r2b1_invalid_physical_root_makes_no_provider_or_stage_write(
