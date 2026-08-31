@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 import pickle
+import shutil
 import struct
 import subprocess
 import sys
@@ -455,7 +456,7 @@ def test_failed_download_publishes_only_failed_complete_record_and_cleans_temp(
     assert not any(path.name.startswith(".task-") for path in asset_root.iterdir())
 
 
-def test_resume_is_not_exposed_until_r2b2(
+def test_resume_is_exposed_for_r2b2(
     tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
 ) -> None:
     result = subprocess.run(
@@ -465,8 +466,8 @@ def test_resume_is_not_exposed_until_r2b2(
         text=True,
         check=False,
     )
-    assert result.returncode != 0
-    assert "invalid choice" in result.stderr
+    assert result.returncode == 0
+    assert "existing Meshy task ids" in result.stdout
 
 
 def test_contract_hash_and_prompt_packet_hash_are_recorded(
@@ -1387,3 +1388,184 @@ def test_r2b1_validators_enforce_success_cost_and_overrun_bindings(
     overrun["error"] = "Meshy actual credit consumption exceeded the approved bound"
     overrun["budget_violation"] = True
     assert stage_module.validate_generation_record(overrun) == []
+
+
+def test_r2b2_resume_pending_reuses_existing_task_ids_without_create(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    original = FakeMeshyClient()
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(valid_contract, tmp_path, original, 100, **generation_kwargs)
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    journal_path = asset_root / "_batches" / (generated["batch_id"] + ".json")
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    for task_id in generated["task_ids"]:
+        shutil.rmtree(asset_root / task_id)
+    for task in journal["tasks"]:
+        task.update(state="PENDING", consumed_credits=None, error=None, budget_violation=False)
+    journal["state"] = "SUBMITTING"
+    journal["cumulative_consumed_credits"] = 0
+    journal_path.write_bytes(canonical_json_bytes(journal))
+
+    class NoCreate(FakeMeshyClient):
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            raise AssertionError("resume must never create a provider task")
+
+    client = NoCreate()
+    client.balance = 0
+    resumed = stage_module.resume_batch(
+        valid_contract,
+        tmp_path,
+        client,
+        journal_path,
+        100,
+        **generation_kwargs,
+    )
+
+    assert resumed["state"] == "COMPLETED"
+    assert resumed["resumed"] == generated["task_ids"]
+    assert resumed["unresolved"] == []
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["state"] == "COMPLETED"
+
+
+def test_r2b2_verify_batch_is_offline_and_reports_completed_without_client(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    journal_path = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json")
+
+    report = stage_module.verify_batch(tmp_path, valid_contract, journal_path)
+
+    assert report["pass"] is True
+    assert report["terminal_state"] == "COMPLETED"
+    assert report["unresolved"] == []
+    assert report["errors"] == []
+    assert set(report["verified_ids"]) == set(generated["task_ids"])
+
+
+def test_r2b2_cli_exposes_resume_and_offline_verify_help() -> None:
+    parser = stage_module._build_parser()
+    resume = parser.parse_args([
+        "resume", "--project-root", "/tmp/project", "--contract", "/tmp/contract.json",
+        "--batch-journal", "/tmp/batch.json", "--approved-credits", "20",
+        "--reference-root", "/tmp/references", "--reference", "front=front.png",
+        "--output-license", "paid-private",
+    ])
+    verify = parser.parse_args([
+        "verify", "--project-root", "/tmp/project", "--contract", "/tmp/contract.json",
+        "--batch-journal", "/tmp/batch.json",
+    ])
+    assert resume.command == "resume"
+    assert verify.command == "verify"
+
+
+def test_r2b2_resume_completed_batch_skips_without_poll_or_create(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    client = FakeMeshyClient()
+
+    result = stage_module.resume_batch(
+        valid_contract,
+        tmp_path,
+        client,
+        _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json"),
+        100,
+        **generation_kwargs,
+    )
+
+    assert result["pass"] is True
+    assert result["resumed"] == []
+    assert result["skipped"] == generated["task_ids"]
+    assert client.poll_task_ids == []
+    assert client.created_tasks == []
+
+
+def test_r2b2_resume_reports_null_submitting_as_unresolved_submission(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class CrashAfterPost(FakeMeshyClient):
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            self.calls.append(("create_task", endpoint, payload))
+            raise RuntimeError("transport crashed after POST")
+
+    generation_kwargs = _generation_kwargs(tmp_path)
+    with pytest.raises(RuntimeError):
+        generate_batch(valid_contract, tmp_path, CrashAfterPost(), 100, **generation_kwargs)
+    journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
+
+    client = FakeMeshyClient()
+    result = stage_module.resume_batch(
+        valid_contract, tmp_path, client, journal_path, 100, **generation_kwargs
+    )
+
+    assert result["pass"] is False
+    assert result["unresolved_submission"]
+    assert result["unresolved_submission"][0]["reason"] == "unresolved_submission"
+    assert client.poll_task_ids == []
+    assert client.created_tasks == []
+
+
+def test_r2b2_resume_reconciles_uncertain_succeeded_generation(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    journal_path = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json")
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    journal["state"] = "UNCERTAIN"
+    journal["tasks"][0].update(state="UNCERTAIN", error="Meshy task publication durability is uncertain")
+    journal_path.write_bytes(canonical_json_bytes(journal))
+
+    result = stage_module.resume_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+    )
+
+    assert result["pass"] is True
+    assert result["reconciled"] == [generated["task_ids"][0]]
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["state"] == "COMPLETED"
+
+
+def test_r2b2_offline_verify_rejects_orphan_task_directory(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    (asset_root / "orphan-provider-task").mkdir()
+    journal_path = asset_root / "_batches" / (generated["batch_id"] + ".json")
+
+    report = stage_module.verify_batch(tmp_path, valid_contract, journal_path)
+
+    assert report["pass"] is False
+    assert report["unresolved"] == []
+    assert any("not named" in error for error in report["errors"])
+
+
+def test_r2b2_cli_verify_is_offline_and_emits_pass_marker(
+    tmp_path: Path, valid_contract: AssetContract, capsys: pytest.CaptureFixture[str]
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    journal_path = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json")
+
+    result = stage_module.main([
+        "verify", "--project-root", str(tmp_path), "--contract", str(valid_contract.path),
+        "--batch-journal", str(journal_path),
+    ])
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert "MESHY VERIFY PASS" in captured.out

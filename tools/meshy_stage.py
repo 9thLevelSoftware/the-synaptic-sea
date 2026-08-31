@@ -1198,6 +1198,7 @@ def _stage_task(
     prior_consumed: int,
 ) -> Dict[str, Any]:
     task_dir = preflight.asset_root / task_id
+    governance.governed_task_path(preflight.root, task_dir, "Meshy task directory", allow_missing=True)
     if os.path.lexists(str(task_dir)):
         raise _TaskCollision(task_id)
     generation_record = _base_generation(preflight, batch_id, task_index, task_id, created_at)
@@ -1486,7 +1487,7 @@ def generate_batch(
             tasks[index] = _task_entry(index, task_id, "PENDING", None, None)
             _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "SUBMITTING", tasks, cumulative, created_at))
             try:
-                record = _stage_task(client, preflight, batch_id, index, task_id, _utc_timestamp(), cumulative)
+                record = _stage_task(client, preflight, batch_id, index, task_id, created_at, cumulative)
             except Exception as exc:
                 consumed = exc.consumed if isinstance(exc, _TaskFailure) else None
                 if consumed is not None:
@@ -1987,11 +1988,16 @@ def _verify_generation_journal_binding(
     ):
         if document[name] != approval[name]:
             raise ValueError("Meshy generation and journal approval hash does not match")
-    for name in ("approved_credits", "cost_per_candidate", "maximum_credits", "output_license"):
+    for name in (
+        "prompt_profile_id", "pricing_id", "endpoint", "request", "references",
+        "approved_credits", "cost_per_candidate", "maximum_credits", "output_license",
+    ):
         if document[name] != approval[name]:
             raise ValueError("Meshy generation and journal approval does not match")
     if document["asset_id"] != journal["asset_id"] or document["batch_id"] != journal["batch_id"]:
         raise ValueError("Meshy generation and journal identity does not match")
+    if document["created_at"] != approval["created_at"]:
+        raise ValueError("Meshy generation and journal creation time does not match")
     index = document["task_index"]
     if index >= len(journal["tasks"]):
         raise ValueError("Meshy generation task index is outside journal")
@@ -2136,16 +2142,638 @@ def load_batch_journal(path: Union[str, os.PathLike]) -> Dict[str, Any]:
     return document
 
 
+def _resume_journal_path(
+    project_root: Union[str, os.PathLike],
+    asset_id: str,
+    batch_journal: Union[str, os.PathLike],
+) -> Tuple[Path, Path, Path, Path]:
+    """Resolve a resume journal to the one physical, governed journal root."""
+
+    root, stage, asset_root = _validate_staging_paths(project_root, asset_id)
+    batch_root = asset_root / "_batches"
+    governance._reject_symlink_components_below(root, batch_root, "Meshy batch journal root")
+    candidate = Path(batch_journal).expanduser()
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    candidate = Path(os.path.abspath(os.fspath(candidate)))
+    governance._reject_symlink_components_below(root, candidate, "Meshy batch journal")
+    if candidate.parent != batch_root:
+        raise ValueError("Meshy batch journal must be physically under the asset _batches directory")
+    if candidate.suffix != ".json" or candidate.name == ".json":
+        raise ValueError("Meshy batch journal filename must be the batch id")
+    return root, stage, asset_root, candidate
+
+
+def _load_resume_journal(
+    project_root: Union[str, os.PathLike],
+    contract: AssetContract,
+    batch_journal: Union[str, os.PathLike],
+) -> Tuple[Path, Path, Path, Path, Dict[str, Any]]:
+    root, stage, asset_root, path = _resume_journal_path(project_root, contract.asset_id, batch_journal)
+    journal = load_batch_journal(path)
+    if journal.get("asset_id") != contract.asset_id:
+        raise ValueError("Meshy batch journal asset identity does not match contract")
+    if path.stem != journal.get("batch_id"):
+        raise ValueError("Meshy batch journal filename does not match batch id")
+    return root, stage, asset_root, path, journal
+
+
+def _approval_matches_preflight(preflight: _Preflight, journal: Dict[str, Any]) -> bool:
+    approval = journal.get("approval")
+    if not isinstance(approval, dict):
+        return False
+    created_at = approval.get("created_at")
+    expected = _approval(preflight, created_at if isinstance(created_at, str) else "")
+    return approval == expected
+
+
+def _approval_creation_matches_evidence(preflight: _Preflight, journal: Dict[str, Any]) -> bool:
+    """Bind the journal creation time when a task record already exists."""
+
+    created_at = journal["approval"]["created_at"]
+    for task in journal["tasks"]:
+        task_id = task.get("task_id")
+        if task.get("state") not in ("SUCCEEDED", "UNCERTAIN") or not isinstance(task_id, str):
+            continue
+        record_path = preflight.asset_root / task_id / "generation.json"
+        if not record_path.exists():
+            continue
+        try:
+            record = governance.strict_load_json(record_path, "Meshy generation record", 4 * 1024 * 1024)
+        except (OSError, TypeError, ValueError):
+            continue
+        if record.get("created_at") != created_at:
+            return False
+    return True
+
+
+def _resume_state(tasks: List[Dict[str, Any]]) -> str:
+    states = [task.get("state") for task in tasks]
+    if states and all(state == "SUCCEEDED" for state in states):
+        return "COMPLETED"
+    if "OVERRUN" in states:
+        return "BUDGET_OVERRUN"
+    if "UNCERTAIN" in states:
+        return "UNCERTAIN"
+    if "FAILED" in states or "COLLISION" in states:
+        return "FAILED"
+    if states and all(state == "PENDING" and task.get("task_id") is None for state, task in zip(states, tasks)):
+        return "APPROVED"
+    return "SUBMITTING"
+
+
+def _resume_journal_update(
+    preflight: _Preflight,
+    journal: Dict[str, Any],
+    tasks: List[Dict[str, Any]],
+    cumulative: int,
+) -> None:
+    updated = _copy_mapping(journal)
+    updated["tasks"] = tasks
+    updated["cumulative_consumed_credits"] = cumulative
+    updated["state"] = _resume_state(tasks)
+    _write_journal(preflight, journal["batch_id"], updated)
+
+
+def _unresolved_item(index: int, task: Mapping[str, Any], reason: str) -> Dict[str, Any]:
+    return {
+        "index": index,
+        "task_id": task.get("task_id"),
+        "state": task.get("state"),
+        "reason": reason,
+    }
+
+
+def resume_batch(
+    contract: AssetContract,
+    project_root: Path,
+    client: Any,
+    batch_journal: Union[str, os.PathLike],
+    approved_credits: int,
+    *,
+    pricing_file: Optional[Path],
+    reference_root: Path,
+    reference_specs: object,
+    output_license: str,
+    today: object = None,
+    date: object = None,
+    clock: Optional[Callable[[], float]] = None,
+    deadline: object = _DEFAULT_DEADLINE_SECONDS,
+) -> Dict[str, Any]:
+    """Resume only provider tasks already named by a validated batch journal.
+
+    This function deliberately has no create-task seam.  A journal without a
+    task id is an unresolved provider POST window, never permission to retry a
+    request that may already have been accepted by Meshy.
+    """
+
+    if client is None or not all(hasattr(client, name) for name in ("get_balance", "poll_task", "download_bytes")):
+        raise ValueError("a Meshy resume client must expose balance, polling, and download operations")
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    account_lock_id = getattr(client, "account_lock_id", None)
+    if not isinstance(account_lock_id, str):
+        raise ValueError("Meshy client must expose an account lock id")
+
+    root, _stage, _asset_root, journal_path, journal = _load_resume_journal(project_root, contract, batch_journal)
+    approval = journal["approval"]
+    preflight = _preflight(
+        contract,
+        root,
+        client,
+        approved_credits,
+        pricing_file=pricing_file,
+        reference_root=reference_root,
+        reference_specs=reference_specs,
+        output_license=output_license,
+        today=today,
+        date=date,
+        clock=clock,
+        deadline=deadline,
+    )
+    if not _approval_matches_preflight(preflight, journal):
+        raise ValueError("Meshy batch journal approval does not match the recomputed request")
+    if not _approval_creation_matches_evidence(preflight, journal):
+        raise ValueError("Meshy batch journal creation time does not match staged evidence")
+    if approval.get("approved_credits") != approved_credits:
+        raise ValueError("Meshy approved credit ceiling does not match the original journal")
+
+    with governance.credit_lock(account_lock_id, preflight.operation_deadline, preflight.clock):
+        _refresh_before_provider(preflight)
+        reloaded = load_batch_journal(journal_path)
+        if reloaded != journal:
+            raise ValueError("Meshy batch journal changed during resume preflight")
+        if not _approval_matches_preflight(preflight, reloaded):
+            raise ValueError("Meshy batch journal approval changed during resume preflight")
+        if not _approval_creation_matches_evidence(preflight, reloaded):
+            raise ValueError("Meshy batch journal creation time changed during resume preflight")
+        journal = reloaded
+
+        try:
+            balance = _call_with_deadline(client.get_balance, preflight)
+        except Exception as exc:
+            raise RuntimeError(_safe_error(exc)) from exc
+        if not _valid_nonnegative_int(balance):
+            raise ValueError("Meshy balance response did not contain credits")
+
+        tasks = [_copy_mapping(task) for task in journal["tasks"]]
+        cumulative = journal["cumulative_consumed_credits"]
+        resumed: List[str] = []
+        skipped: List[str] = []
+        reconciled: List[str] = []
+        unresolved: List[Dict[str, Any]] = []
+        unresolved_submission: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        changed = False
+
+        for index, task in enumerate(tasks):
+            state = task["state"]
+            task_id = task.get("task_id")
+            if state == "SUCCEEDED":
+                if not isinstance(task_id, str):
+                    item = _unresolved_item(index, task, "succeeded task has no task id")
+                    unresolved.append(item)
+                    errors.append("Meshy succeeded journal task has no task id")
+                    continue
+                try:
+                    load_generation_record(
+                        preflight.asset_root / task_id / "generation.json",
+                        journal_path=journal_path,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    unresolved.append(_unresolved_item(index, task, "invalid_succeeded_evidence"))
+                    errors.append(_safe_error(exc))
+                else:
+                    skipped.append(task_id)
+                continue
+
+            if state == "UNCERTAIN":
+                if not isinstance(task_id, str):
+                    unresolved.append(_unresolved_item(index, task, "uncertain task has no task id"))
+                    errors.append("Meshy uncertain journal task has no task id")
+                    continue
+                try:
+                    record = load_generation_record(
+                        preflight.asset_root / task_id / "generation.json",
+                        journal_path=journal_path,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    unresolved.append(_unresolved_item(index, task, "uncertain_evidence_unresolved"))
+                    errors.append(_safe_error(exc))
+                    continue
+                if record.get("status") != "SUCCEEDED":
+                    unresolved.append(_unresolved_item(index, task, "uncertain_evidence_unresolved"))
+                    errors.append("Meshy uncertain task has no bound succeeded generation")
+                    continue
+                tasks[index] = _task_entry(index, task_id, "SUCCEEDED", record["consumed_credits"], None)
+                reconciled.append(task_id)
+                changed = True
+                continue
+
+            if state in ("FAILED", "OVERRUN", "COLLISION"):
+                unresolved.append(_unresolved_item(index, task, "terminal_manual"))
+                continue
+
+            if state == "SUBMITTING":
+                reason = "unresolved_submission" if task_id is None else "submission_state_unresolved"
+                item = _unresolved_item(index, task, reason)
+                unresolved.append(item)
+                if task_id is None:
+                    unresolved_submission.append(item)
+                continue
+
+            if state != "PENDING":
+                unresolved.append(_unresolved_item(index, task, "unsupported_resume_state"))
+                errors.append("Meshy journal contains an unsupported resume state")
+                continue
+
+            if task_id is None:
+                unresolved.append(_unresolved_item(index, task, "unsubmitted"))
+                continue
+
+            _check_deadline(preflight)
+            _refresh_before_provider(preflight)
+            try:
+                record = _stage_task(
+                    client,
+                    preflight,
+                    journal["batch_id"],
+                    index,
+                    task_id,
+                    journal["approval"]["created_at"],
+                    cumulative,
+                )
+            except BaseException as exc:
+                consumed = exc.consumed if isinstance(exc, _TaskFailure) else None
+                if consumed is not None:
+                    cumulative += consumed
+                if isinstance(exc, _TaskCollision):
+                    tasks[index] = _task_entry(index, None, "COLLISION", None, _safe_error(exc), collision_task_id=exc.collision_task_id)
+                    unresolved.append(_unresolved_item(index, tasks[index], "collision"))
+                elif isinstance(exc, _TaskFailure) and exc.publication_uncertain:
+                    tasks[index] = _task_entry(index, task_id, "UNCERTAIN", consumed, _safe_error(exc))
+                    unresolved.append(_unresolved_item(index, tasks[index], "publication_uncertain"))
+                elif isinstance(exc, _TaskFailure) and exc.budget_violation:
+                    tasks[index] = _task_entry(index, task_id, "OVERRUN", consumed, _safe_error(exc), budget_violation=True)
+                    unresolved.append(_unresolved_item(index, tasks[index], "budget_overrun"))
+                else:
+                    tasks[index] = _task_entry(index, task_id, "FAILED", consumed, _safe_error(exc))
+                    unresolved.append(_unresolved_item(index, tasks[index], "failed"))
+                errors.append(_safe_error(exc))
+                changed = True
+                _resume_journal_update(preflight, journal, tasks, cumulative)
+                journal = load_batch_journal(journal_path)
+                continue
+
+            consumed = record.get("consumed_credits")
+            if not _valid_nonnegative_int(consumed):
+                raise ValueError("Meshy resumed generation did not contain consumed credits")
+            cumulative += consumed
+            tasks[index] = _task_entry(index, task_id, "SUCCEEDED", consumed, None)
+            resumed.append(task_id)
+            changed = True
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+
+        if changed:
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+
+        final_state = journal["state"]
+        passed = final_state == "COMPLETED" and not unresolved and not errors and all(
+            task.get("state") == "SUCCEEDED" for task in journal["tasks"]
+        )
+        return {
+            "asset_id": contract.asset_id,
+            "batch_id": journal["batch_id"],
+            "state": final_state,
+            "pass": passed,
+            "resumed": resumed,
+            "skipped": skipped,
+            "reconciled": reconciled,
+            "unresolved": unresolved,
+            "unresolved_submission": unresolved_submission,
+            "errors": sorted(set(errors)),
+            "consumed_credits": journal["cumulative_consumed_credits"],
+        }
+
+
+def _visible_task_directories(
+    root: Path,
+    asset_root: Path,
+    journal_task_ids: set,
+    errors: List[str],
+) -> Dict[str, Path]:
+    """Inventory visible task roots, excluding journals and hidden temp files."""
+
+    result: Dict[str, Path] = {}
+    if not asset_root.exists():
+        errors.append("Meshy task root is missing")
+        return result
+    if asset_root.is_symlink() or not asset_root.is_dir():
+        errors.append("Meshy task root is not a regular directory")
+        return result
+    try:
+        children = sorted(asset_root.iterdir(), key=lambda item: item.name)
+    except OSError:
+        errors.append("Meshy task root could not be enumerated")
+        return result
+    for child in children:
+        if child.name == "_batches":
+            if child.is_symlink() or not child.is_dir():
+                errors.append("Meshy batch journal root is not a regular directory")
+            continue
+        if child.name.startswith("."):
+            continue
+        try:
+            governance.governed_task_path(root, child, "Meshy task directory", allow_missing=False)
+        except (OSError, ValueError):
+            errors.append("Meshy task directory is outside governed staging")
+            continue
+        if child.is_symlink() or not child.is_dir():
+            errors.append("Meshy task root contains a non-directory entry")
+            continue
+        if child.name not in journal_task_ids:
+            errors.append("Meshy task directory is not named by the batch journal")
+            continue
+        result[child.name] = child
+    return result
+
+
+def _staged_reference_inputs(
+    task_dir: Path,
+    references: List[Dict[str, Any]],
+) -> ReferenceInputs:
+    records: List[ReferenceInput] = []
+    for reference in references:
+        suffix = Path(reference["basename"]).suffix.lower()
+        source = task_dir / ("source_{0}{1}".format(reference["view"], suffix))
+        payload = governance._read_bounded_regular_file(source, "Meshy staged source", _REFERENCE_FILE_MAX_BYTES)
+        records.append(
+            ReferenceInput(
+                reference["view"],
+                reference["basename"],
+                reference["media_type"],
+                reference["byte_size"],
+                reference["sha256"],
+                payload,
+            )
+        )
+    return ReferenceInputs(records)
+
+
+def _pricing_record_from_document(document: Dict[str, Any], raw: bytes) -> PricingRecord:
+    return PricingRecord(
+        document["pricing_id"],
+        document["checked_at"],
+        document["expires_at"],
+        document["source_url"],
+        hashlib.sha256(raw).hexdigest(),
+        canonical_json_bytes(document),
+    )
+
+
+def _verify_current_approval(
+    root: Path,
+    contract: AssetContract,
+    journal: Dict[str, Any],
+    task_dirs: Mapping[str, Path],
+    errors: List[str],
+) -> None:
+    """Recompute approval fields from current sources and staged evidence."""
+
+    approval = journal["approval"]
+    try:
+        current_contract = load_contract(contract.path)
+        if current_contract.sha256 != contract.sha256 or current_contract.snapshot_bytes() != contract.snapshot_bytes():
+            errors.append("asset contract changed since approval")
+        packet = render_prompt_packet(current_contract)
+        prompt_hash = hashlib.sha256(canonical_json_bytes(packet)).hexdigest()
+        if approval["prompt_profile_id"] != packet["prompt_profile_id"] or approval["prompt_profile_sha256"] != packet["prompt_profile_sha256"]:
+            errors.append("prompt profile changed since approval")
+        if approval["prompt_packet_sha256"] != prompt_hash:
+            errors.append("prompt packet changed since approval")
+        if approval["contract_sha256"] != current_contract.sha256:
+            errors.append("contract hash does not match current contract")
+
+        pricing_document: Optional[Dict[str, Any]] = None
+        pricing_raw: Optional[bytes] = None
+        try:
+            pricing_document, pricing_raw = governance.strict_load_json_bytes(
+                DEFAULT_PRICING_PATH,
+                "Meshy pricing",
+                _PRICING_MAX_BYTES,
+            )
+            _validate_pricing_document(pricing_document)
+        except (OSError, TypeError, ValueError):
+            pricing_document = None
+            pricing_raw = None
+
+        source_task_dir = next(iter(task_dirs.values()), None)
+        if source_task_dir is not None:
+            staged_pricing, staged_raw = _read_adjacent_json(source_task_dir / "pricing.json", "pricing.json")
+            try:
+                _validate_pricing_document(staged_pricing)
+            except (TypeError, ValueError):
+                errors.append("staged pricing document is invalid")
+            if approval["pricing_id"] != staged_pricing.get("pricing_id"):
+                errors.append("pricing id does not match approval")
+            if pricing_document is not None and staged_pricing != pricing_document:
+                errors.append("current pricing changed since approval")
+            if pricing_document is not None and pricing_raw is not None:
+                if approval["pricing_sha256"] != hashlib.sha256(pricing_raw).hexdigest():
+                    errors.append("pricing hash does not match current pricing")
+            elif approval["pricing_sha256"] != hashlib.sha256(staged_raw).hexdigest():
+                errors.append("pricing hash does not match staged pricing")
+            pricing_document = staged_pricing if pricing_document is None else pricing_document
+        elif pricing_document is not None and pricing_raw is not None:
+            if approval["pricing_sha256"] != hashlib.sha256(pricing_raw).hexdigest():
+                errors.append("pricing hash does not match current pricing")
+
+        generation = current_contract._snapshot_document().get("generation", {})
+        expected_endpoint = ENDPOINTS.get(generation.get("mode"))
+        if approval["endpoint"] != expected_endpoint:
+            errors.append("provider endpoint changed since approval")
+        expected_count = generation.get("candidate_count")
+        if approval["candidate_count"] != expected_count:
+            errors.append("candidate count changed since approval")
+        if pricing_document is not None:
+            pricing = _pricing_record_from_document(pricing_document, pricing_raw or canonical_json_bytes(pricing_document))
+            expected_cost = pricing.cost_for(current_contract)
+            if approval["cost_per_candidate"] != expected_cost:
+                errors.append("provider cost changed since approval")
+            if approval["maximum_credits"] != expected_count * expected_cost:
+                errors.append("maximum credits changed since approval")
+
+        if source_task_dir is not None:
+            staged_references = _staged_reference_inputs(source_task_dir, approval["references"])
+            if list(staged_references.metadata) != approval["references"]:
+                errors.append("reference evidence changed since approval")
+            transient = build_transient_provider_request(current_contract, staged_references)
+            if approval["provider_payload_sha256"] != transient.provider_payload_sha256:
+                errors.append("provider payload changed since approval")
+            if approval["request"] != transient.redacted_request:
+                errors.append("provider request changed since approval")
+        else:
+            if journal["state"] == "COMPLETED":
+                errors.append("provider payload cannot be recomputed without staged reference evidence")
+    except (OSError, TypeError, ValueError) as exc:
+        errors.append(_safe_error(exc))
+
+
+def verify_batch(
+    project_root: Path,
+    contract: AssetContract,
+    batch_journal: Union[str, os.PathLike],
+) -> Dict[str, Any]:
+    """Verify a Meshy batch entirely from local journal and staged evidence."""
+
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    root, _stage, asset_root, journal_path, journal = _load_resume_journal(project_root, contract, batch_journal)
+    errors: List[str] = []
+    unresolved: List[Dict[str, Any]] = []
+    verified_ids: List[str] = []
+    journal_task_ids = {task["task_id"] for task in journal["tasks"] if task.get("task_id") is not None}
+    task_dirs = _visible_task_directories(root, asset_root, journal_task_ids, errors)
+    for task_id in sorted(task_dirs):
+        if task_id not in journal_task_ids:
+            errors.append("Meshy task directory is not named by the batch journal")
+
+    _verify_current_approval(root, contract, journal, task_dirs, errors)
+
+    for index, task in enumerate(journal["tasks"]):
+        state = task["state"]
+        task_id = task.get("task_id")
+        task_dir = task_dirs.get(task_id) if isinstance(task_id, str) else None
+        if state == "SUCCEEDED":
+            if task_dir is None:
+                unresolved.append(_unresolved_item(index, task, "missing_succeeded_evidence"))
+                errors.append("Meshy succeeded task directory is missing")
+                continue
+            try:
+                record = load_generation_record(task_dir / "generation.json", journal_path=journal_path)
+                if record.get("status") != "SUCCEEDED":
+                    raise ValueError("Meshy succeeded task record is not succeeded")
+            except (OSError, TypeError, ValueError) as exc:
+                unresolved.append(_unresolved_item(index, task, "invalid_succeeded_evidence"))
+                errors.append(_safe_error(exc))
+            else:
+                verified_ids.append(task_id)
+            continue
+
+        if state == "FAILED":
+            if task_id is None:
+                if task.get("error") not in {
+                    "Meshy operation failed",
+                    "insufficient Meshy balance for remaining reserved maximum",
+                    "Meshy balance response did not contain credits",
+                }:
+                    errors.append("Meshy journal-only failure is not a documented early static failure")
+                if task_dir is not None:
+                    errors.append("Meshy journal-only failure has an unexpected task directory")
+            elif task_dir is None:
+                unresolved.append(_unresolved_item(index, task, "missing_failed_evidence"))
+                errors.append("Meshy failed task directory is missing")
+            else:
+                try:
+                    record = load_generation_record(task_dir / "generation.json", journal_path=journal_path)
+                    if record.get("status") != "FAILED" or record.get("budget_violation") is not False:
+                        raise ValueError("Meshy failed task record is invalid")
+                except (OSError, TypeError, ValueError) as exc:
+                    unresolved.append(_unresolved_item(index, task, "invalid_failed_evidence"))
+                    errors.append(_safe_error(exc))
+                else:
+                    verified_ids.append(task_id)
+            continue
+
+        if state == "OVERRUN":
+            if task_dir is None:
+                unresolved.append(_unresolved_item(index, task, "missing_overrun_evidence"))
+                errors.append("Meshy overrun task directory is missing")
+            else:
+                try:
+                    record = load_generation_record(task_dir / "generation.json", journal_path=journal_path)
+                    if record.get("status") != "FAILED" or record.get("budget_violation") is not True:
+                        raise ValueError("Meshy overrun task record is invalid")
+                except (OSError, TypeError, ValueError) as exc:
+                    unresolved.append(_unresolved_item(index, task, "invalid_overrun_evidence"))
+                    errors.append(_safe_error(exc))
+                else:
+                    verified_ids.append(task_id)
+            continue
+
+        if state == "UNCERTAIN":
+            if task_dir is not None:
+                try:
+                    record = load_generation_record(task_dir / "generation.json", journal_path=journal_path)
+                    if record.get("status") == "SUCCEEDED":
+                        verified_ids.append(task_id)
+                    else:
+                        raise ValueError("Meshy uncertain task has no succeeded generation")
+                except (OSError, TypeError, ValueError) as exc:
+                    errors.append(_safe_error(exc))
+            unresolved.append(_unresolved_item(index, task, "uncertain"))
+            continue
+
+        if state == "COLLISION":
+            if task_dir is not None:
+                errors.append("Meshy collision task has a final directory")
+            unresolved.append(_unresolved_item(index, task, "collision"))
+            continue
+
+        if state in ("PENDING", "SUBMITTING"):
+            reason = "unresolved_submission" if state == "SUBMITTING" and task_id is None else "unresolved"
+            if task_dir is not None:
+                errors.append("Meshy unresolved task has a final directory")
+            unresolved.append(_unresolved_item(index, task, reason))
+            continue
+
+        errors.append("Meshy journal contains an unsupported task state")
+        unresolved.append(_unresolved_item(index, task, "unsupported"))
+
+    protected = governance.snapshot_protected_surfaces(
+        root,
+        max_file_bytes=_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES,
+        max_total_bytes=_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES,
+        max_entries=_REPOSITORY_SNAPSHOT_MAX_ENTRIES,
+        max_depth=_REPOSITORY_SNAPSHOT_MAX_DEPTH,
+    )
+    expected_protected = [
+        {"type": item.type, "path": item.path, "sha256": item.sha256, "size": item.size}
+        for item in protected
+    ]
+    if expected_protected != journal["approval"]["protected_snapshot"]:
+        errors.append("protected runtime surfaces changed since approval")
+
+    errors = sorted(set(errors))
+    passed = (
+        journal["state"] == "COMPLETED"
+        and all(task.get("state") == "SUCCEEDED" for task in journal["tasks"])
+        and not errors
+        and not unresolved
+    )
+    return {
+        "asset_id": contract.asset_id,
+        "batch_id": journal["batch_id"],
+        "terminal_state": journal["state"],
+        "pass": passed,
+        "verified_ids": verified_ids,
+        "unresolved": unresolved,
+        "errors": errors,
+    }
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    plan = subparsers.add_parser("plan")
+    plan = subparsers.add_parser("plan", help="build a read-only Meshy request plan")
     plan.add_argument("--project-root", type=Path, required=True)
     plan.add_argument("--contract", type=Path, required=True)
     plan.add_argument("--pricing-file", type=Path, default=None)
     plan.add_argument("--reference-root", type=Path, default=None)
     plan.add_argument("--reference", action="append", default=None, metavar="VIEW=FILENAME")
-    generate = subparsers.add_parser("generate")
+    generate = subparsers.add_parser("generate", help="create and stage a new Meshy batch")
     generate.add_argument("--project-root", type=Path, required=True)
     generate.add_argument("--contract", type=Path, required=True)
     generate.add_argument("--approved-credits", type=int, required=True)
@@ -2154,6 +2782,28 @@ def _build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
     generate.add_argument("--output-license", choices=_ALLOWED_LICENSES, required=True)
     generate.add_argument("--deadline-seconds", type=float, default=_DEFAULT_DEADLINE_SECONDS)
+    resume = subparsers.add_parser(
+        "resume",
+        help="resume existing Meshy task ids without creating tasks",
+        description="Resume existing Meshy task ids without creating provider tasks or retrying an unknown POST.",
+    )
+    resume.add_argument("--project-root", type=Path, required=True)
+    resume.add_argument("--contract", type=Path, required=True)
+    resume.add_argument("--batch-journal", type=Path, required=True)
+    resume.add_argument("--approved-credits", type=int, required=True)
+    resume.add_argument("--pricing-file", type=Path, default=None, required=False)
+    resume.add_argument("--reference-root", type=Path, required=True)
+    resume.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
+    resume.add_argument("--output-license", choices=_ALLOWED_LICENSES, required=True)
+    resume.add_argument("--deadline-seconds", type=float, default=_DEFAULT_DEADLINE_SECONDS)
+    verify = subparsers.add_parser(
+        "verify",
+        help="verify a Meshy batch offline with no API client",
+        description="Verify a Meshy batch offline from its journal and staged artifacts; no API key is used.",
+    )
+    verify.add_argument("--project-root", type=Path, required=True)
+    verify.add_argument("--contract", type=Path, required=True)
+    verify.add_argument("--batch-journal", type=Path, required=True)
     return parser
 
 
@@ -2163,14 +2813,32 @@ def main(argv: Optional[List[str]] = None) -> int:
         contract = load_contract(args.contract)
         if args.command == "plan":
             result = plan_generation(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
-        else:
+        elif args.command == "generate":
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
             result = generate_batch(contract, args.project_root, MeshyClient(), args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
+        elif args.command == "resume":
+            if args.approved_credits <= 0:
+                raise ValueError("approved credit ceiling must be positive")
+            result = resume_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
+        else:
+            result = verify_batch(args.project_root, contract, args.batch_journal)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         print("error: {0}".format(_safe_error(exc)), file=sys.stderr)
         return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
+    if args.command == "resume":
+        if result.get("pass"):
+            print("MESHY RESUME PASS batch={0}".format(result["batch_id"]))
+            return 0
+        print("MESHY RESUME UNRESOLVED batch={0}".format(result["batch_id"]))
+        return 1
+    if args.command == "verify":
+        if result.get("pass"):
+            print("MESHY VERIFY PASS batch={0}".format(result["batch_id"]))
+            return 0
+        print("MESHY VERIFY FAIL batch={0}".format(result["batch_id"]))
+        return 1
     return 0
 
 
@@ -2180,5 +2848,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
 ]
