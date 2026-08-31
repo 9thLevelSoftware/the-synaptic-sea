@@ -37,6 +37,7 @@ from tools.meshy_asset_contract import (  # noqa: E402
     load_contract,
     render_prompt_packet,
 )
+from tools.meshy_candidate_review import validate_review  # noqa: E402
 
 
 ENDPOINTS = {
@@ -75,8 +76,12 @@ _SAFE_ERROR_MESSAGES = {
     "Meshy task did not reach SUCCEEDED",
     "Meshy task ended with status FAILED",
     "Meshy actual credit consumption exceeded the approved bound",
+    "Meshy consumed credit observation decreased and is ambiguous",
     "Meshy generation deadline exceeded",
     "Meshy failure evidence publication failed",
+    "Meshy returned a duplicate task id",
+    "Meshy task id collision",
+    "Meshy task publication durability is uncertain",
 }
 
 
@@ -108,6 +113,9 @@ class MeshyClient:
             except AttributeError:
                 pass
         self.api_key = api_key or ""
+        if not isinstance(self.api_key, str):
+            raise ValueError("MESHY_API_KEY must be text")
+        self.account_lock_id = hashlib.sha256(self.api_key.encode("utf-8")).hexdigest()
         self.base_url = origin
         self.session = session
 
@@ -922,9 +930,24 @@ def _refresh_before_provider(preflight: _Preflight) -> None:
 
 
 class _TaskFailure(RuntimeError):
-    def __init__(self, message: str, consumed: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        consumed: Optional[int] = None,
+        *,
+        budget_violation: bool = False,
+        publication_uncertain: bool = False,
+    ) -> None:
         super().__init__(message)
         self.consumed = consumed
+        self.budget_violation = budget_violation
+        self.publication_uncertain = publication_uncertain
+
+
+class _TaskCollision(_TaskFailure):
+    def __init__(self, task_id: str) -> None:
+        super().__init__("Meshy task id collision")
+        self.collision_task_id = task_id
 
 
 def _base_generation(
@@ -951,6 +974,7 @@ def _base_generation(
         "references": list(preflight.references.metadata), "input_image_hashes": {item.view: item.sha256 for item in sorted(preflight.references, key=lambda item: item.view)},
         "output_license": preflight.output_license, "created_at": created_at, "completed_at": None, "consumed_credits": None,
         "outputs": {}, "provenance": {"provider": "meshy", "model": generation["ai_model"], "license_state": preflight.output_license}, "error": None,
+        "budget_violation": False,
     }
 
 
@@ -962,44 +986,18 @@ def _artifact_path(preflight: _Preflight, task_dir: Path, name: str) -> Path:
     return path
 
 
-def _validate_review_record(value: object, asset_id: str, task_id: str) -> List[str]:
-    if not isinstance(value, dict):
-        return ["review record must be an object"]
-    required = {
-        "schema_version", "document_kind", "asset_id", "task_id", "state", "decision",
-        "checks", "rejection_reasons", "reviewer",
-    }
-    errors: List[str] = []
-    if set(value) != required:
-        errors.append("review record fields are not exact")
-    if value.get("schema_version") != "1.0.0" or value.get("document_kind") != "meshy_candidate_review":
-        errors.append("review record kind/version is invalid")
-    if value.get("asset_id") != asset_id or value.get("task_id") != task_id:
-        errors.append("review record identity does not match task")
-    if value.get("state") != "pending" or value.get("decision") != "pending":
-        errors.append("review record initial state is invalid")
-    checks = value.get("checks")
-    expected_checks = {
-        "silhouette_readable", "proportions_match_contract", "functional_volume_present",
-        "movable_parts_separable", "cleanup_bounded", "camera_readability",
-    }
-    if not isinstance(checks, dict) or set(checks) != expected_checks or any(type(item) is not bool for item in checks.values()):
-        errors.append("review record checks are invalid")
-    if value.get("rejection_reasons") != [] or value.get("reviewer") != "unassigned":
-        errors.append("review record initial evidence is invalid")
-    return sorted(set(errors))
-
-
 def _validate_artifact_before_publish(
     preflight: _Preflight, task_dir: Path, name: str, value: object
 ) -> None:
     if name == "generation.json":
         errors = validate_generation_record(value)
     elif name == "review.json":
-        task_id = value.get("task_id") if isinstance(value, dict) else ""
-        if not isinstance(task_id, str):
-            task_id = ""
-        errors = _validate_review_record(value, preflight.contract.asset_id, task_id)
+        errors = validate_review(value)
+        if isinstance(value, dict) and (
+            value.get("asset_id") != preflight.contract.asset_id
+            or not isinstance(value.get("task_id"), str)
+        ):
+            errors.append("review record identity does not match task")
     elif name == "contract.json":
         errors = [] if value == preflight.contract._snapshot_document() else ["staged contract does not match loaded contract"]
     elif name == "prompt-packet.json":
@@ -1089,6 +1087,11 @@ def _validate_glb(payload: bytes) -> None:
         raise ValueError("raw.glb JSON chunk is invalid") from exc
     if not isinstance(decoded, dict):
         raise ValueError("raw.glb JSON chunk must decode to an object")
+    asset = decoded.get("asset")
+    if not isinstance(asset, dict):
+        raise ValueError("raw.glb JSON chunk must contain an asset object")
+    if asset.get("version") != "2.0":
+        raise ValueError("raw.glb asset.version must be exactly 2.0")
 
 
 def _download_with_limit(client: Any, url: str, maximum: int, preflight: _Preflight) -> bytes:
@@ -1132,9 +1135,12 @@ def _call_with_deadline(method: Callable[..., Any], preflight: _Preflight, *args
 
 
 def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_consumed: Callable[[int], None]) -> Dict[str, Any]:
-    last: Optional[Dict[str, Any]] = None
+    last_consumed: Optional[int] = None
     for attempt in range(_MAX_POLL_ATTEMPTS):
-        _check_deadline(preflight)
+        try:
+            _check_deadline(preflight)
+        except Exception as exc:
+            raise _TaskFailure(_safe_error(exc), last_consumed)
         try:
             response = _call_with_deadline(
                 client.poll_task,
@@ -1143,34 +1149,43 @@ def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_c
                 task_id,
             )
         except Exception as exc:
-            raise _TaskFailure(_safe_error(exc))
+            raise _TaskFailure(_safe_error(exc), last_consumed)
         if not isinstance(response, dict):
-            raise _TaskFailure("Meshy task response must be an object")
+            raise _TaskFailure("Meshy task response must be an object", last_consumed)
         if response.get("task_id") != task_id:
-            raise _TaskFailure("Meshy task response identity mismatch")
+            raise _TaskFailure("Meshy task response identity mismatch", last_consumed)
         consumed = response.get("consumed_credits")
         if consumed is not None:
             if not isinstance(consumed, int) or isinstance(consumed, bool) or consumed < 0:
-                raise _TaskFailure("Meshy consumed_credits must be a non-negative integer")
+                raise _TaskFailure("Meshy consumed_credits must be a non-negative integer", last_consumed)
+            if last_consumed is not None and consumed < last_consumed:
+                raise _TaskFailure("Meshy consumed credit observation decreased and is ambiguous", last_consumed)
+            last_consumed = consumed
             on_consumed(consumed)
-        last = response
         status = response.get("status")
         if status == "SUCCEEDED":
+            if consumed is None and last_consumed is not None:
+                response = dict(response)
+                response["consumed_credits"] = last_consumed
             return response
+        terminal_consumed = consumed if consumed is not None else last_consumed
         if status in ("FAILED", "CANCELED", "CANCELLED", "EXPIRED"):
-            raise _TaskFailure("Meshy task ended with status {0}".format(status), consumed)
+            raise _TaskFailure("Meshy task ended with status {0}".format(status), terminal_consumed)
         if status not in ("PENDING", "IN_PROGRESS", "QUEUED"):
-            raise _TaskFailure("Meshy task returned an unsupported status", consumed)
+            raise _TaskFailure("Meshy task returned an unsupported status", terminal_consumed)
         if attempt + 1 >= _MAX_POLL_ATTEMPTS:
             break
         delay = _POLL_DELAYS[min(attempt, len(_POLL_DELAYS) - 1)]
         if delay:
-            _check_deadline(preflight)
+            try:
+                _check_deadline(preflight)
+            except Exception as exc:
+                raise _TaskFailure(_safe_error(exc), last_consumed)
             remaining = preflight.operation_deadline - preflight.clock()
             if remaining <= 0:
-                raise _TaskFailure("Meshy generation deadline exceeded", consumed)
+                raise _TaskFailure("Meshy generation deadline exceeded", last_consumed)
             time.sleep(min(delay, remaining))
-    raise _TaskFailure("Meshy task did not reach SUCCEEDED", last.get("consumed_credits") if last else None)
+    raise _TaskFailure("Meshy task did not reach SUCCEEDED", last_consumed)
 
 
 def _stage_task(
@@ -1184,10 +1199,11 @@ def _stage_task(
 ) -> Dict[str, Any]:
     task_dir = preflight.asset_root / task_id
     if os.path.lexists(str(task_dir)):
-        raise _TaskFailure("Meshy task directory already exists")
+        raise _TaskCollision(task_id)
     generation_record = _base_generation(preflight, batch_id, task_index, task_id, created_at)
     candidate_dir: Optional[Path] = None
     last_consumed: Optional[int] = None
+    static_complete = False
     try:
         candidate_dir = Path(
             tempfile.mkdtemp(
@@ -1231,12 +1247,17 @@ def _stage_task(
         }
         _write_artifact_json(preflight, candidate_dir, "review.json", review)
         _write_artifact_json(preflight, candidate_dir, "generation.json", generation_record)
+        static_complete = True
 
         def note_consumed(value: int) -> None:
             nonlocal last_consumed
             last_consumed = value
             if value > preflight.cost_per_candidate or prior_consumed + value > preflight.approved_credits:
-                raise _TaskFailure("Meshy actual credit consumption exceeded the approved bound", value)
+                raise _TaskFailure(
+                    "Meshy actual credit consumption exceeded the approved bound",
+                    value,
+                    budget_violation=True,
+                )
 
         response = _poll_until_succeeded(client, preflight, task_id, note_consumed)
         if response.get("task_id") != task_id or response.get("status") != "SUCCEEDED":
@@ -1245,7 +1266,11 @@ def _stage_task(
         if not isinstance(consumed, int) or isinstance(consumed, bool) or consumed < 0:
             raise _TaskFailure("Meshy success response did not contain consumed_credits", last_consumed)
         if consumed > preflight.cost_per_candidate or prior_consumed + consumed > preflight.approved_credits:
-            raise _TaskFailure("Meshy actual credit consumption exceeded the approved bound", consumed)
+            raise _TaskFailure(
+                "Meshy actual credit consumption exceeded the approved bound",
+                consumed,
+                budget_violation=True,
+            )
         model_urls = response.get("model_urls")
         glb_url = model_urls.get("glb") if isinstance(model_urls, dict) else None
         thumbnail_url = response.get("thumbnail_url")
@@ -1273,6 +1298,7 @@ def _stage_task(
                 "status": "SUCCEEDED",
                 "completed_at": _utc_timestamp(),
                 "consumed_credits": consumed,
+                "budget_violation": False,
                 "outputs": {
                     "raw.glb": {"sha256": hashlib.sha256(glb).hexdigest(), "byte_size": len(glb)},
                     "thumbnail.png": {
@@ -1293,12 +1319,29 @@ def _stage_task(
         candidate_dir = None
         return generation_record
     except BaseException as exc:
-        if candidate_dir is not None and candidate_dir.exists():
+        if isinstance(exc, governance.PublicationUncertainError) and exc.published:
+            raise _TaskFailure(
+                "Meshy task publication durability is uncertain",
+                last_consumed,
+                publication_uncertain=True,
+            ) from exc
+        if isinstance(exc, _TaskCollision):
+            raise
+        if isinstance(exc, ValueError) and "final task directory" in str(exc):
+            raise _TaskCollision(task_id) from exc
+        if static_complete and candidate_dir is not None and candidate_dir.exists():
             failed = dict(generation_record)
             failed["status"] = "FAILED"
             failed["consumed_credits"] = last_consumed
+            failed["budget_violation"] = bool(getattr(exc, "budget_violation", False))
             failed["error"] = _safe_error(exc)
             try:
+                for output_name in ("raw.glb", "thumbnail.png"):
+                    output_path = _artifact_path(preflight, candidate_dir, output_name)
+                    if os.path.lexists(str(output_path)):
+                        if output_path.is_symlink() or not output_path.is_file():
+                            raise ValueError("Meshy failed envelope contains an invalid output")
+                        output_path.unlink()
                 _write_artifact_json(preflight, candidate_dir, "generation.json", failed)
                 governance.atomic_publish_directory(
                     candidate_dir,
@@ -1324,6 +1367,7 @@ def _task_entry(
     consumed: Optional[int],
     error: Optional[str],
     collision_task_id: Optional[str] = None,
+    budget_violation: bool = False,
 ) -> Dict[str, Any]:
     return {
         "index": index,
@@ -1332,6 +1376,7 @@ def _task_entry(
         "state": state,
         "consumed_credits": consumed,
         "error": error,
+        "budget_violation": budget_violation,
     }
 
 
@@ -1362,7 +1407,10 @@ def generate_batch(
     )
     batch_id = uuid.uuid4().hex
     created_at = _utc_timestamp()
-    with governance.credit_lock(preflight.root, preflight.operation_deadline, preflight.clock):
+    account_lock_id = getattr(client, "account_lock_id", None)
+    if not isinstance(account_lock_id, str):
+        raise ValueError("Meshy client must expose an account lock id")
+    with governance.credit_lock(account_lock_id, preflight.operation_deadline, preflight.clock):
         # The lock covers the duplicate-journal check, balance check, every
         # POST, polling/downloads, and all journal publication for this batch.
         _refresh_before_provider(preflight)
@@ -1425,9 +1473,15 @@ def generate_batch(
                 raise RuntimeError(error)
             if task_id in task_ids:
                 error = "Meshy returned a duplicate task id"
-                tasks[index] = _task_entry(index, None, "FAILED", None, error, collision_task_id=task_id)
+                tasks[index] = _task_entry(index, None, "COLLISION", None, error, collision_task_id=task_id)
                 _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
                 raise ValueError("duplicate task id")
+            task_dir = preflight.asset_root / task_id
+            if os.path.lexists(str(task_dir)):
+                error = "Meshy task id collision"
+                tasks[index] = _task_entry(index, None, "COLLISION", None, error, collision_task_id=task_id)
+                _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
+                raise ValueError("Meshy task id collision")
             task_ids.append(task_id)
             tasks[index] = _task_entry(index, task_id, "PENDING", None, None)
             _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "SUBMITTING", tasks, cumulative, created_at))
@@ -1437,8 +1491,18 @@ def generate_batch(
                 consumed = exc.consumed if isinstance(exc, _TaskFailure) else None
                 if consumed is not None:
                     cumulative += consumed
-                tasks[index] = _task_entry(index, task_id, "FAILED", consumed, _safe_error(exc))
-                _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
+                if isinstance(exc, _TaskCollision):
+                    tasks[index] = _task_entry(index, None, "COLLISION", None, _safe_error(exc), collision_task_id=exc.collision_task_id)
+                    _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
+                elif isinstance(exc, _TaskFailure) and exc.publication_uncertain:
+                    tasks[index] = _task_entry(index, task_id, "UNCERTAIN", consumed, _safe_error(exc))
+                    _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "UNCERTAIN", tasks, cumulative, created_at))
+                elif isinstance(exc, _TaskFailure) and exc.budget_violation:
+                    tasks[index] = _task_entry(index, task_id, "OVERRUN", consumed, _safe_error(exc), budget_violation=True)
+                    _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "BUDGET_OVERRUN", tasks, cumulative, created_at))
+                else:
+                    tasks[index] = _task_entry(index, task_id, "FAILED", consumed, _safe_error(exc))
+                    _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
                 raise
             consumed = record["consumed_credits"]
             cumulative += consumed
@@ -1644,7 +1708,7 @@ def _validate_generation_record_strict(document: object) -> List[str]:
         "prompt_packet_sha256", "pricing_id", "pricing_sha256", "provider_payload_sha256",
         "approved_credits", "cost_per_candidate", "maximum_credits", "contract_artifact_sha256",
         "pricing_artifact_sha256", "request", "references", "input_image_hashes", "output_license",
-        "created_at", "completed_at", "consumed_credits", "outputs", "provenance", "error",
+        "created_at", "completed_at", "consumed_credits", "outputs", "provenance", "error", "budget_violation",
     }
     errors: List[str] = []
     if set(document) != required:
@@ -1682,7 +1746,7 @@ def _validate_generation_record_strict(document: object) -> List[str]:
     if all(_valid_positive_int(document.get(name)) for name in ("approved_credits", "cost_per_candidate", "maximum_credits")):
         if document["approved_credits"] < document["maximum_credits"]:
             errors.append("generation approved credit bound is invalid")
-    if _valid_nonnegative_int(document.get("consumed_credits")) and _valid_positive_int(document.get("approved_credits")) and document["consumed_credits"] > document["approved_credits"]:
+    if _valid_nonnegative_int(document.get("consumed_credits")) and _valid_positive_int(document.get("approved_credits")) and document["consumed_credits"] > document["approved_credits"] and document.get("budget_violation") is not True:
         errors.append("generation consumed credits exceed approval")
     if not isinstance(document.get("created_at"), str) or not document["created_at"]:
         errors.append("generation created_at is invalid")
@@ -1690,6 +1754,8 @@ def _validate_generation_record_strict(document: object) -> List[str]:
         errors.append("generation completed_at is invalid")
     if document.get("consumed_credits") is not None and not _valid_nonnegative_int(document.get("consumed_credits")):
         errors.append("generation consumed_credits is invalid")
+    if type(document.get("budget_violation")) is not bool:
+        errors.append("generation budget_violation is invalid")
     if document.get("error") is not None and (not isinstance(document.get("error"), str) or not document["error"] or len(document["error"]) > 240):
         errors.append("generation error is invalid")
     references = document.get("references")
@@ -1713,18 +1779,27 @@ def _validate_generation_record_strict(document: object) -> List[str]:
         errors.append("generation provenance is invalid")
     outputs = document.get("outputs")
     errors.extend(_validate_output_map(outputs, "generation outputs"))
+    output_names = set(outputs) if isinstance(outputs, dict) else set()
     status = document.get("status")
     if status == "PENDING":
-        if document.get("completed_at") is not None or document.get("consumed_credits") is not None or outputs != {} or document.get("error") is not None:
+        if document.get("completed_at") is not None or document.get("consumed_credits") is not None or outputs != {} or document.get("error") is not None or document.get("budget_violation") is not False:
             errors.append("pending generation state is inconsistent")
     elif status == "SUCCEEDED":
-        if not isinstance(document.get("completed_at"), str) or not document["completed_at"] or not _valid_nonnegative_int(document.get("consumed_credits")) or set(outputs or {}) != {"raw.glb", "thumbnail.png"} or document.get("error") is not None:
+        if not isinstance(document.get("completed_at"), str) or not document["completed_at"] or not _valid_nonnegative_int(document.get("consumed_credits")) or output_names != {"raw.glb", "thumbnail.png"} or document.get("error") is not None or document.get("budget_violation") is not False:
             errors.append("succeeded generation state is inconsistent")
+        if _valid_nonnegative_int(document.get("consumed_credits")) and _valid_positive_int(document.get("cost_per_candidate")) and document["consumed_credits"] > document["cost_per_candidate"]:
+            errors.append("succeeded generation consumption exceeds per-task cost")
     elif status == "FAILED":
         if not isinstance(document.get("error"), str) or not document["error"] or document.get("completed_at") is not None:
             errors.append("failed generation state is inconsistent")
         if outputs != {}:
             errors.append("failed generation must not contain outputs")
+        consumed = document.get("consumed_credits")
+        if document.get("budget_violation") is True:
+            if not _valid_nonnegative_int(consumed):
+                errors.append("overrun generation must preserve consumed credits")
+        elif document.get("budget_violation") is False and _valid_nonnegative_int(consumed) and _valid_positive_int(document.get("cost_per_candidate")) and consumed > document["cost_per_candidate"]:
+            errors.append("failed generation consumption exceeds per-task cost")
     _validate_evidence_privacy(document, "generation", errors)
     return sorted(set(errors))
 
@@ -1747,7 +1822,7 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
     if not isinstance(document.get("asset_id"), str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", document.get("asset_id", "")) is None:
         errors.append("batch journal asset_id is invalid")
     state = document.get("state")
-    if state not in ("APPROVED", "SUBMITTING", "COMPLETED", "FAILED"):
+    if state not in ("APPROVED", "SUBMITTING", "COMPLETED", "FAILED", "BUDGET_OVERRUN", "UNCERTAIN"):
         errors.append("batch journal state is invalid")
     approval = document.get("approval")
     approval_fields = {
@@ -1786,7 +1861,7 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
             errors.append("batch journal approval created_at is invalid")
     tasks = document.get("tasks")
     task_ids = set()
-    collision_ids = []
+
     if not isinstance(tasks, list) or not tasks:
         errors.append("batch journal tasks must be a non-empty list")
         tasks = []
@@ -1794,7 +1869,7 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
     consumed_values = []
     for index, item in enumerate(tasks):
         label = "batch journal task[%d]" % index
-        fields = {"index", "task_id", "collision_task_id", "state", "consumed_credits", "error"}
+        fields = {"index", "task_id", "collision_task_id", "state", "consumed_credits", "error", "budget_violation"}
         if not isinstance(item, dict) or set(item) != fields:
             errors.append(label + " fields are not exact")
             continue
@@ -1815,9 +1890,8 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
             if task_id in task_ids:
                 errors.append("batch journal contains duplicate task ids")
             task_ids.add(task_id)
-        if collision_id is not None:
-            collision_ids.append((index, collision_id))
-        if task_state not in ("PENDING", "SUBMITTING", "SUCCEEDED", "FAILED"):
+
+        if task_state not in ("PENDING", "SUBMITTING", "SUCCEEDED", "FAILED", "OVERRUN", "UNCERTAIN", "COLLISION"):
             errors.append(label + " state is invalid")
         consumed = item.get("consumed_credits")
         if consumed is not None and not _valid_nonnegative_int(consumed):
@@ -1825,42 +1899,68 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
         error = item.get("error")
         if error is not None and (not isinstance(error, str) or not error or len(error) > 240):
             errors.append(label + " error is invalid")
+        if type(item.get("budget_violation")) is not bool:
+            errors.append(label + " budget_violation is invalid")
         if task_state == "PENDING" and (consumed is not None or error is not None and task_id is None):
             errors.append(label + " pending state is inconsistent")
-        if task_state == "SUBMITTING" and (consumed is not None or collision_id is not None or task_id is not None and error is not None):
+        if task_state == "PENDING" and item.get("budget_violation") is not False:
+            errors.append(label + " pending budget state is inconsistent")
+        if task_state == "SUBMITTING" and (consumed is not None or collision_id is not None or item.get("budget_violation") is not False or task_id is not None and error is not None):
             errors.append(label + " submitting state is inconsistent")
-        if task_state == "SUCCEEDED" and (task_id is None or collision_id is not None or not _valid_nonnegative_int(consumed) or error is not None):
+        if task_state == "SUCCEEDED" and (task_id is None or collision_id is not None or not _valid_nonnegative_int(consumed) or error is not None or item.get("budget_violation") is not False):
             errors.append(label + " succeeded state is inconsistent")
-        if task_state == "FAILED" and not isinstance(error, str):
+        if task_state == "SUCCEEDED" and _valid_nonnegative_int(consumed) and isinstance(approval, dict) and _valid_positive_int(approval.get("cost_per_candidate")) and consumed > approval["cost_per_candidate"]:
+            errors.append(label + " succeeded consumption exceeds per-task cost")
+        if task_state == "FAILED" and (not isinstance(error, str) or item.get("budget_violation") is not False):
             errors.append(label + " failed state requires error")
-        if task_state != "FAILED" and collision_id is not None:
-            errors.append(label + " collision is only valid for FAILED")
+        if task_state == "FAILED" and _valid_nonnegative_int(consumed) and isinstance(approval, dict) and _valid_positive_int(approval.get("cost_per_candidate")) and consumed > approval["cost_per_candidate"]:
+            errors.append(label + " failed consumption exceeds per-task cost")
+        if task_state == "OVERRUN" and (task_id is None or collision_id is not None or not _valid_nonnegative_int(consumed) or not isinstance(error, str) or item.get("budget_violation") is not True):
+            errors.append(label + " overrun state is inconsistent")
+        if task_state == "UNCERTAIN" and (task_id is None or collision_id is not None or not _valid_nonnegative_int(consumed) or not isinstance(error, str) or item.get("budget_violation") is not False):
+            errors.append(label + " uncertain state is inconsistent")
+        if task_state == "UNCERTAIN" and _valid_nonnegative_int(consumed) and isinstance(approval, dict) and _valid_positive_int(approval.get("cost_per_candidate")) and consumed > approval["cost_per_candidate"]:
+            errors.append(label + " uncertain consumption exceeds per-task cost")
+        if task_state == "COLLISION" and (task_id is not None or collision_id is None or consumed is not None or not isinstance(error, str) or item.get("budget_violation") is not False):
+            errors.append(label + " collision state is inconsistent")
+        if task_state not in ("COLLISION",) and collision_id is not None:
+            errors.append(label + " collision is only valid for COLLISION")
         if _valid_nonnegative_int(consumed):
             consumed_values.append(consumed)
     if indexes != list(range(len(indexes))):
         errors.append("batch journal task indexes are not exact")
     if isinstance(approval, dict) and _valid_positive_int(approval.get("candidate_count")) and len(tasks) != approval["candidate_count"]:
         errors.append("batch journal task count does not match approval")
-    for index, collision_id in collision_ids:
-        if collision_id not in task_ids:
-            errors.append("batch journal collision_task_id does not match an existing task id")
     cumulative = document.get("cumulative_consumed_credits")
     if not _valid_nonnegative_int(cumulative):
         errors.append("batch journal cumulative credits are invalid")
     elif cumulative != sum(consumed_values):
         errors.append("batch journal cumulative credits do not match tasks")
-    if isinstance(approval, dict) and _valid_positive_int(approval.get("approved_credits")) and _valid_nonnegative_int(cumulative) and cumulative > approval["approved_credits"]:
+    if state != "BUDGET_OVERRUN" and isinstance(approval, dict) and _valid_positive_int(approval.get("approved_credits")) and _valid_nonnegative_int(cumulative) and cumulative > approval["approved_credits"]:
         errors.append("batch journal cumulative credits exceed approval")
+    if state == "BUDGET_OVERRUN" and isinstance(approval, dict) and _valid_positive_int(approval.get("cost_per_candidate")) and _valid_positive_int(approval.get("approved_credits")):
+        if not any(
+            isinstance(item, dict)
+            and item.get("state") == "OVERRUN"
+            and _valid_nonnegative_int(item.get("consumed_credits"))
+            and (item["consumed_credits"] > approval["cost_per_candidate"] or (_valid_nonnegative_int(cumulative) and cumulative > approval["approved_credits"]))
+            for item in tasks
+        ):
+            errors.append("budget overrun journal does not contain truthful overrun evidence")
     if tasks:
         task_states = [item.get("state") for item in tasks if isinstance(item, dict)]
         all_succeeded = bool(task_states) and all(item == "SUCCEEDED" for item in task_states)
         if (state == "COMPLETED") != all_succeeded:
             errors.append("batch journal COMPLETED state does not match task states")
-        if state == "FAILED" and "FAILED" not in task_states:
-            errors.append("failed batch journal must contain a failed task")
+        if state == "FAILED" and not any(item in ("FAILED", "COLLISION") for item in task_states):
+            errors.append("failed batch journal must contain a failed or collision task")
+        if state == "BUDGET_OVERRUN" and "OVERRUN" not in task_states:
+            errors.append("budget overrun journal must contain an overrun task")
+        if state == "UNCERTAIN" and "UNCERTAIN" not in task_states:
+            errors.append("uncertain journal must contain an uncertain task")
         if state == "APPROVED" and any(item != "PENDING" for item in task_states):
             errors.append("approved batch journal must contain only pending tasks")
-        if state == "SUBMITTING" and (all_succeeded or "FAILED" in task_states or not any(item in ("PENDING", "SUBMITTING") for item in task_states)):
+        if state == "SUBMITTING" and (all_succeeded or any(item in ("FAILED", "COLLISION", "OVERRUN", "UNCERTAIN") for item in task_states) or not any(item in ("PENDING", "SUBMITTING") for item in task_states)):
             errors.append("submitting batch journal task states are inconsistent")
     _validate_evidence_privacy(document, "batch journal", errors)
     return sorted(set(errors))
@@ -1901,8 +2001,12 @@ def _verify_generation_journal_binding(
     if document["status"] == "PENDING":
         if task["state"] not in ("PENDING", "SUBMITTING"):
             raise ValueError("Meshy pending generation state does not match journal")
-    elif task["state"] != document["status"]:
+    elif document["status"] == "SUCCEEDED" and task["state"] not in ("SUCCEEDED", "UNCERTAIN"):
         raise ValueError("Meshy generation state does not match journal")
+    elif document["status"] == "FAILED" and task["state"] not in ("FAILED", "OVERRUN"):
+        raise ValueError("Meshy generation state does not match journal")
+    if bool(document.get("budget_violation")) != (task["state"] == "OVERRUN"):
+        raise ValueError("Meshy generation budget state does not match journal")
     if task.get("consumed_credits") != document.get("consumed_credits"):
         raise ValueError("Meshy generation consumption does not match journal")
 
@@ -1968,10 +2072,11 @@ def _verify_generation_adjacent_artifacts(
         raise ValueError("Meshy source artifact set does not match generation record")
 
     review, _review_raw = _read_adjacent_json(task_dir / "review.json", "review.json")
+    review_errors = validate_review(review)
+    if review_errors:
+        raise ValueError("Meshy review record is invalid: " + "; ".join(review_errors))
     if review.get("asset_id") != document["asset_id"] or review.get("task_id") != document["task_id"]:
         raise ValueError("Meshy review identity does not match generation record")
-    if review.get("document_kind") != "meshy_candidate_review":
-        raise ValueError("Meshy review document kind is invalid")
 
     if document["status"] == "SUCCEEDED":
         for name, maximum in (("raw.glb", _GLB_MAX_BYTES), ("thumbnail.png", _THUMBNAIL_MAX_BYTES)):

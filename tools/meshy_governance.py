@@ -22,8 +22,10 @@ import inspect
 import json
 import math
 import os
+import re
 import secrets
 import stat
+import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -32,6 +34,8 @@ from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, Tu
 
 STAGING_RELATIVE = Path("assets/_staging/meshy")
 CREDIT_LOCK_RELATIVE = STAGING_RELATIVE / "_credit.lock"
+_ACCOUNT_LOCK_ID_RE = re.compile(r"^[0-9a-f]{64}$")
+_CREDIT_LOCK_DIRECTORY = Path(tempfile.gettempdir()).resolve(strict=False) / "synaptic-sea-meshy-credit-locks"
 PROTECTED_RUNTIME_RELATIVE_PATHS = (
     Path("assets/imported"),
     Path("data/combat"),
@@ -55,6 +59,15 @@ class ProtectedSurfaceRecord(NamedTuple):
     @property
     def hash(self) -> Optional[str]:
         return self.sha256
+
+
+class PublicationUncertainError(OSError):
+    """The task directory was renamed, but its parent fsync was not confirmed."""
+
+    published = True
+
+    def __init__(self, message: str = "Meshy directory publication durability is uncertain") -> None:
+        super().__init__(message)
 
 
 # Tests and callers may use this seam to deterministically exercise the
@@ -1215,42 +1228,55 @@ def atomic_publish_directory(
 
     parent_fd: Optional[int] = None
     source_fd: Optional[int] = None
+    renamed = False
     try:
-        parent_fd = _open_pinned_parent(source, identities, _pinned_directory_flags())
-        _check_fd_identity(parent_fd, parent_identity, "Meshy task parent")
         try:
-            source_fd = os.open(source.name, _pinned_directory_flags(), dir_fd=parent_fd)
-        except FileNotFoundError as exc:
-            raise OSError("Meshy task source disappeared after validation") from exc
-        opened_source = os.fstat(source_fd)
-        if (opened_source.st_dev, opened_source.st_ino) != (source_info.st_dev, source_info.st_ino):
-            raise OSError("Meshy task source identity changed after validation")
-        if not stat.S_ISDIR(opened_source.st_mode) or opened_source.st_mode & 0o077:
-            raise OSError("Meshy task source is no longer a private directory")
-        try:
-            os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            pass
-        else:
-            raise ValueError("Meshy final task directory appeared during publication")
-        _fsync_directory_tree(source_fd)
-        try:
-            os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            pass
-        else:
-            raise ValueError("Meshy final task directory appeared during publication")
-        _rename_directory_noreplace(parent_fd, source.name, final.name)
-        assert source_fd is not None
-        published_source_fd = source_fd
-        source_fd = None
-        os.close(published_source_fd)
-        os.fsync(parent_fd)
+            parent_fd = _open_pinned_parent(source, identities, _pinned_directory_flags())
+            _check_fd_identity(parent_fd, parent_identity, "Meshy task parent")
+            try:
+                source_fd = os.open(source.name, _pinned_directory_flags(), dir_fd=parent_fd)
+            except FileNotFoundError as exc:
+                raise OSError("Meshy task source disappeared after validation") from exc
+            opened_source = os.fstat(source_fd)
+            if (opened_source.st_dev, opened_source.st_ino) != (source_info.st_dev, source_info.st_ino):
+                raise OSError("Meshy task source identity changed after validation")
+            if not stat.S_ISDIR(opened_source.st_mode) or opened_source.st_mode & 0o077:
+                raise OSError("Meshy task source is no longer a private directory")
+            try:
+                os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise ValueError("Meshy final task directory appeared during publication")
+            _fsync_directory_tree(source_fd)
+            try:
+                os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise ValueError("Meshy final task directory appeared during publication")
+            _rename_directory_noreplace(parent_fd, source.name, final.name)
+            renamed = True
+            assert source_fd is not None
+            published_source_fd = source_fd
+            os.close(published_source_fd)
+            source_fd = None
+            os.fsync(parent_fd)
+        except BaseException as exc:
+            if renamed:
+                raise PublicationUncertainError() from exc
+            raise
     finally:
         if source_fd is not None:
-            os.close(source_fd)
+            try:
+                os.close(source_fd)
+            except OSError:
+                pass
         if parent_fd is not None:
-            os.close(parent_fd)
+            try:
+                os.close(parent_fd)
+            except OSError:
+                pass
 
 
 def atomic_write_bytes(
@@ -1279,19 +1305,21 @@ def atomic_write_json(
 
 @contextmanager
 def credit_lock(
-    root: Union[str, os.PathLike],
+    account_lock_id: str,
     deadline: float,
     clock: Optional[Callable[[], float]] = None,
 ) -> Iterator[None]:
-    """Hold the process-wide Meshy credit lock through a monotonic deadline.
+    """Hold an account-scoped Meshy credit lock through a monotonic deadline.
 
-    The lock leaf is opened relative to a pinned, no-follow directory
-    descriptor.  Acquisition is deliberately non-blocking so the caller can
-    enforce the operation deadline.  There is no pathname-based fallback: a
-    platform without the required descriptor and ``flock`` primitives fails
-    closed.
+    The account identifier is a lowercase SHA-256 digest, never the API key.
+    The lock lives in a private directory in the canonical system temporary
+    directory, and every pathname operation uses pinned, no-follow descriptors.
+    Creation races are retried so a contender waits for the same lock rather
+    than failing merely because another process created its leaf first.
     """
 
+    if not isinstance(account_lock_id, str) or _ACCOUNT_LOCK_ID_RE.fullmatch(account_lock_id) is None:
+        raise ValueError("Meshy account lock id must be a 64-character lowercase hex digest")
     if (
         not isinstance(deadline, (int, float))
         or isinstance(deadline, bool)
@@ -1299,71 +1327,87 @@ def credit_lock(
     ):
         raise ValueError("credit lock deadline must be finite")
     clock_fn = clock or time.monotonic
-    physical = physical_project_root(root)
-    lock_path = physical / CREDIT_LOCK_RELATIVE
-    if lock_path.name != "_credit.lock":  # pragma: no cover - defensive invariant
+    if not callable(clock_fn):
+        raise ValueError("credit lock clock must be callable")
+    lock_path = _CREDIT_LOCK_DIRECTORY / (str(os.getuid()) + "-" + account_lock_id + ".lock")
+    if lock_path.parent != _CREDIT_LOCK_DIRECTORY or lock_path.name.endswith("/"):
         raise OSError("credit lock path is invalid")
-    _reject_symlink_components_below(physical, lock_path, "Meshy credit lock")
-    identities = _snapshot_identities(lock_path, "Meshy credit lock")
-    parent_fd: Optional[int] = None
-    lock_fd: Optional[int] = None
-    acquired = False
-    try:
-        if clock_fn() >= float(deadline):
-            raise TimeoutError("Meshy credit lock deadline exceeded")
-        parent_fd = _open_pinned_parent(lock_path, identities, _pinned_directory_flags())
-        lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-        expected_lock = identities.get(lock_path.parts)
-        if expected_lock is None:
-            lock_flags |= os.O_EXCL
-        if hasattr(os, "O_CLOEXEC"):
-            lock_flags |= os.O_CLOEXEC
+
+    while True:
+        parent_fd: Optional[int] = None
+        lock_fd: Optional[int] = None
+        acquired = False
         try:
-            lock_fd = os.open(lock_path.name, lock_flags, 0o600, dir_fd=parent_fd)
-        except OSError as exc:
-            if exc.errno == errno.ELOOP:
-                raise OSError("Meshy credit lock must not be a symlink") from exc
-            if exc.errno == errno.EEXIST and expected_lock is None:
-                raise OSError("Meshy credit lock appeared during validation") from exc
-            raise OSError("Meshy credit lock could not be opened safely") from exc
-        info = os.fstat(lock_fd)
-        if not stat.S_ISREG(info.st_mode):
-            raise OSError("Meshy credit lock must be a regular file")
-        if expected_lock is not None:
-            _check_fd_identity(lock_fd, expected_lock, "Meshy credit lock")
-        os.fchmod(lock_fd, 0o600)
-        os.fsync(lock_fd)
-        while True:
             if clock_fn() >= float(deadline):
                 raise TimeoutError("Meshy credit lock deadline exceeded")
             try:
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                acquired = True
-                break
+                identities = _snapshot_identities(lock_path, "Meshy credit lock")
+                parent_fd = _open_pinned_parent(lock_path, identities, _pinned_directory_flags())
             except OSError as exc:
-                if exc.errno not in (errno.EACCES, errno.EAGAIN):
-                    raise OSError("Meshy credit lock acquisition failed") from exc
-                remaining = float(deadline) - clock_fn()
-                if remaining <= 0:
+                if (exc.errno != errno.EEXIST and "appeared during validation" not in str(exc)) or clock_fn() >= float(deadline):
+                    raise OSError("Meshy credit lock could not prepare its private directory") from exc
+                continue
+            parent_info = os.fstat(parent_fd)
+            if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_mode & 0o077:
+                raise OSError("Meshy credit lock directory must be private")
+            os.fchmod(parent_fd, 0o700)
+            os.fsync(parent_fd)
+
+            expected_lock = identities.get(lock_path.parts)
+            lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+            if expected_lock is None:
+                lock_flags |= os.O_EXCL
+            if hasattr(os, "O_CLOEXEC"):
+                lock_flags |= os.O_CLOEXEC
+            try:
+                lock_fd = os.open(lock_path.name, lock_flags, 0o600, dir_fd=parent_fd)
+            except OSError as exc:
+                if exc.errno == errno.ELOOP:
+                    raise OSError("Meshy credit lock must not be a symlink") from exc
+                if exc.errno == errno.EEXIST and expected_lock is None:
+                    if clock_fn() >= float(deadline):
+                        raise TimeoutError("Meshy credit lock deadline exceeded")
+                    continue
+                raise OSError("Meshy credit lock could not be opened safely") from exc
+            info = os.fstat(lock_fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise OSError("Meshy credit lock must be a regular file")
+            if expected_lock is not None:
+                _check_fd_identity(lock_fd, expected_lock, "Meshy credit lock")
+            os.fchmod(lock_fd, 0o600)
+            os.fsync(lock_fd)
+            while True:
+                if clock_fn() >= float(deadline):
                     raise TimeoutError("Meshy credit lock deadline exceeded")
-                time.sleep(min(0.01, remaining))
-        yield
-    finally:
-        if lock_fd is not None:
-            if acquired:
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if exc.errno not in (errno.EACCES, errno.EAGAIN):
+                        raise OSError("Meshy credit lock acquisition failed") from exc
+                    remaining = float(deadline) - clock_fn()
+                    if remaining <= 0:
+                        raise TimeoutError("Meshy credit lock deadline exceeded")
+                    time.sleep(min(0.01, remaining))
+            yield
+            return
+        finally:
+            if lock_fd is not None:
+                if acquired:
+                    try:
+                        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    except OSError:
+                        pass
+                try:
+                    os.close(lock_fd)
                 except OSError:
                     pass
-            try:
-                os.close(lock_fd)
-            except OSError:
-                pass
-        if parent_fd is not None:
-            try:
-                os.close(parent_fd)
-            except OSError:
-                pass
+            if parent_fd is not None:
+                try:
+                    os.close(parent_fd)
+                except OSError:
+                    pass
 
 
 __all__ = [
@@ -1371,6 +1415,7 @@ __all__ = [
     "CREDIT_LOCK_RELATIVE",
     "PROTECTED_RUNTIME_RELATIVE_PATHS",
     "ProtectedSurfaceRecord",
+    "PublicationUncertainError",
     "atomic_publish_directory",
     "atomic_write_bytes",
     "atomic_write_json",

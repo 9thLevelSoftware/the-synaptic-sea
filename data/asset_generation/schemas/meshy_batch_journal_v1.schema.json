@@ -81,17 +81,25 @@
     },
     "task": {
       "type": "object", "additionalProperties": false,
-      "required": ["index", "task_id", "collision_task_id", "state", "consumed_credits", "error"],
+      "required": ["index", "task_id", "collision_task_id", "state", "consumed_credits", "error", "budget_violation"],
       "properties": {
         "index": { "type": "integer", "minimum": 0 },
         "task_id": { "$ref": "#/$defs/taskId" },
         "collision_task_id": { "$ref": "#/$defs/taskId" },
-        "state": { "enum": ["PENDING", "SUBMITTING", "SUCCEEDED", "FAILED"] },
+        "state": { "enum": ["PENDING", "SUBMITTING", "SUCCEEDED", "FAILED", "OVERRUN", "UNCERTAIN", "COLLISION"] },
         "consumed_credits": { "type": ["integer", "null"], "minimum": 0 },
-        "error": { "type": ["string", "null"], "maxLength": 240 }
+        "error": { "type": ["string", "null"], "maxLength": 240 },
+        "budget_violation": { "type": "boolean" }
       },
       "allOf": [
-        { "if": { "required": ["collision_task_id"], "properties": { "collision_task_id": { "type": "string" } } }, "then": { "properties": { "task_id": { "type": "null" }, "state": { "const": "FAILED" } } } }
+        { "if": { "required": ["collision_task_id"], "properties": { "collision_task_id": { "type": "string" } } }, "then": { "properties": { "task_id": { "type": "null" }, "state": { "const": "COLLISION" }, "consumed_credits": { "type": "null" }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "PENDING" } }, "required": ["state"] }, "then": { "properties": { "consumed_credits": { "type": "null" }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "SUBMITTING" } }, "required": ["state"] }, "then": { "properties": { "collision_task_id": { "type": "null" }, "consumed_credits": { "type": "null" }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "SUCCEEDED" } }, "required": ["state"] }, "then": { "required": ["task_id"], "properties": { "task_id": { "type": "string" }, "collision_task_id": { "type": "null" }, "consumed_credits": { "type": "integer", "minimum": 0 }, "error": { "type": "null" }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "FAILED" } }, "required": ["state"] }, "then": { "required": ["error"], "properties": { "collision_task_id": { "type": "null" }, "error": { "type": "string", "minLength": 1 }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "OVERRUN" } }, "required": ["state"] }, "then": { "required": ["task_id", "consumed_credits", "error"], "properties": { "task_id": { "type": "string" }, "collision_task_id": { "type": "null" }, "consumed_credits": { "type": "integer", "minimum": 0 }, "error": { "type": "string", "minLength": 1 }, "budget_violation": { "const": true } } } },
+        { "if": { "properties": { "state": { "const": "UNCERTAIN" } }, "required": ["state"] }, "then": { "required": ["task_id", "consumed_credits", "error"], "properties": { "task_id": { "type": "string" }, "collision_task_id": { "type": "null" }, "consumed_credits": { "type": "integer", "minimum": 0 }, "error": { "type": "string", "minLength": 1 }, "budget_violation": { "const": false } } } },
+        { "if": { "properties": { "state": { "const": "COLLISION" } }, "required": ["state"] }, "then": { "required": ["collision_task_id", "error"], "properties": { "collision_task_id": { "type": "string" }, "task_id": { "type": "null" }, "consumed_credits": { "type": "null" }, "error": { "type": "string", "minLength": 1 }, "budget_violation": { "const": false } } } }
       ]
     }
   },
@@ -101,8 +109,16 @@
     "batch_id": { "$ref": "#/$defs/batchId" },
     "asset_id": { "$ref": "#/$defs/assetId" },
     "approval": { "$ref": "#/$defs/approval" },
-    "state": { "enum": ["APPROVED", "SUBMITTING", "COMPLETED", "FAILED"] },
+    "state": { "enum": ["APPROVED", "SUBMITTING", "COMPLETED", "FAILED", "BUDGET_OVERRUN", "UNCERTAIN"] },
     "tasks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/task" } },
     "cumulative_consumed_credits": { "type": "integer", "minimum": 0 }
-  }
+  },
+  "allOf": [
+    { "if": { "properties": { "state": { "const": "APPROVED" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "items": { "properties": { "state": { "const": "PENDING" } } } } } } },
+    { "if": { "properties": { "state": { "const": "SUBMITTING" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "items": { "properties": { "state": { "enum": ["PENDING", "SUBMITTING", "SUCCEEDED"] } } }, "contains": { "properties": { "state": { "enum": ["PENDING", "SUBMITTING"] } } } } } } },
+    { "if": { "properties": { "state": { "const": "COMPLETED" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "items": { "properties": { "state": { "const": "SUCCEEDED" } } } } } } },
+    { "if": { "properties": { "state": { "const": "FAILED" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "contains": { "properties": { "state": { "enum": ["FAILED", "COLLISION"] } } } } } } },
+    { "if": { "properties": { "state": { "const": "BUDGET_OVERRUN" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "contains": { "properties": { "state": { "const": "OVERRUN" } } } } } } },
+    { "if": { "properties": { "state": { "const": "UNCERTAIN" } }, "required": ["state"] }, "then": { "properties": { "tasks": { "contains": { "properties": { "state": { "const": "UNCERTAIN" } } } } } } }
+  ]
 }

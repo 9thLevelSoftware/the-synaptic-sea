@@ -9,7 +9,7 @@
     "contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_id", "pricing_sha256",
     "provider_payload_sha256", "approved_credits", "cost_per_candidate", "maximum_credits", "contract_artifact_sha256",
     "pricing_artifact_sha256", "request", "references", "input_image_hashes", "output_license", "created_at", "completed_at",
-    "consumed_credits", "outputs", "provenance", "error"
+    "consumed_credits", "outputs", "provenance", "error", "budget_violation"
   ],
   "$defs": {
     "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -98,6 +98,7 @@
     "created_at": { "type": "string", "minLength": 1 },
     "completed_at": { "$ref": "#/$defs/timestamp" },
     "consumed_credits": { "type": ["integer", "null"], "minimum": 0 },
+    "budget_violation": { "type": "boolean" },
     "outputs": {
       "type": "object", "additionalProperties": false,
       "properties": {
@@ -124,6 +125,7 @@
         "properties": {
           "completed_at": { "type": "string", "minLength": 1 },
           "consumed_credits": { "type": "integer", "minimum": 0 },
+          "budget_violation": { "const": false },
           "outputs": { "required": ["raw.glb", "thumbnail.png"] },
           "error": { "type": "null" }
         }
@@ -131,11 +133,11 @@
     },
     {
       "if": { "properties": { "status": { "const": "PENDING" } }, "required": ["status"] },
-      "then": { "properties": { "completed_at": { "type": "null" }, "outputs": { "maxProperties": 0 }, "error": { "type": "null" } } }
+      "then": { "properties": { "completed_at": { "type": "null" }, "consumed_credits": { "type": "null" }, "budget_violation": { "const": false }, "outputs": { "maxProperties": 0 }, "error": { "type": "null" } } }
     },
     {
       "if": { "properties": { "status": { "const": "FAILED" } }, "required": ["status"] },
-      "then": { "required": ["error"], "properties": { "error": { "type": "string", "minLength": 1 }, "completed_at": { "type": "null" }, "outputs": { "maxProperties": 0 } } }
+      "then": { "required": ["error"], "properties": { "error": { "type": "string", "minLength": 1 }, "completed_at": { "type": "null" }, "consumed_credits": { "type": ["integer", "null"], "minimum": 0 }, "outputs": { "maxProperties": 0 } }, "oneOf": [ { "properties": { "budget_violation": { "const": false } } }, { "properties": { "budget_violation": { "const": true }, "consumed_credits": { "type": "integer", "minimum": 0 } } } ] }
     }
   ]
 }

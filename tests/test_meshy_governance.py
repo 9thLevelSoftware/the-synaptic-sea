@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import errno
 import json
 import os
 import time
@@ -590,28 +591,96 @@ def test_atomic_write_preserves_primary_error_when_cleanup_unlink_fails(
 
 
 def test_credit_lock_is_pinned_private_nonblocking_and_times_out(tmp_path: Path) -> None:
-    root = make_project(tmp_path)
+    account_lock_id = "b" * 64
     deadline = time.monotonic() + 1.0
 
-    with governance.credit_lock(root, deadline):
-        lock_path = root / STAGING / "_credit.lock"
+    with governance.credit_lock(account_lock_id, deadline):
+        lock_path = governance._CREDIT_LOCK_DIRECTORY / (str(os.getuid()) + "-" + account_lock_id + ".lock")
         assert lock_path.is_file()
         assert lock_path.stat().st_mode & 0o777 == 0o600
         with pytest.raises(TimeoutError, match="credit lock"):
-            with governance.credit_lock(root, time.monotonic() + 0.02):
+            with governance.credit_lock(account_lock_id, time.monotonic() + 0.02):
                 pass
 
-    lock_path = root / STAGING / "_credit.lock"
+    lock_path = governance._CREDIT_LOCK_DIRECTORY / (str(os.getuid()) + "-" + account_lock_id + ".lock")
     assert lock_path.is_file()
     assert lock_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_credit_lock_rejects_symlink_and_requires_fcntl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = make_project(tmp_path)
-    lock_path = root / STAGING / "_credit.lock"
+    monkeypatch.setattr(governance, "_CREDIT_LOCK_DIRECTORY", tmp_path / "locks")
+    lock_path = governance._CREDIT_LOCK_DIRECTORY / (str(os.getuid()) + "-" + "c" * 64 + ".lock")
+    governance._CREDIT_LOCK_DIRECTORY.mkdir(mode=0o700)
     outside = tmp_path / "outside.lock"
     outside.write_bytes(b"outside")
     lock_path.symlink_to(outside)
     with pytest.raises((OSError, ValueError), match="symlink|lock"):
-        with governance.credit_lock(root, time.monotonic() + 1.0):
+        with governance.credit_lock("c" * 64, time.monotonic() + 1.0):
             pass
+
+
+def test_account_scoped_credit_lock_serializes_independent_roots() -> None:
+    account_lock_id = "a" * 64
+    with governance.credit_lock(account_lock_id, time.monotonic() + 1.0):
+        with pytest.raises(TimeoutError, match="credit lock"):
+            with governance.credit_lock(account_lock_id, time.monotonic() + 0.02):
+                pass
+
+
+def test_credit_lock_rejects_invalid_account_lock_id() -> None:
+    with pytest.raises(ValueError, match="account lock"):
+        with governance.credit_lock("not-a-lock-id", time.monotonic() + 1.0):
+            pass
+
+
+def test_atomic_publish_directory_reports_post_rename_uncertainty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    parent = root / STAGING / "asset"
+    parent.mkdir()
+    source = parent / ".task-id-random.tmp"
+    final = parent / "task-id"
+    source.mkdir(mode=0o700)
+    governance.atomic_write_bytes(source / "raw.glb", b"complete", root, parent)
+    real_rename = governance._rename_directory_noreplace
+    renamed = False
+
+    def mark_rename(parent_fd: int, source_name: str, final_name: str) -> None:
+        nonlocal renamed
+        real_rename(parent_fd, source_name, final_name)
+        renamed = True
+
+    real_fsync = governance.os.fsync
+
+    def fail_after_rename(descriptor: int) -> None:
+        if renamed:
+            raise OSError("parent fsync failed")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(governance, "_rename_directory_noreplace", mark_rename)
+    monkeypatch.setattr(governance.os, "fsync", fail_after_rename)
+    with pytest.raises(governance.PublicationUncertainError) as caught:
+        governance.atomic_publish_directory(source, final, root, parent)
+    assert caught.value.published is True
+    assert final.is_dir()
+    assert not source.exists()
+
+
+def test_credit_lock_retries_first_leaf_creation_eexist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    account_lock_id = "d" * 64
+    monkeypatch.setattr(governance, "_CREDIT_LOCK_DIRECTORY", tmp_path / "locks")
+    real_open = governance.os.open
+    injected = False
+
+    def race_once(path: str, flags: int, *args: object, **kwargs: object) -> int:
+        nonlocal injected
+        if path == str(os.getuid()) + "-" + account_lock_id + ".lock" and flags & os.O_EXCL and not injected:
+            injected = True
+            raise OSError(errno.EEXIST, "exists")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(governance.os, "open", race_once)
+    with governance.credit_lock(account_lock_id, time.monotonic() + 1.0):
+        pass
+    assert injected

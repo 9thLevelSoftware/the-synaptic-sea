@@ -70,6 +70,7 @@ class FakeMeshyClient:
         self.task_statuses: Dict[str, str] = {}
         self.poll_task_ids: List[str] = []
         self.api_key = TEST_API_KEY
+        self.account_lock_id = "a" * 64
 
     def get_balance(self) -> int:
         self.calls.append(("get_balance",))
@@ -985,7 +986,7 @@ def test_r2b1_stops_after_actual_credit_overrun(
         generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
     assert len(client.created_tasks) == 1
     journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
-    assert journal["state"] == "FAILED"
+    assert journal["state"] == "BUDGET_OVERRUN"
     assert journal["cumulative_consumed_credits"] == 6
     assert journal["tasks"][0]["consumed_credits"] == 6
 
@@ -1006,7 +1007,7 @@ def test_r2b1_rejects_duplicate_provider_task_ids(
     journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
     assert journal["tasks"][1]["task_id"] is None
     assert journal["tasks"][1]["collision_task_id"] == "same-task"
-    assert journal["tasks"][1]["state"] == "FAILED"
+    assert journal["tasks"][1]["state"] == "COLLISION"
     assert stage_module.validate_batch_journal(journal) == []
 
 
@@ -1194,3 +1195,195 @@ def test_plan_rejects_partial_reference_group_and_cli_output_is_repeatable(
     assert "data:" not in first.stdout
     assert str(tmp_path) not in first.stdout
     assert not (tmp_path / STAGING_RELATIVE).exists()
+
+
+def test_r2b1_budget_overrun_is_truthful_and_explicit(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class Overrun(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            return {"task_id": task_id, "status": "SUCCEEDED", "consumed_credits": 6}
+
+    client = Overrun()
+    with pytest.raises(RuntimeError, match="credit consumption"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / client.created_tasks[0]
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert generation["status"] == "FAILED"
+    assert generation["consumed_credits"] == 6
+    assert generation["budget_violation"] is True
+    assert journal["state"] == "BUDGET_OVERRUN"
+    assert journal["tasks"][0]["state"] == "OVERRUN"
+    assert journal["tasks"][0]["consumed_credits"] == 6
+    assert journal["tasks"][0]["budget_violation"] is True
+    assert stage_module.validate_generation_record(generation) == []
+    assert stage_module.validate_batch_journal(journal) == []
+    assert stage_module.load_generation_record(task_dir / "generation.json") == generation
+    assert stage_module.load_batch_journal(next((asset_root / "_batches").glob("*.json"))) == journal
+
+
+def test_r2b1_failed_poll_preserves_last_observed_consumption(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class FailedAfterObserved(FakeMeshyClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.poll_count = 0
+
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            self.poll_count += 1
+            if self.poll_count == 1:
+                return {"task_id": task_id, "status": "PENDING", "consumed_credits": 5}
+            return {"task_id": task_id, "status": "FAILED"}
+
+    client = FailedAfterObserved()
+    with pytest.raises(RuntimeError, match="ended with status FAILED"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / client.created_tasks[0]
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert generation["consumed_credits"] == journal["tasks"][0]["consumed_credits"] == 5
+
+
+@pytest.mark.parametrize("json_document", [{}, {"asset": {"version": "1.0"}}, {"asset": []}])
+def test_r2b1_glb_requires_gltf_asset_version_2(json_document: dict) -> None:
+    json_chunk = json.dumps(json_document, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    total = 12 + 8 + len(json_chunk)
+    payload = b"glTF" + struct.pack("<II", 2, total) + struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little")) + json_chunk
+    with pytest.raises(ValueError, match="asset|version"):
+        stage_module._validate_glb(payload)
+
+
+def test_r2b1_publication_uncertainty_preserves_succeeded_generation(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_publish = stage_module.governance.atomic_publish_directory
+
+    def publish_then_report_uncertain(*args: Any, **kwargs: Any) -> None:
+        real_publish(*args, **kwargs)
+        if Path(args[1]).name.startswith("fake-task-"):
+            raise stage_module.governance.PublicationUncertainError()
+
+    monkeypatch.setattr(stage_module.governance, "atomic_publish_directory", publish_then_report_uncertain)
+    client = FakeMeshyClient()
+    with pytest.raises(RuntimeError, match="durability"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / client.created_tasks[0]
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert generation["status"] == "SUCCEEDED"
+    assert journal["state"] == "UNCERTAIN"
+    assert journal["tasks"][0]["state"] == "UNCERTAIN"
+    assert stage_module.load_generation_record(task_dir / "generation.json") == generation
+
+
+def test_r2b1_static_failure_publishes_journal_only(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_write = stage_module._write_artifact_bytes
+
+    def fail_side_source(preflight: Any, task_dir: Path, name: str, payload: bytes) -> None:
+        if name == "source_side.png":
+            raise RuntimeError("source write failed")
+        real_write(preflight, task_dir, name, payload)
+
+    monkeypatch.setattr(stage_module, "_write_artifact_bytes", fail_side_source)
+    client = FakeMeshyClient()
+    with pytest.raises(RuntimeError):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    assert not (asset_root / client.created_tasks[0]).exists()
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert journal["tasks"][0]["state"] == "FAILED"
+    assert not any(path.name.startswith(".task-") for path in asset_root.iterdir())
+
+
+def test_r2b1_existing_final_directory_is_a_collision(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class Existing(FakeMeshyClient):
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            task_id = "existing-task"
+            self.created_tasks.append(task_id)
+            return task_id
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    (asset_root / "existing-task").mkdir(parents=True)
+    client = Existing()
+    with pytest.raises(ValueError, match="collision"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert journal["state"] == "FAILED"
+    assert journal["tasks"][0]["task_id"] is None
+    assert journal["tasks"][0]["collision_task_id"] == "existing-task"
+    assert journal["tasks"][0]["state"] == "COLLISION"
+
+
+def test_r2b1_loader_accepts_valid_mutable_review_state(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    task_dir = _stage_asset_root(tmp_path, valid_contract.asset_id) / fake_client.created_tasks[0]
+    review = json.loads((task_dir / "review.json").read_text(encoding="utf-8"))
+    review.update(
+        state="selected",
+        decision="accept_for_cleanup",
+        checks={field: True for field in review["checks"]},
+        reviewer="reviewer",
+    )
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(review))
+    stage_module.load_generation_record(task_dir / "generation.json")
+
+
+def test_r2b1_decreasing_consumption_is_rejected_as_ambiguous(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class Decreasing(FakeMeshyClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.poll_count = 0
+
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            self.poll_count += 1
+            return {"task_id": task_id, "status": "PENDING", "consumed_credits": 5 if self.poll_count == 1 else 4}
+
+    client = Decreasing()
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / client.created_tasks[0]
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    journal = json.loads(next((asset_root / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert generation["consumed_credits"] == journal["tasks"][0]["consumed_credits"] == 5
+
+
+def test_r2b1_validators_enforce_success_cost_and_overrun_bindings(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / fake_client.created_tasks[0]
+    generation_path = task_dir / "generation.json"
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["consumed_credits"] = 100
+    assert stage_module.validate_generation_record(generation)
+    journal_path = next((asset_root / "_batches").glob("*.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    journal["tasks"][0]["consumed_credits"] = 85
+    journal["cumulative_consumed_credits"] = 85
+    assert stage_module.validate_batch_journal(journal)
+
+    overrun = dict(generation)
+    overrun["status"] = "FAILED"
+    overrun["consumed_credits"] = 100
+    overrun["completed_at"] = None
+    overrun["outputs"] = {}
+    overrun["error"] = "Meshy actual credit consumption exceeded the approved bound"
+    overrun["budget_violation"] = True
+    assert stage_module.validate_generation_record(overrun) == []
