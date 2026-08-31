@@ -47,6 +47,7 @@ _PROMPT_GENERATION_POLICY_FIELDS = ("geometry_first", "should_texture", "target_
 _PROMPT_REVIEW_MATRIX_FIELDS = ("seeds", "lighting_modes", "camera", "environment")
 _PROMPT_TEMPLATE_FIELDS = {"style_vocabulary", "visual_brief", "neutral_presentation"}
 _PROMPT_PROFILE_MAX_BYTES = 1024 * 1024
+_CONTRACT_MAX_BYTES = 1024 * 1024
 
 _REQUIRED_TOP_FIELDS = (
     "schema_version",
@@ -633,21 +634,15 @@ def load_contract(path: Path) -> AssetContract:
     """Load and validate one contract while preserving its original byte hash."""
 
     source = Path(path)
-    raw = source.read_bytes()
     try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ValueError(f"contract is not valid UTF-8: {exc}") from exc
-    try:
-        document = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
-    except RecursionError as exc:
-        raise ValueError("invalid JSON: maximum nesting depth exceeded") from exc
-    except json.JSONDecodeError as exc:
+        document, raw = strict_load_json_bytes(source, "contract", _CONTRACT_MAX_BYTES)
+    except (OSError, TypeError, ValueError) as exc:
+        message = str(exc)
+        if "maximum nesting depth exceeded" in message:
+            raise ValueError(f"invalid JSON: {message.removeprefix('contract ')}") from exc
+        if message.startswith("contract"):
+            raise ValueError(message.removeprefix("contract ")) from exc
         raise ValueError(f"invalid JSON: {exc}") from exc
-    except ValueError:
-        raise
-    if not isinstance(document, dict):
-        raise ValueError("contract must be an object")
     errors = validate_contract(document)
     if errors:
         raise ValueError("; ".join(errors))

@@ -325,6 +325,24 @@ def test_load_contract_hashes_original_bytes(tmp_path: Path) -> None:
     assert contract.snapshot_bytes() == canonical_json_bytes(document)
 
 
+def test_load_contract_uses_strict_bounded_descriptor_reader(tmp_path: Path) -> None:
+    source = FIXTURES / "valid_loot_container.json"
+    link = tmp_path / "linked-contract.json"
+    link.symlink_to(source)
+    with pytest.raises(ValueError, match="symlink"):
+        load_contract(link)
+
+    oversized = tmp_path / "oversized-contract.json"
+    oversized.write_bytes(b" " * (1024 * 1024 + 1))
+    with pytest.raises(ValueError, match="size|large"):
+        load_contract(oversized)
+
+    nonfinite = tmp_path / "nonfinite-contract.json"
+    nonfinite.write_text('{"value":NaN}', encoding="utf-8")
+    with pytest.raises(ValueError, match="non-standard|non-finite"):
+        load_contract(nonfinite)
+
+
 def test_asset_contract_document_is_a_fresh_defensive_copy() -> None:
     contract = load_contract(FIXTURES / "valid_loot_container.json")
     first = contract.document

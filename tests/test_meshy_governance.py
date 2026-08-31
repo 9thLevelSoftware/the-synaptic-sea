@@ -73,6 +73,26 @@ def test_reject_protected_output_catches_direct_and_alias_paths(tmp_path: Path) 
     assert governance.reject_protected_output(root, safe, "output") == safe
 
 
+def test_reject_protected_output_rejects_outside_and_safe_symlink_paths(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(ValueError, match="root|escape"):
+        governance.reject_protected_output(root, outside / "candidate.json", "output")
+
+    outside_link = root / "outside-link"
+    outside_link.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="root|escape|symlink"):
+        governance.reject_protected_output(root, outside_link / "candidate.json", "output")
+
+    real = root / STAGING / "real.json"
+    real.write_text("{}", encoding="utf-8")
+    safe_link = root / STAGING / "safe-link.json"
+    safe_link.symlink_to(real)
+    with pytest.raises(ValueError, match="symlink"):
+        governance.reject_protected_output(root, safe_link, "output")
+
+
 def test_strict_json_rejects_duplicates_nonfinite_deep_nonregular_symlink_and_oversize(
     tmp_path: Path,
 ) -> None:
@@ -133,6 +153,89 @@ def test_file_sha256_is_bounded_regular_and_no_follow(tmp_path: Path) -> None:
         governance.file_sha256(alias)
 
 
+def test_descriptor_reader_rejects_deterministic_ancestor_rebind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    target = safe / "record.json"
+    target.write_text('{"safe":true}', encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "record.json").write_text('{"outside":true}', encoding="utf-8")
+
+    def rebind_after_validation(_path: Path) -> None:
+        moved = tmp_path / "safe-moved"
+        safe.rename(moved)
+        safe.symlink_to(outside, target_is_directory=True)
+
+    monkeypatch.setattr(governance, "_FILE_VALIDATION_HOOK", rebind_after_validation)
+    with pytest.raises(ValueError, match="identity|changed|symlink"):
+        governance.strict_load_json(target, "json", 100)
+
+
+def test_descriptor_reader_rejects_same_size_in_place_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "payload.bin"
+    path.write_bytes(b"AAAA")
+    real_read = governance.os.read
+    mutated = False
+
+    def read_and_mutate(descriptor: int, size: int) -> bytes:
+        nonlocal mutated
+        result = real_read(descriptor, size)
+        if not mutated:
+            path.write_bytes(b"BBBB")
+            mutated = True
+        return result
+
+    monkeypatch.setattr(governance.os, "read", read_and_mutate)
+    with pytest.raises(ValueError, match="changed|mutat"):
+        governance.file_sha256(path, max_bytes=4)
+
+
+def test_streaming_file_hash_does_not_materialize_file_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "payload.bin"
+    payload = b"payload"
+    path.write_bytes(payload)
+
+    def fail_materialization(*_args: object, **_kwargs: object) -> bytes:
+        raise AssertionError("file_sha256 must stream from its descriptor")
+
+    monkeypatch.setattr(governance, "_read_bounded_regular_file", fail_materialization)
+    assert governance.file_sha256(path, max_bytes=len(payload)) == hashlib.sha256(payload).hexdigest()
+
+
+def test_descriptor_reader_closes_fds_on_rebind_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    target = safe / "record.json"
+    target.write_text('{"safe":true}', encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    def rebind_after_validation(_path: Path) -> None:
+        moved = tmp_path / "safe-moved"
+        safe.rename(moved)
+        safe.symlink_to(outside, target_is_directory=True)
+
+    close_calls: list[int] = []
+    real_close = governance.os.close
+
+    def record_close(descriptor: int) -> None:
+        close_calls.append(descriptor)
+        real_close(descriptor)
+
+    monkeypatch.setattr(governance, "_FILE_VALIDATION_HOOK", rebind_after_validation)
+    monkeypatch.setattr(governance.os, "close", record_close)
+    with pytest.raises(ValueError):
+        governance.file_sha256(target, max_bytes=100)
+    assert close_calls
+
+
 def test_protected_surface_snapshot_is_immutable_deterministic_and_content_sensitive(
     tmp_path: Path,
 ) -> None:
@@ -163,6 +266,45 @@ def test_protected_surface_snapshot_is_immutable_deterministic_and_content_sensi
     assert changed != first
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("max_file_bytes", 0),
+        ("max_file_bytes", -1),
+        ("max_file_bytes", True),
+        ("max_total_bytes", 0),
+        ("max_total_bytes", False),
+        ("max_entries", 0),
+        ("max_entries", 1.5),
+        ("max_depth", 0),
+        ("max_depth", None),
+    ],
+)
+def test_snapshot_limits_are_positive_non_bool_integers(
+    tmp_path: Path, name: str, value: object
+) -> None:
+    root = make_project(tmp_path)
+    kwargs = {name: value}
+    with pytest.raises(ValueError, match="positive integer"):
+        governance.snapshot_protected_surfaces(root, **kwargs)
+
+
+def test_snapshot_enforces_aggregate_bytes_entries_and_depth(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    imported = root / "assets/imported"
+    imported.mkdir(parents=True)
+    (imported / "level1").mkdir()
+    (imported / "level1/level2").mkdir()
+    (imported / "level1/level2/payload.bin").write_bytes(b"1234")
+
+    with pytest.raises(ValueError, match="total|aggregate|bytes"):
+        governance.snapshot_protected_surfaces(root, max_total_bytes=3)
+    with pytest.raises(ValueError, match="entr"):
+        governance.snapshot_protected_surfaces(root, max_entries=4)
+    with pytest.raises(ValueError, match="depth"):
+        governance.snapshot_protected_surfaces(root, max_depth=1)
+
+
 def test_atomic_write_json_is_canonical_durable_and_rejects_existing_leaf_symlink(
     tmp_path: Path,
 ) -> None:
@@ -188,6 +330,63 @@ def test_atomic_write_json_is_canonical_durable_and_rejects_existing_leaf_symlin
             allowed_root=root / STAGING,
         )
     assert victim.read_bytes() == b"unchanged"
+
+
+def test_atomic_write_rejects_unexpected_descendant_created_after_parent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    stage = root / STAGING
+    target = stage / "new1" / "new2" / "record.json"
+    real_mkdir = governance.os.mkdir
+
+    def mkdir_and_precreate_descendant(path: object, *args: object, **kwargs: object) -> object:
+        result = real_mkdir(path, *args, **kwargs)
+        if path == "new1":
+            (stage / "new1" / "new2").mkdir()
+        return result
+
+    monkeypatch.setattr(governance.os, "mkdir", mkdir_and_precreate_descendant)
+    with pytest.raises(OSError, match="appeared|validation"):
+        governance.atomic_write_json(
+            target,
+            {"changed": True},
+            project_root=root,
+            allowed_root=stage,
+        )
+
+
+def test_atomic_write_fsyncs_each_created_parent_before_descending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    stage = root / STAGING
+    target = stage / "new1" / "new2" / "record.json"
+    mkdir_parent_fds: list[int] = []
+    fsync_fds: list[int] = []
+    real_mkdir = governance.os.mkdir
+    real_fsync = governance.os.fsync
+
+    def record_mkdir(path: object, *args: object, **kwargs: object) -> object:
+        parent_fd = kwargs.get("dir_fd")
+        if isinstance(parent_fd, int):
+            mkdir_parent_fds.append(parent_fd)
+        return real_mkdir(path, *args, **kwargs)
+
+    def record_fsync(descriptor: int) -> None:
+        fsync_fds.append(descriptor)
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(governance.os, "mkdir", record_mkdir)
+    monkeypatch.setattr(governance.os, "fsync", record_fsync)
+    governance.atomic_write_json(
+        target,
+        {"changed": True},
+        project_root=root,
+        allowed_root=stage,
+    )
+    assert mkdir_parent_fds
+    assert all(parent_fd in fsync_fds for parent_fd in mkdir_parent_fds)
 
 
 def test_atomic_write_rejects_protected_output_and_validation_to_open_rebind(

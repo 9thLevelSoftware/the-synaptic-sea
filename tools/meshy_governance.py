@@ -8,6 +8,7 @@ pinned directory descriptors rather than reopening a validated pathname.
 from __future__ import annotations
 
 import hashlib
+import errno
 import inspect
 import json
 import math
@@ -26,6 +27,9 @@ PROTECTED_RUNTIME_RELATIVE_PATHS = (
     Path("scenes/wrappers"),
 )
 DEFAULT_FILE_MAX_BYTES = 64 * 1024 * 1024
+DEFAULT_TOTAL_MAX_BYTES = 256 * 1024 * 1024
+DEFAULT_SNAPSHOT_MAX_ENTRIES = 10_000
+DEFAULT_SNAPSHOT_MAX_DEPTH = 64
 
 
 class ProtectedSurfaceRecord(NamedTuple):
@@ -44,6 +48,7 @@ class ProtectedSurfaceRecord(NamedTuple):
 # Tests and callers may use this seam to deterministically exercise the
 # validation-to-open boundary.  It is deliberately a no-op in normal use.
 _ATOMIC_VALIDATION_HOOK: Optional[Callable[[Path], None]] = None
+_FILE_VALIDATION_HOOK: Optional[Callable[[Path], None]] = None
 
 # Capture capability markers before tests or callers inject wrappers around the
 # low-level functions.  The actual operation still uses the current os.* call.
@@ -96,15 +101,6 @@ def _path_from_explicit_root(
 
 def _contained(root: Path, candidate: Path) -> bool:
     return candidate == root or root in candidate.parents
-
-
-def _lstat(path: Path, label: str) -> os.stat_result:
-    try:
-        return os.lstat(path)
-    except FileNotFoundError:
-        raise
-    except OSError as exc:
-        raise ValueError(f"{label} could not be inspected: {exc}") from exc
 
 
 def _reject_symlink_components_below(root: Path, candidate: Path, label: str) -> None:
@@ -168,13 +164,21 @@ def reject_protected_output(
     physical = physical_project_root(root)
     candidate = _path_from_explicit_root(root, physical, path)
     try:
-        resolved_candidate = candidate.resolve(strict=False)
-    except (OSError, RuntimeError) as exc:
-        raise ValueError(f"{label} protection check failed: {exc}") from exc
+        resolved_candidate = _resolved_below(physical, candidate, label)
+    except ValueError:
+        try:
+            _reject_symlink_components_below(physical, candidate, label)
+        except ValueError as symlink_error:
+            if "symlink" in str(symlink_error):
+                raise
+        raise
     for relative in PROTECTED_RUNTIME_RELATIVE_PATHS:
-        protected = (physical / relative).resolve(strict=False)
+        protected_candidate = physical / relative
+        _reject_symlink_components_below(physical, protected_candidate, "protected surface")
+        protected = _resolved_below(physical, protected_candidate, "protected surface")
         if _contained(protected, resolved_candidate):
             raise ValueError(f"{label} targets protected runtime surface: {relative}")
+    _reject_symlink_components_below(physical, candidate, label)
     return resolved_candidate
 
 
@@ -211,84 +215,76 @@ def _parse_finite_float(value: str) -> float:
     return parsed
 
 
-def _safe_file_path(path: Union[str, os.PathLike], label: str) -> Path:
-    """Reject file symlinks, while accepting macOS /var and /tmp aliases."""
+def _resolve_accepted_macos_alias(path: Union[str, os.PathLike], label: str) -> Path:
+    """Resolve only the Darwin /var and /tmp aliases, once, before traversal."""
 
     lexical = _absolute_lexical(path)
-    current = Path(lexical.anchor)
-    mac_aliases = {
-        Path("/var"): Path("/private/var"),
-        Path("/tmp"): Path("/private/tmp"),
-    }
-    for component in lexical.parts[1:]:
-        current = current / component
-        try:
-            info = os.lstat(current)
-        except FileNotFoundError:
-            break
-        except OSError as exc:
-            raise ValueError(f"{label} could not be inspected: {exc}") from exc
-        if stat.S_ISLNK(info.st_mode):
-            resolved = current.resolve(strict=False)
-            if current not in mac_aliases or resolved != mac_aliases[current]:
-                raise ValueError(f"{label} contains a symlink component")
+    if len(lexical.parts) < 2:
+        return lexical
+    alias_name = lexical.parts[1]
+    alias_target = {
+        "var": Path("/private/var"),
+        "tmp": Path("/private/tmp"),
+    }.get(alias_name)
+    if alias_target is None:
+        return lexical
+    alias = Path(os.sep) / alias_name
     try:
-        return lexical.resolve(strict=False)
+        alias_info = os.lstat(alias)
+    except FileNotFoundError:
+        return lexical
+    except OSError as exc:
+        raise ValueError(f"{label} could not be inspected: {exc}") from exc
+    if not stat.S_ISLNK(alias_info.st_mode):
+        return lexical
+    try:
+        resolved_alias = alias.resolve(strict=True)
     except (OSError, RuntimeError) as exc:
-        raise ValueError(f"{label} could not be resolved: {exc}") from exc
+        raise ValueError(f"{label} could not resolve macOS alias: {exc}") from exc
+    if resolved_alias != alias_target:
+        raise ValueError(f"{label} contains an unsupported symlink component")
+    return alias_target.joinpath(*lexical.parts[2:])
+
+
+def _file_stat_signature(info: os.stat_result) -> Tuple[int, int, int, int, int]:
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _read_descriptor(
+    descriptor: int,
+    label: str,
+    max_bytes: int,
+    opened: os.stat_result,
+    hasher: Optional["hashlib._Hash"] = None,
+) -> bytes:
+    chunks: List[bytes] = []
+    total = 0
+    while True:
+        chunk = os.read(descriptor, min(1024 * 1024, max_bytes - total + 1))
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError(f"{label} exceeds maximum size")
+        if hasher is None:
+            chunks.append(chunk)
+        else:
+            hasher.update(chunk)
+    finished = os.fstat(descriptor)
+    if _file_stat_signature(finished) != _file_stat_signature(opened):
+        raise ValueError(f"{label} changed while reading")
+    if hasher is not None:
+        return b""
+    return b"".join(chunks)
 
 
 def _read_bounded_regular_file(path: Union[str, os.PathLike], label: str, max_bytes: int) -> bytes:
     if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
         raise ValueError(f"{label} max_bytes must be a non-negative integer")
-    safe_path = _safe_file_path(path, label)
-    try:
-        info = os.lstat(safe_path)
-    except FileNotFoundError as exc:
-        raise ValueError(f"{label} is missing") from exc
-    if stat.S_ISLNK(info.st_mode):
-        raise ValueError(f"{label} must not be a symlink")
-    if not stat.S_ISREG(info.st_mode):
-        raise ValueError(f"{label} must be a regular file")
-    if info.st_size > max_bytes:
-        raise ValueError(f"{label} exceeds maximum size")
-
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if nofollow is None:
-        raise ValueError(f"{label} requires O_NOFOLLOW")
-    flags = os.O_RDONLY | nofollow
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
     descriptor: Optional[int] = None
     try:
-        try:
-            descriptor = os.open(safe_path, flags)
-        except OSError as exc:
-            raise ValueError(f"{label} could not be opened safely: {exc}") from exc
-        opened = os.fstat(descriptor)
-        opened_identity = (opened.st_dev, opened.st_ino)
-        if not stat.S_ISREG(opened.st_mode):
-            raise ValueError(f"{label} must be a regular file")
-        if opened_identity != (info.st_dev, info.st_ino):
-            raise ValueError(f"{label} identity changed while opening")
-        if opened.st_size > max_bytes:
-            raise ValueError(f"{label} exceeds maximum size")
-        chunks: List[bytes] = []
-        total = 0
-        while True:
-            chunk = os.read(descriptor, min(1024 * 1024, max_bytes - total + 1))
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > max_bytes:
-                raise ValueError(f"{label} exceeds maximum size")
-            chunks.append(chunk)
-        finished = os.fstat(descriptor)
-        if (finished.st_dev, finished.st_ino) != opened_identity:
-            raise ValueError(f"{label} identity changed while reading")
-        if finished.st_size != opened.st_size:
-            raise ValueError(f"{label} changed while reading")
-        return b"".join(chunks)
+        descriptor, opened = _open_pinned_regular_file(path, label, max_bytes)
+        return _read_descriptor(descriptor, label, max_bytes, opened)
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -342,37 +338,95 @@ def file_sha256(
 
     if max_bytes is None:
         max_bytes = DEFAULT_FILE_MAX_BYTES
-    raw = _read_bounded_regular_file(path, "file", max_bytes)
-    return hashlib.sha256(raw).hexdigest()
+    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
+        raise ValueError("file max_bytes must be a non-negative integer")
+    descriptor: Optional[int] = None
+    try:
+        descriptor, opened = _open_pinned_regular_file(path, "file", max_bytes)
+        digest = hashlib.sha256()
+        _read_descriptor(descriptor, "file", max_bytes, opened, hasher=digest)
+        return digest.hexdigest()
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+class _SnapshotBudget:
+    def __init__(
+        self, max_file_bytes: int, max_total_bytes: int, max_entries: int, max_depth: int
+    ) -> None:
+        self.max_file_bytes = max_file_bytes
+        self.max_total_bytes = max_total_bytes
+        self.max_entries = max_entries
+        self.max_depth = max_depth
+        self.total_bytes = 0
+        self.entries = 0
+
+    def claim_entry(self, relative: str) -> None:
+        if self.entries >= self.max_entries:
+            raise ValueError(f"protected snapshot exceeds maximum entries at {relative}")
+        self.entries += 1
+
+    def check_depth(self, depth: int, relative: str) -> None:
+        if depth > self.max_depth:
+            raise ValueError(f"protected snapshot exceeds maximum depth at {relative}")
+
+    def claim_file(self, size: int, relative: str) -> None:
+        if size > self.max_file_bytes:
+            raise ValueError(f"protected snapshot file exceeds maximum size: {relative}")
+        if self.total_bytes + size > self.max_total_bytes:
+            raise ValueError(f"protected snapshot exceeds maximum total bytes at {relative}")
+        self.total_bytes += size
+
+
+def _validate_snapshot_limit(value: object, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
 
 
 def _snapshot_directory(
-    path: Path, root: Path, max_file_bytes: int
+    path: Path, root: Path, budget: _SnapshotBudget, depth: int
 ) -> Tuple[str, int, List[Tuple[str, str, Optional[str], int]]]:
+    relative_directory = path.relative_to(root).as_posix()
+    budget.check_depth(depth, relative_directory)
     entries: List[Tuple[str, str, Optional[str], int]] = []
     total_size = 0
     try:
         with os.scandir(path) as iterator:
-            children = sorted(iterator, key=lambda entry: entry.name)
+            children = []
+            for entry in iterator:
+                if budget.entries + len(children) >= budget.max_entries:
+                    raise ValueError(
+                        f"protected snapshot exceeds maximum entries at {relative_directory}"
+                    )
+                children.append(entry)
+            children.sort(key=lambda entry: entry.name)
+    except ValueError:
+        raise
     except OSError as exc:
         raise ValueError(f"protected directory could not be read: {exc}") from exc
     for entry in children:
         child = Path(entry.path)
+        relative = child.relative_to(root).as_posix()
+        child_depth = depth + 1
+        budget.check_depth(child_depth, relative)
+        budget.claim_entry(relative)
         try:
             info = os.lstat(child)
         except OSError as exc:
             raise ValueError(f"protected directory could not be inspected: {exc}") from exc
-        relative = child.relative_to(root).as_posix()
         if stat.S_ISLNK(info.st_mode):
             raise ValueError(f"protected surface contains a symlink: {relative}")
         if stat.S_ISDIR(info.st_mode):
             child_hash, child_size, _child_entries = _snapshot_directory(
-                child, root, max_file_bytes
+                child, root, budget, child_depth
             )
             entries.append((relative, "directory", child_hash, child_size))
             total_size += child_size
         elif stat.S_ISREG(info.st_mode):
-            child_hash = file_sha256(child, max_bytes=max_file_bytes)
+            budget.claim_file(info.st_size, relative)
+            child_hash = file_sha256(child, max_bytes=budget.max_file_bytes)
             entries.append((relative, "file", child_hash, info.st_size))
             total_size += info.st_size
         else:
@@ -382,15 +436,30 @@ def _snapshot_directory(
 
 
 def snapshot_protected_surfaces(
-    root: Union[str, os.PathLike], max_file_bytes: int = DEFAULT_FILE_MAX_BYTES
+    root: Union[str, os.PathLike],
+    max_file_bytes: int = DEFAULT_FILE_MAX_BYTES,
+    max_total_bytes: int = DEFAULT_TOTAL_MAX_BYTES,
+    max_entries: int = DEFAULT_SNAPSHOT_MAX_ENTRIES,
+    max_depth: int = DEFAULT_SNAPSHOT_MAX_DEPTH,
 ) -> Tuple[ProtectedSurfaceRecord, ...]:
-    """Return deterministic immutable type/path/hash/size records for surfaces."""
+    """Return deterministic immutable records under bounded traversal budgets."""
 
+    validated_limits = tuple(
+        _validate_snapshot_limit(value, name)
+        for name, value in (
+            ("max_file_bytes", max_file_bytes),
+            ("max_total_bytes", max_total_bytes),
+            ("max_entries", max_entries),
+            ("max_depth", max_depth),
+        )
+    )
+    budget = _SnapshotBudget(*validated_limits)
     physical = physical_project_root(root)
     records: List[ProtectedSurfaceRecord] = []
     for relative in PROTECTED_RUNTIME_RELATIVE_PATHS:
         surface = physical / relative
         _reject_symlink_components_below(physical, surface, "protected surface")
+        budget.claim_entry(relative.as_posix())
         try:
             info = os.lstat(surface)
         except FileNotFoundError:
@@ -401,10 +470,11 @@ def snapshot_protected_surfaces(
         if stat.S_ISLNK(info.st_mode):
             raise ValueError(f"protected surface must not be a symlink: {relative}")
         if stat.S_ISREG(info.st_mode):
-            digest = file_sha256(surface, max_bytes=max_file_bytes)
+            budget.claim_file(info.st_size, relative.as_posix())
+            digest = file_sha256(surface, max_bytes=budget.max_file_bytes)
             records.append(ProtectedSurfaceRecord("file", relative.as_posix(), digest, info.st_size))
         elif stat.S_ISDIR(info.st_mode):
-            digest, size, _entries = _snapshot_directory(surface, physical, max_file_bytes)
+            digest, size, _entries = _snapshot_directory(surface, physical, budget, 0)
             records.append(ProtectedSurfaceRecord("directory", relative.as_posix(), digest, size))
         else:
             raise ValueError(f"protected surface must be a regular file or directory: {relative}")
@@ -480,11 +550,134 @@ def _check_fd_identity(
         raise OSError(f"{label} identity changed after validation")
 
 
+def _read_directory_flags() -> int:
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    if directory_flag is None or nofollow_flag is None:
+        raise ValueError("file reads require O_DIRECTORY and O_NOFOLLOW")
+    flags = os.O_RDONLY | directory_flag | nofollow_flag
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    return flags
+
+
+def _read_leaf_flags() -> int:
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    if nofollow_flag is None:
+        raise ValueError("file reads require O_NOFOLLOW")
+    flags = os.O_RDONLY | nofollow_flag
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    return flags
+
+
+def _open_pinned_regular_file(
+    path: Union[str, os.PathLike], label: str, max_bytes: int
+) -> Tuple[int, os.stat_result]:
+    """Open a validated regular file through one descriptor-relative walk."""
+
+    normalized = _resolve_accepted_macos_alias(path, label)
+    try:
+        identities = _snapshot_identities(normalized, label)
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} is missing") from exc
+    except OSError as exc:
+        raise ValueError(str(exc)) from exc
+    expected = identities.get(normalized.parts)
+    if expected is None:
+        raise ValueError(f"{label} is missing")
+    try:
+        pre_open = os.lstat(normalized)
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} is missing") from exc
+    except OSError as exc:
+        raise ValueError(f"{label} could not be inspected: {exc}") from exc
+    if stat.S_ISLNK(pre_open.st_mode):
+        raise ValueError(f"{label} contains a symlink component")
+    if not stat.S_ISREG(pre_open.st_mode):
+        raise ValueError(f"{label} must be a regular file")
+    if pre_open.st_size > max_bytes:
+        raise ValueError(f"{label} exceeds maximum size")
+    if (pre_open.st_dev, pre_open.st_ino) != expected:
+        raise ValueError(f"{label} identity changed during validation")
+
+    hook = _FILE_VALIDATION_HOOK
+    if hook is not None:
+        hook(normalized)
+
+    directory_fd: Optional[int] = None
+    descriptor: Optional[int] = None
+    try:
+        try:
+            directory_fd = os.open(os.sep, _read_directory_flags())
+            _check_fd_identity(
+                directory_fd, identities.get(normalized.parts[:1]), "Meshy filesystem root"
+            )
+            for index, component in enumerate(normalized.parts[1:-1], start=2):
+                child_fd: Optional[int] = None
+                try:
+                    child_fd = os.open(
+                        component,
+                        _read_directory_flags(),
+                        dir_fd=directory_fd,
+                    )
+                    _check_fd_identity(
+                        child_fd,
+                        identities.get(normalized.parts[:index]),
+                        f"{label} ancestor {component}",
+                    )
+                    previous_fd = directory_fd
+                    os.close(previous_fd)
+                    directory_fd = child_fd
+                    child_fd = None
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+
+            descriptor = os.open(
+                normalized.name,
+                _read_leaf_flags(),
+                dir_fd=directory_fd,
+            )
+            opened = os.fstat(descriptor)
+            if stat.S_ISLNK(opened.st_mode):
+                raise ValueError(f"{label} must not be a symlink")
+            if not stat.S_ISREG(opened.st_mode):
+                raise ValueError(f"{label} must be a regular file")
+            if (opened.st_dev, opened.st_ino) != expected:
+                raise ValueError(f"{label} identity changed while opening")
+            if _file_stat_signature(opened) != _file_stat_signature(pre_open):
+                raise ValueError(f"{label} changed while opening")
+            if opened.st_size > max_bytes:
+                raise ValueError(f"{label} exceeds maximum size")
+
+            previous_fd = directory_fd
+            os.close(previous_fd)
+            directory_fd = None
+            result = descriptor
+            descriptor = None
+            return result, opened
+        except ValueError:
+            raise
+        except FileNotFoundError as exc:
+            raise ValueError(f"{label} is missing") from exc
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise ValueError(f"{label} contains a symlink component") from exc
+            if exc.errno == errno.ENOTDIR:
+                raise ValueError(f"{label} ancestor identity changed after validation") from exc
+            raise ValueError(f"{label} could not be opened safely: {exc}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
 def _open_pinned_parent(path: Path, identities: Dict[Tuple[str, ...], Tuple[int, int]], flags: int) -> int:
     current_fd: Optional[int] = os.open(os.sep, flags)
     try:
         _check_fd_identity(current_fd, identities.get(path.parts[:1]), "Meshy root")
-        created_prefix = False
         for index, component in enumerate(path.parent.parts[1:], start=2):
             child_fd: Optional[int] = None
             created_here = False
@@ -493,23 +686,23 @@ def _open_pinned_parent(path: Path, identities: Dict[Tuple[str, ...], Tuple[int,
                 try:
                     child_fd = os.open(component, flags, dir_fd=current_fd)
                 except FileNotFoundError:
-                    if not created_prefix and identities.get(component_parts) is not None:
+                    if identities.get(component_parts) is not None:
                         raise OSError(f"Meshy component {component} disappeared after validation")
                     try:
                         os.mkdir(component, mode=0o700, dir_fd=current_fd)
                     except FileExistsError as exc:
                         raise OSError(f"Meshy component {component} appeared during validation") from exc
                     created_here = True
+                    os.fsync(current_fd)
                     child_fd = os.open(component, flags, dir_fd=current_fd)
-                if identities.get(component_parts) is None and not (created_prefix or created_here):
+                if identities.get(component_parts) is None and not created_here:
                     raise OSError(f"Meshy component {component} appeared during validation")
-                if identities.get(component_parts) is not None and not created_prefix:
+                if identities.get(component_parts) is not None:
                     _check_fd_identity(child_fd, identities.get(component_parts), f"Meshy component {component}")
                 previous_fd = current_fd
+                os.close(previous_fd)
                 current_fd = child_fd
                 child_fd = None
-                os.close(previous_fd)
-                created_prefix = created_prefix or created_here
             finally:
                 if child_fd is not None:
                     os.close(child_fd)
