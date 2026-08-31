@@ -1569,3 +1569,217 @@ def test_r2b2_cli_verify_is_offline_and_emits_pass_marker(
     captured = capsys.readouterr()
     assert result == 0
     assert "MESHY VERIFY PASS" in captured.out
+
+
+def test_meshy_client_retries_only_safe_gets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(stage_module.time, "sleep", lambda _seconds: None)
+
+    class Response:
+        def __init__(self, status: int, payload: dict) -> None:
+            self.status_code = status
+            self.payload = payload
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Session:
+        def __init__(self, responses: List[Any]) -> None:
+            self.responses = list(responses)
+            self.methods: List[str] = []
+
+        def request(self, method: str, *_args: Any, **_kwargs: Any) -> Any:
+            self.methods.append(method)
+            response = self.responses.pop(0)
+            if isinstance(response, BaseException):
+                raise response
+            return response
+
+    for failure in (OSError("transport"), Response(429, {}), Response(500, {})):
+        session = Session([failure, Response(200, {"result": "unexpected-second-attempt"})])
+        client = stage_module.MeshyClient(api_key="test", session=session)
+        with pytest.raises(RuntimeError):
+            client.create_task(IMAGE_ENDPOINT, {})
+        assert session.methods == ["POST"]
+
+    session = Session([Response(500, {}), Response(200, {"balance": 17})])
+    client = stage_module.MeshyClient(api_key="test", session=session)
+    assert client.get_balance() == 17
+    assert session.methods == ["GET", "GET"]
+
+
+def test_r2b2_resume_reconciles_published_task_after_journal_write_failure(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_write = stage_module._write_journal
+    armed = True
+
+    def fail_after_publication(preflight: Any, batch_id: str, document: dict) -> None:
+        nonlocal armed
+        if armed and document["tasks"][0]["state"] == "SUCCEEDED":
+            armed = False
+            raise OSError("injected journal write failure")
+        real_write(preflight, batch_id, document)
+
+    monkeypatch.setattr(stage_module, "_write_journal", fail_after_publication)
+    generation_kwargs = _generation_kwargs(tmp_path)
+    original = FakeMeshyClient()
+    with pytest.raises(OSError, match="journal write"):
+        generate_batch(valid_contract, tmp_path, original, 100, **generation_kwargs)
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    journal_path = next((asset_root / "_batches").glob("*.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    task_id = original.created_tasks[0]
+    assert journal["tasks"][0]["state"] == "PENDING"
+    assert journal["tasks"][0]["task_id"] == task_id
+    assert (asset_root / task_id / "generation.json").is_file()
+
+    class NoProviderCalls(FakeMeshyClient):
+        def get_balance(self) -> int:
+            raise AssertionError("bound terminal evidence must not call the provider")
+
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            raise AssertionError("bound terminal evidence must not poll")
+
+        def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+            raise AssertionError("bound terminal evidence must not download")
+
+    client = NoProviderCalls()
+    resumed = stage_module.resume_batch(
+        valid_contract, tmp_path, client, journal_path, 100, **generation_kwargs
+    )
+
+    assert resumed["reconciled"] == [task_id]
+    assert resumed["state"] == "SUBMITTING"
+    assert resumed["errors"] == []
+    assert client.calls == []
+    reconciled = json.loads(journal_path.read_text(encoding="utf-8"))["tasks"][0]
+    assert reconciled["state"] == "SUCCEEDED"
+    assert reconciled["consumed_credits"] == 5
+
+
+@pytest.mark.parametrize("terminal_state", ["FAILED", "OVERRUN"])
+def test_r2b2_resume_reconciles_bound_terminal_failure_semantics(
+    tmp_path: Path, valid_contract: AssetContract, terminal_state: str
+) -> None:
+    class Terminal(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            if terminal_state == "FAILED":
+                return {"task_id": task_id, "status": "FAILED"}
+            return {"task_id": task_id, "status": "SUCCEEDED", "consumed_credits": 6}
+
+    generation_kwargs = _generation_kwargs(tmp_path)
+    client = Terminal()
+    with pytest.raises(RuntimeError):
+        generate_batch(valid_contract, tmp_path, client, 100, **generation_kwargs)
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    journal_path = next((asset_root / "_batches").glob("*.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    task_id = client.created_tasks[0]
+    journal["tasks"][0].update(
+        state="PENDING", consumed_credits=None, error=None, budget_violation=False
+    )
+    journal["state"] = "SUBMITTING"
+    journal["cumulative_consumed_credits"] = 0
+    journal_path.write_bytes(canonical_json_bytes(journal))
+
+    class NoProviderCalls(FakeMeshyClient):
+        def get_balance(self) -> int:
+            raise AssertionError("bound terminal evidence must not call the provider")
+
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            raise AssertionError("bound terminal evidence must not poll")
+
+        def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+            raise AssertionError("bound terminal evidence must not download")
+
+    resumed = stage_module.resume_batch(
+        valid_contract,
+        tmp_path,
+        NoProviderCalls(),
+        journal_path,
+        100,
+        **generation_kwargs,
+    )
+    final_journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    final_task = final_journal["tasks"][0]
+    assert resumed["reconciled"] == [task_id]
+    assert resumed["errors"] == []
+    assert final_task["state"] == terminal_state
+    assert final_task["budget_violation"] is (terminal_state == "OVERRUN")
+    assert final_journal["state"] == ("BUDGET_OVERRUN" if terminal_state == "OVERRUN" else "FAILED")
+
+
+def test_r2b2_resume_maps_explicit_macos_alias_journal_path(
+    tmp_path: Path, valid_contract: AssetContract, fake_client: FakeMeshyClient
+) -> None:
+    physical = tmp_path.resolve()
+    if len(physical.parts) < 3 or physical.parts[1] != "private" or physical.parts[2] not in {"tmp", "var"}:
+        pytest.skip("the macOS /private alias is unavailable")
+    alias_root = Path("/") / physical.parts[2] / Path(*physical.parts[3:])
+    generated = generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    journal_path = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json")
+    alias_journal = alias_root / STAGING_RELATIVE / valid_contract.asset_id / "_batches" / journal_path.name
+
+    resolved = stage_module._resume_journal_path(alias_root, valid_contract.asset_id, alias_journal)
+
+    assert resolved[0] == physical
+    assert resolved[3] == journal_path
+
+
+def test_r2b2_offline_verify_rejects_all_hidden_and_symlink_direct_entries(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **_generation_kwargs(tmp_path)
+    )
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    (asset_root / ".task-orphan.tmp").mkdir()
+    (asset_root / ".hidden-file").write_text("orphan", encoding="utf-8")
+    (asset_root / "symlink-task").symlink_to(asset_root / generated["task_ids"][0], target_is_directory=True)
+    journal_path = asset_root / "_batches" / (generated["batch_id"] + ".json")
+
+    report = stage_module.verify_batch(tmp_path, valid_contract, journal_path)
+
+    assert report["pass"] is False
+    assert any("hidden" in error for error in report["errors"])
+    assert any("symlink" in error for error in report["errors"])
+
+
+def test_r2b2_offline_verify_requires_the_approved_pricing_source(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    pricing_document = json.loads(
+        (ROOT / "data/asset_generation/meshy_pricing_v1.json").read_text(encoding="utf-8")
+    )
+    custom_pricing = tmp_path / "custom-pricing.json"
+    custom_pricing.write_text(json.dumps(pricing_document, indent=2), encoding="utf-8")
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generation_kwargs["pricing_file"] = custom_pricing
+    generated = generate_batch(valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs)
+    journal_path = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches" / (generated["batch_id"] + ".json")
+
+    default_report = stage_module.verify_batch(tmp_path, valid_contract, journal_path)
+    correct_report = stage_module.verify_batch(
+        tmp_path, valid_contract, journal_path, pricing_file=custom_pricing
+    )
+    wrong_report = stage_module.verify_batch(
+        tmp_path, valid_contract, journal_path, pricing_file=stage_module.DEFAULT_PRICING_PATH
+    )
+
+    assert default_report["pass"] is False
+    assert any("non-default pricing" in error for error in default_report["errors"])
+    assert correct_report["pass"] is True
+    assert correct_report["errors"] == []
+    assert wrong_report["pass"] is False
+    assert any("pricing hash" in error for error in wrong_report["errors"])
+
+
+def test_r2b2_cli_verify_accepts_pricing_file() -> None:
+    parser = stage_module._build_parser()
+    verify = parser.parse_args([
+        "verify", "--project-root", "/tmp/project", "--contract", "/tmp/contract.json",
+        "--batch-journal", "/tmp/batch.json", "--pricing-file", "/tmp/custom-pricing.json",
+    ])
+    assert verify.pricing_file == Path("/tmp/custom-pricing.json")

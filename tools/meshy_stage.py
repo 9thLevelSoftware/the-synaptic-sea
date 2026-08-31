@@ -144,7 +144,11 @@ class MeshyClient:
             raise RuntimeError("Meshy request deadline is invalid")
         response = None
         try:
-            for attempt in range(3):
+            # POST creation is paid and has no idempotency contract here.  It
+            # must never be retried after a transport or retryable response;
+            # only safe GET reads retain automatic retries.
+            retryable_read = isinstance(method, str) and method.upper() == "GET"
+            for attempt in range(3 if retryable_read else 1):
                 remaining = 60.0
                 if deadline is not None:
                     remaining = float(deadline) - now()
@@ -167,7 +171,7 @@ class MeshyClient:
                     raise RuntimeError("Meshy response had an invalid status")
                 if status not in (429, 500, 502, 503, 504):
                     break
-                if attempt < 2:
+                if retryable_read and attempt + 1 < 3:
                     delay = 0.5 * (2 ** attempt)
                     if deadline is not None:
                         remaining = float(deadline) - now()
@@ -1979,7 +1983,7 @@ def _read_adjacent_json(path: Path, label: str) -> Tuple[Dict[str, Any], bytes]:
 
 
 def _verify_generation_journal_binding(
-    document: Dict[str, Any], journal: Dict[str, Any]
+    document: Dict[str, Any], journal: Dict[str, Any], allow_pending_reconciliation: bool = False
 ) -> None:
     approval = journal["approval"]
     for name in (
@@ -2004,6 +2008,12 @@ def _verify_generation_journal_binding(
     task = journal["tasks"][index]
     if task["index"] != index or task.get("task_id") != document["task_id"]:
         raise ValueError("Meshy generation task identity does not match journal")
+    if allow_pending_reconciliation and task["state"] == "PENDING":
+        # A crash after publication can leave a terminal generation record
+        # beside a journal that still says PENDING.  Identity and approval
+        # fields above still bind the record; resume reconciles the terminal
+        # state and observed credits below.
+        return
     if document["status"] == "PENDING":
         if task["state"] not in ("PENDING", "SUBMITTING"):
             raise ValueError("Meshy pending generation state does not match journal")
@@ -2018,7 +2028,10 @@ def _verify_generation_journal_binding(
 
 
 def _verify_generation_adjacent_artifacts(
-    path: Path, document: Dict[str, Any], journal_path: Optional[Union[str, os.PathLike]]
+    path: Path,
+    document: Dict[str, Any],
+    journal_path: Optional[Union[str, os.PathLike]],
+    allow_pending_reconciliation: bool = False,
 ) -> None:
     task_dir = path.parent
     contract_path = task_dir / "contract.json"
@@ -2110,12 +2123,16 @@ def _verify_generation_adjacent_artifacts(
         journal_path = task_dir.parent / "_batches" / (document["batch_id"] + ".json")
     assert journal_path is not None
     journal = load_batch_journal(journal_path)
-    _verify_generation_journal_binding(document, journal)
+    _verify_generation_journal_binding(
+        document, journal, allow_pending_reconciliation=allow_pending_reconciliation
+    )
 
 
 def load_generation_record(
     path: Union[str, os.PathLike],
     journal_path: Optional[Union[str, os.PathLike]] = None,
+    *,
+    allow_pending_reconciliation: bool = False,
 ) -> Dict[str, Any]:
     """Strictly parse, validate, and bind one generated record from disk."""
 
@@ -2126,7 +2143,12 @@ def load_generation_record(
         raise ValueError("invalid Meshy generation record: " + "; ".join(errors))
     if record_path.name == "generation.json" and record_path.parent.name != document["task_id"]:
         raise ValueError("Meshy generation filename does not match task_id")
-    _verify_generation_adjacent_artifacts(record_path, document, journal_path)
+    _verify_generation_adjacent_artifacts(
+        record_path,
+        document,
+        journal_path,
+        allow_pending_reconciliation=allow_pending_reconciliation,
+    )
     return document
 
 
@@ -2152,9 +2174,7 @@ def _resume_journal_path(
     root, stage, asset_root = _validate_staging_paths(project_root, asset_id)
     batch_root = asset_root / "_batches"
     governance._reject_symlink_components_below(root, batch_root, "Meshy batch journal root")
-    candidate = Path(batch_journal).expanduser()
-    if not candidate.is_absolute():
-        candidate = root / candidate
+    candidate = governance._path_from_explicit_root(project_root, root, batch_journal)
     candidate = Path(os.path.abspath(os.fspath(candidate)))
     governance._reject_symlink_components_below(root, candidate, "Meshy batch journal")
     if candidate.parent != batch_root:
@@ -2309,13 +2329,7 @@ def resume_batch(
             raise ValueError("Meshy batch journal creation time changed during resume preflight")
         journal = reloaded
 
-        try:
-            balance = _call_with_deadline(client.get_balance, preflight)
-        except Exception as exc:
-            raise RuntimeError(_safe_error(exc)) from exc
-        if not _valid_nonnegative_int(balance):
-            raise ValueError("Meshy balance response did not contain credits")
-
+        balance_checked = False
         tasks = [_copy_mapping(task) for task in journal["tasks"]]
         cumulative = journal["cumulative_consumed_credits"]
         resumed: List[str] = []
@@ -2391,8 +2405,64 @@ def resume_batch(
                 unresolved.append(_unresolved_item(index, task, "unsubmitted"))
                 continue
 
+            existing_task_dir = preflight.asset_root / task_id
+            if os.path.lexists(str(existing_task_dir)):
+                try:
+                    governance.governed_task_path(
+                        preflight.root,
+                        existing_task_dir,
+                        "Meshy existing task directory",
+                        allow_missing=False,
+                    )
+                    record = load_generation_record(
+                        existing_task_dir / "generation.json",
+                        journal_path=journal_path,
+                        allow_pending_reconciliation=True,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    # An existing final name is never overwritten.  Invalid or
+                    # mismatched evidence remains unresolved for an operator.
+                    unresolved.append(_unresolved_item(index, task, "invalid_existing_evidence"))
+                    errors.append(_safe_error(exc))
+                    continue
+                if record.get("status") not in ("SUCCEEDED", "FAILED"):
+                    unresolved.append(_unresolved_item(index, task, "existing_evidence_not_terminal"))
+                    errors.append("Meshy existing task evidence is non-terminal")
+                    continue
+                consumed = record.get("consumed_credits")
+                if consumed is not None and cumulative + consumed > preflight.approved_credits:
+                    unresolved.append(_unresolved_item(index, task, "existing_evidence_overrun"))
+                    errors.append("Meshy existing task evidence exceeds the approved bound")
+                    continue
+                reconciled_state = "SUCCEEDED" if record["status"] == "SUCCEEDED" else (
+                    "OVERRUN" if record.get("budget_violation") is True else "FAILED"
+                )
+                tasks[index] = _task_entry(
+                    index,
+                    task_id,
+                    reconciled_state,
+                    consumed,
+                    None if reconciled_state == "SUCCEEDED" else record.get("error"),
+                    budget_violation=reconciled_state == "OVERRUN",
+                )
+                if consumed is not None:
+                    cumulative += consumed
+                reconciled.append(task_id)
+                changed = True
+                _resume_journal_update(preflight, journal, tasks, cumulative)
+                journal = load_batch_journal(journal_path)
+                continue
+
             _check_deadline(preflight)
             _refresh_before_provider(preflight)
+            if not balance_checked:
+                try:
+                    balance = _call_with_deadline(client.get_balance, preflight)
+                except Exception as exc:
+                    raise RuntimeError(_safe_error(exc)) from exc
+                if not _valid_nonnegative_int(balance):
+                    raise ValueError("Meshy balance response did not contain credits")
+                balance_checked = True
             try:
                 record = _stage_task(
                     client,
@@ -2480,18 +2550,24 @@ def _visible_task_directories(
         return result
     for child in children:
         if child.name == "_batches":
-            if child.is_symlink() or not child.is_dir():
+            if child.is_symlink():
+                errors.append("Meshy batch journal root contains a symlink")
+            elif not child.is_dir():
                 errors.append("Meshy batch journal root is not a regular directory")
             continue
         if child.name.startswith("."):
+            errors.append("Meshy task root contains a hidden entry")
+            continue
+        if child.is_symlink():
+            errors.append("Meshy task root contains a symlink entry")
+            continue
+        if not child.is_dir():
+            errors.append("Meshy task root contains a non-directory entry")
             continue
         try:
             governance.governed_task_path(root, child, "Meshy task directory", allow_missing=False)
         except (OSError, ValueError):
             errors.append("Meshy task directory is outside governed staging")
-            continue
-        if child.is_symlink() or not child.is_dir():
-            errors.append("Meshy task root contains a non-directory entry")
             continue
         if child.name not in journal_task_ids:
             errors.append("Meshy task directory is not named by the batch journal")
@@ -2539,6 +2615,7 @@ def _verify_current_approval(
     journal: Dict[str, Any],
     task_dirs: Mapping[str, Path],
     errors: List[str],
+    pricing_file: Optional[Union[str, os.PathLike]],
 ) -> None:
     """Recompute approval fields from current sources and staged evidence."""
 
@@ -2556,40 +2633,6 @@ def _verify_current_approval(
         if approval["contract_sha256"] != current_contract.sha256:
             errors.append("contract hash does not match current contract")
 
-        pricing_document: Optional[Dict[str, Any]] = None
-        pricing_raw: Optional[bytes] = None
-        try:
-            pricing_document, pricing_raw = governance.strict_load_json_bytes(
-                DEFAULT_PRICING_PATH,
-                "Meshy pricing",
-                _PRICING_MAX_BYTES,
-            )
-            _validate_pricing_document(pricing_document)
-        except (OSError, TypeError, ValueError):
-            pricing_document = None
-            pricing_raw = None
-
-        source_task_dir = next(iter(task_dirs.values()), None)
-        if source_task_dir is not None:
-            staged_pricing, staged_raw = _read_adjacent_json(source_task_dir / "pricing.json", "pricing.json")
-            try:
-                _validate_pricing_document(staged_pricing)
-            except (TypeError, ValueError):
-                errors.append("staged pricing document is invalid")
-            if approval["pricing_id"] != staged_pricing.get("pricing_id"):
-                errors.append("pricing id does not match approval")
-            if pricing_document is not None and staged_pricing != pricing_document:
-                errors.append("current pricing changed since approval")
-            if pricing_document is not None and pricing_raw is not None:
-                if approval["pricing_sha256"] != hashlib.sha256(pricing_raw).hexdigest():
-                    errors.append("pricing hash does not match current pricing")
-            elif approval["pricing_sha256"] != hashlib.sha256(staged_raw).hexdigest():
-                errors.append("pricing hash does not match staged pricing")
-            pricing_document = staged_pricing if pricing_document is None else pricing_document
-        elif pricing_document is not None and pricing_raw is not None:
-            if approval["pricing_sha256"] != hashlib.sha256(pricing_raw).hexdigest():
-                errors.append("pricing hash does not match current pricing")
-
         generation = current_contract._snapshot_document().get("generation", {})
         expected_endpoint = ENDPOINTS.get(generation.get("mode"))
         if approval["endpoint"] != expected_endpoint:
@@ -2597,6 +2640,47 @@ def _verify_current_approval(
         expected_count = generation.get("candidate_count")
         if approval["candidate_count"] != expected_count:
             errors.append("candidate count changed since approval")
+
+        pricing_document: Optional[Dict[str, Any]] = None
+        pricing_raw: Optional[bytes] = None
+        pricing_source = Path(pricing_file) if pricing_file is not None else DEFAULT_PRICING_PATH
+        try:
+            pricing_document, pricing_raw = governance.strict_load_json_bytes(
+                pricing_source,
+                "Meshy pricing",
+                _PRICING_MAX_BYTES,
+            )
+            _validate_pricing_document(pricing_document)
+        except (OSError, TypeError, ValueError) as exc:
+            pricing_document = None
+            pricing_raw = None
+            if pricing_file is None:
+                errors.append("Meshy checked-in default pricing could not be read")
+            else:
+                errors.append("Meshy supplied pricing file could not be read")
+        else:
+            pricing_hash = hashlib.sha256(pricing_raw).hexdigest()
+            if pricing_file is None:
+                if approval["pricing_sha256"] != pricing_hash:
+                    errors.append("non-default pricing requires --pricing-file")
+            elif approval["pricing_sha256"] != pricing_hash:
+                errors.append("pricing hash does not match supplied pricing")
+            if approval["pricing_id"] != pricing_document["pricing_id"]:
+                errors.append("pricing id does not match supplied pricing")
+
+        source_task_dir = next(iter(task_dirs.values()), None)
+        if source_task_dir is not None:
+            staged_pricing, _staged_raw = _read_adjacent_json(source_task_dir / "pricing.json", "pricing.json")
+            try:
+                _validate_pricing_document(staged_pricing)
+            except (TypeError, ValueError):
+                errors.append("staged pricing document is invalid")
+            else:
+                if approval["pricing_id"] != staged_pricing.get("pricing_id"):
+                    errors.append("pricing id does not match approval")
+                if pricing_document is not None and staged_pricing != pricing_document:
+                    errors.append("supplied pricing does not match staged pricing artifact")
+
         if pricing_document is not None:
             pricing = _pricing_record_from_document(pricing_document, pricing_raw or canonical_json_bytes(pricing_document))
             expected_cost = pricing.cost_for(current_contract)
@@ -2604,6 +2688,7 @@ def _verify_current_approval(
                 errors.append("provider cost changed since approval")
             if approval["maximum_credits"] != expected_count * expected_cost:
                 errors.append("maximum credits changed since approval")
+
 
         if source_task_dir is not None:
             staged_references = _staged_reference_inputs(source_task_dir, approval["references"])
@@ -2625,6 +2710,7 @@ def verify_batch(
     project_root: Path,
     contract: AssetContract,
     batch_journal: Union[str, os.PathLike],
+    pricing_file: Optional[Union[str, os.PathLike]] = None,
 ) -> Dict[str, Any]:
     """Verify a Meshy batch entirely from local journal and staged evidence."""
 
@@ -2640,7 +2726,7 @@ def verify_batch(
         if task_id not in journal_task_ids:
             errors.append("Meshy task directory is not named by the batch journal")
 
-    _verify_current_approval(root, contract, journal, task_dirs, errors)
+    _verify_current_approval(root, contract, journal, task_dirs, errors, pricing_file)
 
     for index, task in enumerate(journal["tasks"]):
         state = task["state"]
@@ -2804,6 +2890,7 @@ def _build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--project-root", type=Path, required=True)
     verify.add_argument("--contract", type=Path, required=True)
     verify.add_argument("--batch-journal", type=Path, required=True)
+    verify.add_argument("--pricing-file", type=Path, default=None)
     return parser
 
 
@@ -2822,7 +2909,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 raise ValueError("approved credit ceiling must be positive")
             result = resume_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
         else:
-            result = verify_batch(args.project_root, contract, args.batch_journal)
+            result = verify_batch(args.project_root, contract, args.batch_journal, pricing_file=args.pricing_file)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         print("error: {0}".format(_safe_error(exc)), file=sys.stderr)
         return 1
