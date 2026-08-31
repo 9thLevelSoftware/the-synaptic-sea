@@ -273,6 +273,34 @@ class ValidatePropVisualBindingsTests(unittest.TestCase):
             self.assertEqual(sidecar["binding"]["ids"], ["reactor_console"])
             self.assertEqual(sidecar["placement"]["origin"], "scene_origin")
 
+    def test_refresh_preserves_ai_provenance_fixture(self) -> None:
+        ai_generation = {
+            "provider": "meshy",
+            "task_id": "018-test-promotion",
+            "model": "meshy-t2",
+            "input_sha256": ["a" * 64],
+            "raw_output_sha256": "b" * 64,
+            "cleaned_output_sha256": "c" * 64,
+            "contract_sha256": "d" * 64,
+            "human_cleanup": True,
+            "reviewer": "operator",
+        }
+        with copied_project() as project_root:
+            sidecar_path, sidecar = _load_sidecar(project_root, "reactor_console")
+            sidecar["provenance"] = {
+                "license_state": "paid-private",
+                "source_platform": "meshy",
+            }
+            sidecar["extensions"] = {"ai_generation": ai_generation}
+            _write_json(sidecar_path, sidecar)
+            refresh_derived(project_root, "reactor_console")
+            _sidecar_path, refreshed = _load_sidecar(project_root, "reactor_console")
+            self.assertEqual(refreshed["provenance"], {
+                "license_state": "paid-private",
+                "source_platform": "meshy",
+            })
+            self.assertEqual(refreshed["extensions"]["ai_generation"], ai_generation)
+
 
 if __name__ == "__main__":
     unittest.main()

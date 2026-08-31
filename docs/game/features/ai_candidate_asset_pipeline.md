@@ -172,6 +172,51 @@ surface, but it must not mutate the live catalogs, generated index, wrapper scen
 data. Any proposed sidecar/index/catalog change is emitted as a reviewable promotion packet;
 it is not applied by the generator.
 
+## Promotion proposal packets (Task 10)
+
+Promotion is a proposal-producing boundary, not a promotion command. Run
+`tools/meshy_promotion_packet.py` only against a completed task directory below
+`assets/_staging/meshy/<asset_id>/<task_id>/`. The tool writes proposal records back into that
+staging directory and never writes `assets/imported`, `data/combat`, `data/props`, or
+`scenes/wrappers`.
+
+Every proposal carries this complete, ADR-0052-compatible envelope:
+
+```json
+{
+  "provenance": {
+    "license_state": "paid-private",
+    "source_platform": "meshy"
+  },
+  "extensions": {
+    "ai_generation": {
+      "provider": "meshy",
+      "task_id": "018...",
+      "model": "meshy-t2",
+      "input_sha256": ["<64-lowercase-hex>"],
+      "raw_output_sha256": "<64-lowercase-hex>",
+      "cleaned_output_sha256": "<64-lowercase-hex>",
+      "contract_sha256": "<64-lowercase-hex>",
+      "human_cleanup": true,
+      "reviewer": "operator"
+    }
+  }
+}
+```
+
+Missing rights or any hash, `human_cleanup: false`, `source_platform: self-authored`, signed
+URLs, and API keys are hard failures. All proposal output paths must remain under
+`assets/_staging/meshy`; a target path in a proposal is descriptive only and is never opened for
+writing.
+
+For props, the tool emits `sidecar-overlay.json`. It contains `proposal_only: true`, the live
+sidecar target path, and only the authored `provenance`/`extensions` overlay needed to review a
+future adjacent `<asset>.sidecar.json`. For threats, it emits
+`threat_visual_catalog.patch.json` containing a reviewable JSON-patch-style operation targeting
+`data/combat/threat_visual_catalog.json`, plus `asset-provenance.json` containing the generic
+asset provenance record. A separate, human-approved task must inspect and apply either proposal;
+no proposal file is itself a live catalog, index, wrapper, or imported asset.
+
 ## ADR-0052 reconciliation
 
 This feature extends, rather than replaces, ADR-0052:
