@@ -4,26 +4,19 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 import math
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 SCHEMA_VERSION = "1.0.0"
 DOCUMENT_KIND = "ai_asset_contract"
 IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-STRUCTURAL_CATEGORIES = {
-    "structural",
-    "structural_floor",
-    "structural_wall",
-    "structural_door",
-    "structural_ramp",
-}
+KIT_TOKEN_RE = re.compile(r"(^|_)kit(_|$)")
 RIGHTS_STATES = {"project-owned", "paid-private", "free-cc-by-4.0"}
 REFERENCE_VIEWS = {"front", "side", "back", "left", "right", "three_quarter"}
 PIVOTS = {"bottom_center", "attachment", "scene_origin"}
@@ -99,10 +92,17 @@ class AssetContract:
     path: Path
     document: dict[str, Any]
     sha256: str
+    _snapshot: bytes = field(repr=False, compare=False)
 
     @property
     def asset_id(self) -> str:
-        return str(self.document["asset_id"])
+        return str(self._snapshot_document()["asset_id"])
+
+    def _snapshot_document(self) -> dict[str, Any]:
+        document = json.loads(self._snapshot)
+        if not isinstance(document, dict):  # pragma: no cover - load_contract validates this
+            raise ValueError("contract snapshot must be an object")
+        return document
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -125,7 +125,7 @@ def _is_int(value: object) -> bool:
 
 
 def _is_positive_int(value: object) -> bool:
-    return _is_int(value) and value > 0
+    return _is_int(value) and cast(int, value) > 0
 
 
 def _is_finite_number(value: object) -> bool:
@@ -146,7 +146,7 @@ def _is_positive_number(value: object) -> bool:
 
 
 def _is_bounded_int(value: object, minimum: int, maximum: int) -> bool:
-    return _is_int(value) and isinstance(value, int) and minimum <= value <= maximum
+    return _is_int(value) and minimum <= cast(int, value) <= maximum
 
 
 def _walk_nonfinite(value: object, label: str, errors: list[str]) -> None:
@@ -410,7 +410,7 @@ def validate_contract(document: object) -> list[str]:
 
     if (
         isinstance(category, str)
-        and (category in STRUCTURAL_CATEGORIES or category.startswith("structural_"))
+        and (category == "structural" or category.startswith("structural_"))
         and provider == "meshy"
     ):
         errors.append("structural geometry cannot use Meshy")
@@ -440,7 +440,7 @@ def validate_contract(document: object) -> list[str]:
             _check_identifier_list(top.get(parts_field), parts_field, errors)
 
     is_kit = any(
-        isinstance(value, str) and ("_kit" in value or value.endswith("kit"))
+        isinstance(value, str) and KIT_TOKEN_RE.search(value) is not None
         for value in (asset_id, category)
     )
     if is_kit and not (
@@ -474,6 +474,8 @@ def load_contract(path: Path) -> AssetContract:
         raise ValueError(f"contract is not valid UTF-8: {exc}") from exc
     try:
         document = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+    except RecursionError as exc:
+        raise ValueError("invalid JSON: maximum nesting depth exceeded") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid JSON: {exc}") from exc
     except ValueError:
@@ -483,7 +485,12 @@ def load_contract(path: Path) -> AssetContract:
     errors = validate_contract(document)
     if errors:
         raise ValueError("; ".join(errors))
-    return AssetContract(source, document, hashlib.sha256(raw).hexdigest())
+    return AssetContract(
+        source,
+        document,
+        hashlib.sha256(raw).hexdigest(),
+        canonical_json_bytes(document),
+    )
 
 
 def _triangle_budget_text(value: object) -> str:
@@ -495,7 +502,7 @@ def _triangle_budget_text(value: object) -> str:
 def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
     """Render a deterministic, JSON-serializable production prompt packet."""
 
-    document = contract.document
+    document = contract._snapshot_document()
     brief = document.get("visual_brief")
     if not isinstance(brief, str) or not brief.strip():
         brief = str(document["gameplay_role"]).replace("_", " ")
@@ -521,7 +528,7 @@ def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
         "contract_sha256": contract.sha256,
         "reference_prompt": reference_prompt,
         "negative_prompt": NEUTRAL_PRESENTATION,
-        "geometry_request": copy.deepcopy(document["generation"]),
+        "geometry_request": document["generation"],
         "texture_prompt": TEXTURE_VOCABULARY,
         "blender_cleanup_brief": cleanup,
         "runtime_review_brief": runtime,

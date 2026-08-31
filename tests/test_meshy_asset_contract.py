@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import math
@@ -101,11 +100,55 @@ def test_load_contract_hashes_original_bytes(tmp_path: Path) -> None:
     assert contract.asset_id == document["asset_id"]
 
 
+def test_prompt_packet_uses_immutable_snapshot_after_document_mutation() -> None:
+    contract = load_contract(FIXTURES / "valid_loot_container.json")
+    before = render_prompt_packet(contract)
+
+    contract.document["asset_id"] = "mutated_asset"
+    contract.document["visual_brief"] = "mutated brief"
+    contract.document["generation"]["target_polycount"] = 99
+
+    after = render_prompt_packet(contract)
+    assert after == before
+    assert after["asset_id"] == "loot_container_derelict_v1"
+    assert after["geometry_request"]["target_polycount"] == 3000
+    assert after["contract_sha256"] == contract.sha256
+
+
 def test_duplicate_json_keys_are_rejected(tmp_path: Path) -> None:
     path = tmp_path / "duplicate.json"
     path.write_text('{"asset_id":"x","asset_id":"y"}', encoding="utf-8")
     with pytest.raises(ValueError, match="duplicate JSON key"):
         load_contract(path)
+
+
+def test_nested_duplicate_json_keys_are_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "nested-duplicate.json"
+    path.write_text(
+        '{"generation":{"provider":"meshy","provider":"other"}}',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        load_contract(path)
+
+
+def test_cli_deep_json_recursion_is_nonzero_path_scoped_without_traceback(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "deep.json"
+    depth = 3000
+    path.write_text("[" * depth + "]" * depth, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "tools/meshy_asset_contract.py", "validate", str(path)],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert f"{path}:" in result.stderr
+    assert "invalid JSON" in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 def test_unknown_top_level_and_nested_fields_are_rejected() -> None:
@@ -217,6 +260,30 @@ def test_kit_requires_parts_and_accepts_bounded_triangle_range() -> None:
     assert validate_contract(document) == []
 
 
+@pytest.mark.parametrize(
+    ("asset_id", "requires_metadata"),
+    [("kit_v1", True), ("toolkit", False), ("foo_kitten", False)],
+)
+def test_kit_detection_matches_schema_token_boundaries(
+    asset_id: str, requires_metadata: bool
+) -> None:
+    document = _valid_document()
+    document["asset_id"] = asset_id
+    errors = validate_contract(document)
+    message = "kit contract must declare kit_parts or deliverables"
+    assert (message in errors) is requires_metadata
+
+
+def test_reversed_triangle_range_is_rejected_by_python_validator() -> None:
+    document = _valid_document()
+    document["budget"]["triangles"] = {
+        "min": 3000,
+        "max": 100,
+        "scope": "whole_asset",
+    }
+    assert "budget.triangles min must not exceed max" in validate_contract(document)
+
+
 def test_prompt_packet_has_exact_keys_and_does_not_alias_generation() -> None:
     contract = load_contract(FIXTURES / "valid_loot_container.json")
     packet = render_prompt_packet(contract)
@@ -248,6 +315,12 @@ def test_schema_records_runtime_cross_field_constraints() -> None:
     assert "multi_image_to_3d" in encoded
     assert "kit_parts" in encoded and "deliverables" in encoded
     assert "min <= max" in schema["$defs"]["triangleBudget"]["$comment"]
+    assert "Python validator is authoritative" in schema["$defs"]["triangleBudget"]["$comment"]
+
+
+def test_schema_visual_brief_rejects_whitespace_only() -> None:
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    assert schema["properties"]["visual_brief"]["pattern"] == r"\S"
 
 
 def test_cli_validate_success_prints_marker() -> None:

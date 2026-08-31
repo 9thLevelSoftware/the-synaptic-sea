@@ -40,7 +40,7 @@
       "minimum": 1
     },
     "triangleBudget": {
-      "$comment": "For range objects the runtime validator additionally enforces min <= max; draft 2020-12 has no sibling-value comparison keyword.",
+      "$comment": "The Python validator is authoritative for range objects and additionally enforces min <= max; draft 2020-12 has no sibling-value comparison keyword.",
       "oneOf": [
         {"$ref": "#/$defs/positiveInteger"},
         {
@@ -200,7 +200,7 @@
       }
     },
     "prompt_profile": {"$ref": "#/$defs/identifier"},
-    "visual_brief": {"type": "string", "minLength": 1},
+    "visual_brief": {"type": "string", "minLength": 1, "pattern": "\\S"},
     "kit_parts": {"$ref": "#/$defs/identifierList"},
     "deliverables": {"$ref": "#/$defs/identifierList"}
   },
