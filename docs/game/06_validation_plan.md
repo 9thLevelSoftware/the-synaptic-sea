@@ -63,7 +63,7 @@ Expected eventual marker (not currently claimed):
 MESHY BLENDER VALIDATION PASS asset=loot_container_derelict_v1 triangles=<n> materials=<n>
 ```
 
-### Locked-isometric runtime review — PENDING Task 11
+### Locked-isometric runtime review — IMPLEMENTED Task 11
 
 ```bash
 TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
@@ -75,7 +75,31 @@ python3 tools/meshy_runtime_review.py \
   --preview-dir artifacts/validation-previews/meshy/stalker_v1
 ```
 
-Expected eventual marker (not currently claimed):
+The runner requires `cleaned.glb` plus a `blender-validation.json` report with a `PASS` status. It
+copies the production project into a disposable external overlay and mounts the candidate only at
+`res://assets/_review/meshy/<asset_id>/cleaned.glb`; live runtime surfaces are not write targets.
+The overlay is import-primed before six bounded subprocess captures: seeds `42` and `777` under
+`normal`, `emergency`, and `dark` lighting. Every capture must emit the pass marker without an
+unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostic and produce a complete 1600x900
+PNG. The six captures and canonical report publish atomically only after all captures pass.
+
+Published output:
+
+```text
+artifacts/validation-previews/meshy/<asset_id>/
+  seed-42-normal.png
+  seed-42-emergency.png
+  seed-42-dark.png
+  seed-777-normal.png
+  seed-777-emergency.png
+  seed-777-dark.png
+  runtime-review.json
+```
+
+`runtime-review.json` records contract and cleaned-GLB hashes, the reviewed seed/lighting matrix,
+locked-isometric camera transform, per-capture output hashes, and pass status.
+
+Expected marker (when a real staged task is supplied):
 
 ```text
 MESHY RUNTIME REVIEW PASS asset=stalker_v1 seeds=42,777 lighting=normal,emergency,dark captures=6
