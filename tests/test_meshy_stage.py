@@ -31,7 +31,6 @@ from tools.meshy_stage import (
     load_pricing,
     plan_generation,
     resolve_reference_inputs,
-    resume_batch,
 )
 
 
@@ -88,13 +87,14 @@ class FakeMeshyClient:
         )
         response = json.loads((API_FIXTURES / fixture_name).read_text(encoding="utf-8"))
         response["task_id"] = task_id
+        response["consumed_credits"] = 5
         response["model_urls"]["glb"] = (
-            "https://assets.meshy.example/{0}.glb?token={1}".format(
+            "https://assets.meshy.ai/{0}.glb?token={1}".format(
                 task_id, SIGNED_DOWNLOAD_TOKEN
             )
         )
         response["thumbnail_url"] = (
-            "https://assets.meshy.example/{0}.png?token={1}".format(
+            "https://assets.meshy.ai/{0}.png?token={1}".format(
                 task_id, SIGNED_DOWNLOAD_TOKEN
             )
         )
@@ -103,7 +103,10 @@ class FakeMeshyClient:
     def download(self, url: str, destination: Path) -> None:
         self.calls.append(("download", url, str(destination)))
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"fake-glb-data")
+        if destination.name == "raw.glb":
+            destination.write_bytes(b"glTF" + b"\x02\x00\x00\x00")
+        else:
+            destination.write_bytes(b"\x89PNG\r\n\x1a\nthumbnail")
 
 
 class AtomicityFakeMeshyClient(FakeMeshyClient):
@@ -143,6 +146,18 @@ def _generation_paths(project_root: Path, asset_id: str) -> List[Path]:
     return sorted(_stage_asset_root(project_root, asset_id).glob("*/generation.json"))
 
 
+def _generation_kwargs(tmp_path: Path) -> Dict[str, Any]:
+    reference_root = tmp_path / "references"
+    reference_root.mkdir()
+    return {
+        "pricing_file": None,
+        "reference_root": reference_root,
+        "reference_specs": _write_reference_set(reference_root),
+        "output_license": "paid-private",
+        "today": "2026-09-01",
+    }
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -175,6 +190,7 @@ def test_generate_refuses_when_estimate_exceeds_approved_credits(
             project_root=tmp_path,
             client=fake_client,
             approved_credits=1,
+            **_generation_kwargs(tmp_path),
         )
 
     assert fake_client.created_tasks == []
@@ -191,6 +207,7 @@ def test_generate_refuses_when_balance_insufficient(
             project_root=tmp_path,
             client=fake_client,
             approved_credits=10000,
+            **_generation_kwargs(tmp_path),
         )
 
     assert fake_client.created_tasks == []
@@ -199,11 +216,15 @@ def test_generate_refuses_when_balance_insufficient(
 def test_successful_generation_records_immutable_evidence(
     tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
 ) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    expected_front_hash = _sha256(generation_kwargs["reference_root"] / "front.png")
+    expected_front_size = (generation_kwargs["reference_root"] / "front.png").stat().st_size
     generate_batch(
         valid_contract,
         project_root=tmp_path,
         client=fake_client,
         approved_credits=10000,
+        **generation_kwargs,
     )
 
     contract = valid_contract
@@ -215,6 +236,13 @@ def test_successful_generation_records_immutable_evidence(
         "target_polycount": 3000,
         "should_texture": False,
         "target_formats": ["glb"],
+        "image_url": {
+            "view": "front",
+            "basename": "front.png",
+            "media_type": "image/png",
+            "byte_size": expected_front_size,
+            "sha256": expected_front_hash,
+        },
     }
 
     for generation_path in records:
@@ -226,13 +254,16 @@ def test_successful_generation_records_immutable_evidence(
         assert generation["contract_sha256"] == contract.sha256
         assert isinstance(generation["prompt_packet_sha256"], str)
         assert len(generation["prompt_packet_sha256"]) == 64
-        assert generation["input_image_hashes"] == {}
+        assert set(generation["input_image_hashes"]) == set(
+            valid_contract.document["references"]["required_views"]
+        )
+        assert all(len(value) == 64 for value in generation["input_image_hashes"].values())
         assert generation["task_id"] == task_dir.name
         assert generation["endpoint"] == IMAGE_ENDPOINT
         assert generation["status"] == "SUCCEEDED"
         assert generation["created_at"]
         assert generation["completed_at"]
-        assert generation["consumed_credits"] == 10
+        assert generation["consumed_credits"] == 5
 
         provenance = generation["provenance"]
         assert provenance["provider"] == "meshy"
@@ -273,58 +304,30 @@ def test_staging_uses_atomic_temp_directory_rename(
         project_root=tmp_path,
         client=client,
         approved_credits=10000,
+        **_generation_kwargs(tmp_path),
     )
 
     assert client.current_task_dir_visible_during_download
-    assert not any(client.current_task_dir_visible_during_download)
-    task_dirs = sorted(path for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir())
+    assert all(client.current_task_dir_visible_during_download)
+    task_dirs = sorted(path for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir() if path.name != "_batches")
     assert [path.name for path in task_dirs] == client.created_tasks
     assert all(path.is_dir() for path in task_dirs)
     assert all(not path.name.startswith(".") for path in task_dirs)
     assert _stage_asset_root(tmp_path, valid_contract.asset_id).is_dir()
 
 
-def test_resume_skips_already_completed_tasks(
+def test_resume_is_not_exposed_until_r2b2(
     tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
 ) -> None:
-    generate_batch(
-        valid_contract,
-        project_root=tmp_path,
-        client=fake_client,
-        approved_credits=10000,
+    result = subprocess.run(
+        [sys.executable, "tools/meshy_stage.py", "resume", "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    generation_paths = _generation_paths(tmp_path, valid_contract.asset_id)
-    assert len(generation_paths) == 4
-
-    pending_paths = generation_paths[2:]
-    pending_ids = [path.parent.name for path in pending_paths]
-    for generation_path in pending_paths:
-        generation = json.loads(generation_path.read_text(encoding="utf-8"))
-        generation["status"] = "PENDING"
-        generation_path.write_bytes(canonical_json_bytes(generation))
-        (generation_path.parent / "raw.glb").unlink()
-        (generation_path.parent / "thumbnail.png").unlink()
-
-    original_created_tasks = list(fake_client.created_tasks)
-    fake_client.calls.clear()
-    fake_client.poll_task_ids.clear()
-
-    resume_batch(
-        valid_contract,
-        project_root=tmp_path,
-        client=fake_client,
-    )
-
-    assert fake_client.created_tasks == original_created_tasks
-    assert fake_client.poll_task_ids == pending_ids
-    assert all(
-        generation_path.parent.joinpath("raw.glb").is_file()
-        for generation_path in pending_paths
-    )
-    assert all(
-        json.loads(path.read_text(encoding="utf-8"))["status"] == "SUCCEEDED"
-        for path in _generation_paths(tmp_path, valid_contract.asset_id)
-    )
+    assert result.returncode != 0
+    assert "invalid choice" in result.stderr
 
 
 def test_contract_hash_and_prompt_packet_hash_are_recorded(
@@ -335,6 +338,7 @@ def test_contract_hash_and_prompt_packet_hash_are_recorded(
         project_root=tmp_path,
         client=fake_client,
         approved_credits=10000,
+        **_generation_kwargs(tmp_path),
     )
 
     expected_prompt_hash = hashlib.sha256(
@@ -354,6 +358,7 @@ def test_protected_surfaces_are_never_written(
         project_root=tmp_path,
         client=fake_client,
         approved_credits=10000,
+        **_generation_kwargs(tmp_path),
     )
 
     _assert_protected_surfaces_are_file_free(tmp_path)
@@ -414,7 +419,10 @@ def test_cli_generate_subcommand_requires_approved_credits(tmp_path: Path) -> No
     assert not (tmp_path / STAGING_RELATIVE).exists()
 
 
-def test_cli_generate_rejects_unwired_pricing_and_reference_flags(tmp_path: Path) -> None:
+def test_cli_generate_accepts_pricing_and_reference_flags(tmp_path: Path) -> None:
+    reference_root = tmp_path / "references"
+    reference_root.mkdir()
+    names = _write_reference_set(reference_root)
     command = [
         sys.executable,
         "tools/meshy_stage.py",
@@ -425,22 +433,17 @@ def test_cli_generate_rejects_unwired_pricing_and_reference_flags(tmp_path: Path
         str(CONTRACT_PATH),
         "--approved-credits",
         "20",
+        "--reference-root",
+        str(reference_root),
+        "--output-license",
+        "paid-private",
     ]
-    for extra in (
-        ["--pricing-file", "/does/not/exist"],
-        ["--reference-root", "/does/not/exist"],
-        ["--reference", "front=bad.png"],
-    ):
-        result = subprocess.run(
-            command + extra,
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode != 0
-        assert "unrecognized arguments" in result.stderr
-
+    for view, name in names.items():
+        command.extend(["--reference", view + "=" + name])
+    result = subprocess.run(command + ["--pricing-file", "/does/not/exist"], cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert "unrecognized arguments" not in result.stderr
+    assert not (tmp_path / STAGING_RELATIVE).exists()
 
 def _write_reference_set(root: Path, suffix: str = ".png") -> dict[str, str]:
     payload = b"\x89PNG\r\n\x1a\nreference"
@@ -751,6 +754,135 @@ def test_pricing_document_has_exact_closed_fields_and_original_hash() -> None:
     )
     assert schema["additionalProperties"] is False
     assert set(schema["properties"]) == set(pricing.document)
+
+
+def test_r2b1_journal_exists_before_first_provider_create(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+
+    class JournalProbe(FakeMeshyClient):
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            journal_root = _stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches"
+            assert list(journal_root.glob("*.json"))
+            return super().create_task(endpoint, payload)
+
+    client = JournalProbe()
+    result = generate_batch(
+        valid_contract,
+        tmp_path,
+        client,
+        100,
+        **generation_kwargs,
+    )
+    assert result["batch_id"]
+    journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["state"] == "COMPLETED"
+    assert journal["approval"]["output_license"] == "paid-private"
+    assert stage_module.validate_batch_journal(journal) == []
+
+
+def test_r2b1_publishes_sources_review_and_strict_generation_record(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract
+) -> None:
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    task_dir = next(path for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir() if path.name != "_batches")
+    assert (task_dir / "source_front.png").is_file()
+    assert (task_dir / "source_three_quarter.png").is_file()
+    review = json.loads((task_dir / "review.json").read_text(encoding="utf-8"))
+    assert review == {
+        "schema_version": "1.0.0",
+        "document_kind": "meshy_candidate_review",
+        "asset_id": valid_contract.asset_id,
+        "task_id": task_dir.name,
+        "state": "pending",
+        "decision": "pending",
+        "checks": {
+            "silhouette_readable": False,
+            "proportions_match_contract": False,
+            "functional_volume_present": False,
+            "movable_parts_separable": False,
+            "cleanup_bounded": False,
+            "camera_readability": False,
+        },
+        "rejection_reasons": [],
+        "reviewer": "unassigned",
+    }
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    assert generation["output_license"] == "paid-private"
+    assert stage_module.validate_generation_record(generation) == []
+
+
+def test_r2b1_failure_keeps_task_identity_and_failed_evidence(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class FailingPoll(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            self.calls.append(("poll_task", endpoint, task_id))
+            return {"task_id": task_id, "status": "FAILED"}
+
+    client = FailingPoll()
+    with pytest.raises(RuntimeError, match="ended with status FAILED"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    task_id = client.created_tasks[0]
+    task_dir = _stage_asset_root(tmp_path, valid_contract.asset_id) / task_id
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    assert generation["status"] == "FAILED"
+    assert generation["task_id"] == task_id
+    journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert journal["tasks"][0]["task_id"] == task_id
+    assert journal["tasks"][0]["state"] == "FAILED"
+
+
+def test_r2b1_stops_after_actual_credit_overrun(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class Overrun(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            return {"task_id": task_id, "status": "SUCCEEDED", "consumed_credits": 6}
+
+    client = Overrun()
+    with pytest.raises(RuntimeError, match="credit consumption"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    assert len(client.created_tasks) == 1
+    journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert journal["state"] == "FAILED"
+    assert journal["cumulative_consumed_credits"] == 6
+    assert journal["tasks"][0]["consumed_credits"] == 6
+
+
+def test_r2b1_rejects_duplicate_provider_task_ids(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class Duplicate(FakeMeshyClient):
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            self.calls.append(("create_task", endpoint, payload))
+            self.created_tasks.append("same-task")
+            return "same-task"
+
+    client = Duplicate()
+    with pytest.raises(ValueError, match="duplicate task id"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+    assert len(client.created_tasks) == 2
+    journal = json.loads(next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json")).read_text(encoding="utf-8"))
+    assert journal["tasks"][1]["task_id"] == "same-task"
+    assert journal["tasks"][1]["state"] == "FAILED"
+
+
+def test_r2b1_invalid_physical_root_makes_no_provider_or_stage_write(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (project / "assets").symlink_to(outside, target_is_directory=True)
+    client = FakeMeshyClient()
+    with pytest.raises(ValueError, match="symlink|staging|root"):
+        generate_batch(valid_contract, project, client, 100, **_generation_kwargs(tmp_path))
+    assert client.calls == []
+    assert not (outside / "_staging").exists()
 
 
 def test_plan_rejects_partial_reference_group_and_cli_output_is_repeatable(

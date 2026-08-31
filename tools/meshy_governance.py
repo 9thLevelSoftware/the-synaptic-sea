@@ -957,14 +957,14 @@ def _validate_existing_leaf(
             os.close(descriptor)
 
 
-def _create_sibling_temp(parent_fd: int, target_name: str) -> Tuple[int, str]:
+def _create_sibling_temp(parent_fd: int, target_name: str, mode: int) -> Tuple[int, str]:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
     for _attempt in range(32):
         name = f".{target_name}.{secrets.token_hex(12)}.tmp"
         try:
-            return os.open(name, flags, 0o600, dir_fd=parent_fd), name
+            return os.open(name, flags, mode, dir_fd=parent_fd), name
         except FileExistsError:
             continue
     raise OSError("could not allocate a unique Meshy temporary file")
@@ -979,15 +979,19 @@ def _write_all(descriptor: int, payload: bytes) -> None:
         offset += written
 
 
-def atomic_write_json(
+def _atomic_write_payload(
     path: Union[str, os.PathLike],
-    value: object,
+    payload: bytes,
     project_root: Union[str, os.PathLike],
     allowed_root: Union[str, os.PathLike],
+    mode: int = 0o600,
 ) -> None:
-    """Publish canonical JSON only through a pinned allowed directory FD."""
+    """Publish bytes only through a pinned allowed directory FD."""
 
-    payload = canonical_json_bytes(value)
+    if not isinstance(payload, bytes):
+        raise TypeError("Meshy payload must be bytes")
+    if not isinstance(mode, int) or isinstance(mode, bool) or mode <= 0 or mode & ~0o777:
+        raise ValueError("Meshy payload mode must be a positive permission mask")
     physical = physical_project_root(project_root)
     target = _path_from_explicit_root(project_root, physical, path)
     allowed = _path_from_explicit_root(project_root, physical, allowed_root)
@@ -1019,7 +1023,7 @@ def atomic_write_json(
         directory_fd = _open_pinned_parent(target, identities, flags)
         os.fsync(directory_fd)
         _validate_existing_leaf(directory_fd, target, identities)
-        temporary_fd, temporary_name = _create_sibling_temp(directory_fd, target.name)
+        temporary_fd, temporary_name = _create_sibling_temp(directory_fd, target.name, mode)
         try:
             _write_all(temporary_fd, payload)
             os.fsync(temporary_fd)
@@ -1069,10 +1073,35 @@ def atomic_write_json(
         raise cleanup_error.with_traceback(cleanup_traceback)
 
 
+def atomic_write_bytes(
+    path: Union[str, os.PathLike],
+    payload: bytes,
+    project_root: Union[str, os.PathLike],
+    allowed_root: Union[str, os.PathLike],
+    mode: int = 0o600,
+) -> None:
+    """Publish exact bytes through the same pinned-FD path as JSON."""
+
+    _atomic_write_payload(path, payload, project_root, allowed_root, mode=mode)
+
+
+def atomic_write_json(
+    path: Union[str, os.PathLike],
+    value: object,
+    project_root: Union[str, os.PathLike],
+    allowed_root: Union[str, os.PathLike],
+    mode: int = 0o600,
+) -> None:
+    """Publish canonical JSON through the pinned-FD byte publisher."""
+
+    _atomic_write_payload(path, canonical_json_bytes(value), project_root, allowed_root, mode=mode)
+
+
 __all__ = [
     "STAGING_RELATIVE",
     "PROTECTED_RUNTIME_RELATIVE_PATHS",
     "ProtectedSurfaceRecord",
+    "atomic_write_bytes",
     "atomic_write_json",
     "canonical_json_bytes",
     "file_sha256",

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synaptic-sea.invalid/schemas/meshy_batch_journal_v1.schema.json",
+  "title": "Synaptic Sea Meshy batch journal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_kind", "batch_id", "asset_id", "approval", "state", "tasks", "cumulative_consumed_credits"],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "assetId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "taskId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["view", "basename", "media_type", "byte_size", "sha256"],
+      "properties": {
+        "view": { "type": "string", "minLength": 1 },
+        "basename": { "type": "string", "pattern": "^[^/\\\\]+$", "minLength": 1 },
+        "media_type": { "enum": ["image/png", "image/jpeg"] },
+        "byte_size": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "protected": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "path", "sha256", "size"],
+      "properties": {
+        "type": { "enum": ["missing", "file", "directory"] },
+        "path": { "type": "string", "minLength": 1, "pattern": "^[^/].*" },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "requestReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["view", "basename", "media_type", "byte_size", "sha256"],
+      "properties": {
+        "view": { "type": "string", "minLength": 1 },
+        "basename": { "type": "string", "pattern": "^[^/\\\\]+$", "minLength": 1 },
+        "media_type": { "enum": ["image/png", "image/jpeg"] },
+        "byte_size": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "providerRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_type", "ai_model", "target_polycount", "should_texture", "target_formats"],
+      "oneOf": [
+        { "required": ["image_url"], "not": { "required": ["image_urls"] } },
+        { "required": ["image_urls"], "not": { "required": ["image_url"] } }
+      ],
+      "properties": {
+        "model_type": { "type": "string", "minLength": 1 },
+        "ai_model": { "type": "string", "minLength": 1 },
+        "target_polycount": { "type": "integer", "minimum": 1 },
+        "should_texture": { "const": false },
+        "target_formats": { "type": "array", "const": ["glb"] },
+        "image_url": { "$ref": "#/$defs/requestReference" },
+        "image_urls": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/requestReference" } }
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_id", "pricing_sha256", "provider_payload_sha256", "request", "references", "endpoint", "candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits", "output_license", "protected_snapshot", "created_at"],
+      "properties": {
+        "contract_sha256": { "$ref": "#/$defs/hash" },
+        "prompt_profile_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "prompt_profile_sha256": { "$ref": "#/$defs/hash" },
+        "prompt_packet_sha256": { "$ref": "#/$defs/hash" },
+        "pricing_id": { "type": "string", "minLength": 1 },
+        "pricing_sha256": { "$ref": "#/$defs/hash" },
+        "provider_payload_sha256": { "$ref": "#/$defs/hash" },
+        "request": { "$ref": "#/$defs/providerRequest" },
+        "references": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } },
+        "endpoint": { "enum": ["/openapi/v1/image-to-3d", "/openapi/v1/multi-image-to-3d"] },
+        "candidate_count": { "type": "integer", "minimum": 1 },
+        "cost_per_candidate": { "type": "integer", "minimum": 1 },
+        "maximum_credits": { "type": "integer", "minimum": 1 },
+        "approved_credits": { "type": "integer", "minimum": 1 },
+        "output_license": { "enum": ["paid-private", "free-cc-by-4.0"] },
+        "protected_snapshot": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/protected" } },
+        "created_at": { "type": "string", "minLength": 1 }
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["index", "task_id", "state", "consumed_credits", "error"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "task_id": { "$ref": "#/$defs/taskId" },
+        "state": { "enum": ["PENDING", "SUBMITTING", "SUCCEEDED", "FAILED"] },
+        "consumed_credits": { "type": ["integer", "null"], "minimum": 0 },
+        "error": { "type": ["string", "null"], "maxLength": 240 }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "document_kind": { "const": "meshy_batch_journal" },
+    "batch_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "asset_id": { "$ref": "#/$defs/assetId" },
+    "approval": { "$ref": "#/$defs/approval" },
+    "state": { "enum": ["APPROVED", "SUBMITTING", "COMPLETED", "FAILED"] },
+    "tasks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/task" } },
+    "cumulative_consumed_credits": { "type": "integer", "minimum": 0 }
+  }
+}

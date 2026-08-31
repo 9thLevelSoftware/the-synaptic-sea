@@ -363,6 +363,49 @@ def test_atomic_write_json_is_canonical_durable_and_rejects_existing_leaf_symlin
     assert victim.read_bytes() == b"unchanged"
 
 
+def test_atomic_write_bytes_publishes_exact_bytes_with_private_mode(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    target = root / STAGING / "tasks" / "payload.bin"
+    payload = b"not-json\x00exact"
+
+    governance.atomic_write_bytes(
+        target,
+        payload,
+        project_root=root,
+        allowed_root=root / STAGING,
+    )
+
+    assert target.read_bytes() == payload
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert not list(target.parent.glob(".*.tmp"))
+
+
+def test_atomic_write_bytes_uses_pinned_parent_and_preserves_primary_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    parent = root / STAGING / "safe"
+    parent.mkdir()
+    target = parent / "payload.bin"
+    moved = root / STAGING / "safe-moved"
+
+    def swap_after_validation(_target: Path) -> None:
+        parent.rename(moved)
+        parent.mkdir()
+
+    monkeypatch.setattr(governance, "_ATOMIC_VALIDATION_HOOK", swap_after_validation)
+    with pytest.raises(OSError, match="identity changed"):
+        governance.atomic_write_bytes(
+            target,
+            b"protected exact bytes",
+            project_root=root,
+            allowed_root=root / STAGING,
+        )
+    assert not target.exists()
+    assert not list(parent.glob(".*.tmp"))
+    assert not list(moved.glob(".*.tmp"))
+
+
 def test_atomic_write_rejects_unexpected_descendant_created_after_parent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
