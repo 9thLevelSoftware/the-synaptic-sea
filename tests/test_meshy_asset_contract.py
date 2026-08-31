@@ -13,6 +13,7 @@ from tools import meshy_asset_contract as contract_module
 from tools.meshy_asset_contract import (
     canonical_json_bytes,
     load_contract,
+    load_prompt_profile,
     render_prompt_packet,
     validate_contract,
 )
@@ -321,6 +322,50 @@ def test_load_contract_hashes_original_bytes(tmp_path: Path) -> None:
     contract = load_contract(path)
     assert contract.sha256 == hashlib.sha256(raw).hexdigest()
     assert contract.asset_id == document["asset_id"]
+    assert contract.snapshot_bytes() == canonical_json_bytes(document)
+
+
+def test_asset_contract_document_is_a_fresh_defensive_copy() -> None:
+    contract = load_contract(FIXTURES / "valid_loot_container.json")
+    first = contract.document
+    first["asset_id"] = "mutated"
+    first["generation"]["target_polycount"] = 1
+
+    second = contract.document
+    assert second["asset_id"] == "loot_container_derelict_v1"
+    assert second["generation"]["target_polycount"] == 3000
+    assert first is not second
+
+
+def test_prompt_profile_preserves_original_hash_and_defensive_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = Path(__file__).resolve().parents[1] / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    raw = source.read_bytes() + b"\n"
+    profile_path = tmp_path / source.name
+    profile_path.write_bytes(raw)
+    monkeypatch.setattr(contract_module, "PROMPT_PROFILE_ROOT", tmp_path, raising=False)
+
+    profile = load_prompt_profile("synaptic_sea_derelict_v1")
+    profile.document["profile_id"] = "mutated"
+
+    assert profile.profile_id == "synaptic_sea_derelict_v1"
+    assert profile.sha256 == hashlib.sha256(raw).hexdigest()
+    assert profile.document["profile_id"] == "synaptic_sea_derelict_v1"
+    assert profile.snapshot_bytes() != raw
+
+
+def test_prompt_profile_rejects_unknown_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = Path(__file__).resolve().parents[1] / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    profile = json.loads(source.read_text(encoding="utf-8"))
+    profile["unexpected"] = True
+    (tmp_path / source.name).write_text(json.dumps(profile), encoding="utf-8")
+    monkeypatch.setattr(contract_module, "PROMPT_PROFILE_ROOT", tmp_path, raising=False)
+
+    with pytest.raises(ValueError, match="unknown prompt profile field"):
+        load_prompt_profile("synaptic_sea_derelict_v1")
 
 
 def test_prompt_packet_uses_immutable_snapshot_after_document_mutation() -> None:
@@ -513,6 +558,8 @@ def test_prompt_packet_has_exact_keys_and_does_not_alias_generation() -> None:
     assert set(packet) == {
         "asset_id",
         "contract_sha256",
+        "prompt_profile_id",
+        "prompt_profile_sha256",
         "reference_prompt",
         "negative_prompt",
         "geometry_request",
@@ -522,6 +569,9 @@ def test_prompt_packet_has_exact_keys_and_does_not_alias_generation() -> None:
     }
     packet["geometry_request"]["target_polycount"] = 99
     assert contract.document["generation"]["target_polycount"] == 3000
+    assert packet["prompt_profile_id"] == "synaptic_sea_derelict_v1"
+    profile_path = Path(__file__).resolve().parents[1] / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    assert packet["prompt_profile_sha256"] == hashlib.sha256(profile_path.read_bytes()).hexdigest()
     assert "Grounded utilitarian industrial science fiction" in packet["reference_prompt"]
     assert "Grounded utilitarian industrial science fiction" in packet["texture_prompt"]
     assert "texture_resolution=1024" in packet["blender_cleanup_brief"]

@@ -14,6 +14,11 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, cast
 
+try:
+    from tools.meshy_governance import strict_load_json_bytes
+except ModuleNotFoundError:  # pragma: no cover - supports direct script execution
+    from meshy_governance import strict_load_json_bytes
+
 SCHEMA_VERSION = "1.0.0"
 DOCUMENT_KIND = "ai_asset_contract"
 DEFAULT_PROMPT_PROFILE = "synaptic_sea_derelict_v1"
@@ -35,8 +40,13 @@ _PROMPT_PROFILE_FIELDS = (
     "reference_prompt_template",
     "neutral_presentation",
     "texture_guidance",
+    "generation_policy",
+    "review_matrix",
 )
+_PROMPT_GENERATION_POLICY_FIELDS = ("geometry_first", "should_texture", "target_formats")
+_PROMPT_REVIEW_MATRIX_FIELDS = ("seeds", "lighting_modes", "camera", "environment")
 _PROMPT_TEMPLATE_FIELDS = {"style_vocabulary", "visual_brief", "neutral_presentation"}
+_PROMPT_PROFILE_MAX_BYTES = 1024 * 1024
 
 _REQUIRED_TOP_FIELDS = (
     "schema_version",
@@ -86,19 +96,60 @@ _NESTED_FIELDS: dict[str, tuple[str, ...]] = {
 @dataclass(frozen=True)
 class AssetContract:
     path: Path
-    document: dict[str, Any]
     sha256: str
     _snapshot: bytes = field(repr=False, compare=False)
 
     @property
-    def asset_id(self) -> str:
-        return str(self._snapshot_document()["asset_id"])
+    def document(self) -> dict[str, Any]:
+        """Return a fresh defensive copy of the immutable contract snapshot."""
 
-    def _snapshot_document(self) -> dict[str, Any]:
+        return self.document_copy()
+
+    def snapshot_bytes(self) -> bytes:
+        """Return the canonical immutable contract snapshot bytes."""
+
+        return self._snapshot
+
+    def document_copy(self) -> dict[str, Any]:
         document = json.loads(self._snapshot)
         if not isinstance(document, dict):  # pragma: no cover - load_contract validates this
             raise ValueError("contract snapshot must be an object")
         return document
+
+    @property
+    def asset_id(self) -> str:
+        return str(self.document_copy()["asset_id"])
+
+    def _snapshot_document(self) -> dict[str, Any]:
+        return self.document_copy()
+
+
+@dataclass(frozen=True)
+class PromptProfile:
+    path: Path
+    profile_id: str
+    sha256: str
+    _snapshot: bytes = field(repr=False, compare=False)
+
+    @property
+    def document(self) -> dict[str, Any]:
+        """Return a fresh defensive copy of the immutable profile snapshot."""
+
+        return self.document_copy()
+
+    def snapshot_bytes(self) -> bytes:
+        """Return the immutable canonical profile snapshot bytes."""
+
+        return self._snapshot
+
+    def document_copy(self) -> dict[str, Any]:
+        document = json.loads(self._snapshot)
+        if not isinstance(document, dict):  # pragma: no cover - strict loader validates this
+            raise ValueError("prompt profile snapshot must be an object")
+        return document
+
+    def _snapshot_document(self) -> dict[str, Any]:
+        return self.document_copy()
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -462,16 +513,19 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def _validate_prompt_profile(profile: object, profile_id: str) -> dict[str, Any]:
     if not isinstance(profile, dict):
         raise ValueError("prompt profile must be an object")
-    for field_name in _PROMPT_PROFILE_FIELDS:
-        if field_name not in profile:
-            raise ValueError(f"prompt profile missing field: {field_name}")
+    expected_fields = set(_PROMPT_PROFILE_FIELDS)
+    actual_fields = set(profile)
+    for field_name in sorted(expected_fields - actual_fields):
+        raise ValueError(f"prompt profile missing field: {field_name}")
+    for field_name in sorted(actual_fields - expected_fields):
+        raise ValueError(f"unknown prompt profile field: {field_name}")
     if profile.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(f"prompt profile schema_version must be {SCHEMA_VERSION}")
     if profile.get("document_kind") != "asset_prompt_profile":
         raise ValueError("prompt profile document_kind must be asset_prompt_profile")
     if profile.get("profile_id") != profile_id:
         raise ValueError("prompt profile_id must match requested profile")
-    for field_name in _PROMPT_PROFILE_FIELDS[3:]:
+    for field_name in _PROMPT_PROFILE_FIELDS[3:7]:
         value = profile.get(field_name)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"prompt profile {field_name} must be a non-empty string")
@@ -498,45 +552,81 @@ def _validate_prompt_profile(profile: object, profile_id: str) -> dict[str, Any]
             "prompt profile reference_prompt_template missing fields: "
             f"{missing}"
         )
+
+    generation_policy = profile.get("generation_policy")
+    if not isinstance(generation_policy, dict):
+        raise ValueError("prompt profile generation_policy must be an object")
+    if set(generation_policy) != set(_PROMPT_GENERATION_POLICY_FIELDS):
+        raise ValueError("prompt profile generation_policy fields are not exact")
+    if generation_policy.get("geometry_first") is not True:
+        raise ValueError("prompt profile generation_policy.geometry_first must be true")
+    if generation_policy.get("should_texture") is not False:
+        raise ValueError("prompt profile generation_policy.should_texture must be false")
+    if generation_policy.get("target_formats") != ["glb"]:
+        raise ValueError("prompt profile generation_policy.target_formats must equal [glb]")
+
+    review_matrix = profile.get("review_matrix")
+    if not isinstance(review_matrix, dict):
+        raise ValueError("prompt profile review_matrix must be an object")
+    if set(review_matrix) != set(_PROMPT_REVIEW_MATRIX_FIELDS):
+        raise ValueError("prompt profile review_matrix fields are not exact")
+    if review_matrix.get("seeds") != REVIEW_SEEDS:
+        raise ValueError("prompt profile review_matrix.seeds must equal [42, 777]")
+    if review_matrix.get("lighting_modes") != LIGHTING_MODES:
+        raise ValueError(
+            "prompt profile review_matrix.lighting_modes must equal "
+            "[normal, emergency, dark]"
+        )
+    if review_matrix.get("camera") != "locked_isometric":
+        raise ValueError("prompt profile review_matrix.camera must be locked_isometric")
+    if review_matrix.get("environment") != "breach_field":
+        raise ValueError("prompt profile review_matrix.environment must be breach_field")
     return profile
 
 
-def _load_prompt_profile(profile_id: object) -> dict[str, Any]:
+def load_prompt_profile(profile_id: object) -> PromptProfile:
+    """Load an exact, immutable prompt profile with its original-byte hash."""
+
     if not isinstance(profile_id, str) or IDENTIFIER_RE.fullmatch(profile_id) is None:
         raise ValueError("prompt profile id must be a lowercase identifier")
 
     root = Path(PROMPT_PROFILE_ROOT)
     try:
-        resolved_root = root.resolve()
-        requested_path = (resolved_root / f"{profile_id}.json").resolve()
-    except OSError as exc:
+        resolved_root = root.expanduser().resolve(strict=True)
+        requested_path = resolved_root / f"{profile_id}.json"
+    except (OSError, RuntimeError) as exc:
         raise ValueError(f"prompt profile path could not be resolved: {exc}") from exc
-    try:
-        requested_path.relative_to(resolved_root)
-    except ValueError as exc:
-        raise ValueError("prompt profile path escapes the profile directory") from exc
-    if not requested_path.is_file():
-        raise ValueError(f"prompt profile {profile_id!r} not found")
+    if not resolved_root.is_dir():
+        raise ValueError("prompt profile root must be a directory")
+    if not requested_path.parent == resolved_root:
+        raise ValueError("prompt profile path escapes the profile directory")
 
     try:
-        raw = requested_path.read_bytes()
-    except OSError as exc:
+        profile, raw = strict_load_json_bytes(
+            requested_path, f"prompt profile {profile_id!r}", _PROMPT_PROFILE_MAX_BYTES
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        message = str(exc)
+        if "is missing" in message:
+            raise ValueError(f"prompt profile {profile_id!r} not found") from exc
+        if "must be an object" in message:
+            raise ValueError("prompt profile must be an object") from exc
+        if isinstance(exc, ValueError) and message.startswith("prompt profile"):
+            raise
         raise ValueError(f"prompt profile {profile_id!r} could not be read: {exc}") from exc
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
-    try:
-        profile = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
-    except RecursionError as exc:
-        raise ValueError(
-            f"invalid JSON in prompt profile {profile_id!r}: maximum nesting depth exceeded"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
-    except ValueError as exc:
-        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
-    return _validate_prompt_profile(profile, profile_id)
+    _validate_prompt_profile(profile, profile_id)
+    return PromptProfile(
+        path=requested_path,
+        profile_id=profile_id,
+        sha256=hashlib.sha256(raw).hexdigest(),
+        _snapshot=canonical_json_bytes(profile),
+    )
+
+
+# Preserve the old private spelling for callers that used the implementation
+# detail before PromptProfile became part of the public contract.
+def _load_prompt_profile(profile_id: object) -> PromptProfile:
+    return load_prompt_profile(profile_id)
 
 
 def load_contract(path: Path) -> AssetContract:
@@ -562,10 +652,9 @@ def load_contract(path: Path) -> AssetContract:
     if errors:
         raise ValueError("; ".join(errors))
     return AssetContract(
-        source,
-        document,
-        hashlib.sha256(raw).hexdigest(),
-        canonical_json_bytes(document),
+        path=source,
+        sha256=hashlib.sha256(raw).hexdigest(),
+        _snapshot=canonical_json_bytes(document),
     )
 
 
@@ -586,20 +675,21 @@ def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
     states = ", ".join(document["required_states"])
     budget = document["budget"]
     profile_id = document.get("prompt_profile", DEFAULT_PROMPT_PROFILE)
-    profile = _load_prompt_profile(profile_id)
-    template = cast(str, profile["reference_prompt_template"])
+    profile = load_prompt_profile(profile_id)
+    profile_document = profile._snapshot_document()
+    template = cast(str, profile_document["reference_prompt_template"])
     try:
         reference_prompt = template.format(
-            style_vocabulary=profile["style_vocabulary"],
+            style_vocabulary=profile_document["style_vocabulary"],
             visual_brief=brief.strip(),
-            neutral_presentation=profile["neutral_presentation"],
+            neutral_presentation=profile_document["neutral_presentation"],
         )
     except (IndexError, KeyError, ValueError) as exc:
         raise ValueError(
             f"invalid prompt profile reference_prompt_template: {exc}"
         ) from exc
     texture_prompt = (
-        f"{profile['style_vocabulary']} {profile['texture_guidance']}"
+        f"{profile_document['style_vocabulary']} {profile_document['texture_guidance']}"
     ).strip()
     cleanup = (
         f"Create the canonical Blender master at exact dimensions {dimensions} meters; "
@@ -617,8 +707,10 @@ def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
     return {
         "asset_id": contract.asset_id,
         "contract_sha256": contract.sha256,
+        "prompt_profile_id": profile.profile_id,
+        "prompt_profile_sha256": profile.sha256,
         "reference_prompt": reference_prompt,
-        "negative_prompt": profile["neutral_presentation"],
+        "negative_prompt": profile_document["neutral_presentation"],
         "geometry_request": document["generation"],
         "texture_prompt": texture_prompt,
         "blender_cleanup_brief": cleanup,
