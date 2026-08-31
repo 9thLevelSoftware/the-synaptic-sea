@@ -48,11 +48,13 @@ python3 -m pytest -q \
 
 ```bash
 BLENDER="${BLENDER:-/opt/homebrew/bin/blender}"
+TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
+TASK_DIR="assets/_staging/meshy/loot_container_derelict_v1/${TASK_ID}"
 "$BLENDER" --background --factory-startup --python tools/meshy_blender_validate.py -- \
   --project-root . \
   --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
-  --task-dir assets/_staging/meshy/loot_container_derelict_v1/<task-id> \
-  --glb assets/_staging/meshy/loot_container_derelict_v1/<task-id>/cleaned.glb
+  --task-dir "$TASK_DIR" \
+  --glb "$TASK_DIR/cleaned.glb"
 ```
 
 Expected eventual marker (not currently claimed):
@@ -64,10 +66,12 @@ MESHY BLENDER VALIDATION PASS asset=loot_container_derelict_v1 triangles=<n> mat
 ### Locked-isometric runtime review — PENDING Task 11
 
 ```bash
+TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
+TASK_DIR="assets/_staging/meshy/stalker_v1/${TASK_ID}"
 python3 tools/meshy_runtime_review.py \
   --project-root . \
   --contract data/asset_generation/contracts/stalker_v1.json \
-  --task-dir assets/_staging/meshy/stalker_v1/<task-id> \
+  --task-dir "$TASK_DIR" \
   --preview-dir artifacts/validation-previews/meshy/stalker_v1
 ```
 
