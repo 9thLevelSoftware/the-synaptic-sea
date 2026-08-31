@@ -10,6 +10,7 @@ All provider URLs and credentials stay outside staged evidence.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -20,9 +21,10 @@ import sys
 import tempfile
 import time
 import uuid
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import date as _date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -33,11 +35,26 @@ from tools.meshy_asset_contract import (  # noqa: E402
     load_contract,
     render_prompt_packet,
 )
+from tools import meshy_governance as governance  # noqa: E402
 
 
 ENDPOINTS = {
     "image_to_3d": "/openapi/v1/image-to-3d",
     "multi_image_to_3d": "/openapi/v1/multi-image-to-3d",
+}
+
+DEFAULT_PRICING_PATH = (
+    Path(__file__).resolve().parents[1] / "data/asset_generation/meshy_pricing_v1.json"
+)
+_PRICING_MAX_BYTES = 1024 * 1024
+_REFERENCE_FILE_MAX_BYTES = 16 * 1024 * 1024
+_REFERENCE_TOTAL_MAX_BYTES = 48 * 1024 * 1024
+_PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
+_JPEG_SIGNATURE = bytes((255, 216))
+_REFERENCE_EXTENSIONS = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
 }
 
 # These are the provider's fixed pilot estimates used by the credit gate.  A
@@ -176,6 +193,444 @@ def _copy_mapping(value: Mapping[str, Any]) -> Dict[str, Any]:
     return json.loads(canonical_json_bytes(dict(value)).decode("utf-8"))
 
 
+@dataclass(frozen=True)
+class ReferenceInput:
+    """One validated reference with transient bytes hidden from evidence."""
+
+    view: str
+    basename: str
+    media_type: str
+    byte_size: int
+    sha256: str
+    _bytes: bytes = field(repr=False, compare=False)
+
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "view": self.view,
+            "basename": self.basename,
+            "media_type": self.media_type,
+            "byte_size": self.byte_size,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True)
+class ReferenceInputs:
+    """Immutable, contract-ordered reference snapshot."""
+
+    references: Tuple[ReferenceInput, ...]
+
+    def __iter__(self):
+        return iter(self.references)
+
+    def __len__(self) -> int:
+        return len(self.references)
+
+    def __getitem__(self, index: int) -> ReferenceInput:
+        return self.references[index]
+
+    @property
+    def metadata(self) -> Tuple[Dict[str, Any], ...]:
+        return tuple(reference.metadata for reference in self.references)
+
+
+# A descriptive alias for callers that prefer the singular resolved-record name.
+ResolvedReference = ReferenceInput
+
+
+@dataclass(frozen=True)
+class PricingRecord:
+    """Immutable pricing document and the hash of its original source bytes."""
+
+    path: Path
+    pricing_id: str
+    checked_at: str
+    expires_at: str
+    source_url: str
+    sha256: str
+    _snapshot: bytes = field(repr=False, compare=False)
+
+    @property
+    def document(self) -> Dict[str, Any]:
+        return self.document_copy()
+
+    def snapshot_bytes(self) -> bytes:
+        return self._snapshot
+
+    def document_copy(self) -> Dict[str, Any]:
+        value = json.loads(self._snapshot.decode("utf-8"))
+        if not isinstance(value, dict):  # pragma: no cover - strict loader validates this
+            raise ValueError("pricing snapshot must be an object")
+        return value
+
+    def cost_for(
+        self,
+        contract_or_mode: Union[AssetContract, str, None] = None,
+        model_type: Optional[str] = None,
+        ai_model: Optional[str] = None,
+        should_texture: object = False,
+        *,
+        mode: Optional[str] = None,
+        texture_state: Optional[str] = None,
+    ) -> int:
+        if contract_or_mode is None:
+            contract_or_mode = mode
+        if texture_state is not None:
+            should_texture = False if texture_state == "untextured" else True
+        if isinstance(contract_or_mode, AssetContract):
+            generation = contract_or_mode._snapshot_document().get("generation")
+            if not isinstance(generation, dict):
+                raise ValueError("contract generation must be an object")
+            mode = generation.get("mode")
+            model_type = generation.get("model_type")
+            ai_model = generation.get("ai_model")
+            should_texture = generation.get("should_texture")
+        else:
+            mode = contract_or_mode
+        if not isinstance(mode, str) or not isinstance(model_type, str) or not isinstance(ai_model, str):
+            raise ValueError("unknown Meshy pricing combination")
+        texture_state = "untextured" if should_texture is False else None
+        if texture_state is None:
+            raise ValueError("unknown Meshy pricing combination")
+        costs = self.document_copy()["costs"]
+        try:
+            value = costs[mode][model_type][ai_model][texture_state]
+        except (KeyError, TypeError):
+            raise ValueError(
+                "unknown Meshy pricing combination: {0}/{1}/{2}/{3}".format(
+                    mode, model_type, ai_model, texture_state
+                )
+            )
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError("unknown Meshy pricing combination")
+        return value
+
+
+@dataclass(frozen=True)
+class TransientProviderRequest:
+    """Request payload held as private canonical bytes and redacted evidence."""
+
+    provider_payload_sha256: str
+    _payload_snapshot: bytes = field(repr=False, compare=False)
+    _redacted_snapshot: bytes = field(repr=False, compare=False)
+
+    @property
+    def payload(self) -> Dict[str, Any]:
+        value = json.loads(self._payload_snapshot.decode("utf-8"))
+        if not isinstance(value, dict):  # pragma: no cover - built internally
+            raise ValueError("provider request snapshot must be an object")
+        return value
+
+    @property
+    def provider_payload(self) -> Dict[str, Any]:
+        return self.payload
+
+    @property
+    def request(self) -> Dict[str, Any]:
+        return self.payload
+
+    def __getitem__(self, key: str) -> Any:
+        """Permit transient request[key] without making it JSON serializable."""
+        return self.payload[key]
+
+    @property
+    def redacted_request(self) -> Dict[str, Any]:
+        value = json.loads(self._redacted_snapshot.decode("utf-8"))
+        if not isinstance(value, dict):  # pragma: no cover - built internally
+            raise ValueError("redacted request snapshot must be an object")
+        return value
+
+    @property
+    def request_evidence(self) -> Dict[str, Any]:
+        return self.redacted_request
+
+
+def _coerce_iso_date(value: object, label: str) -> _date:
+    if isinstance(value, _date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = _date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError(f"{label} must be an ISO date") from exc
+        if parsed.isoformat() != value:
+            raise ValueError(f"{label} must be an ISO date")
+        return parsed
+    raise ValueError(f"{label} must be an ISO date")
+
+
+def _pricing_document_is_exact(document: Mapping[str, Any]) -> None:
+    expected_top = {
+        "schema_version",
+        "document_kind",
+        "pricing_id",
+        "checked_at",
+        "expires_at",
+        "source_url",
+        "costs",
+    }
+    if set(document) != expected_top:
+        raise ValueError("pricing document fields are not exact")
+    if document["schema_version"] != "1.0.0":
+        raise ValueError("pricing schema_version must be 1.0.0")
+    if document["document_kind"] != "meshy_pricing":
+        raise ValueError("pricing document_kind must be meshy_pricing")
+    pricing_id = document["pricing_id"]
+    if pricing_id != "meshy_api_2026_08_31":
+        raise ValueError("pricing_id must be meshy_api_2026_08_31")
+    if not isinstance(pricing_id, str) or _TASK_ID_RE.fullmatch(pricing_id) is None:
+        raise ValueError("pricing_id must be a safe identifier")
+    checked_text = document["checked_at"]
+    expires_text = document["expires_at"]
+    if checked_text != "2026-08-31" or expires_text != "2026-09-30":
+        raise ValueError("pricing checked_at/expires_at do not match the versioned record")
+    checked = _coerce_iso_date(checked_text, "pricing checked_at")
+    expires = _coerce_iso_date(expires_text, "pricing expires_at")
+    if checked >= expires:
+        raise ValueError("pricing checked_at must precede expires_at")
+    if document["source_url"] != "https://docs.meshy.ai/api/pricing.md":
+        raise ValueError("pricing source_url is not the official Meshy pricing URL")
+    expected_costs = {
+        "image_to_3d": {
+            "smart-topology": {"meshy-t2": {"untextured": 5}},
+        },
+        "multi_image_to_3d": {
+            "standard": {
+                "meshy-7": {"untextured": 20},
+                "latest": {"untextured": 20},
+            },
+        },
+    }
+    if document["costs"] != expected_costs:
+        raise ValueError("pricing costs contain an unknown or unsupported combination")
+
+
+def load_pricing(
+    path: Optional[Path] = None,
+    today: object = None,
+    date: object = None,
+) -> PricingRecord:
+    """Load the exact official pricing record, failing closed after expiry."""
+
+    source = Path(path) if path is not None else DEFAULT_PRICING_PATH
+    try:
+        document, raw = governance.strict_load_json_bytes(
+            source, "Meshy pricing", _PRICING_MAX_BYTES
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError(f"Meshy pricing could not be read: {exc}") from exc
+    _pricing_document_is_exact(document)
+    if today is not None and date is not None:
+        raise ValueError("pass only one of today or date")
+    as_of = _coerce_iso_date(
+        today if today is not None else date if date is not None else _date.today(),
+        "pricing today",
+    )
+    expires = _coerce_iso_date(document["expires_at"], "pricing expires_at")
+    if as_of >= expires:
+        raise ValueError("Meshy pricing is expired")
+    return PricingRecord(
+        path=source,
+        pricing_id=document["pricing_id"],
+        checked_at=document["checked_at"],
+        expires_at=document["expires_at"],
+        source_url=document["source_url"],
+        sha256=hashlib.sha256(raw).hexdigest(),
+        _snapshot=canonical_json_bytes(document),
+    )
+
+
+# Explicit aliases keep the loader discoverable without creating alternate behavior.
+load_meshy_pricing = load_pricing
+load_pricing_record = load_pricing
+
+
+def _resolve_reference_root(reference_root: Union[str, os.PathLike]) -> Path:
+    candidate = Path(reference_root).expanduser()
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"reference root could not be resolved: {exc}") from exc
+    if not resolved.is_dir():
+        raise ValueError("reference root must be a directory")
+    return resolved
+
+
+def _parse_reference_specs(
+    reference_specs: Union[Mapping[str, str], Iterable[Union[str, Tuple[str, str]]]]
+) -> Dict[str, str]:
+    if isinstance(reference_specs, Mapping):
+        entries = list(reference_specs.items())
+    elif isinstance(reference_specs, str):
+        entries = [reference_specs]
+    else:
+        try:
+            entries = list(reference_specs)
+        except TypeError as exc:
+            raise ValueError("reference specs must be a mapping or repeated view=filename") from exc
+    parsed: Dict[str, str] = {}
+    for entry in entries:
+        if isinstance(entry, str):
+            if entry.count("=") != 1:
+                raise ValueError("reference spec must be view=filename")
+            view, filename = entry.split("=", 1)
+        elif isinstance(entry, (tuple, list)) and len(entry) == 2:
+            view, filename = entry
+        else:
+            raise ValueError("reference spec must be view=filename")
+        if not isinstance(view, str) or not isinstance(filename, str) or not view or not filename:
+            raise ValueError("reference spec view and filename must be strings")
+        if view in parsed:
+            raise ValueError(f"duplicate reference view: {view}")
+        parsed[view] = filename
+    return parsed
+
+
+def _validate_reference_filename(filename: str) -> str:
+    if (
+        not filename
+        or any(ord(character) == 0 for character in filename)
+        or "/" in filename
+        or chr(92) in filename
+        or filename in {".", ".."}
+    ):
+        raise ValueError("reference filename must be basename-only without slash or dot traversal")
+    candidate = Path(filename)
+    if candidate.is_absolute() or candidate.name != filename:
+        raise ValueError("reference filename must be basename-only")
+    suffix = candidate.suffix.lower()
+    if suffix not in _REFERENCE_EXTENSIONS:
+        raise ValueError("reference filename extension must be .png, .jpg, or .jpeg")
+    return suffix
+
+
+def _reference_magic_matches(suffix: str, payload: bytes) -> bool:
+    if suffix == ".png":
+        return payload.startswith(_PNG_SIGNATURE)
+    return payload.startswith(_JPEG_SIGNATURE)
+
+
+def resolve_reference_inputs(
+    contract: AssetContract,
+    reference_root: Union[str, os.PathLike],
+    reference_specs: Union[Mapping[str, str], Iterable[Union[str, Tuple[str, str]]]],
+) -> ReferenceInputs:
+    """Read and hash exactly the contract's ordered reference views."""
+
+    document = contract._snapshot_document()
+    references = document.get("references")
+    required_views = references.get("required_views") if isinstance(references, dict) else None
+    if not isinstance(required_views, list) or not all(isinstance(view, str) for view in required_views):
+        raise ValueError("contract references.required_views must be a list")
+    parsed = _parse_reference_specs(reference_specs)
+    required_set = set(required_views)
+    if set(parsed) != required_set:
+        missing = sorted(required_set - set(parsed))
+        extra = sorted(set(parsed) - required_set)
+        detail = []
+        if missing:
+            detail.append("missing " + ", ".join(missing))
+        if extra:
+            detail.append("unknown " + ", ".join(extra))
+        raise ValueError("reference views must match contract exactly" + (": " + "; ".join(detail) if detail else ""))
+
+    root = _resolve_reference_root(reference_root)
+    result = []
+    aggregate_size = 0
+    for view in required_views:
+        filename = parsed[view]
+        suffix = _validate_reference_filename(filename)
+        path = root / filename
+        try:
+            governance._reject_symlink_components_below(root, path, f"reference {view}")
+            payload = governance._read_bounded_regular_file(
+                path, f"reference {view}", _REFERENCE_FILE_MAX_BYTES
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            raise ValueError(f"reference {view} could not be read: {exc}") from exc
+        aggregate_size += len(payload)
+        if aggregate_size > _REFERENCE_TOTAL_MAX_BYTES:
+            raise ValueError("references exceed maximum aggregate size")
+        if not _reference_magic_matches(suffix, payload):
+            raise ValueError(f"reference {view} has an invalid {suffix} signature")
+        result.append(
+            ReferenceInput(
+                view=view,
+                basename=filename,
+                media_type=_REFERENCE_EXTENSIONS[suffix],
+                byte_size=len(payload),
+                sha256=hashlib.sha256(payload).hexdigest(),
+                _bytes=bytes(payload),
+            )
+        )
+    return ReferenceInputs(tuple(result))
+
+
+def _base_provider_request(contract: AssetContract) -> Dict[str, Any]:
+    generation = contract._snapshot_document().get("generation")
+    if not isinstance(generation, dict):
+        raise ValueError("contract generation must be an object")
+    mode = generation.get("mode")
+    if mode not in ENDPOINTS:
+        raise ValueError("unsupported Meshy generation mode")
+    request_fields = (
+        "model_type",
+        "ai_model",
+        "target_polycount",
+        "should_texture",
+        "target_formats",
+    )
+    if any(field_name not in generation for field_name in request_fields):
+        raise ValueError("contract generation is missing a request field")
+    return _copy_mapping({field_name: generation[field_name] for field_name in request_fields})
+
+
+def _reference_record_for_evidence(reference: ReferenceInput) -> Dict[str, Any]:
+    return reference.metadata
+
+
+def build_transient_provider_request(
+    contract: AssetContract, reference_inputs: ReferenceInputs
+) -> TransientProviderRequest:
+    """Build a provider payload while retaining data URIs only in private bytes."""
+
+    if not isinstance(reference_inputs, ReferenceInputs):
+        try:
+            reference_inputs = ReferenceInputs(tuple(reference_inputs))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("reference inputs must be resolved reference records") from exc
+    required_views = contract._snapshot_document()["references"]["required_views"]
+    if tuple(reference.view for reference in reference_inputs) != tuple(required_views):
+        raise ValueError("reference inputs must match contract order exactly")
+    if not reference_inputs.references:
+        raise ValueError("at least one reference input is required")
+
+    payload = _base_provider_request(contract)
+    evidence = [_reference_record_for_evidence(reference) for reference in reference_inputs]
+    data_uris = [
+        "data:{0};base64,{1}".format(
+            reference.media_type, base64.b64encode(reference._bytes).decode("ascii")
+        )
+        for reference in reference_inputs
+    ]
+    generation = contract._snapshot_document()["generation"]
+    if generation["mode"] == "image_to_3d":
+        payload["image_url"] = data_uris[0]
+        redacted = _copy_mapping(payload)
+        redacted["image_url"] = evidence[0]
+    else:
+        payload["image_urls"] = data_uris
+        redacted = _copy_mapping(payload)
+        redacted["image_urls"] = evidence
+    payload_snapshot = canonical_json_bytes(payload)
+    return TransientProviderRequest(
+        provider_payload_sha256=hashlib.sha256(payload_snapshot).hexdigest(),
+        _payload_snapshot=payload_snapshot,
+        _redacted_snapshot=canonical_json_bytes(redacted),
+    )
+
+
 def _generation_details(contract: AssetContract) -> Tuple[int, str, Dict[str, Any], int, str]:
     generation = contract.document.get("generation")
     if not isinstance(generation, dict):
@@ -242,22 +697,75 @@ def _reject_static_symlink_components(path: Path, label: str) -> None:
 
 
 def plan_generation(
-    contract: AssetContract, project_root: Path, client: Any = None
+    contract: AssetContract,
+    project_root: Path,
+    client: Any = None,
+    pricing_file: Optional[Path] = None,
+    reference_root: Optional[Path] = None,
+    reference_specs: object = None,
+    today: object = None,
+    date: object = None,
 ) -> Dict[str, Any]:
-    """Return a read-only generation plan without consulting the client."""
+    """Return a deterministic, read-only generation plan.
+
+    ``client`` and ``project_root`` remain accepted for caller compatibility,
+    but planning never consults the client or writes through the project root.
+    """
+
     del project_root, client
-    candidate_count, endpoint, request, estimated_cost, prompt_hash = _generation_details(contract)
-    cost_per_candidate = estimated_cost // candidate_count
-    return {
+    document = contract._snapshot_document()
+    generation = document.get("generation")
+    if not isinstance(generation, dict):
+        raise ValueError("contract generation must be an object")
+    mode = generation.get("mode")
+    if mode not in ENDPOINTS:
+        raise ValueError("unsupported Meshy generation mode")
+    candidate_count = generation.get("candidate_count")
+    if not isinstance(candidate_count, int) or isinstance(candidate_count, bool) or candidate_count <= 0:
+        raise ValueError("candidate_count must be a positive integer")
+    base_request = _base_provider_request(contract)
+    endpoint = ENDPOINTS[mode]
+    prompt_packet = render_prompt_packet(contract)
+    prompt_hash = hashlib.sha256(canonical_json_bytes(prompt_packet)).hexdigest()
+    pricing = load_pricing(pricing_file, today=today, date=date)
+    cost_per_candidate = pricing.cost_for(contract)
+    required_views = document["references"]["required_views"]
+    has_root = reference_root is not None
+    has_specs = reference_specs is not None
+    if has_root != has_specs:
+        raise ValueError("reference-root and reference specs must be supplied together")
+
+    result: Dict[str, Any] = {
         "asset_id": contract.asset_id,
+        "required_views": list(required_views),
+        "references_resolved": False,
         "candidate_count": candidate_count,
         "endpoint": endpoint,
         "estimated_cost_per_candidate": cost_per_candidate,
-        "estimated_cost": estimated_cost,
-        "maximum_credits": estimated_cost,
+        "estimated_cost": candidate_count * cost_per_candidate,
+        "cost_per_candidate": cost_per_candidate,
+        "maximum_credits": candidate_count * cost_per_candidate,
+        "pricing_id": pricing.pricing_id,
+        "pricing_sha256": pricing.sha256,
+        "pricing_source_url": pricing.source_url,
+        "pricing_checked_at": pricing.checked_at,
+        "pricing_expires_at": pricing.expires_at,
+        "contract_sha256": contract.sha256,
+        "prompt_profile_id": prompt_packet["prompt_profile_id"],
+        "prompt_profile_sha256": prompt_packet["prompt_profile_sha256"],
         "prompt_packet_sha256": prompt_hash,
-        "request": request,
+        "request": base_request,
     }
+    if has_root and has_specs:
+        resolved = resolve_reference_inputs(contract, reference_root, reference_specs)
+        transient = build_transient_provider_request(contract, resolved)
+        result["references_resolved"] = True
+        result["resolved_references"] = [
+            reference.metadata for reference in resolved.references
+        ]
+        result["request"] = transient.redacted_request
+        result["provider_payload_sha256"] = transient.provider_payload_sha256
+    return result
 
 
 def _safe_task_id(task_id: object) -> str:
@@ -566,10 +1074,18 @@ def _build_parser() -> argparse.ArgumentParser:
     plan = subparsers.add_parser("plan")
     plan.add_argument("--project-root", type=Path, required=True)
     plan.add_argument("--contract", type=Path, required=True)
+    plan.add_argument("--pricing-file", type=Path, default=None)
+    plan.add_argument("--reference-root", type=Path, default=None)
+    plan.add_argument("--reference", action="append", default=None, metavar="VIEW=FILENAME")
     generate = subparsers.add_parser("generate")
     generate.add_argument("--project-root", type=Path, required=True)
     generate.add_argument("--contract", type=Path, required=True)
     generate.add_argument("--approved-credits", type=int, required=True)
+    # Accepted here for forward-compatible invocation; R2B will bind them to
+    # execution.  Plan mode is the only R2A path that consumes them.
+    generate.add_argument("--pricing-file", type=Path, default=None)
+    generate.add_argument("--reference-root", type=Path, default=None)
+    generate.add_argument("--reference", action="append", default=None, metavar="VIEW=FILENAME")
     return parser
 
 
@@ -578,7 +1094,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         contract = load_contract(args.contract)
         if args.command == "plan":
-            result = plan_generation(contract, args.project_root)
+            result = plan_generation(
+                contract,
+                args.project_root,
+                pricing_file=args.pricing_file,
+                reference_root=args.reference_root,
+                reference_specs=args.reference,
+            )
         elif args.command == "generate":
             # Reject a zero/negative ceiling before constructing a client.  This
             # makes the safety gate useful even when no API key is configured.
@@ -604,9 +1126,20 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "DEFAULT_PRICING_PATH",
     "ENDPOINTS",
     "MeshyClient",
+    "PricingRecord",
+    "ReferenceInput",
+    "ReferenceInputs",
+    "ResolvedReference",
+    "TransientProviderRequest",
+    "build_transient_provider_request",
     "generate_batch",
+    "load_meshy_pricing",
+    "load_pricing",
+    "load_pricing_record",
     "plan_generation",
+    "resolve_reference_inputs",
     "resume_batch",
 ]
