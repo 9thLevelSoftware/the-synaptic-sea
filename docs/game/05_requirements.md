@@ -1615,6 +1615,188 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ---
 
+# Meshy-to-Blender candidate asset pipeline (ADR-0057)
+
+These requirements govern the candidate-only AI asset workflow described in
+`features/ai_candidate_asset_pipeline.md`. They are approved as documentation governance in
+Task 1; the commands below remain pending until their implementation tasks land. Meshy output
+is never a runtime source, and promotion is always a separate reviewed task.
+
+## REQ-AIAP-001: Contract-first candidate generation
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: process / content pipeline
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - A validated repository asset contract exists before reference packaging, candidate
+    selection, Blender cleanup, or any Meshy API call.
+  - The contract defines category, gameplay role, dimensions and tolerance, pivot, `+Z`
+    forward, required states, budgets, generation policy, reference requirements, and runtime
+    review matrix.
+  - Threat and kit triangle budgets use an explicit range plus scope (such as per organism,
+    per module, or final kit), not one ambiguous scalar.
+  - `hull_tendril_kit_v1` and `biomatter_swarm_kit_v1` include explicit `deliverables`/`kit_parts`
+    arrays that enumerate their required modules, parts, and state coverage.
+  - Structural floors, walls, doors, ramps, sockets, collision, and damage topology are not
+    valid Meshy generation targets.
+- Verification:
+  - `python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`
+    (PENDING Task 3/4 implementation).
+
+## REQ-AIAP-002: Reference consistency and rights
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: content pipeline / legal
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - Required reference views are separate image files, consistent in subject, proportions, and
+    design language; a collage cannot substitute for separate views.
+  - Every input records a hash and an explicit rights/license state before upload.
+  - Missing, inconsistent, unlicensed, or ambiguous references fail closed before provider
+    submission.
+- Verification:
+  - Focused contract/staging tests (PENDING Tasks 2–7).
+
+## REQ-AIAP-003: Explicit credit gate
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: process / cost control
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - A live provider balance is checked for every paid generation batch.
+  - An explicit maximum credit ceiling is approved and the requested batch is refused when its
+    estimate exceeds either the live balance or that ceiling.
+  - No API call occurs without the validated contract, validated reference rights, live
+    balance, explicit maximum credit ceiling, and immutable request record.
+- Verification:
+  - Focused staging tests (PENDING Task 5/6).
+
+## REQ-AIAP-004: Immutable staged provenance
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: technical / provenance
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - Candidate output is isolated below `assets/_staging/meshy/<asset_id>/<task_id>/`.
+  - The immutable generation record captures the exact request, contract/reference/prompt
+    hashes, provider/model/task identifiers, output hashes and sizes, license state, and
+    consumed credits.
+  - Records contain no API key, authorization header, signed download URL, or local secret.
+  - Later review and validation decisions do not rewrite immutable generation facts.
+- Verification:
+  - Focused staging/provenance tests (PENDING Tasks 5–7).
+
+## REQ-AIAP-005: Blender canonical master
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: technical / content pipeline
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - A selected candidate becomes eligible for runtime review only after a canonical external
+    Blender master exists.
+  - Blender owns the editable master, topology, UVs, exact meter scale, pivot, `+Z` forward,
+    alternate-state derivation, rig, cleanup, and normalized GLB export.
+  - All alternate states derive from one Blender master; independently generated states are
+    rejected.
+  - Blender does not become the owner of runtime collision, navigation, sockets, integrity,
+    or damage topology.
+- Verification:
+  - Blender master/validator tests and command (PENDING Task 8).
+
+## REQ-AIAP-006: Geometry, material, and scale gate
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: technical / visual quality
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - The normalized GLB is independently re-imported and checked against the contract for
+    readable geometry, dimensions/tolerance, exact scale, pivot, `+Z` forward, applied
+    transforms, triangle/material budgets, UVs, and permitted state/rig policy.
+  - Texturing is downstream of candidate selection and geometry/UV approval; baked lighting,
+    floating helpers, collision nodes, and forbidden structural gameplay geometry fail the
+    visual export gate.
+  - The validator reports failures rather than silently decimating, retopologizing, or
+    otherwise changing the Blender master.
+- Verification:
+  - `BLENDER="${BLENDER:-/opt/homebrew/bin/blender}"` normalized-GLB validator command in
+    `docs/game/06_validation_plan.md` (PENDING Task 8).
+
+## REQ-AIAP-007: Wrapper-owned gameplay concerns
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057, ADR-0052
+- Type: gameplay / technical boundary
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - Godot wrappers and repository runtime data remain authoritative for collision, navigation,
+    sockets/connectors, integrity/damage state, VFX/animation integration, and gameplay
+    bindings.
+  - Meshy candidates and Blender visual exports do not author or replace structural floors,
+    walls, doors, ramps, sockets, collision, or damage topology.
+  - Existing ADR-0052 prop GLB+sidecar records, generated visual-binding index, placement IDs,
+    fallbacks, and wrapper contracts remain intact; visual refresh cannot duplicate gameplay
+    state.
+- Verification:
+  - Existing Godot visual/catalog, structural-loader, and generated-seed smokes plus future
+    runtime-binding smokes (PENDING integration Task 11).
+
+## REQ-AIAP-008: Locked-isometric seed review
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: runtime validation
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - A temporary overlay reviews the staged normalized GLB in the real `breach_field` derelict
+    environment with the production locked-isometric camera.
+  - The review runs seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting,
+    for exactly six cases, and publishes captures only after all six pass.
+  - Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks runtime acceptance
+    unless that exact output is explicitly classified by the validation plan.
+- Verification:
+  - `python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in
+    `docs/game/06_validation_plan.md` (PENDING Task 11).
+
+## REQ-AIAP-009: No automatic promotion
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057
+- Type: process / release safety
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - Generation, candidate review, Blender cleanup, validation, and runtime review cannot write
+    to `assets/imported`, `data/combat/threat_visual_catalog.json`,
+    `data/props/visual_bindings.generated.json`, or `scenes/wrappers`.
+  - Any sidecar, generated-index, catalog, or wrapper change is a reviewable proposal only.
+  - Promotion occurs only through a separate reviewed task with an explicit diff and complete
+    provenance.
+- Verification:
+  - Protected-path and no-promotion tests (PENDING Tasks 5–7, 10–11).
+
+## REQ-AIAP-010: Skill pressure-test compliance
+
+- Source: `features/ai_candidate_asset_pipeline.md`, ADR-0057, implementation plan Task 12
+- Type: process / operator workflow
+- Priority: must
+- Status: Approved (Task 1 governance)
+- Acceptance criteria:
+  - The umbrella asset skill refuses structural Meshy routes, independently generated states,
+    premature texturing, non-humanoid auto-rigging, collage substitution, contract bypass,
+    unbounded spending, and self-authored relabeling of AI provenance.
+  - The skill routes operators to the repository contract, staging, Blender, runtime-review,
+    and separate-promotion gates rather than improvising direct Godot import.
+  - Fresh RED/GREEN pressure scenarios demonstrate behavior change and are recorded as proof.
+- Verification:
+  - Skill pressure-test proof and focused scenarios (PENDING Task 12).
+
+---
+
 # Socketed enclosed interiors (ADR-0053)
 
 ## REQ-ENC-001: Topology construction emits connector-grown occupancy with shared edges

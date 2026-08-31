@@ -4,6 +4,98 @@
 
 No completion claim without fresh validation evidence.
 
+## Meshy-to-Blender candidate asset pipeline (ADR-0057) — PENDING
+
+Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
+Requirements: `REQ-AIAP-001` through `REQ-AIAP-010`.
+
+Task 1 records the governance and exact eventual commands below. Every command in this
+section is **PENDING** until its corresponding implementation task lands; none is a Task 1
+pass claim. No Meshy API call, paid generation, asset generation, or promotion is run by Task 1.
+
+The authority chain is:
+
+```text
+asset contract -> consistent separate reference images -> Meshy candidate
+  -> Blender canonical master/cleanup -> staged validation
+  -> temporary Godot overlay locked-isometric review -> separate reviewed promotion
+```
+
+The review overlay must use the real `breach_field` environment and locked-isometric camera at
+seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting. Meshy cannot author
+structural floors, walls, doors, ramps, sockets, collision, or damage topology. Blender owns
+the editable master, topology, UV, exact meter scale, pivot, `+Z` forward, state derivation,
+rig, and export. Godot wrappers/runtime data own collision, navigation, sockets, integrity,
+VFX/animation integration, and gameplay bindings.
+
+### Contract and focused Python tests — PENDING Tasks 2–7, 9–11
+
+```bash
+python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json
+python3 -m pytest -q \
+  tests/test_meshy_asset_contract.py \
+  tests/test_meshy_stage.py \
+  tests/test_meshy_candidate_review.py \
+  tests/test_meshy_blender_tools.py \
+  tests/test_meshy_texture_packet.py \
+  tests/test_meshy_promotion_packet.py \
+  tests/test_meshy_runtime_review.py \
+  tests/test_validate_prop_visual_bindings.py \
+  tests/test_prop_visual_metadata.py
+```
+
+### Blender normalized-GLB validator — PENDING Task 8
+
+```bash
+BLENDER="${BLENDER:-/opt/homebrew/bin/blender}"
+"$BLENDER" --background --factory-startup --python tools/meshy_blender_validate.py -- \
+  --project-root . \
+  --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
+  --task-dir assets/_staging/meshy/loot_container_derelict_v1/<task-id> \
+  --glb assets/_staging/meshy/loot_container_derelict_v1/<task-id>/cleaned.glb
+```
+
+Expected eventual marker (not currently claimed):
+
+```text
+MESHY BLENDER VALIDATION PASS asset=loot_container_derelict_v1 triangles=<n> materials=<n>
+```
+
+### Locked-isometric runtime review — PENDING Task 11
+
+```bash
+python3 tools/meshy_runtime_review.py \
+  --project-root . \
+  --contract data/asset_generation/contracts/stalker_v1.json \
+  --task-dir assets/_staging/meshy/stalker_v1/<task-id> \
+  --preview-dir artifacts/validation-previews/meshy/stalker_v1
+```
+
+Expected eventual marker (not currently claimed):
+
+```text
+MESHY RUNTIME REVIEW PASS asset=stalker_v1 seeds=42,777 lighting=normal,emergency,dark captures=6
+```
+
+### Existing Godot regression smokes — PENDING integration of Task 11
+
+These existing production-environment smokes remain regression evidence. Task 1 does not claim
+new or current passes for them:
+
+```bash
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path . --script res://scripts/validation/threat_visual_catalog_smoke.gd
+"$GODOT" --headless --path . --script res://scripts/validation/structural_live_loader_smoke.gd
+"$GODOT" --headless --path . --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+```
+
+Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines block runtime acceptance unless the
+existing validation plan explicitly classifies that exact output. A pass marker or zero exit
+code does not override an unclassified diagnostic. Generation and review must not write to
+`assets/imported`, `data/combat/threat_visual_catalog.json`,
+`data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is a separate
+reviewed task.
+
 ## Godot binary
 
 `/Users/christopherwilloughby/.local/bin/godot-4.6.2`
