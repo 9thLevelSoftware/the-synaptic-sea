@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
+import inspect
 import json
+import os
+import pickle
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +22,10 @@ from tools.meshy_asset_contract import (
 )
 from tools import meshy_stage as stage_module
 from tools.meshy_stage import (
+    PricingRecord,
+    ReferenceInput,
+    ReferenceInputs,
+    TransientProviderRequest,
     build_transient_provider_request,
     generate_batch,
     load_pricing,
@@ -406,6 +414,34 @@ def test_cli_generate_subcommand_requires_approved_credits(tmp_path: Path) -> No
     assert not (tmp_path / STAGING_RELATIVE).exists()
 
 
+def test_cli_generate_rejects_unwired_pricing_and_reference_flags(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "tools/meshy_stage.py",
+        "generate",
+        "--project-root",
+        str(tmp_path),
+        "--contract",
+        str(CONTRACT_PATH),
+        "--approved-credits",
+        "20",
+    ]
+    for extra in (
+        ["--pricing-file", "/does/not/exist"],
+        ["--reference-root", "/does/not/exist"],
+        ["--reference", "front=bad.png"],
+    ):
+        result = subprocess.run(
+            command + extra,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode != 0
+        assert "unrecognized arguments" in result.stderr
+
+
 def _write_reference_set(root: Path, suffix: str = ".png") -> dict[str, str]:
     payload = b"\x89PNG\r\n\x1a\nreference"
     names = {
@@ -429,6 +465,131 @@ def test_reference_inputs_are_ordered_hashed_and_basename_only(tmp_path: Path, v
     assert all(len(item.sha256) == 64 for item in resolved.references)
     with pytest.raises(ValueError, match="basename|slash"):
         resolve_reference_inputs(valid_contract, tmp_path, {**names, "front": "nested/front.png"})
+
+
+def test_reference_inputs_reject_duplicate_basenames(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = {view: "same.png" for view in valid_contract.document["references"]["required_views"]}
+    (tmp_path / "same.png").write_bytes(b"\x89PNG\r\n\x1a\nreference")
+
+    with pytest.raises(ValueError, match="duplicate.*basename"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+
+def test_reference_inputs_reject_duplicate_content_and_file_identity(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = _write_reference_set(tmp_path)
+    shared = b"\x89PNG\r\n\x1a\nidentical"
+    (tmp_path / names["front"]).write_bytes(shared)
+    (tmp_path / names["side"]).write_bytes(shared)
+    with pytest.raises(ValueError, match="duplicate.*(content|sha|file)"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+    names = _write_reference_set(tmp_path)
+    (tmp_path / names["side"]).unlink()
+    os.link(str(tmp_path / names["front"]), str(tmp_path / names["side"]))
+    with pytest.raises(ValueError, match="duplicate.*(content|sha|file)"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+
+def test_transient_builder_rejects_fabricated_reference_hash(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = _write_reference_set(tmp_path)
+    resolved = resolve_reference_inputs(valid_contract, tmp_path, names)
+    first = resolved[0]
+    forged = ReferenceInput(
+        view=first.view,
+        basename=first.basename,
+        media_type=first.media_type,
+        byte_size=first.byte_size,
+        sha256="0" * 64,
+        _bytes=first._bytes,
+    )
+    fabricated = ReferenceInputs((forged,) + tuple(resolved.references[1:]))
+
+    with pytest.raises(ValueError, match="sha256|hash"):
+        build_transient_provider_request(valid_contract, fabricated)
+
+
+def test_multi_image_provider_requires_front_as_first_view(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    document = _multi_image_contract(tmp_path, valid_contract).document
+    document["references"]["required_views"] = ["side", "front", "back", "three_quarter"]
+    path = tmp_path / "side-first-contract.json"
+    path.write_bytes(canonical_json_bytes(document))
+    contract = load_contract(path)
+
+    with pytest.raises(ValueError, match="front"):
+        plan_generation(contract, tmp_path, today="2026-09-01")
+
+
+def test_jpeg_requires_minimal_end_marker(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = _write_reference_set(tmp_path, suffix=".jpg")
+    for name in names.values():
+        (tmp_path / name).write_bytes(b"\xff\xd8\xff\xe0not-terminated")
+
+    with pytest.raises(ValueError, match="signature"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+
+def test_pricing_cost_for_has_only_strict_contract_argument(
+    valid_contract: AssetContract,
+) -> None:
+    pricing = load_pricing(today="2026-09-01")
+
+    assert list(inspect.signature(PricingRecord.cost_for).parameters) == ["self", "contract"]
+    assert pricing.cost_for(valid_contract) == 5
+    with pytest.raises(TypeError):
+        pricing.cost_for(valid_contract, texture_state="textured")
+    with pytest.raises(TypeError):
+        pricing.cost_for("image_to_3d")
+
+
+def test_pricing_loader_rejects_float_cost_leaf(tmp_path: Path) -> None:
+    pricing_document = json.loads(
+        (ROOT / "data/asset_generation/meshy_pricing_v1.json").read_text(encoding="utf-8")
+    )
+    pricing_document["costs"]["image_to_3d"]["smart-topology"]["meshy-t2"]["untextured"] = 5.0
+    pricing_path = tmp_path / "float-pricing.json"
+    pricing_path.write_bytes(canonical_json_bytes(pricing_document))
+
+    with pytest.raises(ValueError, match="positive integer|exact integer"):
+        load_pricing(pricing_path, today="2026-09-01")
+
+
+def test_secret_bearing_capsules_are_not_serializable_or_path_leaking(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = _write_reference_set(tmp_path)
+    resolved = resolve_reference_inputs(valid_contract, tmp_path, names)
+    transient = build_transient_provider_request(valid_contract, resolved)
+    pricing = load_pricing(today="2026-09-01")
+
+    assert not dataclasses.is_dataclass(ReferenceInput)
+    assert not dataclasses.is_dataclass(ReferenceInputs)
+    assert not dataclasses.is_dataclass(TransientProviderRequest)
+    assert not dataclasses.is_dataclass(PricingRecord)
+    assert not hasattr(transient, "provider_payload")
+    assert not hasattr(transient, "request")
+    assert not hasattr(stage_module, "ResolvedReference")
+    assert not hasattr(stage_module, "load_meshy_pricing")
+    assert not hasattr(stage_module, "load_pricing_record")
+    assert not hasattr(pricing, "path")
+
+    for capsule in (resolved[0], resolved, transient, pricing):
+        assert str(tmp_path) not in repr(capsule)
+        with pytest.raises(TypeError):
+            json.dumps(capsule)
+        with pytest.raises(TypeError):
+            dataclasses.asdict(capsule)
+        with pytest.raises(TypeError):
+            pickle.dumps(capsule)
 
 
 def test_transient_request_hashes_payload_but_redacts_data_uris(
@@ -458,7 +619,7 @@ def test_pricing_is_strict_expiring_and_fails_unknown_combinations(
     assert pricing.expires_at == "2026-09-30"
     with pytest.raises(ValueError, match="expired"):
         load_pricing(pricing_path, today="2026-10-01")
-    with pytest.raises(ValueError, match="unknown|unsupported"):
+    with pytest.raises(TypeError):
         pricing.cost_for("multi_image_to_3d", "standard", "not-a-model", False)
 
 
@@ -479,6 +640,8 @@ def test_plan_binds_pricing_and_reference_metadata_without_paths_or_data_uris(
     assert result["references_resolved"] is True
     assert result["cost_per_candidate"] == 5
     assert result["maximum_credits"] == 20
+    assert "estimated_cost_per_candidate" not in result
+    assert "estimated_cost" not in result
     assert result["provider_payload_sha256"]
     assert result["resolved_references"][0]["view"] == "front"
     assert "data:image" not in encoded
@@ -536,8 +699,10 @@ def test_reference_jpeg_magic_extension_and_symlink_fail_closed(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:
     names = _write_reference_set(tmp_path)
-    for name in names.values():
-        (tmp_path / name).write_bytes(bytes((255, 216, 255, 224)) + b"jpeg")
+    for index, name in enumerate(names.values()):
+        (tmp_path / name).write_bytes(
+            bytes((255, 216, 255, 224)) + b"jpeg" + bytes([index]) + bytes((255, 217))
+        )
     jpeg_names = {view: name[:-4] + ".jpg" for view, name in names.items()}
     for old_name, new_name in zip(names.values(), jpeg_names.values()):
         (tmp_path / old_name).rename(tmp_path / new_name)

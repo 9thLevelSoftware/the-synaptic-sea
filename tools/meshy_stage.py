@@ -21,7 +21,6 @@ import sys
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass, field
 from datetime import date as _date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
@@ -50,7 +49,7 @@ _PRICING_MAX_BYTES = 1024 * 1024
 _REFERENCE_FILE_MAX_BYTES = 16 * 1024 * 1024
 _REFERENCE_TOTAL_MAX_BYTES = 48 * 1024 * 1024
 _PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
-_JPEG_SIGNATURE = bytes((255, 216))
+_JPEG_SIGNATURE = bytes((255, 216, 255))
 _REFERENCE_EXTENSIONS = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -193,16 +192,61 @@ def _copy_mapping(value: Mapping[str, Any]) -> Dict[str, Any]:
     return json.loads(canonical_json_bytes(dict(value)).decode("utf-8"))
 
 
-@dataclass(frozen=True)
-class ReferenceInput:
+class _SealedCapsule:
+    """Base for transient records that must not be serialized or mutated."""
+
+    __slots__ = ()
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("capsule records are immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("capsule records are immutable")
+
+    def __reduce_ex__(self, protocol: Any) -> Any:
+        raise TypeError("capsule records cannot be pickled")
+
+
+class ReferenceInput(_SealedCapsule):
     """One validated reference with transient bytes hidden from evidence."""
 
-    view: str
-    basename: str
-    media_type: str
-    byte_size: int
-    sha256: str
-    _bytes: bytes = field(repr=False, compare=False)
+    __slots__ = ("_view", "_basename", "_media_type", "_byte_size", "_sha256", "_bytes")
+
+    def __init__(
+        self,
+        view: str,
+        basename: str,
+        media_type: str,
+        byte_size: int,
+        sha256: str,
+        _bytes: bytes,
+    ) -> None:
+        object.__setattr__(self, "_view", view)
+        object.__setattr__(self, "_basename", basename)
+        object.__setattr__(self, "_media_type", media_type)
+        object.__setattr__(self, "_byte_size", byte_size)
+        object.__setattr__(self, "_sha256", sha256)
+        object.__setattr__(self, "_bytes", _bytes)
+
+    @property
+    def view(self) -> str:
+        return self._view
+
+    @property
+    def basename(self) -> str:
+        return self._basename
+
+    @property
+    def media_type(self) -> str:
+        return self._media_type
+
+    @property
+    def byte_size(self) -> int:
+        return self._byte_size
+
+    @property
+    def sha256(self) -> str:
+        return self._sha256
 
     @property
     def metadata(self) -> Dict[str, Any]:
@@ -214,12 +258,24 @@ class ReferenceInput:
             "sha256": self.sha256,
         }
 
+    def __repr__(self) -> str:
+        return (
+            "ReferenceInput(view={0!r}, basename={1!r}, media_type={2!r}, "
+            "byte_size={3!r}, sha256={4!r})"
+        ).format(self.view, self.basename, self.media_type, self.byte_size, self.sha256)
 
-@dataclass(frozen=True)
-class ReferenceInputs:
+
+class ReferenceInputs(_SealedCapsule):
     """Immutable, contract-ordered reference snapshot."""
 
-    references: Tuple[ReferenceInput, ...]
+    __slots__ = ("_references",)
+
+    def __init__(self, references: Iterable[ReferenceInput]) -> None:
+        object.__setattr__(self, "_references", tuple(references))
+
+    @property
+    def references(self) -> Tuple[ReferenceInput, ...]:
+        return self._references
 
     def __iter__(self):
         return iter(self.references)
@@ -234,29 +290,64 @@ class ReferenceInputs:
     def metadata(self) -> Tuple[Dict[str, Any], ...]:
         return tuple(reference.metadata for reference in self.references)
 
+    def __repr__(self) -> str:
+        return "ReferenceInputs(count={0})".format(len(self.references))
 
-# A descriptive alias for callers that prefer the singular resolved-record name.
-ResolvedReference = ReferenceInput
 
-
-@dataclass(frozen=True)
-class PricingRecord:
+class PricingRecord(_SealedCapsule):
     """Immutable pricing document and the hash of its original source bytes."""
 
-    path: Path
-    pricing_id: str
-    checked_at: str
-    expires_at: str
-    source_url: str
-    sha256: str
-    _snapshot: bytes = field(repr=False, compare=False)
+    __slots__ = (
+        "_pricing_id",
+        "_checked_at",
+        "_expires_at",
+        "_source_url",
+        "_sha256",
+        "_snapshot",
+    )
+
+    def __init__(
+        self,
+        pricing_id: str,
+        checked_at: str,
+        expires_at: str,
+        source_url: str,
+        sha256: str,
+        _snapshot: bytes,
+    ) -> None:
+        object.__setattr__(self, "_pricing_id", pricing_id)
+        object.__setattr__(self, "_checked_at", checked_at)
+        object.__setattr__(self, "_expires_at", expires_at)
+        object.__setattr__(self, "_source_url", source_url)
+        object.__setattr__(self, "_sha256", sha256)
+        object.__setattr__(self, "_snapshot", _snapshot)
+
+    @property
+    def pricing_id(self) -> str:
+        return self._pricing_id
+
+    @property
+    def checked_at(self) -> str:
+        return self._checked_at
+
+    @property
+    def expires_at(self) -> str:
+        return self._expires_at
+
+    @property
+    def source_url(self) -> str:
+        return self._source_url
+
+    @property
+    def sha256(self) -> str:
+        return self._sha256
 
     @property
     def document(self) -> Dict[str, Any]:
         return self.document_copy()
 
     def snapshot_bytes(self) -> bytes:
-        return self._snapshot
+        return bytes(self._snapshot)
 
     def document_copy(self) -> Dict[str, Any]:
         value = json.loads(self._snapshot.decode("utf-8"))
@@ -264,35 +355,34 @@ class PricingRecord:
             raise ValueError("pricing snapshot must be an object")
         return value
 
-    def cost_for(
+    def cost_for(self, contract: AssetContract) -> int:
+        if not isinstance(contract, AssetContract):
+            raise TypeError("cost_for requires an AssetContract")
+        generation = contract._snapshot_document().get("generation")
+        if not isinstance(generation, dict):
+            raise ValueError("contract generation must be an object")
+        return self._cost_for_values(
+            generation.get("mode"),
+            generation.get("model_type"),
+            generation.get("ai_model"),
+            generation.get("should_texture"),
+        )
+
+    def _cost_for_values(
         self,
-        contract_or_mode: Union[AssetContract, str, None] = None,
-        model_type: Optional[str] = None,
-        ai_model: Optional[str] = None,
-        should_texture: object = False,
-        *,
-        mode: Optional[str] = None,
-        texture_state: Optional[str] = None,
+        mode: object,
+        model_type: object,
+        ai_model: object,
+        should_texture: object,
     ) -> int:
-        if contract_or_mode is None:
-            contract_or_mode = mode
-        if texture_state is not None:
-            should_texture = False if texture_state == "untextured" else True
-        if isinstance(contract_or_mode, AssetContract):
-            generation = contract_or_mode._snapshot_document().get("generation")
-            if not isinstance(generation, dict):
-                raise ValueError("contract generation must be an object")
-            mode = generation.get("mode")
-            model_type = generation.get("model_type")
-            ai_model = generation.get("ai_model")
-            should_texture = generation.get("should_texture")
-        else:
-            mode = contract_or_mode
-        if not isinstance(mode, str) or not isinstance(model_type, str) or not isinstance(ai_model, str):
+        if (
+            not isinstance(mode, str)
+            or not isinstance(model_type, str)
+            or not isinstance(ai_model, str)
+            or should_texture is not False
+        ):
             raise ValueError("unknown Meshy pricing combination")
-        texture_state = "untextured" if should_texture is False else None
-        if texture_state is None:
-            raise ValueError("unknown Meshy pricing combination")
+        texture_state = "untextured"
         costs = self.document_copy()["costs"]
         try:
             value = costs[mode][model_type][ai_model][texture_state]
@@ -306,14 +396,37 @@ class PricingRecord:
             raise ValueError("unknown Meshy pricing combination")
         return value
 
+    def __repr__(self) -> str:
+        return (
+            "PricingRecord(pricing_id={0!r}, checked_at={1!r}, expires_at={2!r}, "
+            "source_url={3!r}, sha256={4!r})"
+        ).format(
+            self.pricing_id,
+            self.checked_at,
+            self.expires_at,
+            self.source_url,
+            self.sha256,
+        )
 
-@dataclass(frozen=True)
-class TransientProviderRequest:
+
+class TransientProviderRequest(_SealedCapsule):
     """Request payload held as private canonical bytes and redacted evidence."""
 
-    provider_payload_sha256: str
-    _payload_snapshot: bytes = field(repr=False, compare=False)
-    _redacted_snapshot: bytes = field(repr=False, compare=False)
+    __slots__ = ("_provider_payload_sha256", "_payload_snapshot", "_redacted_snapshot")
+
+    def __init__(
+        self,
+        provider_payload_sha256: str,
+        _payload_snapshot: bytes,
+        _redacted_snapshot: bytes,
+    ) -> None:
+        object.__setattr__(self, "_provider_payload_sha256", provider_payload_sha256)
+        object.__setattr__(self, "_payload_snapshot", _payload_snapshot)
+        object.__setattr__(self, "_redacted_snapshot", _redacted_snapshot)
+
+    @property
+    def provider_payload_sha256(self) -> str:
+        return self._provider_payload_sha256
 
     @property
     def payload(self) -> Dict[str, Any]:
@@ -323,27 +436,16 @@ class TransientProviderRequest:
         return value
 
     @property
-    def provider_payload(self) -> Dict[str, Any]:
-        return self.payload
-
-    @property
-    def request(self) -> Dict[str, Any]:
-        return self.payload
-
-    def __getitem__(self, key: str) -> Any:
-        """Permit transient request[key] without making it JSON serializable."""
-        return self.payload[key]
-
-    @property
     def redacted_request(self) -> Dict[str, Any]:
         value = json.loads(self._redacted_snapshot.decode("utf-8"))
         if not isinstance(value, dict):  # pragma: no cover - built internally
             raise ValueError("redacted request snapshot must be an object")
         return value
 
-    @property
-    def request_evidence(self) -> Dict[str, Any]:
-        return self.redacted_request
+    def __repr__(self) -> str:
+        return "TransientProviderRequest(provider_payload_sha256={0!r})".format(
+            self.provider_payload_sha256
+        )
 
 
 def _coerce_iso_date(value: object, label: str) -> _date:
@@ -358,6 +460,18 @@ def _coerce_iso_date(value: object, label: str) -> _date:
             raise ValueError(f"{label} must be an ISO date")
         return parsed
     raise ValueError(f"{label} must be an ISO date")
+
+
+def _validate_pricing_cost_leaves(value: object, label: str = "pricing costs") -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("{0} must contain exact positive integer leaves".format(label))
+    for key, child in value.items():
+        child_label = "{0}.{1}".format(label, key)
+        if isinstance(child, Mapping):
+            _validate_pricing_cost_leaves(child, child_label)
+            continue
+        if not isinstance(child, int) or isinstance(child, bool) or child <= 0:
+            raise ValueError("{0} must be an exact positive integer".format(child_label))
 
 
 def _pricing_document_is_exact(document: Mapping[str, Any]) -> None:
@@ -402,6 +516,7 @@ def _pricing_document_is_exact(document: Mapping[str, Any]) -> None:
             },
         },
     }
+    _validate_pricing_cost_leaves(document["costs"])
     if document["costs"] != expected_costs:
         raise ValueError("pricing costs contain an unknown or unsupported combination")
 
@@ -431,7 +546,6 @@ def load_pricing(
     if as_of >= expires:
         raise ValueError("Meshy pricing is expired")
     return PricingRecord(
-        path=source,
         pricing_id=document["pricing_id"],
         checked_at=document["checked_at"],
         expires_at=document["expires_at"],
@@ -439,11 +553,6 @@ def load_pricing(
         sha256=hashlib.sha256(raw).hexdigest(),
         _snapshot=canonical_json_bytes(document),
     )
-
-
-# Explicit aliases keep the loader discoverable without creating alternate behavior.
-load_meshy_pricing = load_pricing
-load_pricing_record = load_pricing
 
 
 def _resolve_reference_root(reference_root: Union[str, os.PathLike]) -> Path:
@@ -508,7 +617,25 @@ def _validate_reference_filename(filename: str) -> str:
 def _reference_magic_matches(suffix: str, payload: bytes) -> bool:
     if suffix == ".png":
         return payload.startswith(_PNG_SIGNATURE)
-    return payload.startswith(_JPEG_SIGNATURE)
+    return payload.startswith(_JPEG_SIGNATURE) and payload.endswith(bytes((255, 217)))
+
+
+def _provider_required_views(contract: AssetContract) -> list[str]:
+    document = contract._snapshot_document()
+    references = document.get("references")
+    required_views = references.get("required_views") if isinstance(references, dict) else None
+    if (
+        not isinstance(required_views, list)
+        or not required_views
+        or not all(isinstance(view, str) for view in required_views)
+        or len(required_views) != len(set(required_views))
+    ):
+        raise ValueError("contract references.required_views must be a non-empty unique list")
+    generation = document.get("generation")
+    mode = generation.get("mode") if isinstance(generation, dict) else None
+    if mode == "multi_image_to_3d" and required_views[0] != "front":
+        raise ValueError("multi-image provider requires front as the first reference view")
+    return required_views
 
 
 def resolve_reference_inputs(
@@ -518,11 +645,7 @@ def resolve_reference_inputs(
 ) -> ReferenceInputs:
     """Read and hash exactly the contract's ordered reference views."""
 
-    document = contract._snapshot_document()
-    references = document.get("references")
-    required_views = references.get("required_views") if isinstance(references, dict) else None
-    if not isinstance(required_views, list) or not all(isinstance(view, str) for view in required_views):
-        raise ValueError("contract references.required_views must be a list")
+    required_views = _provider_required_views(contract)
     parsed = _parse_reference_specs(reference_specs)
     required_set = set(required_views)
     if set(parsed) != required_set:
@@ -538,8 +661,15 @@ def resolve_reference_inputs(
     root = _resolve_reference_root(reference_root)
     result = []
     aggregate_size = 0
+    seen_basenames = set()
+    seen_file_ids = set()
+    seen_hashes = set()
     for view in required_views:
         filename = parsed[view]
+        basename_key = filename.casefold()
+        if basename_key in seen_basenames:
+            raise ValueError("duplicate reference basename across views")
+        seen_basenames.add(basename_key)
         suffix = _validate_reference_filename(filename)
         path = root / filename
         try:
@@ -547,20 +677,29 @@ def resolve_reference_inputs(
             payload = governance._read_bounded_regular_file(
                 path, f"reference {view}", _REFERENCE_FILE_MAX_BYTES
             )
+            file_stat = path.stat()
         except (OSError, TypeError, ValueError) as exc:
             raise ValueError(f"reference {view} could not be read: {exc}") from exc
+        file_identity = (file_stat.st_dev, file_stat.st_ino)
+        if file_identity in seen_file_ids:
+            raise ValueError("duplicate reference file identity across views")
+        seen_file_ids.add(file_identity)
         aggregate_size += len(payload)
         if aggregate_size > _REFERENCE_TOTAL_MAX_BYTES:
             raise ValueError("references exceed maximum aggregate size")
         if not _reference_magic_matches(suffix, payload):
             raise ValueError(f"reference {view} has an invalid {suffix} signature")
+        digest = hashlib.sha256(payload).hexdigest()
+        if digest in seen_hashes:
+            raise ValueError("duplicate reference content SHA-256 across views")
+        seen_hashes.add(digest)
         result.append(
             ReferenceInput(
                 view=view,
                 basename=filename,
                 media_type=_REFERENCE_EXTENSIONS[suffix],
                 byte_size=len(payload),
-                sha256=hashlib.sha256(payload).hexdigest(),
+                sha256=digest,
                 _bytes=bytes(payload),
             )
         )
@@ -568,6 +707,7 @@ def resolve_reference_inputs(
 
 
 def _base_provider_request(contract: AssetContract) -> Dict[str, Any]:
+    _provider_required_views(contract)
     generation = contract._snapshot_document().get("generation")
     if not isinstance(generation, dict):
         raise ValueError("contract generation must be an object")
@@ -586,6 +726,67 @@ def _base_provider_request(contract: AssetContract) -> Dict[str, Any]:
     return _copy_mapping({field_name: generation[field_name] for field_name in request_fields})
 
 
+def _validate_resolved_reference_inputs(
+    contract: AssetContract, reference_inputs: ReferenceInputs
+) -> list[ReferenceInput]:
+    if type(reference_inputs) is not ReferenceInputs:
+        raise ValueError("reference inputs must be resolved reference records")
+    required_views = _provider_required_views(contract)
+    records = reference_inputs.references
+    if not records:
+        raise ValueError("at least one reference input is required")
+    if len(records) != len(required_views):
+        raise ValueError("reference inputs must match contract views exactly")
+
+    aggregate_size = 0
+    seen_basenames = set()
+    seen_hashes = set()
+    for reference, expected_view in zip(records, required_views):
+        if type(reference) is not ReferenceInput:
+            raise ValueError("reference inputs must contain exact resolver records")
+        try:
+            view = reference.view
+            basename = reference.basename
+            media_type = reference.media_type
+            byte_size = reference.byte_size
+            digest = reference.sha256
+            payload = reference._bytes
+        except AttributeError as exc:
+            raise ValueError("reference input record is incomplete") from exc
+        if type(view) is not str or view != expected_view:
+            raise ValueError("reference inputs must match contract order exactly")
+        if type(basename) is not str:
+            raise ValueError("reference basename must be a string")
+        basename_key = basename.casefold()
+        if basename_key in seen_basenames:
+            raise ValueError("duplicate reference basename across views")
+        seen_basenames.add(basename_key)
+        try:
+            suffix = _validate_reference_filename(basename)
+        except ValueError as exc:
+            raise ValueError("reference input has an invalid basename") from exc
+        if type(media_type) is not str or media_type != _REFERENCE_EXTENSIONS[suffix]:
+            raise ValueError("reference media type does not match its extension")
+        if type(payload) is not bytes:
+            raise ValueError("reference input bytes must be immutable bytes")
+        if not isinstance(byte_size, int) or isinstance(byte_size, bool):
+            raise ValueError("reference byte size must be an integer")
+        if byte_size <= 0 or byte_size > _REFERENCE_FILE_MAX_BYTES or byte_size != len(payload):
+            raise ValueError("reference byte size does not match its bytes")
+        aggregate_size += byte_size
+        if aggregate_size > _REFERENCE_TOTAL_MAX_BYTES:
+            raise ValueError("references exceed maximum aggregate size")
+        if not _reference_magic_matches(suffix, payload):
+            raise ValueError("reference input has an invalid signature")
+        computed_digest = hashlib.sha256(payload).hexdigest()
+        if type(digest) is not str or digest != computed_digest:
+            raise ValueError("reference sha256 does not match its bytes")
+        if digest in seen_hashes:
+            raise ValueError("duplicate reference content SHA-256 across views")
+        seen_hashes.add(digest)
+    return list(records)
+
+
 def _reference_record_for_evidence(reference: ReferenceInput) -> Dict[str, Any]:
     return reference.metadata
 
@@ -595,24 +796,14 @@ def build_transient_provider_request(
 ) -> TransientProviderRequest:
     """Build a provider payload while retaining data URIs only in private bytes."""
 
-    if not isinstance(reference_inputs, ReferenceInputs):
-        try:
-            reference_inputs = ReferenceInputs(tuple(reference_inputs))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("reference inputs must be resolved reference records") from exc
-    required_views = contract._snapshot_document()["references"]["required_views"]
-    if tuple(reference.view for reference in reference_inputs) != tuple(required_views):
-        raise ValueError("reference inputs must match contract order exactly")
-    if not reference_inputs.references:
-        raise ValueError("at least one reference input is required")
-
+    records = _validate_resolved_reference_inputs(contract, reference_inputs)
     payload = _base_provider_request(contract)
-    evidence = [_reference_record_for_evidence(reference) for reference in reference_inputs]
+    evidence = [_reference_record_for_evidence(reference) for reference in records]
     data_uris = [
         "data:{0};base64,{1}".format(
             reference.media_type, base64.b64encode(reference._bytes).decode("ascii")
         )
-        for reference in reference_inputs
+        for reference in records
     ]
     generation = contract._snapshot_document()["generation"]
     if generation["mode"] == "image_to_3d":
@@ -632,6 +823,7 @@ def build_transient_provider_request(
 
 
 def _generation_details(contract: AssetContract) -> Tuple[int, str, Dict[str, Any], int, str]:
+    _provider_required_views(contract)
     generation = contract.document.get("generation")
     if not isinstance(generation, dict):
         raise ValueError("contract generation must be an object")
@@ -741,8 +933,6 @@ def plan_generation(
         "references_resolved": False,
         "candidate_count": candidate_count,
         "endpoint": endpoint,
-        "estimated_cost_per_candidate": cost_per_candidate,
-        "estimated_cost": candidate_count * cost_per_candidate,
         "cost_per_candidate": cost_per_candidate,
         "maximum_credits": candidate_count * cost_per_candidate,
         "pricing_id": pricing.pricing_id,
@@ -1081,11 +1271,6 @@ def _build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--project-root", type=Path, required=True)
     generate.add_argument("--contract", type=Path, required=True)
     generate.add_argument("--approved-credits", type=int, required=True)
-    # Accepted here for forward-compatible invocation; R2B will bind them to
-    # execution.  Plan mode is the only R2A path that consumes them.
-    generate.add_argument("--pricing-file", type=Path, default=None)
-    generate.add_argument("--reference-root", type=Path, default=None)
-    generate.add_argument("--reference", action="append", default=None, metavar="VIEW=FILENAME")
     return parser
 
 
@@ -1132,13 +1317,10 @@ __all__ = [
     "PricingRecord",
     "ReferenceInput",
     "ReferenceInputs",
-    "ResolvedReference",
     "TransientProviderRequest",
     "build_transient_provider_request",
     "generate_batch",
-    "load_meshy_pricing",
     "load_pricing",
-    "load_pricing_record",
     "plan_generation",
     "resolve_reference_inputs",
     "resume_batch",
