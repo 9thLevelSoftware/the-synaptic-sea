@@ -28,6 +28,26 @@
       "type": "string",
       "minLength": 1,
       "pattern": "\\S"
+    },
+    "allChecksTrue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "silhouette_readable",
+        "proportions_match_contract",
+        "functional_volume_present",
+        "movable_parts_separable",
+        "cleanup_bounded",
+        "camera_readability"
+      ],
+      "properties": {
+        "silhouette_readable": {"const": true},
+        "proportions_match_contract": {"const": true},
+        "functional_volume_present": {"const": true},
+        "movable_parts_separable": {"const": true},
+        "cleanup_bounded": {"const": true},
+        "camera_readability": {"const": true}
+      }
     }
   },
   "properties": {
@@ -54,7 +74,14 @@
       ]
     },
     "decision": {
-      "$ref": "#/$defs/nonEmptyText"
+      "enum": [
+        "pending",
+        "reject",
+        "accept_for_cleanup",
+        "cleanup_validated",
+        "runtime_validated",
+        "promotion_ready"
+      ]
     },
     "checks": {
       "type": "object",
@@ -91,6 +118,20 @@
     {
       "if": {
         "properties": {
+          "state": {"const": "pending"}
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "decision": {"const": "pending"},
+          "rejection_reasons": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "state": {"const": "selected"}
         },
         "required": ["state"]
@@ -99,16 +140,7 @@
         "properties": {
           "decision": {"const": "accept_for_cleanup"},
           "rejection_reasons": {"maxItems": 0},
-          "checks": {
-            "properties": {
-              "silhouette_readable": {"const": true},
-              "proportions_match_contract": {"const": true},
-              "functional_volume_present": {"const": true},
-              "movable_parts_separable": {"const": true},
-              "cleanup_bounded": {"const": true},
-              "camera_readability": {"const": true}
-            }
-          }
+          "checks": {"$ref": "#/$defs/allChecksTrue"}
         }
       }
     },
@@ -129,21 +161,45 @@
     {
       "if": {
         "properties": {
-          "state": {
-            "enum": [
-              "pending",
-              "selected",
-              "blender_cleanup_pass",
-              "runtime_review_pass",
-              "promotion_ready"
-            ]
-          }
+          "state": {"const": "blender_cleanup_pass"}
         },
         "required": ["state"]
       },
       "then": {
         "properties": {
-          "rejection_reasons": {"maxItems": 0}
+          "decision": {"const": "cleanup_validated"},
+          "rejection_reasons": {"maxItems": 0},
+          "checks": {"$ref": "#/$defs/allChecksTrue"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {"const": "runtime_review_pass"}
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "decision": {"const": "runtime_validated"},
+          "rejection_reasons": {"maxItems": 0},
+          "checks": {"$ref": "#/$defs/allChecksTrue"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {"const": "promotion_ready"}
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "decision": {"const": "promotion_ready"},
+          "rejection_reasons": {"maxItems": 0},
+          "checks": {"$ref": "#/$defs/allChecksTrue"}
         }
       }
     }

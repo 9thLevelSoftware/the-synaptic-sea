@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import json
+import stat
+import struct
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import pytest
 
-from tools.meshy_asset_contract import canonical_json_bytes
+from tools.meshy_asset_contract import AssetContract, canonical_json_bytes, load_contract
+from tools.meshy_stage import generate_batch
 from tools.meshy_candidate_review import (
     CHECK_FIELDS,
+    ReviewError,
+    reject_candidate,
+    select_candidate,
     transition_review,
     validate_review,
+    verify_review,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +27,9 @@ SCHEMA = ROOT / "data/asset_generation/schemas/meshy_candidate_review_v1.schema.
 SCRIPT = ROOT / "tools/meshy_candidate_review.py"
 TASK_ID = "018-test-candidate"
 ASSET_ID = "loot_container_derelict_v1"
+CONTRACT_PATH = ROOT / "data/asset_generation/contracts/loot_container_derelict_v1.json"
+API_FIXTURES = ROOT / "tests/fixtures/meshy_api"
+STAGING = Path("assets/_staging/meshy")
 
 
 def _review(
@@ -76,10 +86,95 @@ def _read_review(task_dir: Path) -> dict:
     return json.loads((task_dir / "review.json").read_text(encoding="utf-8"))
 
 
-def test_select_transitions_pending_to_selected(tmp_path: Path) -> None:
-    task_dir = _task_dir(tmp_path)
+def _valid_glb() -> bytes:
+    json_chunk = b'{"asset":{"version":"2.0"}}'
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    total = 12 + 8 + len(json_chunk)
+    return (
+        b"glTF"
+        + struct.pack("<II", 2, total)
+        + struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little"))
+        + json_chunk
+    )
 
-    result = _run("select", "--task-dir", str(task_dir), "--reviewer", "human-reviewer")
+
+class _ReviewFakeMeshyClient:
+    def __init__(self) -> None:
+        self.created_tasks = []
+        self._counter = 0
+        self.account_lock_id = "a" * 64
+
+    def get_balance(self) -> int:
+        return 10000
+
+    def create_task(self, endpoint: str, payload: dict) -> str:
+        self._counter += 1
+        task_id = "review-task-{0:04d}".format(self._counter)
+        self.created_tasks.append(task_id)
+        return task_id
+
+    def poll_task(self, endpoint: str, task_id: str) -> dict:
+        fixture = "image_to_3d_succeeded.json"
+        response = json.loads((API_FIXTURES / fixture).read_text(encoding="utf-8"))
+        response["task_id"] = task_id
+        response["consumed_credits"] = 5
+        response["model_urls"]["glb"] = "https://assets.meshy.ai/{0}.glb".format(task_id)
+        response["thumbnail_url"] = "https://assets.meshy.ai/{0}.png".format(task_id)
+        return response
+
+    def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+        return _valid_glb() if url.endswith(".glb") else b"\x89PNG\r\n\x1a\nthumbnail"
+
+
+def _write_review_references(root: Path) -> dict[str, str]:
+    names = {
+        "front": "front.png",
+        "side": "side.png",
+        "back": "back.png",
+        "three_quarter": "three-quarter.png",
+    }
+    payload = b"\x89PNG\r\n\x1a\nreference"
+    for index, name in enumerate(names.values()):
+        (root / name).write_bytes(payload + bytes([index]))
+    return names
+
+
+def _real_staged_task(tmp_path: Path) -> tuple[Path, Path, AssetContract]:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    references = project_root / "references"
+    references.mkdir()
+    contract = load_contract(CONTRACT_PATH)
+    specs = _write_review_references(references)
+    generate_batch(
+        contract,
+        project_root=project_root,
+        client=_ReviewFakeMeshyClient(),
+        approved_credits=100,
+        pricing_file=None,
+        reference_root=references,
+        reference_specs=specs,
+        output_license="paid-private",
+        today="2026-09-01",
+    )
+    task_root = project_root / STAGING / contract.asset_id
+    task_dir = next(path for path in task_root.iterdir() if path.name != "_batches")
+    return project_root, task_dir, contract
+
+
+def test_select_transitions_pending_to_selected(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    result = _run(
+        "select",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+        "--reviewer",
+        "human-reviewer",
+        *(item for field in CHECK_FIELDS for item in ("--check", field)),
+    )
 
     assert result.returncode == 0, result.stderr
     review = _read_review(task_dir)
@@ -91,10 +186,12 @@ def test_select_transitions_pending_to_selected(tmp_path: Path) -> None:
 
 
 def test_reject_transitions_pending_to_rejected(tmp_path: Path) -> None:
-    task_dir = _task_dir(tmp_path)
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
 
     result = _run(
         "reject",
+        "--project-root",
+        str(project_root),
         "--task-dir",
         str(task_dir),
         "--reason",
@@ -112,9 +209,21 @@ def test_reject_transitions_pending_to_rejected(tmp_path: Path) -> None:
 
 
 def test_select_rejects_non_pending_state(tmp_path: Path) -> None:
-    task_dir = _task_dir(tmp_path, review=_review(state="selected", checks={field: True for field in CHECK_FIELDS}))
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    selected = _read_review(task_dir)
+    selected.update({"state": "selected", "decision": "accept_for_cleanup", "checks": _true_checks(), "rejection_reasons": []})
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(selected))
 
-    result = _run("select", "--task-dir", str(task_dir), "--reviewer", "operator")
+    result = _run(
+        "select",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+        "--reviewer",
+        "operator",
+        *(item for field in CHECK_FIELDS for item in ("--check", field)),
+    )
 
     assert result.returncode != 0
     assert "pending" in result.stderr
@@ -122,10 +231,15 @@ def test_select_rejects_non_pending_state(tmp_path: Path) -> None:
 
 
 def test_reject_rejects_non_pending_state(tmp_path: Path) -> None:
-    task_dir = _task_dir(tmp_path, review=_review(state="rejected", rejection_reasons=["bad silhouette"]))
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    rejected = _read_review(task_dir)
+    rejected.update({"state": "rejected", "decision": "reject", "rejection_reasons": ["bad silhouette"]})
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(rejected))
 
     result = _run(
         "reject",
+        "--project-root",
+        str(project_root),
         "--task-dir",
         str(task_dir),
         "--reason",
@@ -140,23 +254,38 @@ def test_reject_rejects_non_pending_state(tmp_path: Path) -> None:
 
 
 def test_verify_passes_for_complete_review(tmp_path: Path) -> None:
-    task_dir = _task_dir(
-        tmp_path,
-        review=_review(state="selected", checks={field: True for field in CHECK_FIELDS}),
-    )
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    selected = _read_review(task_dir)
+    selected.update({"state": "selected", "decision": "accept_for_cleanup", "checks": _true_checks(), "rejection_reasons": []})
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(selected))
 
-    result = _run("verify", "--task-dir", str(task_dir))
+    result = _run(
+        "verify",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+    )
 
     assert result.returncode == 0, result.stderr
     assert "MESHY CANDIDATE REVIEW PASS" in result.stdout
 
 
 def test_verify_fails_for_incomplete_review(tmp_path: Path) -> None:
-    checks = {field: True for field in CHECK_FIELDS}
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    checks = _true_checks()
     checks.pop("camera_readability")
-    task_dir = _task_dir(tmp_path, review=_review(checks=checks))
+    incomplete = _read_review(task_dir)
+    incomplete["checks"] = checks
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(incomplete))
 
-    result = _run("verify", "--task-dir", str(task_dir))
+    result = _run(
+        "verify",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+    )
 
     assert result.returncode != 0
     assert "checks" in result.stderr
@@ -179,14 +308,23 @@ def test_no_backward_transitions() -> None:
 
 
 def test_no_direct_promotion_jump() -> None:
-    with pytest.raises(ValueError, match="invalid transition"):
+    with pytest.raises(ValueError, match="evidence-bound"):
         transition_review(_review(), "promotion_ready")
 
 
 def test_review_json_is_canonical(tmp_path: Path) -> None:
-    task_dir = _task_dir(tmp_path)
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
 
-    result = _run("select", "--task-dir", str(task_dir), "--reviewer", "operator")
+    result = _run(
+        "select",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+        "--reviewer",
+        "operator",
+        *(item for field in CHECK_FIELDS for item in ("--check", field)),
+    )
 
     assert result.returncode == 0, result.stderr
     review_path = task_dir / "review.json"
@@ -195,3 +333,161 @@ def test_review_json_is_canonical(tmp_path: Path) -> None:
     assert raw.endswith(b"\n")
     assert not raw.endswith(b"\n\n")
     assert b"aesthetic_score" not in raw
+
+
+def _true_checks() -> dict[str, bool]:
+    return {field: True for field in CHECK_FIELDS}
+
+
+def test_r3_select_requires_real_bound_generation_and_explicit_checklist(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    selected = select_candidate(project_root, task_dir, "human-reviewer", _true_checks())
+
+    assert selected["state"] == "selected"
+    assert selected["decision"] == "accept_for_cleanup"
+    assert selected["checks"] == _true_checks()
+    assert stat.S_IMODE((task_dir / "review.json").stat().st_mode) == 0o600
+    assert _read_review(task_dir) == selected
+
+
+@pytest.mark.parametrize(
+    "checks",
+    [
+        {field: True for field in CHECK_FIELDS[:-1]},
+        {**{field: True for field in CHECK_FIELDS[:-1]}, CHECK_FIELDS[-1]: False},
+        {**{field: True for field in CHECK_FIELDS}, "unexpected": True},
+    ],
+)
+def test_r3_select_rejects_missing_false_or_unknown_checklist(
+    tmp_path: Path, checks: dict[str, bool]
+) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    with pytest.raises(ReviewError, match="check"):
+        select_candidate(project_root, task_dir, "human-reviewer", checks)
+
+    assert _read_review(task_dir)["state"] == "pending"
+
+
+def test_r3_reject_and_verify_are_distinct_nonpassing_outcome(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    rejected = reject_candidate(project_root, task_dir, "bad silhouette", "human-reviewer")
+    assert rejected["state"] == "rejected"
+    assert rejected["decision"] == "reject"
+
+    verified = verify_review(project_root, task_dir)
+    assert verified["state"] == "rejected"
+
+    result = _run(
+        "verify",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+    )
+    assert result.returncode == 1
+    assert "MESHY CANDIDATE REVIEW REJECTED" in result.stdout
+    assert "PASS" not in result.stdout
+
+
+def test_r3_cli_select_requires_each_exact_check_field(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    command = ["select", "--project-root", str(project_root), "--task-dir", str(task_dir), "--reviewer", "operator"]
+
+    missing = _run(*command)
+    assert missing.returncode != 0
+    assert "check" in missing.stderr
+
+    duplicate = _run(*command, "--check", CHECK_FIELDS[0], "--check", CHECK_FIELDS[0])
+    assert duplicate.returncode != 0
+    assert "duplicate" in duplicate.stderr
+
+    selected = _run(*command, *(item for field in CHECK_FIELDS for item in ("--check", field)))
+    assert selected.returncode == 0, selected.stderr
+    assert _read_review(task_dir)["checks"] == _true_checks()
+
+
+def test_r3_rejects_external_nested_and_symlink_task_paths(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(ReviewError, match="staging|project root"):
+        verify_review(project_root, outside)
+    with pytest.raises(ReviewError, match="direct|task"):
+        verify_review(project_root, task_dir / "nested")
+
+    linked = project_root / STAGING / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ReviewError, match="symlink"):
+        verify_review(project_root, linked)
+
+
+def test_r3_post_selected_transitions_require_evidence_binder(tmp_path: Path) -> None:
+    record = _review(state="selected", checks=_true_checks())
+
+    with pytest.raises(ReviewError, match="evidence-bound"):
+        transition_review(record, "blender_cleanup_pass")
+
+
+def test_r3_direct_validation_rejects_nonfinite_and_deep_json() -> None:
+    nonfinite = _review()
+    nonfinite["checks"]["silhouette_readable"] = float("nan")
+    assert validate_review(nonfinite)
+
+    deep: object = _review()
+    for _index in range(100):
+        deep = {"nested": deep}
+    assert validate_review(deep)
+
+
+def test_r3_tampered_or_missing_bound_generation_artifacts_fail_closed(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    generation_path = task_dir / "generation.json"
+    original_generation = generation_path.read_bytes()
+    original_raw = (task_dir / "raw.glb").read_bytes()
+    try:
+        generation_path.write_text('{"task_id":"forged"}', encoding="utf-8")
+        with pytest.raises(ReviewError, match="generation evidence"):
+            verify_review(project_root, task_dir)
+        generation_path.write_bytes(original_generation)
+
+        (task_dir / "raw.glb").unlink()
+        with pytest.raises(ReviewError, match="generation evidence"):
+            verify_review(project_root, task_dir)
+    finally:
+        generation_path.write_bytes(original_generation)
+        (task_dir / "raw.glb").write_bytes(original_raw)
+
+
+def test_r3_review_leaf_symlink_and_duplicate_json_do_not_escape_or_pass(
+    tmp_path: Path,
+) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    review_path = task_dir / "review.json"
+    original = review_path.read_bytes()
+    victim = tmp_path / "victim.json"
+    victim.write_bytes(b"outside-original")
+    try:
+        review_path.unlink()
+        review_path.symlink_to(victim)
+        with pytest.raises(ReviewError, match="symlink"):
+            verify_review(project_root, task_dir)
+        assert victim.read_bytes() == b"outside-original"
+
+        review_path.unlink()
+        review_path.write_bytes(b'{"schema_version":"1.0.0","schema_version":"1.0.0"}')
+        with pytest.raises(ReviewError, match="duplicate"):
+            verify_review(project_root, task_dir)
+    finally:
+        if review_path.is_symlink() or review_path.exists():
+            review_path.unlink()
+        review_path.write_bytes(original)
+
+
+def test_r3_lexical_escape_is_rejected_before_resolution(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    with pytest.raises(ReviewError, match="lexical"):
+        verify_review(project_root, task_dir / ".." / task_dir.name)
