@@ -662,7 +662,6 @@ def resolve_reference_inputs(
     result = []
     aggregate_size = 0
     seen_basenames = set()
-    seen_file_ids = set()
     seen_hashes = set()
     for view in required_views:
         filename = parsed[view]
@@ -677,13 +676,8 @@ def resolve_reference_inputs(
             payload = governance._read_bounded_regular_file(
                 path, f"reference {view}", _REFERENCE_FILE_MAX_BYTES
             )
-            file_stat = path.stat()
         except (OSError, TypeError, ValueError) as exc:
             raise ValueError(f"reference {view} could not be read: {exc}") from exc
-        file_identity = (file_stat.st_dev, file_stat.st_ino)
-        if file_identity in seen_file_ids:
-            raise ValueError("duplicate reference file identity across views")
-        seen_file_ids.add(file_identity)
         aggregate_size += len(payload)
         if aggregate_size > _REFERENCE_TOTAL_MAX_BYTES:
             raise ValueError("references exceed maximum aggregate size")
