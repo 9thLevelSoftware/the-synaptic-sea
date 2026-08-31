@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tools import meshy_asset_contract as contract_module
 from tools.meshy_asset_contract import (
     canonical_json_bytes,
     load_contract,
@@ -31,6 +32,74 @@ PILOT_IDS = {
     "crafting_station_derelict_v1",
 }
 
+PILOT_POLICY_MATRIX = {
+    "stalker_v1": {
+        "required_views": ["front", "side", "back", "three_quarter"],
+        "generation": {
+            "mode": "multi_image_to_3d",
+            "model_type": "standard",
+            "ai_model": "meshy-7",
+            "candidate_count": 4,
+        },
+        "triangles": {"min": 6000, "max": 12000, "scope": "whole_asset"},
+        "animation": {
+            "kind": "optional_humanoid_biped_rig_after_selection",
+            "meshy_rigging_allowed": True,
+            "rigging_target": "humanoid_biped",
+        },
+        "visual_marker": "Low stalking silhouette",
+    },
+    "hull_tendril_kit_v1": {
+        "kit_parts": [
+            "root",
+            "trunk_module_a",
+            "trunk_module_b",
+            "trunk_module_c",
+            "branch_a",
+            "branch_b",
+            "attack_tip",
+            "severed_tip",
+        ],
+        "required_states": ["living", "severed"],
+        "state_derivation": "one_blender_master",
+        "animation": {
+            "kind": "blender_segmented_chain_rig",
+            "meshy_rigging_allowed": False,
+        },
+    },
+    "biomatter_swarm_kit_v1": {
+        "kit_parts": [
+            "body_a",
+            "body_b",
+            "body_c",
+            "larva_a",
+            "larva_b",
+            "ground_wall_cluster",
+            "strand",
+            "dead_burned_cluster",
+        ],
+        "triangles": {"min": 300, "max": 800, "scope": "per_part"},
+        "animation_kind": "godot_multimesh_particles_behavior",
+        "visual_marker": "one shared material atlas",
+    },
+    "loot_container_derelict_v1": {
+        "required_states": ["closed", "open", "looted"],
+        "state_derivation": "one_blender_master",
+        "animation": {"kind": "hinge", "meshy_rigging_allowed": False},
+        "visual_marker": "Generate the closed master only",
+    },
+    "crafting_station_derelict_v1": {
+        "generation": {
+            "mode": "image_to_3d",
+            "model_type": "smart-topology",
+            "ai_model": "meshy-t2",
+            "target_polycount": 6000,
+        },
+        "triangles": {"min": 3000, "max": 6000, "scope": "whole_asset"},
+        "visual_marker": "clear front-side interaction silhouette",
+    },
+}
+
 
 def test_all_pilot_contracts_validate_and_share_one_prompt_profile() -> None:
     root = Path(__file__).resolve().parents[1]
@@ -40,6 +109,160 @@ def test_all_pilot_contracts_validate_and_share_one_prompt_profile() -> None:
     assert {contract.document["prompt_profile"] for contract in contracts} == {
         "synaptic_sea_derelict_v1"
     }
+
+
+def test_pilot_contracts_match_exact_task_four_policy_matrix() -> None:
+    root = Path(__file__).resolve().parents[1]
+    contract_root = root / "data/asset_generation/contracts"
+    documents = {
+        contract.asset_id: contract.document
+        for contract in (load_contract(path) for path in sorted(contract_root.glob("*.json")))
+    }
+    assert set(documents) == set(PILOT_POLICY_MATRIX)
+
+    stalker = documents["stalker_v1"]
+    stalker_expected = PILOT_POLICY_MATRIX["stalker_v1"]
+    assert stalker["references"]["required_views"] == stalker_expected["required_views"]
+    assert {
+        key: stalker["generation"][key]
+        for key in ("mode", "model_type", "ai_model", "candidate_count")
+    } == stalker_expected["generation"]
+    assert stalker["budget"]["triangles"] == stalker_expected["triangles"]
+    assert stalker["animation"] == stalker_expected["animation"]
+    assert stalker_expected["visual_marker"] in stalker["visual_brief"]
+
+    tendril = documents["hull_tendril_kit_v1"]
+    tendril_expected = PILOT_POLICY_MATRIX["hull_tendril_kit_v1"]
+    assert tendril["kit_parts"] == tendril_expected["kit_parts"]
+    assert tendril["required_states"] == tendril_expected["required_states"]
+    assert tendril["state_derivation"] == tendril_expected["state_derivation"]
+    assert tendril["animation"]["kind"] == tendril_expected["animation"]["kind"]
+    assert tendril["animation"]["meshy_rigging_allowed"] is tendril_expected["animation"][
+        "meshy_rigging_allowed"
+    ]
+
+    swarm = documents["biomatter_swarm_kit_v1"]
+    swarm_expected = PILOT_POLICY_MATRIX["biomatter_swarm_kit_v1"]
+    assert swarm["kit_parts"] == swarm_expected["kit_parts"]
+    assert swarm["budget"]["triangles"] == swarm_expected["triangles"]
+    assert swarm["animation"]["kind"] == swarm_expected["animation_kind"]
+    assert swarm_expected["visual_marker"] in swarm["visual_brief"]
+
+    loot = documents["loot_container_derelict_v1"]
+    loot_expected = PILOT_POLICY_MATRIX["loot_container_derelict_v1"]
+    assert loot["required_states"] == loot_expected["required_states"]
+    assert loot["state_derivation"] == loot_expected["state_derivation"]
+    assert loot["animation"]["kind"] == loot_expected["animation"]["kind"]
+    assert loot["animation"]["meshy_rigging_allowed"] is loot_expected["animation"][
+        "meshy_rigging_allowed"
+    ]
+    assert loot_expected["visual_marker"] in loot["visual_brief"]
+
+    crafting = documents["crafting_station_derelict_v1"]
+    crafting_expected = PILOT_POLICY_MATRIX["crafting_station_derelict_v1"]
+    assert {
+        key: crafting["generation"][key]
+        for key in ("mode", "model_type", "ai_model", "target_polycount")
+    } == crafting_expected["generation"]
+    assert crafting["budget"]["triangles"] == crafting_expected["triangles"]
+    assert crafting_expected["visual_marker"] in crafting["visual_brief"]
+
+
+def test_shared_style_literal_is_only_in_versioned_prompt_profile() -> None:
+    root = Path(__file__).resolve().parents[1]
+    profile_path = root / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    style_vocabulary = json.loads(profile_path.read_text(encoding="utf-8"))["style_vocabulary"]
+    tool_text = (root / "tools/meshy_asset_contract.py").read_text(encoding="utf-8")
+    contract_text = "\\n".join(
+        path.read_text(encoding="utf-8") for path in (root / "data/asset_generation/contracts").glob("*.json")
+    )
+    assert style_vocabulary not in tool_text
+    assert style_vocabulary not in contract_text
+
+
+def test_prompt_profile_exists_and_contains_rendering_guidance() -> None:
+    root = Path(__file__).resolve().parents[1]
+    profile_path = root / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert profile["document_kind"] == "asset_prompt_profile"
+    assert profile["profile_id"] == "synaptic_sea_derelict_v1"
+    for field in (
+        "style_vocabulary",
+        "reference_prompt_template",
+        "neutral_presentation",
+        "texture_guidance",
+    ):
+        assert isinstance(profile[field], str)
+        assert profile[field].strip()
+    assert "{style_vocabulary}" in profile["reference_prompt_template"]
+    assert "{neutral_presentation}" in profile["reference_prompt_template"]
+
+
+def test_render_prompt_packet_uses_changed_profile_content_without_repo_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    profile_path = root / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    profile.update(
+        style_vocabulary="PROFILE STYLE",
+        neutral_presentation="PROFILE NEGATIVE",
+        texture_guidance="PROFILE TEXTURE",
+        reference_prompt_template="{style_vocabulary} [{visual_brief}] {neutral_presentation}",
+    )
+    (tmp_path / profile_path.name).write_text(json.dumps(profile), encoding="utf-8")
+    monkeypatch.setattr(contract_module, "PROMPT_PROFILE_ROOT", tmp_path, raising=False)
+
+    contract = load_contract(FIXTURES / "valid_loot_container.json")
+    packet = render_prompt_packet(contract)
+
+    assert packet["reference_prompt"] == (
+        "PROFILE STYLE [searchable loot container] PROFILE NEGATIVE"
+    )
+    assert packet["negative_prompt"] == "PROFILE NEGATIVE"
+    assert packet["texture_prompt"] == "PROFILE STYLE PROFILE TEXTURE"
+
+
+@pytest.mark.parametrize(
+    ("profile_record", "message"),
+    [
+        (None, "profile must be an object"),
+        ("mismatched", "profile_id must match"),
+        ({"profile_id": "synaptic_sea_derelict_v1"}, "profile missing field"),
+        ("not-json", "invalid JSON"),
+    ],
+)
+def test_render_prompt_packet_rejects_invalid_prompt_profiles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_record: object,
+    message: str,
+) -> None:
+    profile_path = tmp_path / "synaptic_sea_derelict_v1.json"
+    if profile_record == "not-json":
+        profile_path.write_text("{not valid", encoding="utf-8")
+    elif profile_record == "mismatched":
+        root = Path(__file__).resolve().parents[1]
+        source = root / "data/asset_generation/prompt_profiles/synaptic_sea_derelict_v1.json"
+        mismatched = json.loads(source.read_text(encoding="utf-8"))
+        mismatched["profile_id"] = "other_profile"
+        profile_path.write_text(json.dumps(mismatched), encoding="utf-8")
+    else:
+        profile_path.write_text(json.dumps(profile_record), encoding="utf-8")
+    monkeypatch.setattr(contract_module, "PROMPT_PROFILE_ROOT", tmp_path, raising=False)
+
+    contract = load_contract(FIXTURES / "valid_loot_container.json")
+    with pytest.raises(ValueError, match=message):
+        render_prompt_packet(contract)
+
+
+def test_render_prompt_packet_rejects_missing_prompt_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(contract_module, "PROMPT_PROFILE_ROOT", tmp_path, raising=False)
+    contract = load_contract(FIXTURES / "valid_loot_container.json")
+    with pytest.raises(ValueError, match="prompt profile.*not found"):
+        render_prompt_packet(contract)
 
 
 def _valid_document() -> dict:

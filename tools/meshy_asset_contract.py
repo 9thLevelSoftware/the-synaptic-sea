@@ -11,10 +11,15 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from string import Formatter
 from typing import Any, cast
 
 SCHEMA_VERSION = "1.0.0"
 DOCUMENT_KIND = "ai_asset_contract"
+DEFAULT_PROMPT_PROFILE = "synaptic_sea_derelict_v1"
+PROMPT_PROFILE_ROOT = (
+    Path(__file__).resolve().parents[1] / "data/asset_generation/prompt_profiles"
+)
 IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 KIT_TOKEN_RE = re.compile(r"(^|_)kit(_|$)")
 RIGHTS_STATES = {"project-owned", "paid-private", "free-cc-by-4.0"}
@@ -22,25 +27,16 @@ REFERENCE_VIEWS = {"front", "side", "back", "left", "right", "three_quarter"}
 PIVOTS = {"bottom_center", "attachment", "scene_origin"}
 LIGHTING_MODES = ["normal", "emergency", "dark"]
 REVIEW_SEEDS = [42, 777]
-
-STYLE_VOCABULARY = (
-    "Grounded utilitarian industrial science fiction; late-20th-century analog technology "
-    "translated into space; heavy serviceable construction; matte desaturated painted alloy; "
-    "dark oxidized steel; black rubber seals; restrained safety-yellow accents; asymmetrical "
-    "field repairs; localized corrosion and grime; large readable forms; readable from a high "
-    "locked-isometric camera."
+_PROMPT_PROFILE_FIELDS = (
+    "schema_version",
+    "document_kind",
+    "profile_id",
+    "style_vocabulary",
+    "reference_prompt_template",
+    "neutral_presentation",
+    "texture_guidance",
 )
-NEUTRAL_PRESENTATION = (
-    "No environment, no floor, no cast shadow, no readable text, no logo, no floating parts, "
-    "no duplicate components, no dramatic perspective, no depth of field, no baked lighting."
-)
-TEXTURE_VOCABULARY = STYLE_VOCABULARY + (
-    " Texture as grounded derelict spacecraft construction: matte desaturated painted alloy, dark oxidized "
-    "steel exposed at worn edges, black rubber seals, restrained safety-yellow accents, grime "
-    "concentrated in seams and hand-contact areas, subtle moisture staining, isolated corrosion, "
-    "practical field repairs, low gloss, readable medium-scale wear. No readable text, no logos, "
-    "no decorative neon, no baked shadows, no directional lighting, no environment reflection."
-)
+_PROMPT_TEMPLATE_FIELDS = {"style_vocabulary", "visual_brief", "neutral_presentation"}
 
 _REQUIRED_TOP_FIELDS = (
     "schema_version",
@@ -463,6 +459,86 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _validate_prompt_profile(profile: object, profile_id: str) -> dict[str, Any]:
+    if not isinstance(profile, dict):
+        raise ValueError("prompt profile must be an object")
+    for field_name in _PROMPT_PROFILE_FIELDS:
+        if field_name not in profile:
+            raise ValueError(f"prompt profile missing field: {field_name}")
+    if profile.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(f"prompt profile schema_version must be {SCHEMA_VERSION}")
+    if profile.get("document_kind") != "asset_prompt_profile":
+        raise ValueError("prompt profile document_kind must be asset_prompt_profile")
+    if profile.get("profile_id") != profile_id:
+        raise ValueError("prompt profile_id must match requested profile")
+    for field_name in _PROMPT_PROFILE_FIELDS[3:]:
+        value = profile.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"prompt profile {field_name} must be a non-empty string")
+
+    template = cast(str, profile["reference_prompt_template"])
+    try:
+        parsed_template = list(Formatter().parse(template))
+    except ValueError as exc:
+        raise ValueError(f"invalid prompt profile reference_prompt_template: {exc}") from exc
+    fields_used = set()
+    for _, field_name, _, _ in parsed_template:
+        if field_name is None:
+            continue
+        if field_name not in _PROMPT_TEMPLATE_FIELDS:
+            raise ValueError(
+                "invalid prompt profile reference_prompt_template field: "
+                f"{field_name}"
+            )
+        fields_used.add(field_name)
+    missing_template_fields = _PROMPT_TEMPLATE_FIELDS - fields_used
+    if missing_template_fields:
+        missing = ", ".join(sorted(missing_template_fields))
+        raise ValueError(
+            "prompt profile reference_prompt_template missing fields: "
+            f"{missing}"
+        )
+    return profile
+
+
+def _load_prompt_profile(profile_id: object) -> dict[str, Any]:
+    if not isinstance(profile_id, str) or IDENTIFIER_RE.fullmatch(profile_id) is None:
+        raise ValueError("prompt profile id must be a lowercase identifier")
+
+    root = Path(PROMPT_PROFILE_ROOT)
+    try:
+        resolved_root = root.resolve()
+        requested_path = (resolved_root / f"{profile_id}.json").resolve()
+    except OSError as exc:
+        raise ValueError(f"prompt profile path could not be resolved: {exc}") from exc
+    try:
+        requested_path.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError("prompt profile path escapes the profile directory") from exc
+    if not requested_path.is_file():
+        raise ValueError(f"prompt profile {profile_id!r} not found")
+
+    try:
+        raw = requested_path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"prompt profile {profile_id!r} could not be read: {exc}") from exc
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
+    try:
+        profile = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+    except RecursionError as exc:
+        raise ValueError(
+            f"invalid JSON in prompt profile {profile_id!r}: maximum nesting depth exceeded"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
+    except ValueError as exc:
+        raise ValueError(f"invalid JSON in prompt profile {profile_id!r}: {exc}") from exc
+    return _validate_prompt_profile(profile, profile_id)
+
+
 def load_contract(path: Path) -> AssetContract:
     """Load and validate one contract while preserving its original byte hash."""
 
@@ -509,7 +585,22 @@ def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
     dimensions = document["dimensions_m"]
     states = ", ".join(document["required_states"])
     budget = document["budget"]
-    reference_prompt = f"{STYLE_VOCABULARY} Single isolated {brief.strip()}. {NEUTRAL_PRESENTATION}"
+    profile_id = document.get("prompt_profile", DEFAULT_PROMPT_PROFILE)
+    profile = _load_prompt_profile(profile_id)
+    template = cast(str, profile["reference_prompt_template"])
+    try:
+        reference_prompt = template.format(
+            style_vocabulary=profile["style_vocabulary"],
+            visual_brief=brief.strip(),
+            neutral_presentation=profile["neutral_presentation"],
+        )
+    except (IndexError, KeyError, ValueError) as exc:
+        raise ValueError(
+            f"invalid prompt profile reference_prompt_template: {exc}"
+        ) from exc
+    texture_prompt = (
+        f"{profile['style_vocabulary']} {profile['texture_guidance']}"
+    ).strip()
     cleanup = (
         f"Create the canonical Blender master at exact dimensions {dimensions} meters; "
         f"pivot={document['pivot']}; forward=+Z; derive states [{states}] from one master; "
@@ -527,9 +618,9 @@ def render_prompt_packet(contract: AssetContract) -> dict[str, Any]:
         "asset_id": contract.asset_id,
         "contract_sha256": contract.sha256,
         "reference_prompt": reference_prompt,
-        "negative_prompt": NEUTRAL_PRESENTATION,
+        "negative_prompt": profile["neutral_presentation"],
         "geometry_request": document["generation"],
-        "texture_prompt": TEXTURE_VOCABULARY,
+        "texture_prompt": texture_prompt,
         "blender_cleanup_brief": cleanup,
         "runtime_review_brief": runtime,
     }
