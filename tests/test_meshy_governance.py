@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import typing
 from pathlib import Path
 
 import pytest
@@ -234,6 +235,36 @@ def test_descriptor_reader_closes_fds_on_rebind_failure(
     with pytest.raises(ValueError):
         governance.file_sha256(target, max_bytes=100)
     assert close_calls
+
+
+def test_descriptor_reader_annotation_resolves_without_private_hashlib_types() -> None:
+    hints = typing.get_type_hints(governance._read_descriptor)
+
+    assert hints["hasher"] == typing.Optional[typing.Any]
+
+
+def test_protected_surface_snapshot_rejects_pre_enumeration_directory_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    protected = root / "assets/imported"
+    protected.mkdir(parents=True)
+    (protected / "inside.bin").write_bytes(b"inside")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "outside.bin").write_bytes(b"outside")
+
+    def swap_before_enumeration(path: Path) -> None:
+        if path == protected:
+            moved = tmp_path / "protected-moved"
+            protected.rename(moved)
+            outside.rename(protected)
+
+    monkeypatch.setattr(governance, "_SNAPSHOT_VALIDATION_HOOK", swap_before_enumeration)
+    with pytest.raises(ValueError, match="identity|changed"):
+        governance.snapshot_protected_surfaces(root)
+    assert (protected / "outside.bin").read_bytes() == b"outside"
+    assert (tmp_path / "protected-moved/inside.bin").read_bytes() == b"inside"
 
 
 def test_protected_surface_snapshot_is_immutable_deterministic_and_content_sensitive(

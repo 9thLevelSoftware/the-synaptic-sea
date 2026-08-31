@@ -3,6 +3,13 @@
 The helper intentionally has a narrow boundary: task files are confined to the
 Meshy staging tree, runtime surfaces are deny-listed, and JSON publication uses
 pinned directory descriptors rather than reopening a validated pathname.
+
+The descriptor controls prevent ordinary symlink and validation-to-use
+accidents.  This module operates within a trusted-workspace boundary: user-space
+code on macOS cannot prove ownership against a malicious same-UID actor that
+rebinds a just-created directory between mkdirat/openat.  It therefore makes no
+absolute race-proof claim against that actor; the existing mkdir, fsync, open,
+and identity checks are fail-closed controls for the supported threat model.
 """
 
 from __future__ import annotations
@@ -49,6 +56,7 @@ class ProtectedSurfaceRecord(NamedTuple):
 # validation-to-open boundary.  It is deliberately a no-op in normal use.
 _ATOMIC_VALIDATION_HOOK: Optional[Callable[[Path], None]] = None
 _FILE_VALIDATION_HOOK: Optional[Callable[[Path], None]] = None
+_SNAPSHOT_VALIDATION_HOOK: Optional[Callable[[Path], None]] = None
 
 # Capture capability markers before tests or callers inject wrappers around the
 # low-level functions.  The actual operation still uses the current os.* call.
@@ -255,7 +263,7 @@ def _read_descriptor(
     label: str,
     max_bytes: int,
     opened: os.stat_result,
-    hasher: Optional["hashlib._Hash"] = None,
+    hasher: Optional[Any] = None,
 ) -> bytes:
     chunks: List[bytes] = []
     total = 0
@@ -385,52 +393,242 @@ def _validate_snapshot_limit(value: object, name: str) -> int:
     return value
 
 
-def _snapshot_directory(
-    path: Path, root: Path, budget: _SnapshotBudget, depth: int
-) -> Tuple[str, int, List[Tuple[str, str, Optional[str], int]]]:
-    relative_directory = path.relative_to(root).as_posix()
-    budget.check_depth(depth, relative_directory)
-    entries: List[Tuple[str, str, Optional[str], int]] = []
-    total_size = 0
+def _snapshot_path_metadata(
+    path: Path, label: str
+) -> Tuple[Dict[Tuple[str, ...], Tuple[int, int]], Dict[Tuple[str, ...], Tuple[int, int, int, int, int]]]:
+    """Capture path identities and metadata before descriptor traversal begins."""
+
+    if not path.is_absolute() or path.anchor != os.sep:
+        raise OSError(f"{label} requires an absolute POSIX path")
+    identities: Dict[Tuple[str, ...], Tuple[int, int]] = {}
+    signatures: Dict[Tuple[str, ...], Tuple[int, int, int, int, int]] = {}
+    for end in range(1, len(path.parts) + 1):
+        parts = path.parts[:end]
+        component = Path(parts[0])
+        for part in parts[1:]:
+            component /= part
+        try:
+            info = os.lstat(component)
+        except FileNotFoundError:
+            break
+        except OSError as exc:
+            raise OSError(f"{label} identity snapshot failed: {exc}") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise OSError(f"{label} contains a symlink component")
+        if end < len(path.parts) and not stat.S_ISDIR(info.st_mode):
+            raise OSError(f"{label} contains a non-directory ancestor")
+        identities[parts] = (info.st_dev, info.st_ino)
+        signatures[parts] = _file_stat_signature(info)
+    return identities, signatures
+
+
+def _snapshot_directory_flags() -> int:
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    supports_dir_fd = getattr(os, "supports_dir_fd", ())
+    if directory_flag is None or nofollow_flag is None:
+        raise OSError("protected snapshots require O_DIRECTORY and O_NOFOLLOW")
+    if _ORIGINAL_OPEN not in supports_dir_fd or not callable(os.open):
+        raise OSError("protected snapshots require directory-fd open operations")
+    flags = os.O_RDONLY | directory_flag | nofollow_flag
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    return flags
+
+
+def _snapshot_open_error(exc: OSError, label: str) -> None:
+    if exc.errno == errno.ELOOP:
+        raise ValueError(f"{label} contains a symlink component") from exc
+    if exc.errno == errno.ENOTDIR:
+        raise ValueError(f"{label} ancestor is not a directory") from exc
+    raise ValueError(f"{label} could not be opened safely: {exc}") from exc
+
+
+def _open_pinned_surface(
+    path: Path,
+    identities: Dict[Tuple[str, ...], Tuple[int, int]],
+    signatures: Dict[Tuple[str, ...], Tuple[int, int, int, int, int]],
+    label: str,
+) -> Optional[Tuple[str, int, os.stat_result]]:
+    """Open a protected surface through component-pinned descriptors only."""
+
+    directory_flags = _snapshot_directory_flags()
+    current_fd: Optional[int] = None
+    opened_fd: Optional[int] = None
     try:
-        with os.scandir(path) as iterator:
-            children = []
+        try:
+            current_fd = os.open(os.sep, directory_flags)
+            _check_fd_identity(current_fd, identities.get(path.parts[:1]), "Meshy filesystem root")
+            for index, component in enumerate(path.parts[1:-1], start=2):
+                expected = identities.get(path.parts[:index])
+                child_fd: Optional[int] = None
+                try:
+                    try:
+                        child_fd = os.open(component, directory_flags, dir_fd=current_fd)
+                    except FileNotFoundError as exc:
+                        if expected is None:
+                            return None
+                        raise OSError(
+                            f"{label} component {component} disappeared after validation"
+                        ) from exc
+                    if expected is None:
+                        raise OSError(f"{label} component {component} appeared during validation")
+                    _check_fd_identity(child_fd, expected, f"{label} ancestor {component}")
+                    previous_fd = current_fd
+                    os.close(previous_fd)
+                    current_fd = child_fd
+                    child_fd = None
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+
+            expected = identities.get(path.parts)
+            expected_signature = signatures.get(path.parts)
+            try:
+                opened_fd = os.open(path.name, directory_flags, dir_fd=current_fd)
+            except FileNotFoundError as exc:
+                if expected is None:
+                    return None
+                raise OSError(f"{label} disappeared after validation") from exc
+            except OSError as exc:
+                if exc.errno != errno.ENOTDIR:
+                    raise
+                try:
+                    leaf_flags = _read_leaf_flags()
+                    if hasattr(os, "O_NONBLOCK"):
+                        leaf_flags |= os.O_NONBLOCK
+                    opened_fd = os.open(path.name, leaf_flags, dir_fd=current_fd)
+                except FileNotFoundError as leaf_exc:
+                    if expected is None:
+                        return None
+                    raise OSError(f"{label} disappeared after validation") from leaf_exc
+                info = os.fstat(opened_fd)
+                if expected is None:
+                    raise OSError(f"{label} appeared during validation")
+                if not stat.S_ISREG(info.st_mode):
+                    raise ValueError(f"{label} must be a regular file")
+                _check_fd_identity(opened_fd, expected, label)
+                if expected_signature is None or _file_stat_signature(info) != expected_signature:
+                    raise ValueError(f"{label} changed during validation")
+                result = ("file", opened_fd, info)
+                opened_fd = None
+                return result
+
+            info = os.fstat(opened_fd)
+            if expected is None:
+                raise OSError(f"{label} appeared during validation")
+            if not stat.S_ISDIR(info.st_mode):
+                raise ValueError(f"{label} must be a directory")
+            _check_fd_identity(opened_fd, expected, label)
+            if expected_signature is None or _file_stat_signature(info) != expected_signature:
+                raise ValueError(f"{label} changed during validation")
+            result = ("directory", opened_fd, info)
+            opened_fd = None
+            return result
+        except ValueError:
+            raise
+        except OSError as exc:
+            _snapshot_open_error(exc, label)
+    finally:
+        if opened_fd is not None:
+            os.close(opened_fd)
+        if current_fd is not None:
+            os.close(current_fd)
+
+
+def _snapshot_directory_fd(
+    directory_fd: int, relative_directory: str, budget: _SnapshotBudget, depth: int
+) -> Tuple[str, int, List[Tuple[str, str, Optional[str], int]]]:
+    """Snapshot one already-pinned directory without reopening its pathname."""
+
+    budget.check_depth(depth, relative_directory)
+    try:
+        before = os.fstat(directory_fd)
+    except OSError as exc:
+        raise ValueError(f"protected directory could not be inspected: {exc}") from exc
+    children: List[os.DirEntry] = []
+    try:
+        with os.scandir(directory_fd) as iterator:
             for entry in iterator:
                 if budget.entries + len(children) >= budget.max_entries:
                     raise ValueError(
                         f"protected snapshot exceeds maximum entries at {relative_directory}"
                     )
                 children.append(entry)
-            children.sort(key=lambda entry: entry.name)
+        children.sort(key=lambda entry: entry.name)
+        after_enumeration = os.fstat(directory_fd)
     except ValueError:
         raise
     except OSError as exc:
         raise ValueError(f"protected directory could not be read: {exc}") from exc
+    if _file_stat_signature(after_enumeration) != _file_stat_signature(before):
+        raise ValueError(f"protected directory changed while enumerating: {relative_directory}")
+
+    entries: List[Tuple[str, str, Optional[str], int]] = []
+    total_size = 0
+    directory_flags = _snapshot_directory_flags()
     for entry in children:
-        child = Path(entry.path)
-        relative = child.relative_to(root).as_posix()
+        relative = f"{relative_directory}/{entry.name}"
         child_depth = depth + 1
         budget.check_depth(child_depth, relative)
         budget.claim_entry(relative)
         try:
-            info = os.lstat(child)
+            info = entry.stat(follow_symlinks=False)
         except OSError as exc:
             raise ValueError(f"protected directory could not be inspected: {exc}") from exc
         if stat.S_ISLNK(info.st_mode):
             raise ValueError(f"protected surface contains a symlink: {relative}")
         if stat.S_ISDIR(info.st_mode):
-            child_hash, child_size, _child_entries = _snapshot_directory(
-                child, root, budget, child_depth
-            )
-            entries.append((relative, "directory", child_hash, child_size))
-            total_size += child_size
+            child_fd: Optional[int] = None
+            try:
+                try:
+                    child_fd = os.open(entry.name, directory_flags, dir_fd=directory_fd)
+                except OSError as exc:
+                    _snapshot_open_error(exc, relative)
+                assert child_fd is not None
+                opened = os.fstat(child_fd)
+                if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                    raise ValueError(f"protected directory changed while opening: {relative}")
+                if _file_stat_signature(opened) != _file_stat_signature(info):
+                    raise ValueError(f"protected directory changed while opening: {relative}")
+                child_hash, child_size, _child_entries = _snapshot_directory_fd(
+                    child_fd, relative, budget, child_depth
+                )
+                entries.append((relative, "directory", child_hash, child_size))
+                total_size += child_size
+            finally:
+                if child_fd is not None:
+                    os.close(child_fd)
         elif stat.S_ISREG(info.st_mode):
             budget.claim_file(info.st_size, relative)
-            child_hash = file_sha256(child, max_bytes=budget.max_file_bytes)
-            entries.append((relative, "file", child_hash, info.st_size))
-            total_size += info.st_size
+            descriptor: Optional[int] = None
+            try:
+                try:
+                    descriptor = os.open(entry.name, _read_leaf_flags(), dir_fd=directory_fd)
+                except OSError as exc:
+                    _snapshot_open_error(exc, relative)
+                assert descriptor is not None
+                opened = os.fstat(descriptor)
+                if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                    raise ValueError(f"protected file changed while opening: {relative}")
+                if _file_stat_signature(opened) != _file_stat_signature(info):
+                    raise ValueError(f"protected file changed while opening: {relative}")
+                digest = hashlib.sha256()
+                _read_descriptor(descriptor, relative, budget.max_file_bytes, opened, hasher=digest)
+                entries.append((relative, "file", digest.hexdigest(), opened.st_size))
+                total_size += opened.st_size
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
         else:
             raise ValueError(f"protected surface contains a non-regular entry: {relative}")
+
+    try:
+        after_processing = os.fstat(directory_fd)
+    except OSError as exc:
+        raise ValueError(f"protected directory could not be inspected: {exc}") from exc
+    if _file_stat_signature(after_processing) != _file_stat_signature(before):
+        raise ValueError(f"protected directory changed while snapshotting: {relative_directory}")
     digest = hashlib.sha256(canonical_json_bytes(entries)).hexdigest()
     return digest, total_size, entries
 
@@ -458,26 +656,40 @@ def snapshot_protected_surfaces(
     records: List[ProtectedSurfaceRecord] = []
     for relative in PROTECTED_RUNTIME_RELATIVE_PATHS:
         surface = physical / relative
-        _reject_symlink_components_below(physical, surface, "protected surface")
         budget.claim_entry(relative.as_posix())
         try:
-            info = os.lstat(surface)
-        except FileNotFoundError:
+            identities, signatures = _snapshot_path_metadata(surface, "protected surface")
+        except OSError as exc:
+            raise ValueError(str(exc)) from exc
+        hook = _SNAPSHOT_VALIDATION_HOOK
+        if hook is not None:
+            hook(surface)
+        opened = _open_pinned_surface(surface, identities, signatures, "protected surface")
+        if opened is None:
             records.append(ProtectedSurfaceRecord("missing", relative.as_posix(), None, 0))
             continue
-        except OSError as exc:
-            raise ValueError(f"protected surface could not be inspected: {exc}") from exc
-        if stat.S_ISLNK(info.st_mode):
-            raise ValueError(f"protected surface must not be a symlink: {relative}")
-        if stat.S_ISREG(info.st_mode):
-            budget.claim_file(info.st_size, relative.as_posix())
-            digest = file_sha256(surface, max_bytes=budget.max_file_bytes)
-            records.append(ProtectedSurfaceRecord("file", relative.as_posix(), digest, info.st_size))
-        elif stat.S_ISDIR(info.st_mode):
-            digest, size, _entries = _snapshot_directory(surface, physical, budget, 0)
-            records.append(ProtectedSurfaceRecord("directory", relative.as_posix(), digest, size))
-        else:
-            raise ValueError(f"protected surface must be a regular file or directory: {relative}")
+        surface_type, descriptor, info = opened
+        try:
+            if surface_type == "file":
+                budget.claim_file(info.st_size, relative.as_posix())
+                digest = hashlib.sha256()
+                _read_descriptor(
+                    descriptor,
+                    relative.as_posix(),
+                    budget.max_file_bytes,
+                    info,
+                    hasher=digest,
+                )
+                records.append(
+                    ProtectedSurfaceRecord("file", relative.as_posix(), digest.hexdigest(), info.st_size)
+                )
+            else:
+                digest, size, _entries = _snapshot_directory_fd(
+                    descriptor, relative.as_posix(), budget, 0
+                )
+                records.append(ProtectedSurfaceRecord("directory", relative.as_posix(), digest, size))
+        finally:
+            os.close(descriptor)
     return tuple(records)
 
 
