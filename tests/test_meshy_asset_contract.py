@@ -24,6 +24,25 @@ SCHEMA = (
 )
 
 
+PILOT_IDS = {
+    "stalker_v1",
+    "hull_tendril_kit_v1",
+    "biomatter_swarm_kit_v1",
+    "loot_container_derelict_v1",
+    "crafting_station_derelict_v1",
+}
+
+
+def test_all_pilot_contracts_validate_and_share_one_prompt_profile() -> None:
+    root = Path(__file__).resolve().parents[1]
+    contract_root = root / "data/asset_generation/contracts"
+    contracts = [load_contract(path) for path in sorted(contract_root.glob("*.json"))]
+    assert {contract.asset_id for contract in contracts} == PILOT_IDS
+    assert {contract.document["prompt_profile"] for contract in contracts} == {
+        "synaptic_sea_derelict_v1"
+    }
+
+
 def _valid_document() -> dict:
     return json.loads(
         (FIXTURES / "valid_loot_container.json").read_text(encoding="utf-8")
