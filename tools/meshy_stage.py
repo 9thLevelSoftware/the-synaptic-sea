@@ -16,7 +16,8 @@ import json
 import math
 import os
 import re
-import stat
+import shutil
+import struct
 import sys
 import tempfile
 import time
@@ -59,6 +60,15 @@ _THUMBNAIL_MAX_BYTES = 16 * 1024 * 1024
 _DOWNLOAD_TOTAL_MAX_BYTES = 80 * 1024 * 1024
 _MAX_POLL_ATTEMPTS = 120
 _POLL_DELAYS = (0.0, 0.25, 0.5, 1.0, 2.0)
+_DEFAULT_DEADLINE_SECONDS = 1200
+_MAX_DEADLINE_SECONDS = 7200
+# The checked-in repository contains a large protected assets/imported tree.
+# These are explicit, bounded caps for this repository only; governance's
+# conservative defaults remain unchanged for other callers.
+_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES = 1 * 1024 * 1024 * 1024
+_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024
+_REPOSITORY_SNAPSHOT_MAX_ENTRIES = 20_000
+_REPOSITORY_SNAPSHOT_MAX_DEPTH = 128
 _ALLOWED_LICENSES = ("paid-private", "free-cc-by-4.0")
 
 
@@ -97,31 +107,58 @@ class MeshyClient:
     def _safe_transport_error() -> RuntimeError:
         return RuntimeError("Meshy transport failed")
 
-    def _request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        deadline: Optional[float] = None,
+        clock: Optional[Callable[[], float]] = None,
+        **kwargs: Any,
+    ) -> Any:
         headers = dict(kwargs.pop("headers", {}))
         if self.api_key:
             headers["Authorization"] = "Bearer " + self.api_key
         headers["Accept"] = "application/json"
+        now = clock or time.monotonic
+        if deadline is not None and (
+            not isinstance(deadline, (int, float))
+            or isinstance(deadline, bool)
+            or not math.isfinite(float(deadline))
+        ):
+            raise RuntimeError("Meshy request deadline is invalid")
         response = None
         try:
             for attempt in range(3):
+                remaining = 60.0
+                if deadline is not None:
+                    remaining = float(deadline) - now()
+                    if remaining <= 0:
+                        raise RuntimeError("Meshy generation deadline exceeded")
                 try:
                     response = self.session.request(
                         method,
                         self.base_url + endpoint,
                         headers=headers,
-                        timeout=(10, 60),
+                        timeout=(min(10.0, remaining), min(60.0, remaining)),
                         **kwargs,
                     )
                 except Exception as exc:
                     raise self._safe_transport_error() from exc
+                if deadline is not None and now() >= float(deadline):
+                    raise RuntimeError("Meshy generation deadline exceeded")
                 status = getattr(response, "status_code", None)
                 if not isinstance(status, int) or isinstance(status, bool):
                     raise RuntimeError("Meshy response had an invalid status")
                 if status not in (429, 500, 502, 503, 504):
                     break
                 if attempt < 2:
-                    time.sleep(0.5 * (2 ** attempt))
+                    delay = 0.5 * (2 ** attempt)
+                    if deadline is not None:
+                        remaining = float(deadline) - now()
+                        if remaining <= 0:
+                            raise RuntimeError("Meshy generation deadline exceeded")
+                        delay = min(delay, remaining)
+                    time.sleep(delay)
             status = getattr(response, "status_code", None)
             if not isinstance(status, int) or not 200 <= status < 300:
                 raise RuntimeError("Meshy request failed with status {0}".format(status if isinstance(status, int) else "unknown"))
@@ -134,8 +171,12 @@ class MeshyClient:
         except Exception as exc:
             raise self._safe_transport_error() from exc
 
-    def get_balance(self) -> int:
-        payload = self._request("GET", "/openapi/v1/balance")
+    def get_balance(
+        self,
+        deadline: Optional[float] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> int:
+        payload = self._request("GET", "/openapi/v1/balance", deadline=deadline, clock=clock)
         if isinstance(payload, dict):
             for key in ("balance", "credits", "credit_balance"):
                 value = payload.get(key)
@@ -143,8 +184,14 @@ class MeshyClient:
                     return value
         raise RuntimeError("Meshy balance response did not contain credits")
 
-    def create_task(self, endpoint: str, payload: Dict[str, Any]) -> str:
-        response = self._request("POST", endpoint, json=payload)
+    def create_task(
+        self,
+        endpoint: str,
+        payload: Dict[str, Any],
+        deadline: Optional[float] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> str:
+        response = self._request("POST", endpoint, json=payload, deadline=deadline, clock=clock)
         if isinstance(response, dict):
             for key in ("result", "task_id", "id"):
                 value = response.get(key)
@@ -152,8 +199,19 @@ class MeshyClient:
                     return value
         raise RuntimeError("Meshy create response did not contain a task id")
 
-    def poll_task(self, endpoint: str, task_id: str) -> Dict[str, Any]:
-        response = self._request("GET", endpoint.rstrip("/") + "/" + task_id)
+    def poll_task(
+        self,
+        endpoint: str,
+        task_id: str,
+        deadline: Optional[float] = None,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> Dict[str, Any]:
+        response = self._request(
+            "GET",
+            endpoint.rstrip("/") + "/" + task_id,
+            deadline=deadline,
+            clock=clock,
+        )
         if not isinstance(response, dict):
             raise RuntimeError("Meshy task response was not an object")
         return response
@@ -174,54 +232,67 @@ class MeshyClient:
             raise RuntimeError("Meshy download host is not approved")
         return value
 
-    def download(
+    def download_bytes(
         self,
         url: str,
-        destination: Path,
-        max_bytes: int = _GLB_MAX_BYTES,
-        deadline: Optional[float] = None,
-        clock: Optional[Callable[[], float]] = None,
-    ) -> None:
+        max_bytes: int,
+        deadline: float,
+        clock: Callable[[], float],
+    ) -> bytes:
+        """Download bounded bytes in memory from an approved Meshy host.
+
+        ``deadline`` is the remaining duration for this individual request;
+        the caller derives it from the operation's absolute deadline.
+        """
+
         self._validate_download_url(url)
         if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0:
             raise RuntimeError("Meshy download size limit is invalid")
-        now = clock or time.monotonic
-        started = now()
-        parent = Path(destination).parent
+        if not isinstance(deadline, (int, float)) or isinstance(deadline, bool) or not math.isfinite(float(deadline)) or float(deadline) <= 0:
+            raise RuntimeError("Meshy download deadline is invalid")
+        if not callable(clock):
+            raise RuntimeError("Meshy download clock is invalid")
+        duration = float(deadline)
         try:
-            info = parent.lstat()
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-                raise RuntimeError("Meshy download directory is not private")
-            current = Path(os.path.abspath(os.fspath(parent.anchor or os.sep)))
-            for component in Path(os.path.abspath(os.fspath(parent))).parts[1:]:
-                current /= component
-                if current in (Path("/tmp"), Path("/var")):
-                    continue
-                if current.is_symlink():
-                    raise RuntimeError("Meshy download directory contains a symlink")
-        except OSError as exc:
-            raise RuntimeError("Meshy download directory is unavailable") from exc
-        temporary: Optional[Path] = None
-        response = None
-        try:
-            try:
-                response = self.session.get(url, stream=True, timeout=(10, 120))
-            except Exception as exc:
-                raise self._safe_transport_error() from exc
-            status = getattr(response, "status_code", None)
-            if not isinstance(status, int) or isinstance(status, bool):
-                raise RuntimeError("Meshy download returned an invalid status")
-            if not 200 <= status < 300:
-                raise RuntimeError("Meshy download failed with status {0}".format(status))
-            if deadline is not None and now() - started >= deadline:
+            started = clock()
+            deadline_at = started + duration
+            if started >= deadline_at:
                 raise RuntimeError("Meshy download deadline exceeded")
-            descriptor, name = tempfile.mkstemp(prefix="." + Path(destination).name + ".", suffix=".tmp", dir=str(parent))
-            os.close(descriptor)
-            temporary = parent / name
-            total = 0
-            with temporary.open("wb") as handle:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if deadline is not None and now() - started >= deadline:
+            remaining = deadline_at - clock()
+            if remaining <= 0:
+                raise RuntimeError("Meshy download deadline exceeded")
+            response = None
+            try:
+                try:
+                    response = self.session.get(
+                        url,
+                        stream=True,
+                        timeout=(min(10.0, remaining), min(120.0, remaining)),
+                    )
+                except Exception as exc:
+                    raise self._safe_transport_error() from exc
+                try:
+                    status = getattr(response, "status_code", None)
+                except Exception as exc:
+                    raise self._safe_transport_error() from exc
+                if not isinstance(status, int) or isinstance(status, bool):
+                    raise RuntimeError("Meshy download returned an invalid status")
+                if not 200 <= status < 300:
+                    raise RuntimeError("Meshy download request failed")
+                try:
+                    iterator = iter(response.iter_content(chunk_size=1024 * 1024))
+                except Exception as exc:
+                    raise self._safe_transport_error() from exc
+                chunks: List[bytes] = []
+                total = 0
+                while True:
+                    try:
+                        chunk = next(iterator)
+                    except StopIteration:
+                        break
+                    except Exception as exc:
+                        raise self._safe_transport_error() from exc
+                    if clock() >= deadline_at:
                         raise RuntimeError("Meshy download deadline exceeded")
                     if chunk:
                         if not isinstance(chunk, bytes):
@@ -229,23 +300,20 @@ class MeshyClient:
                         total += len(chunk)
                         if total > max_bytes:
                             raise RuntimeError("Meshy download exceeds maximum size")
-                        handle.write(chunk)
-                handle.flush()
-                os.fsync(handle.fileno())
-            if deadline is not None and now() - started >= deadline:
-                raise RuntimeError("Meshy download deadline exceeded")
-            os.replace(str(temporary), str(destination))
-            temporary = None
+                        chunks.append(chunk)
+                if clock() >= deadline_at:
+                    raise RuntimeError("Meshy download deadline exceeded")
+                return b"".join(chunks)
+            finally:
+                if response is not None:
+                    try:
+                        response.close()
+                    except Exception:
+                        pass
         except RuntimeError:
             raise
         except Exception as exc:
             raise self._safe_transport_error() from exc
-        finally:
-            if temporary is not None:
-                try:
-                    temporary.unlink()
-                except OSError:
-                    pass
 
 
 def _utc_timestamp() -> str:
@@ -686,7 +754,7 @@ class _Preflight(NamedTuple):
     today: object
     date: object
     clock: Callable[[], float]
-    operation_deadline: Optional[float]
+    operation_deadline: float
 
 
 def _validate_positive_int(value: object, label: str) -> int:
@@ -695,16 +763,19 @@ def _validate_positive_int(value: object, label: str) -> int:
     return value
 
 
-def _new_deadline(clock: Callable[[], float], deadline: object) -> Optional[float]:
+def _new_deadline(clock: Callable[[], float], deadline: object) -> float:
     if deadline is None:
-        return None
-    if not isinstance(deadline, (int, float)) or isinstance(deadline, bool) or not math.isfinite(float(deadline)) or float(deadline) < 0:
-        raise ValueError("deadline must be a non-negative finite number")
-    return clock() + float(deadline)
+        raise ValueError("deadline must be a positive finite number")
+    if not isinstance(deadline, (int, float)) or isinstance(deadline, bool) or not math.isfinite(float(deadline)):
+        raise ValueError("deadline must be a positive finite number")
+    seconds = float(deadline)
+    if seconds <= 0 or seconds > _MAX_DEADLINE_SECONDS:
+        raise ValueError("deadline must be positive and no more than {0} seconds".format(_MAX_DEADLINE_SECONDS))
+    return clock() + seconds
 
 
 def _check_deadline(preflight: _Preflight) -> None:
-    if preflight.operation_deadline is not None and preflight.clock() >= preflight.operation_deadline:
+    if preflight.clock() >= preflight.operation_deadline:
         raise RuntimeError("Meshy generation deadline exceeded")
 
 
@@ -761,6 +832,8 @@ def _load_open_journals(preflight: _Preflight, contract_sha256: str, profile_sha
 
 def _preflight(contract: AssetContract, project_root: Path, client: Any, approved_credits: int, *, pricing_file: Optional[Path], reference_root: Path, reference_specs: object, output_license: str, today: object, date: object, clock: Optional[Callable[[], float]], deadline: object) -> _Preflight:
     del client
+    clock_fn = clock or time.monotonic
+    operation_deadline = _new_deadline(clock_fn, deadline)
     approved = _validate_positive_int(approved_credits, "approved_credits")
     if output_license not in _ALLOWED_LICENSES:
         raise ValueError("output_license must be paid-private or free-cc-by-4.0")
@@ -779,7 +852,13 @@ def _preflight(contract: AssetContract, project_root: Path, client: Any, approve
     references = resolve_reference_inputs(source_contract, reference_root_physical, parsed_reference_specs)
     transient = build_transient_provider_request(source_contract, references)
     root, stage, asset_root = _validate_staging_paths(project_root, source_contract.asset_id)
-    protected = governance.snapshot_protected_surfaces(root)
+    protected = governance.snapshot_protected_surfaces(
+        root,
+        max_file_bytes=_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES,
+        max_total_bytes=_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES,
+        max_entries=_REPOSITORY_SNAPSHOT_MAX_ENTRIES,
+        max_depth=_REPOSITORY_SNAPSHOT_MAX_DEPTH,
+    )
     cost = pricing.cost_for(source_contract)
     count = _validate_positive_int(source_contract._snapshot_document()["generation"].get("candidate_count"), "candidate_count")
     maximum = count * cost
@@ -787,7 +866,8 @@ def _preflight(contract: AssetContract, project_root: Path, client: Any, approve
         raise ValueError("approved credit ceiling is below the maximum Meshy batch cost ({0} required)".format(maximum))
     batch_root = asset_root / "_batches"
     governance._reject_symlink_components_below(root, batch_root, "Meshy batch journal root")
-    result = _Preflight(root, stage, asset_root, batch_root, source_contract, pricing, Path(pricing_file) if pricing_file is not None else None, packet, prompt_hash, references, reference_root_physical, tuple(parsed_reference_specs.items()), transient, ENDPOINTS[source_contract._snapshot_document()["generation"]["mode"]], count, cost, maximum, approved, output_license, protected, today, date, clock or time.monotonic, _new_deadline(clock or time.monotonic, deadline))
+    result = _Preflight(root, stage, asset_root, batch_root, source_contract, pricing, Path(pricing_file) if pricing_file is not None else None, packet, prompt_hash, references, reference_root_physical, tuple(parsed_reference_specs.items()), transient, ENDPOINTS[source_contract._snapshot_document()["generation"]["mode"]], count, cost, maximum, approved, output_license, protected, today, date, clock_fn, operation_deadline)
+    _check_deadline(result)
     _load_open_journals(result, source_contract.sha256, packet["prompt_profile_sha256"], pricing.sha256, transient.provider_payload_sha256)
     return result
 
@@ -809,7 +889,13 @@ def _refresh_before_provider(preflight: _Preflight) -> None:
     transient = build_transient_provider_request(current_contract, current_references)
     if transient.provider_payload_sha256 != preflight.transient.provider_payload_sha256:
         raise ValueError("Meshy provider payload changed during preflight")
-    current_snapshot = governance.snapshot_protected_surfaces(preflight.root)
+    current_snapshot = governance.snapshot_protected_surfaces(
+        preflight.root,
+        max_file_bytes=_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES,
+        max_total_bytes=_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES,
+        max_entries=_REPOSITORY_SNAPSHOT_MAX_ENTRIES,
+        max_depth=_REPOSITORY_SNAPSHOT_MAX_DEPTH,
+    )
     if current_snapshot != preflight.protected_snapshot:
         raise ValueError("protected runtime surfaces changed during preflight")
 
@@ -834,43 +920,122 @@ def _base_generation(preflight: _Preflight, task_id: str, created_at: str) -> Di
     }
 
 
-def _artifact_path(preflight: _Preflight, task_id: str, name: str) -> Path:
-    path = preflight.asset_root / task_id / name
+def _artifact_path(preflight: _Preflight, task_dir: Path, name: str) -> Path:
+    if not isinstance(name, str) or not name or Path(name).name != name or name in (".", ".."):
+        raise ValueError("Meshy task artifact name must be a basename")
+    path = task_dir / name
     governance.governed_task_path(preflight.root, path, "Meshy task artifact")
     return path
 
 
-def _write_artifact_json(preflight: _Preflight, task_id: str, name: str, value: object) -> None:
-    governance.atomic_write_json(_artifact_path(preflight, task_id, name), value, project_root=preflight.root, allowed_root=preflight.asset_root)
+def _write_artifact_json(preflight: _Preflight, task_dir: Path, name: str, value: object) -> None:
+    governance.atomic_write_json(
+        _artifact_path(preflight, task_dir, name),
+        value,
+        project_root=preflight.root,
+        allowed_root=preflight.asset_root,
+    )
 
 
-def _read_download(path: Path, label: str, maximum: int, preflight: _Preflight) -> bytes:
-    _check_deadline(preflight)
-    return governance._read_bounded_regular_file(path, label, maximum)
+def _write_artifact_bytes(preflight: _Preflight, task_dir: Path, name: str, payload: bytes) -> None:
+    governance.atomic_write_bytes(
+        _artifact_path(preflight, task_dir, name),
+        payload,
+        project_root=preflight.root,
+        allowed_root=preflight.asset_root,
+    )
 
 
-def _download_with_limit(client: Any, url: str, destination: Path, maximum: int, preflight: _Preflight) -> None:
-    """Use the bounded real-client seam while retaining tiny fake compatibility."""
+def _validate_glb(payload: bytes) -> None:
+    """Validate the complete GLB 2.0 container, not merely its magic bytes."""
 
-    remaining = None
-    if preflight.operation_deadline is not None:
-        remaining = max(0.0, preflight.operation_deadline - preflight.clock())
+    if not isinstance(payload, bytes) or len(payload) < 12:
+        raise ValueError("raw.glb has an invalid GLB header")
+    magic, version, declared_length = struct.unpack_from("<4sII", payload, 0)
+    if magic != b"glTF":
+        raise ValueError("raw.glb has an invalid GLB magic")
+    if version != 2:
+        raise ValueError("raw.glb must use GLB version 2")
+    if declared_length < 12 or declared_length != len(payload) or declared_length % 4:
+        raise ValueError("raw.glb declared length is invalid")
+    offset = 12
+    json_chunk: Optional[bytes] = None
+    json_count = 0
+    bin_count = 0
+    first = True
+    while offset < declared_length:
+        if declared_length - offset < 8:
+            raise ValueError("raw.glb contains a truncated chunk header")
+        chunk_length, chunk_type_value = struct.unpack_from("<II", payload, offset)
+        chunk_type = struct.pack("<I", chunk_type_value)
+        if chunk_length % 4:
+            raise ValueError("raw.glb chunk is not aligned")
+        chunk_start = offset + 8
+        chunk_end = chunk_start + chunk_length
+        if chunk_end > declared_length:
+            raise ValueError("raw.glb chunk exceeds declared length")
+        if first and chunk_type != b"JSON":
+            raise ValueError("raw.glb first chunk must be JSON")
+        first = False
+        chunk = payload[chunk_start:chunk_end]
+        if chunk_type == b"JSON":
+            json_count += 1
+            if json_count > 1:
+                raise ValueError("raw.glb contains more than one JSON chunk")
+            json_chunk = chunk
+        elif chunk_type == b"BIN\x00":
+            bin_count += 1
+            if bin_count > 1:
+                raise ValueError("raw.glb contains more than one BIN chunk")
+        offset = chunk_end
+    if offset != declared_length or json_chunk is None:
+        raise ValueError("raw.glb must contain a JSON first chunk")
     try:
-        parameters = inspect.signature(client.download).parameters
+        decoded = json.loads(json_chunk.rstrip(b" \\t\\r\\n\\x00").decode("utf-8"))
+    except (UnicodeDecodeError, TypeError, ValueError) as exc:
+        raise ValueError("raw.glb JSON chunk is invalid") from exc
+    if not isinstance(decoded, dict):
+        raise ValueError("raw.glb JSON chunk must decode to an object")
+
+
+def _download_with_limit(client: Any, url: str, maximum: int, preflight: _Preflight) -> bytes:
+    """Use the sealed in-memory client seam with the operation deadline."""
+
+    _check_deadline(preflight)
+    remaining = preflight.operation_deadline - preflight.clock()
+    if remaining <= 0:
+        raise RuntimeError("Meshy generation deadline exceeded")
+    _check_deadline(preflight)
+    payload = client.download_bytes(
+        url,
+        maximum,
+        remaining,
+        preflight.clock,
+    )
+    if not isinstance(payload, bytes):
+        raise RuntimeError("Meshy download returned invalid bytes")
+    if len(payload) > maximum:
+        raise RuntimeError("Meshy download exceeds maximum size")
+    _check_deadline(preflight)
+    return payload
+
+
+def _call_with_deadline(method: Callable[..., Any], preflight: _Preflight, *args: Any) -> Any:
+    """Pass the absolute operation deadline to real clients, not rigid fakes."""
+
+    try:
+        parameters = inspect.signature(method).parameters
     except (TypeError, ValueError):
         parameters = {}
-    accepts_limits = "max_bytes" in parameters or any(
+    accepts_kwargs = any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
     )
-    if accepts_limits:
-        options: Dict[str, Any] = {"max_bytes": maximum}
-        if "deadline" in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
-            options["deadline"] = remaining
-        if "clock" in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
-            options["clock"] = preflight.clock
-        client.download(url, destination, **options)
-    else:
-        client.download(url, destination)
+    options: Dict[str, Any] = {}
+    if "deadline" in parameters or accepts_kwargs:
+        options["deadline"] = preflight.operation_deadline
+    if "clock" in parameters or accepts_kwargs:
+        options["clock"] = preflight.clock
+    return method(*args, **options)
 
 
 def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_consumed: Callable[[int], None]) -> Dict[str, Any]:
@@ -878,7 +1043,12 @@ def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_c
     for attempt in range(_MAX_POLL_ATTEMPTS):
         _check_deadline(preflight)
         try:
-            response = client.poll_task(preflight.endpoint, task_id)
+            response = _call_with_deadline(
+                client.poll_task,
+                preflight,
+                preflight.endpoint,
+                task_id,
+            )
         except Exception as exc:
             raise _TaskFailure(_safe_error(exc))
         if not isinstance(response, dict):
@@ -903,7 +1073,7 @@ def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_c
         delay = _POLL_DELAYS[min(attempt, len(_POLL_DELAYS) - 1)]
         if delay:
             _check_deadline(preflight)
-            remaining = preflight.operation_deadline - preflight.clock() if preflight.operation_deadline is not None else delay
+            remaining = preflight.operation_deadline - preflight.clock()
             if remaining <= 0:
                 raise _TaskFailure("Meshy generation deadline exceeded", consumed)
             time.sleep(min(delay, remaining))
@@ -915,19 +1085,51 @@ def _stage_task(client: Any, preflight: _Preflight, task_id: str, created_at: st
     if os.path.lexists(str(task_dir)):
         raise _TaskFailure("Meshy task directory already exists")
     generation_record = _base_generation(preflight, task_id, created_at)
-    generation_written = False
+    candidate_dir: Optional[Path] = None
     last_consumed: Optional[int] = None
     try:
-        _write_artifact_json(preflight, task_id, "contract.json", json.loads(preflight.contract.snapshot_bytes().decode("utf-8")))
-        _write_artifact_json(preflight, task_id, "prompt-packet.json", preflight.prompt_packet)
-        _write_artifact_json(preflight, task_id, "pricing.json", preflight.pricing.document)
+        candidate_dir = Path(
+            tempfile.mkdtemp(
+                prefix=".task-{0}-".format(task_id),
+                suffix=".tmp",
+                dir=str(preflight.asset_root),
+            )
+        )
+        _write_artifact_json(
+            preflight,
+            candidate_dir,
+            "contract.json",
+            json.loads(preflight.contract.snapshot_bytes().decode("utf-8")),
+        )
+        _write_artifact_json(preflight, candidate_dir, "prompt-packet.json", preflight.prompt_packet)
+        _write_artifact_json(preflight, candidate_dir, "pricing.json", preflight.pricing.document)
         for item in preflight.references:
-            _write_artifact_bytes = lambda name, payload: governance.atomic_write_bytes(_artifact_path(preflight, task_id, name), payload, project_root=preflight.root, allowed_root=preflight.asset_root)
-            _write_artifact_bytes("source_{0}{1}".format(item.view, Path(item.basename).suffix.lower()), item._bytes)
-        review = {"schema_version": "1.0.0", "document_kind": "meshy_candidate_review", "asset_id": preflight.contract.asset_id, "task_id": task_id, "state": "pending", "decision": "pending", "checks": {"silhouette_readable": False, "proportions_match_contract": False, "functional_volume_present": False, "movable_parts_separable": False, "cleanup_bounded": False, "camera_readability": False}, "rejection_reasons": [], "reviewer": "unassigned"}
-        _write_artifact_json(preflight, task_id, "review.json", review)
-        _write_artifact_json(preflight, task_id, "generation.json", generation_record)
-        generation_written = True
+            _write_artifact_bytes(
+                preflight,
+                candidate_dir,
+                "source_{0}{1}".format(item.view, Path(item.basename).suffix.lower()),
+                item._bytes,
+            )
+        review = {
+            "schema_version": "1.0.0",
+            "document_kind": "meshy_candidate_review",
+            "asset_id": preflight.contract.asset_id,
+            "task_id": task_id,
+            "state": "pending",
+            "decision": "pending",
+            "checks": {
+                "silhouette_readable": False,
+                "proportions_match_contract": False,
+                "functional_volume_present": False,
+                "movable_parts_separable": False,
+                "cleanup_bounded": False,
+                "camera_readability": False,
+            },
+            "rejection_reasons": [],
+            "reviewer": "unassigned",
+        }
+        _write_artifact_json(preflight, candidate_dir, "review.json", review)
+        _write_artifact_json(preflight, candidate_dir, "generation.json", generation_record)
 
         def note_consumed(value: int) -> None:
             nonlocal last_consumed
@@ -953,62 +1155,82 @@ def _stage_task(client: Any, preflight: _Preflight, task_id: str, created_at: st
             MeshyClient._validate_download_url(thumbnail_url)
         except RuntimeError as exc:
             raise _TaskFailure(_safe_error(exc), consumed)
-        _check_deadline(preflight)
-        temp_dir = Path(tempfile.mkdtemp(prefix=".download-", dir=str(task_dir)))
+        glb = _download_with_limit(client, glb_url, _GLB_MAX_BYTES, preflight)
+        thumbnail = _download_with_limit(client, thumbnail_url, _THUMBNAIL_MAX_BYTES, preflight)
         try:
-            _download_with_limit(client, glb_url, temp_dir / "raw.glb", _GLB_MAX_BYTES, preflight)
-            _check_deadline(preflight)
-            _download_with_limit(client, thumbnail_url, temp_dir / "thumbnail.png", _THUMBNAIL_MAX_BYTES, preflight)
-            glb = _read_download(temp_dir / "raw.glb", "raw.glb", _GLB_MAX_BYTES, preflight)
-            thumbnail = _read_download(temp_dir / "thumbnail.png", "thumbnail.png", _THUMBNAIL_MAX_BYTES, preflight)
-            if len(glb) <= 4 or not glb.startswith(b"glTF"):
-                raise _TaskFailure("raw.glb has an invalid GLB signature", consumed)
-            if not thumbnail.startswith(_PNG_SIGNATURE):
-                raise _TaskFailure("thumbnail.png has an invalid PNG signature", consumed)
-            if len(glb) + len(thumbnail) > _DOWNLOAD_TOTAL_MAX_BYTES:
-                raise _TaskFailure("Meshy downloads exceed aggregate size", consumed)
-            governance.atomic_write_bytes(_artifact_path(preflight, task_id, "raw.glb"), glb, project_root=preflight.root, allowed_root=preflight.asset_root)
-            governance.atomic_write_bytes(_artifact_path(preflight, task_id, "thumbnail.png"), thumbnail, project_root=preflight.root, allowed_root=preflight.asset_root)
-        finally:
-            for child in sorted(temp_dir.iterdir()) if temp_dir.exists() else []:
-                try:
-                    child.unlink()
-                except OSError:
-                    pass
-            try:
-                temp_dir.rmdir()
-            except OSError:
-                pass
-        generation_record.update({"status": "SUCCEEDED", "completed_at": _utc_timestamp(), "consumed_credits": consumed, "outputs": {"raw.glb": {"sha256": hashlib.sha256(glb).hexdigest(), "byte_size": len(glb)}, "thumbnail.png": {"sha256": hashlib.sha256(thumbnail).hexdigest(), "byte_size": len(thumbnail)}}})
-        _write_artifact_json(preflight, task_id, "generation.json", generation_record)
+            _validate_glb(glb)
+        except ValueError as exc:
+            raise _TaskFailure(_safe_error(exc), consumed)
+        if len(thumbnail) <= len(_PNG_SIGNATURE) or not thumbnail.startswith(_PNG_SIGNATURE):
+            raise _TaskFailure("thumbnail.png has an invalid PNG signature", consumed)
+        if len(glb) + len(thumbnail) > _DOWNLOAD_TOTAL_MAX_BYTES:
+            raise _TaskFailure("Meshy downloads exceed aggregate size", consumed)
+        _write_artifact_bytes(preflight, candidate_dir, "raw.glb", glb)
+        _write_artifact_bytes(preflight, candidate_dir, "thumbnail.png", thumbnail)
+        generation_record.update(
+            {
+                "status": "SUCCEEDED",
+                "completed_at": _utc_timestamp(),
+                "consumed_credits": consumed,
+                "outputs": {
+                    "raw.glb": {"sha256": hashlib.sha256(glb).hexdigest(), "byte_size": len(glb)},
+                    "thumbnail.png": {
+                        "sha256": hashlib.sha256(thumbnail).hexdigest(),
+                        "byte_size": len(thumbnail),
+                    },
+                },
+            }
+        )
+        # The success marker is written last, immediately before publication.
+        _write_artifact_json(preflight, candidate_dir, "generation.json", generation_record)
+        governance.atomic_publish_directory(
+            candidate_dir,
+            task_dir,
+            project_root=preflight.root,
+            allowed_root=preflight.asset_root,
+        )
+        candidate_dir = None
         return generation_record
     except BaseException as exc:
-        if generation_written:
+        if candidate_dir is not None and candidate_dir.exists():
             failed = dict(generation_record)
             failed["status"] = "FAILED"
             failed["consumed_credits"] = last_consumed
             failed["error"] = _safe_error(exc)
             try:
-                _write_artifact_json(preflight, task_id, "generation.json", failed)
-            except BaseException:
-                pass
+                _write_artifact_json(preflight, candidate_dir, "generation.json", failed)
+                governance.atomic_publish_directory(
+                    candidate_dir,
+                    task_dir,
+                    project_root=preflight.root,
+                    allowed_root=preflight.asset_root,
+                )
+                candidate_dir = None
+            except BaseException as publish_exc:
+                if isinstance(exc, _TaskFailure):
+                    raise _TaskFailure(_safe_error(publish_exc), last_consumed) from exc
+                raise _TaskFailure(_safe_error(publish_exc), last_consumed) from exc
         if isinstance(exc, _TaskFailure):
             raise
         raise _TaskFailure(_safe_error(exc), last_consumed)
+    finally:
+        if candidate_dir is not None and candidate_dir.exists():
+            shutil.rmtree(candidate_dir, ignore_errors=True)
 
 
 def _task_entry(index: int, task_id: Optional[str], state: str, consumed: Optional[int], error: Optional[str]) -> Dict[str, Any]:
     return {"index": index, "task_id": task_id, "state": state, "consumed_credits": consumed, "error": error}
 
 
-def generate_batch(contract: AssetContract, project_root: Path, client: Any, approved_credits: int, *, pricing_file: Optional[Path], reference_root: Path, reference_specs: object, output_license: str, today: object = None, date: object = None, clock: Optional[Callable[[], float]] = None, deadline: object = None) -> Dict[str, Any]:
-    if client is None or not all(hasattr(client, name) for name in ("get_balance", "create_task", "poll_task", "download")):
+def generate_batch(contract: AssetContract, project_root: Path, client: Any, approved_credits: int, *, pricing_file: Optional[Path], reference_root: Path, reference_specs: object, output_license: str, today: object = None, date: object = None, clock: Optional[Callable[[], float]] = None, deadline: object = _DEFAULT_DEADLINE_SECONDS) -> Dict[str, Any]:
+    if client is None or not all(hasattr(client, name) for name in ("get_balance", "create_task", "poll_task", "download_bytes")):
         raise ValueError("a Meshy client is required for generation")
     preflight = _preflight(contract, project_root, client, approved_credits, pricing_file=pricing_file, reference_root=reference_root, reference_specs=reference_specs, output_license=output_license, today=today, date=date, clock=clock, deadline=deadline)
     batch_id = uuid.uuid4().hex
     created_at = _utc_timestamp()
     tasks = [_task_entry(index, None, "PENDING", None, None) for index in range(preflight.candidate_count)]
     journal = _journal_document(preflight, batch_id, "APPROVED", tasks, 0, created_at)
+    _check_deadline(preflight)
     # This is the first filesystem mutation, and it occurs after every
     # contract/profile/pricing/reference/path/protected/credit preflight.
     _write_journal(preflight, batch_id, journal)
@@ -1026,7 +1248,7 @@ def generate_batch(contract: AssetContract, project_root: Path, client: Any, app
         journal = _journal_document(preflight, batch_id, "SUBMITTING", tasks, cumulative, created_at)
         _write_journal(preflight, batch_id, journal)
         try:
-            balance = client.get_balance()
+            balance = _call_with_deadline(client.get_balance, preflight)
         except Exception as exc:
             error = _safe_error(exc)
             tasks[index] = _task_entry(index, None, "FAILED", None, error)
@@ -1048,7 +1270,14 @@ def generate_batch(contract: AssetContract, project_root: Path, client: Any, app
             _write_journal(preflight, batch_id, _journal_document(preflight, batch_id, "FAILED", tasks, cumulative, created_at))
             raise
         try:
-            task_id = _safe_task_id(client.create_task(preflight.endpoint, preflight.transient.payload))
+            task_id = _safe_task_id(
+                _call_with_deadline(
+                    client.create_task,
+                    preflight,
+                    preflight.endpoint,
+                    preflight.transient.payload,
+                )
+            )
         except Exception as exc:
             # Keep SUBMITTING: a crash/transport failure after POST may have
             # created an unknown provider task, and R2B2 must reconcile it.
@@ -1279,7 +1508,12 @@ def load_generation_record(path: Union[str, os.PathLike]) -> Dict[str, Any]:
                 payload = governance._read_bounded_regular_file(artifact, "Meshy " + name, maximum)
             except (OSError, ValueError) as exc:
                 raise ValueError("Meshy succeeded artifact is unavailable: " + name) from exc
-            if (name == "raw.glb" and (len(payload) <= 4 or not payload.startswith(b"glTF"))) or (name == "thumbnail.png" and not payload.startswith(_PNG_SIGNATURE)):
+            if name == "raw.glb":
+                try:
+                    _validate_glb(payload)
+                except ValueError as exc:
+                    raise ValueError("Meshy succeeded artifact container is invalid: " + name) from exc
+            elif len(payload) <= len(_PNG_SIGNATURE) or not payload.startswith(_PNG_SIGNATURE):
                 raise ValueError("Meshy succeeded artifact signature is invalid: " + name)
             evidence = document["outputs"][name]
             if evidence["byte_size"] != len(payload) or evidence["sha256"] != hashlib.sha256(payload).hexdigest():
@@ -1316,6 +1550,7 @@ def _build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--reference-root", type=Path, required=True)
     generate.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
     generate.add_argument("--output-license", choices=_ALLOWED_LICENSES, required=True)
+    generate.add_argument("--deadline-seconds", type=float, default=_DEFAULT_DEADLINE_SECONDS)
     return parser
 
 
@@ -1328,7 +1563,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
-            result = generate_batch(contract, args.project_root, MeshyClient(), args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license)
+            result = generate_batch(contract, args.project_root, MeshyClient(), args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         print("error: {0}".format(_safe_error(exc)), file=sys.stderr)
         return 1

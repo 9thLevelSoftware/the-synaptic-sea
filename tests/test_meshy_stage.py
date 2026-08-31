@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 import pickle
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +49,13 @@ PROTECTED_SURFACES = (
 )
 TEST_API_KEY = "sk-test-meshy-secret"
 SIGNED_DOWNLOAD_TOKEN = "signed-download-token"
+
+
+def _valid_glb() -> bytes:
+    json_chunk = b'{"asset":{"version":"2.0"}}'
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    total = 12 + 8 + len(json_chunk)
+    return b"glTF" + struct.pack("<II", 2, total) + struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little")) + json_chunk
 
 
 class FakeMeshyClient:
@@ -100,13 +108,11 @@ class FakeMeshyClient:
         )
         return response
 
-    def download(self, url: str, destination: Path) -> None:
-        self.calls.append(("download", url, str(destination)))
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.name == "raw.glb":
-            destination.write_bytes(b"glTF" + b"\x02\x00\x00\x00")
-        else:
-            destination.write_bytes(b"\x89PNG\r\n\x1a\nthumbnail")
+    def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+        self.calls.append(("download_bytes", url, max_bytes, deadline))
+        payload = _valid_glb() if url.endswith(".glb?token=" + SIGNED_DOWNLOAD_TOKEN) else b"\x89PNG\r\n\x1a\nthumbnail"
+        assert len(payload) <= max_bytes
+        return payload
 
 
 class AtomicityFakeMeshyClient(FakeMeshyClient):
@@ -116,16 +122,11 @@ class AtomicityFakeMeshyClient(FakeMeshyClient):
         self.asset_id = asset_id
         self.current_task_dir_visible_during_download: List[bool] = []
 
-    def download(self, url: str, destination: Path) -> None:
+    def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
         task_id = next(task_id for task_id in self.created_tasks if task_id in url)
-        final_task_dir = (
-            self.project_root
-            / STAGING_RELATIVE
-            / self.asset_id
-            / task_id
-        )
+        final_task_dir = self.project_root / STAGING_RELATIVE / self.asset_id / task_id
         self.current_task_dir_visible_during_download.append(final_task_dir.exists())
-        super().download(url, destination)
+        return super().download_bytes(url, max_bytes, deadline, clock)
 
 
 @pytest.fixture
@@ -177,6 +178,121 @@ def test_plan_mode_writes_nothing_and_calls_no_api(
     assert result["candidate_count"] == 4
     assert fake_client.calls == []
     assert list(tmp_path.rglob("*")) == []
+
+
+def test_meshy_client_download_bytes_is_sealed_and_closes_response() -> None:
+    class Response:
+        status_code = 200
+
+        def __init__(self) -> None:
+            self.closed = False
+
+        def iter_content(self, chunk_size: int):
+            assert chunk_size > 0
+            return [b"one", b"", b"two"]
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Session:
+        def __init__(self) -> None:
+            self.response = Response()
+
+        def get(self, url: str, **kwargs: Any) -> Response:
+            assert url == "https://assets.meshy.ai/model.glb"
+            assert kwargs["stream"] is True
+            assert kwargs["timeout"][1] <= 120
+            return self.response
+
+    session = Session()
+    client = stage_module.MeshyClient(api_key="test", session=session)
+    assert not hasattr(client, "download")
+    assert client.download_bytes(
+        "https://assets.meshy.ai/model.glb", 10, 10.0, lambda: 0.0
+    ) == b"onetwo"
+    assert session.response.closed
+
+
+def test_meshy_client_download_bytes_rejects_deadline_and_bounds_chunks() -> None:
+    class Session:
+        def get(self, *_args: Any, **_kwargs: Any) -> Any:
+            raise AssertionError("deadline should be checked before request")
+
+    client = stage_module.MeshyClient(api_key="test", session=Session())
+    clock_values = iter((1.0, 3.0))
+    with pytest.raises(RuntimeError, match="deadline"):
+        client.download_bytes(
+            "https://assets.meshy.ai/model.glb", 10, 1.0, lambda: next(clock_values)
+        )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"glTFX",
+        b"glTF\x02\x00\x00\x00",
+        b"glTF" + struct.pack("<II", 1, 12),
+        b"glTF" + struct.pack("<II", 2, 16),
+        b"glTF" + struct.pack("<II", 2, 20) + b"\x04\x00\x00\x00JSON{}",
+    ],
+)
+def test_glb_validation_rejects_truncated_invalid_or_misaligned_containers(payload: bytes) -> None:
+    with pytest.raises(ValueError, match="GLB|glTF|chunk|length|JSON|version"):
+        stage_module._validate_glb(payload)
+
+
+def test_glb_validation_accepts_tiny_valid_padded_container() -> None:
+    stage_module._validate_glb(_valid_glb())
+
+
+def test_preflight_uses_repository_snapshot_caps(
+    tmp_path: Path, fake_client: FakeMeshyClient, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: List[Dict[str, int]] = []
+    real_snapshot = stage_module.governance.snapshot_protected_surfaces
+
+    def capture_snapshot(root: Path, **kwargs: int):
+        calls.append(kwargs)
+        return real_snapshot(root, **kwargs)
+
+    monkeypatch.setattr(stage_module.governance, "snapshot_protected_surfaces", capture_snapshot)
+    generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
+    assert calls
+    assert all(call["max_file_bytes"] >= 1024**3 for call in calls)
+    assert all(call["max_total_bytes"] >= 4 * 1024**3 for call in calls)
+    assert all(call["max_entries"] >= 20_000 for call in calls)
+    assert all(call["max_depth"] >= 128 for call in calls)
+
+
+def test_generate_deadline_is_positive_default_and_cli_exposes_it() -> None:
+    assert inspect.signature(generate_batch).parameters["deadline"].default == 1200
+    parser = stage_module._build_parser()
+    args = parser.parse_args(
+        [
+            "generate", "--project-root", "/tmp/project", "--contract", "/tmp/contract.json",
+            "--approved-credits", "1", "--reference-root", "/tmp/references",
+            "--reference", "front=front.png", "--output-license", "paid-private",
+        ]
+    )
+    assert args.deadline_seconds == 1200
+
+
+def test_polling_is_bounded_at_120_attempts_and_publishes_deadline_failure(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Pending(FakeMeshyClient):
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            self.calls.append(("poll_task", endpoint, task_id))
+            self.poll_task_ids.append(task_id)
+            return {"task_id": task_id, "status": "PENDING"}
+
+    monkeypatch.setattr(stage_module.time, "sleep", lambda _seconds: None)
+    client = Pending()
+    with pytest.raises(RuntimeError, match="did not reach SUCCEEDED"):
+        generate_batch(valid_contract, tmp_path, client, 100, deadline=1200, **_generation_kwargs(tmp_path))
+    assert len(client.poll_task_ids) == 120
+    task_dir = _stage_asset_root(tmp_path, valid_contract.asset_id) / client.created_tasks[0]
+    assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "FAILED"
 
 
 def test_generate_refuses_when_estimate_exceeds_approved_credits(
@@ -308,12 +424,33 @@ def test_staging_uses_atomic_temp_directory_rename(
     )
 
     assert client.current_task_dir_visible_during_download
-    assert all(client.current_task_dir_visible_during_download)
+    assert all(not visible for visible in client.current_task_dir_visible_during_download)
     task_dirs = sorted(path for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir() if path.name != "_batches")
     assert [path.name for path in task_dirs] == client.created_tasks
     assert all(path.is_dir() for path in task_dirs)
     assert all(not path.name.startswith(".") for path in task_dirs)
     assert _stage_asset_root(tmp_path, valid_contract.asset_id).is_dir()
+
+
+def test_failed_download_publishes_only_failed_complete_record_and_cleans_temp(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    class FailingDownload(FakeMeshyClient):
+        def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+            if ".glb?token=" in url:
+                raise RuntimeError("download failed")
+            return super().download_bytes(url, max_bytes, deadline, clock)
+
+    client = FailingDownload()
+    with pytest.raises(RuntimeError, match="download failed"):
+        generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    task_dir = asset_root / client.created_tasks[0]
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    assert generation["status"] == "FAILED"
+    assert not (task_dir / "raw.glb").exists()
+    assert not any(path.name.startswith(".task-") for path in asset_root.iterdir())
 
 
 def test_resume_is_not_exposed_until_r2b2(

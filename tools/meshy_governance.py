@@ -14,8 +14,9 @@ and identity checks are fail-closed controls for the supported threat model.
 
 from __future__ import annotations
 
-import hashlib
+import ctypes
 import errno
+import hashlib
 import inspect
 import json
 import math
@@ -1073,6 +1074,181 @@ def _atomic_write_payload(
         raise cleanup_error.with_traceback(cleanup_traceback)
 
 
+def _fsync_directory_tree(directory_fd: int) -> None:
+    """Durably flush a private task tree before publishing its directory name."""
+
+    os.fsync(directory_fd)
+    directory_flags = _pinned_directory_flags()
+    with os.scandir(directory_fd) as iterator:
+        children = sorted(iterator, key=lambda entry: entry.name)
+    for entry in children:
+        info = entry.stat(follow_symlinks=False)
+        if stat.S_ISLNK(info.st_mode):
+            raise OSError("Meshy task source contains a symlink")
+        if info.st_mode & 0o077:
+            raise OSError("Meshy task source contains a non-private entry")
+        if stat.S_ISDIR(info.st_mode):
+            child_fd: Optional[int] = None
+            try:
+                child_fd = os.open(entry.name, directory_flags, dir_fd=directory_fd)
+                opened = os.fstat(child_fd)
+                if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                    raise OSError("Meshy task source directory identity changed")
+                _fsync_directory_tree(child_fd)
+            finally:
+                if child_fd is not None:
+                    os.close(child_fd)
+        elif stat.S_ISREG(info.st_mode):
+            descriptor: Optional[int] = None
+            try:
+                descriptor = os.open(entry.name, _read_leaf_flags(), dir_fd=directory_fd)
+                opened = os.fstat(descriptor)
+                if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+                    raise OSError("Meshy task source file identity changed")
+                os.fsync(descriptor)
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
+        else:
+            raise OSError("Meshy task source contains a non-regular entry")
+
+
+def _rename_directory_noreplace(parent_fd: int, source_name: str, final_name: str) -> None:
+    """Use the platform's directory-relative exclusive rename primitive."""
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameatx_np = getattr(libc, "renameatx_np", None)
+    if renameatx_np is not None:
+        renameatx_np.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        renameatx_np.restype = ctypes.c_int
+        result = renameatx_np(
+            parent_fd,
+            os.fsencode(source_name),
+            parent_fd,
+            os.fsencode(final_name),
+            ctypes.c_uint(0x00000004),  # RENAME_EXCL on Darwin.
+        )
+        if result == 0:
+            return
+        error_number = ctypes.get_errno()
+        if error_number == errno.EEXIST:
+            raise ValueError("Meshy final task directory appeared during publication")
+        raise OSError(error_number, os.strerror(error_number))
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is not None:
+        renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        renameat2.restype = ctypes.c_int
+        result = renameat2(
+            parent_fd,
+            os.fsencode(source_name),
+            parent_fd,
+            os.fsencode(final_name),
+            ctypes.c_uint(1),  # RENAME_NOREPLACE on Linux.
+        )
+        if result == 0:
+            return
+        error_number = ctypes.get_errno()
+        if error_number == errno.EEXIST:
+            raise ValueError("Meshy final task directory appeared during publication")
+        raise OSError(error_number, os.strerror(error_number))
+    # No portable exclusive primitive is safe to emulate with os.rename:
+    # that call replaces an existing destination.  Fail closed instead.
+    raise OSError("Meshy publication requires an exclusive directory rename primitive")
+
+
+def atomic_publish_directory(
+    source_dir: Union[str, os.PathLike],
+    final_dir: Union[str, os.PathLike],
+    project_root: Union[str, os.PathLike],
+    allowed_root: Union[str, os.PathLike],
+) -> None:
+    """Atomically publish a complete private task directory without replacement.
+
+    ``source_dir`` and ``final_dir`` must be direct siblings under an existing,
+    pinned ``allowed_root``.  The source is recursively fsynced and renamed
+    relative to the pinned parent descriptor; the parent is fsynced after the
+    rename.  This is a trusted-workspace boundary, not a claim against a
+    malicious same-UID actor racing every descriptor operation.
+    """
+
+    physical = physical_project_root(project_root)
+    source = _path_from_explicit_root(project_root, physical, source_dir)
+    final = _path_from_explicit_root(project_root, physical, final_dir)
+    allowed = _path_from_explicit_root(project_root, physical, allowed_root)
+    if source == final or source.name in ("", ".", "..") or final.name in ("", ".", ".."):
+        raise ValueError("Meshy task directories must have distinct names")
+    if source.parent != final.parent:
+        raise ValueError("Meshy task directories must be direct siblings")
+    _reject_symlink_components_below(physical, allowed, "Meshy allowed root")
+    _reject_symlink_components_below(physical, source, "Meshy task source")
+    _reject_symlink_components_below(physical, final, "Meshy task final")
+    if not _contained(allowed, source.parent) or not _contained(allowed, source):
+        raise ValueError("Meshy task directories must be under the allowed root")
+    if not allowed.exists() or not allowed.is_dir():
+        raise ValueError("Meshy allowed root is not a directory")
+    try:
+        source_info = os.lstat(source)
+    except FileNotFoundError as exc:
+        raise ValueError("Meshy task source directory is missing") from exc
+    if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISDIR(source_info.st_mode):
+        raise ValueError("Meshy task source must be a private directory")
+    if source_info.st_mode & 0o077:
+        raise ValueError("Meshy task source directory must be private")
+    try:
+        os.lstat(final)
+    except FileNotFoundError:
+        pass
+    else:
+        raise ValueError("Meshy final task directory already exists")
+
+    identities = _snapshot_identities(source, "Meshy task source")
+    parent_identity = identities.get(source.parent.parts)
+    if parent_identity is None:
+        raise OSError("Meshy task parent disappeared during validation")
+    hook = _ATOMIC_VALIDATION_HOOK
+    if hook is not None:
+        hook(final)
+
+    parent_fd: Optional[int] = None
+    source_fd: Optional[int] = None
+    try:
+        parent_fd = _open_pinned_parent(source, identities, _pinned_directory_flags())
+        _check_fd_identity(parent_fd, parent_identity, "Meshy task parent")
+        try:
+            source_fd = os.open(source.name, _pinned_directory_flags(), dir_fd=parent_fd)
+        except FileNotFoundError as exc:
+            raise OSError("Meshy task source disappeared after validation") from exc
+        opened_source = os.fstat(source_fd)
+        if (opened_source.st_dev, opened_source.st_ino) != (source_info.st_dev, source_info.st_ino):
+            raise OSError("Meshy task source identity changed after validation")
+        if not stat.S_ISDIR(opened_source.st_mode) or opened_source.st_mode & 0o077:
+            raise OSError("Meshy task source is no longer a private directory")
+        try:
+            os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ValueError("Meshy final task directory appeared during publication")
+        _fsync_directory_tree(source_fd)
+        try:
+            os.stat(final.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ValueError("Meshy final task directory appeared during publication")
+        _rename_directory_noreplace(parent_fd, source.name, final.name)
+        assert source_fd is not None
+        published_source_fd = source_fd
+        source_fd = None
+        os.close(published_source_fd)
+        os.fsync(parent_fd)
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
 def atomic_write_bytes(
     path: Union[str, os.PathLike],
     payload: bytes,
@@ -1101,6 +1277,7 @@ __all__ = [
     "STAGING_RELATIVE",
     "PROTECTED_RUNTIME_RELATIVE_PATHS",
     "ProtectedSurfaceRecord",
+    "atomic_publish_directory",
     "atomic_write_bytes",
     "atomic_write_json",
     "canonical_json_bytes",

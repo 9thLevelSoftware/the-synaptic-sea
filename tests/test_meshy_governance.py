@@ -380,6 +380,62 @@ def test_atomic_write_bytes_publishes_exact_bytes_with_private_mode(tmp_path: Pa
     assert not list(target.parent.glob(".*.tmp"))
 
 
+def test_atomic_publish_directory_renames_complete_private_tree(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    parent = root / STAGING / "asset"
+    parent.mkdir()
+    source = parent / ".task-id-random.tmp"
+    final = parent / "task-id"
+    source.mkdir(mode=0o700)
+    governance.atomic_write_bytes(source / "raw.glb", b"complete", root, parent)
+
+    governance.atomic_publish_directory(source, final, root, parent)
+
+    assert final.is_dir()
+    assert (final / "raw.glb").read_bytes() == b"complete"
+    assert not source.exists()
+
+
+def test_atomic_publish_directory_rejects_existing_final_and_symlink_source(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    parent = root / STAGING / "asset"
+    parent.mkdir()
+    source = parent / ".task-id-random.tmp"
+    final = parent / "task-id"
+    source.mkdir(mode=0o700)
+    final.mkdir()
+    with pytest.raises(ValueError, match="existing|final"):
+        governance.atomic_publish_directory(source, final, root, parent)
+
+    final.rmdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    source.rmdir()
+    source.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink|regular|directory"):
+        governance.atomic_publish_directory(source, final, root, parent)
+
+
+def test_atomic_publish_directory_rejects_parent_rebind_and_leaves_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = make_project(tmp_path)
+    parent = root / STAGING / "asset"
+    parent.mkdir()
+    source = parent / ".task-id-random.tmp"
+    final = parent / "task-id"
+    source.mkdir(mode=0o700)
+    moved = root / STAGING / "asset-moved"
+
+    def rebind(_path: Path) -> None:
+        parent.rename(moved)
+        parent.mkdir()
+
+    monkeypatch.setattr(governance, "_ATOMIC_VALIDATION_HOOK", rebind)
+    with pytest.raises(OSError, match="identity|changed|validation"):
+        governance.atomic_publish_directory(source, final, root, parent)
+    assert not final.exists()
+    assert (moved / source.name).is_dir()
+
+
 def test_atomic_write_bytes_uses_pinned_parent_and_preserves_primary_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
