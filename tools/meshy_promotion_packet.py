@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Create review-only Meshy promotion proposals with complete provenance.
+"""Create immutable, review-only Meshy promotion proposal leaves.
 
-This module deliberately writes only proposal records beneath
-``assets/_staging/meshy``.  It never applies a sidecar, generated index,
-threat catalog, wrapper, or imported asset change.
+The proposal boundary consumes only a governed task whose candidate review has
+already been independently verified as ``promotion_ready``.  It writes no
+runtime asset, catalog, wrapper, index, or imported sidecar.
 """
 
 from __future__ import annotations
@@ -15,18 +15,18 @@ import os
 import re
 import stat
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from urllib.parse import parse_qsl, urlsplit
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools import meshy_candidate_review as candidate_review  # noqa: E402
+from tools import meshy_governance as governance  # noqa: E402
 from tools.meshy_asset_contract import canonical_json_bytes  # noqa: E402
 
 
-STAGING_RELATIVE = Path("assets/_staging/meshy")
 PROP_OVERLAY_NAME = "sidecar-overlay.json"
 THREAT_PATCH_NAME = "threat_visual_catalog.patch.json"
 ASSET_PROVENANCE_NAME = "asset-provenance.json"
@@ -37,6 +37,7 @@ ASSET_PROVENANCE_DOCUMENT_KIND = "asset_provenance"
 IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+RIGHTS_STATES = frozenset(("paid-private", "free-cc-by-4.0"))
 FORBIDDEN_SECRET_FIELD_RE = re.compile(
     r"(?:api[_-]?key|authorization|access[_-]?token|client[_-]?secret|password|private[_-]?key|secret)",
     re.IGNORECASE,
@@ -55,73 +56,18 @@ SIGNED_QUERY_KEYS = {
     "x-amz-signature",
     "x-amz-signedheaders",
     "se",
-    "sig",
     "sp",
     "sr",
     "st",
     "sv",
     "token",
 }
-RIGHTS_STATES = {"paid-private", "free-cc-by-4.0", "project-owned"}
 
 PathLike = Union[str, Path]
 
 
 class PromotionPacketError(ValueError):
     """Raised when a promotion proposal cannot pass its safety gates."""
-
-
-def _contained(root: Path, candidate: Path) -> bool:
-    return candidate == root or root in candidate.parents
-
-
-def _project_path(project_root: Path, value: PathLike) -> Path:
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = Path(project_root) / path
-    return path.resolve(strict=False)
-
-
-def _reject_symlink_components(path: Path, label: str) -> None:
-    absolute = Path(os.path.abspath(os.fspath(path)))
-    current = Path(absolute.anchor)
-    for part in absolute.parts[1:]:
-        current /= part
-        try:
-            mode = current.lstat().st_mode
-        except FileNotFoundError:
-            break
-        except OSError as exc:
-            raise PromotionPacketError("cannot inspect {0}".format(label)) from exc
-        if stat.S_ISLNK(mode) and current not in (Path("/tmp"), Path("/var")):
-            raise PromotionPacketError("{0} contains symlink component".format(label))
-
-
-def _staging_path(project_root: Path, value: PathLike, label: str) -> Path:
-    root = Path(project_root).expanduser().resolve(strict=False)
-    staging = root / STAGING_RELATIVE
-    path = _project_path(root, value)
-    staging_resolved = staging.resolve(strict=False)
-    if not _contained(staging_resolved, path):
-        raise PromotionPacketError(
-            "{0} must be inside {1}".format(label, STAGING_RELATIVE.as_posix())
-        )
-    _reject_symlink_components(path, label)
-    return path
-
-
-def _read_json(path: Path, label: str) -> object:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
-        raise PromotionPacketError("invalid JSON in {0}".format(label)) from exc
-
-
-def _copy_json(value: object) -> object:
-    try:
-        return json.loads(canonical_json_bytes(value).decode("utf-8"))
-    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
-        raise PromotionPacketError("proposal fields must be JSON serializable") from exc
 
 
 def _security_diagnostics(value: object, label: str = "") -> List[str]:
@@ -150,7 +96,9 @@ def _security_diagnostics(value: object, label: str = "") -> List[str]:
         elif isinstance(current, str):
             parsed = urlsplit(current)
             if parsed.scheme.lower() in ("http", "https"):
-                query_keys = {key.lower() for key, _value in parse_qsl(parsed.query, keep_blank_values=True)}
+                query_keys = {
+                    key.lower() for key, _value in parse_qsl(parsed.query, keep_blank_values=True)
+                }
                 if query_keys.intersection(SIGNED_QUERY_KEYS) or "signed" in parsed.path.lower():
                     diagnostics.append("signed URL is not allowed: {0}".format(current_label))
             if API_KEY_VALUE_RE.search(current):
@@ -164,36 +112,42 @@ def _hash_diagnostic(value: object, label: str, errors: List[str]) -> None:
 
 
 def validate_ai_provenance(value: object) -> List[str]:
-    """Return deterministic diagnostics for the ADR-0052 AI provenance envelope."""
+    """Return deterministic diagnostics for the proposal provenance envelope."""
     errors = _security_diagnostics(value)
     if not isinstance(value, dict):
-        errors.append("provenance envelope must be an object")
-        return sorted(set(errors))
+        return errors + ["provenance envelope must be an object"]
 
-    unknown = sorted(set(value) - {"provenance", "extensions"})
-    errors.extend("unknown provenance envelope field: {0}".format(key) for key in unknown)
+    if set(value) != {"provenance", "extensions"}:
+        errors.extend(
+            "unknown or missing provenance envelope field: {0}".format(key)
+            for key in sorted(set(value) ^ {"provenance", "extensions"})
+        )
 
     provenance = value.get("provenance")
     if not isinstance(provenance, dict):
         errors.append("provenance must be an object")
     else:
-        unknown_provenance = sorted(set(provenance) - {"license_state", "source_platform"})
-        errors.extend("unknown provenance field: {0}".format(key) for key in unknown_provenance)
-        license_state = provenance.get("license_state")
-        if not isinstance(license_state, str) or not license_state:
-            errors.append("provenance.license_state is required")
-        elif license_state not in RIGHTS_STATES:
+        if set(provenance) != {"provider", "license_state"}:
+            errors.extend(
+                "unknown or missing provenance field: {0}".format(key)
+                for key in sorted(set(provenance) ^ {"provider", "license_state"})
+            )
+        if provenance.get("provider") != "meshy":
+            errors.append("provenance.provider must be meshy")
+        if provenance.get("license_state") not in RIGHTS_STATES:
             errors.append("provenance.license_state is not an approved rights state")
-        source_platform = provenance.get("source_platform")
-        if source_platform != "meshy":
-            errors.append("provenance.source_platform must be meshy")
 
     extensions = value.get("extensions")
     if not isinstance(extensions, dict):
         errors.append("extensions must be an object")
     else:
-        unknown_extensions = sorted(set(extensions) - {"ai_generation"})
-        errors.extend("unknown extensions field: {0}".format(key) for key in unknown_extensions)
+        if set(extensions) != {"ai_generated", "ai_generation"}:
+            errors.extend(
+                "unknown or missing extensions field: {0}".format(key)
+                for key in sorted(set(extensions) ^ {"ai_generated", "ai_generation"})
+            )
+        if extensions.get("ai_generated") is not True:
+            errors.append("extensions.ai_generated must be true")
         ai_generation = extensions.get("ai_generation")
         required = {
             "provider",
@@ -209,15 +163,11 @@ def validate_ai_provenance(value: object) -> List[str]:
         if not isinstance(ai_generation, dict):
             errors.append("extensions.ai_generation must be an object")
         else:
-            unknown_ai = sorted(set(ai_generation) - required)
-            errors.extend("unknown ai_generation field: {0}".format(key) for key in unknown_ai)
-            for field in sorted(required):
-                if field not in ai_generation:
-                    if field.endswith("sha256"):
-                        errors.append("extensions.ai_generation missing hash field: {0}".format(field))
-                    else:
-                        errors.append("extensions.ai_generation missing field: {0}".format(field))
-
+            if set(ai_generation) != required:
+                errors.extend(
+                    "unknown or missing ai_generation field: {0}".format(key)
+                    for key in sorted(set(ai_generation) ^ required)
+                )
             if ai_generation.get("provider") != "meshy":
                 errors.append("extensions.ai_generation.provider must be meshy")
             task_id = ai_generation.get("task_id")
@@ -225,24 +175,32 @@ def validate_ai_provenance(value: object) -> List[str]:
                 errors.append("extensions.ai_generation.task_id must be a safe identifier")
             if not isinstance(ai_generation.get("model"), str) or not ai_generation.get("model"):
                 errors.append("extensions.ai_generation.model is required")
-
             inputs = ai_generation.get("input_sha256")
             if not isinstance(inputs, list) or not inputs:
                 errors.append("extensions.ai_generation.input_sha256 must be a non-empty list")
             else:
-                if len(inputs) != len(set(item for item in inputs if isinstance(item, str))):
+                if any(not isinstance(item, str) for item in inputs):
+                    errors.append("extensions.ai_generation.input_sha256 must contain hashes")
+                if len(inputs) != len(set(inputs)):
                     errors.append("extensions.ai_generation.input_sha256 must contain unique hashes")
                 for index, item in enumerate(inputs):
                     _hash_diagnostic(item, "extensions.ai_generation.input_sha256[{0}]".format(index), errors)
-
             for field in ("raw_output_sha256", "cleaned_output_sha256", "contract_sha256"):
-                _hash_diagnostic(ai_generation.get(field), "extensions.ai_generation." + field, errors)
+                _hash_diagnostic(
+                    ai_generation.get(field), "extensions.ai_generation." + field, errors
+                )
             if ai_generation.get("human_cleanup") is not True:
                 errors.append("extensions.ai_generation.human_cleanup must be true")
             if not isinstance(ai_generation.get("reviewer"), str) or not ai_generation.get("reviewer", "").strip():
                 errors.append("extensions.ai_generation.reviewer is required")
-
     return sorted(set(errors))
+
+
+def _copy_json(value: object) -> object:
+    try:
+        return json.loads(canonical_json_bytes(value).decode("utf-8"))
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise PromotionPacketError("proposal fields must be JSON serializable") from exc
 
 
 def _validated_envelope(value: object) -> Dict[str, Any]:
@@ -254,49 +212,99 @@ def _validated_envelope(value: object) -> Dict[str, Any]:
     return copied
 
 
-def _validate_task_dir(project_root: Path, task_dir: PathLike) -> Tuple[Path, str, str]:
-    root = Path(project_root).expanduser().resolve(strict=False)
-    resolved = _staging_path(root, task_dir, "task directory")
-    if not resolved.exists() or not resolved.is_dir() or resolved.is_symlink():
-        raise PromotionPacketError("task directory must be an existing directory")
-    try:
-        relative = resolved.relative_to((root / STAGING_RELATIVE).resolve(strict=False))
-    except ValueError as exc:
-        raise PromotionPacketError("task directory must be inside Meshy staging") from exc
-    parts = relative.parts
-    if len(parts) < 2:
-        raise PromotionPacketError("task directory must include asset and task identifiers")
-    asset_id, task_id = parts[0], parts[-1]
-    if IDENTIFIER_RE.fullmatch(asset_id) is None:
-        raise PromotionPacketError("staged asset id is not a safe identifier")
-    if TASK_ID_RE.fullmatch(task_id) is None:
-        raise PromotionPacketError("staged task id is not a safe identifier")
-    return resolved, asset_id, task_id
-
-
 def _hash_file(path: Path, label: str) -> str:
     try:
-        mode = path.lstat().st_mode
+        info = path.lstat()
     except OSError as exc:
         raise PromotionPacketError("missing {0}".format(label)) from exc
-    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode) or path.stat().st_size <= 0:
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_size <= 0:
         raise PromotionPacketError("{0} must be a non-empty regular file".format(label))
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        return governance.file_sha256(path)
+    except (OSError, ValueError) as exc:
+        raise PromotionPacketError("could not hash {0}".format(label)) from exc
 
 
-def _logical_staging_path(project_root: Path, path: PathLike, label: str) -> str:
-    resolved = _staging_path(project_root, path, label)
-    root = Path(project_root).expanduser().resolve(strict=False)
-    return "res://" + resolved.relative_to(root).as_posix()
-
-
-def _default_asset_id(task_dir: Path) -> str:
-    return task_dir.parent.name
-
-
-def _default_prop_target(asset_id: str, prop_kind: str) -> str:
-    group = {"component": "components", "dressing": "dressing", "objective": "objectives"}.get(prop_kind, "dressing")
-    return "res://assets/imported/props/{0}/{1}.sidecar.json".format(group, asset_id)
+def _verified_task(
+    project_root: PathLike, task_dir: PathLike
+) -> Tuple[Path, Path, str, str, Dict[str, Any], Dict[str, Any]]:
+    """Return only task data authenticated by the candidate/runtime authority."""
+    try:
+        root, resolved_task, asset_root, asset_id, task_id = candidate_review._task_layout(
+            project_root, task_dir
+        )
+        review = candidate_review.verify_review(root, resolved_task)
+        if review.get("state") != "promotion_ready":
+            raise PromotionPacketError("promotion proposal requires promotion_ready evidence")
+        _review_path, canonical_review, generation, root, _asset_root = candidate_review._load_task_record(
+            root, resolved_task
+        )
+        if canonical_review != review:
+            raise PromotionPacketError("canonical promotion review changed during verification")
+        if generation.get("status") != "SUCCEEDED":
+            raise PromotionPacketError("promotion proposal requires SUCCEEDED generation evidence")
+        if generation.get("asset_id") != asset_id or generation.get("task_id") != task_id:
+            raise PromotionPacketError("generation identity does not match task directory")
+        generation_provenance = generation.get("provenance")
+        if not isinstance(generation_provenance, dict) or set(generation_provenance) != {
+            "provider",
+            "model",
+            "license_state",
+        }:
+            raise PromotionPacketError("generation provenance is incomplete")
+        output_license = generation.get("output_license")
+        if output_license not in RIGHTS_STATES:
+            raise PromotionPacketError("generation output license is not approved")
+        if (
+            generation_provenance.get("provider") != "meshy"
+            or generation_provenance.get("license_state") != output_license
+            or not isinstance(generation_provenance.get("model"), str)
+            or not generation_provenance.get("model")
+        ):
+            raise PromotionPacketError("generation provenance and output license disagree")
+        inputs = generation.get("input_image_hashes")
+        if not isinstance(inputs, dict) or not inputs:
+            raise PromotionPacketError("generation input_image_hashes are missing")
+        input_hashes = [inputs[key] for key in sorted(inputs)]
+        for index, value in enumerate(input_hashes):
+            if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
+                raise PromotionPacketError("generation input hash is invalid at index {0}".format(index))
+        outputs = generation.get("outputs")
+        raw_output = outputs.get("raw.glb") if isinstance(outputs, dict) else None
+        raw_hash = raw_output.get("sha256") if isinstance(raw_output, dict) else None
+        if not isinstance(raw_hash, str) or SHA256_RE.fullmatch(raw_hash) is None:
+            raise PromotionPacketError("generation raw.glb hash is missing")
+        contract_hash = generation.get("contract_sha256")
+        if not isinstance(contract_hash, str) or SHA256_RE.fullmatch(contract_hash) is None:
+            raise PromotionPacketError("generation contract hash is invalid")
+        reviewer = canonical_review.get("reviewer")
+        if not isinstance(reviewer, str) or not reviewer.strip():
+            raise PromotionPacketError("promotion review reviewer is missing")
+        cleaned = candidate_review._governed_artifact(root, resolved_task, "cleaned.glb")
+        cleaned_hash = _hash_file(cleaned, "cleaned.glb")
+        envelope = {
+            "provenance": {"provider": "meshy", "license_state": output_license},
+            "extensions": {
+                "ai_generated": True,
+                "ai_generation": {
+                    "provider": "meshy",
+                    "task_id": task_id,
+                    "model": generation_provenance["model"],
+                    "input_sha256": input_hashes,
+                    "raw_output_sha256": raw_hash,
+                    "cleaned_output_sha256": cleaned_hash,
+                    "contract_sha256": contract_hash,
+                    "human_cleanup": True,
+                    "reviewer": reviewer,
+                },
+            },
+        }
+        _validated_envelope(envelope)
+        return root, resolved_task, asset_id, task_id, envelope, generation
+    except PromotionPacketError:
+        raise
+    except (candidate_review.ReviewError, OSError, TypeError, ValueError, RuntimeError, RecursionError) as exc:
+        raise PromotionPacketError("canonical promotion evidence is not valid: {0}".format(exc)) from exc
 
 
 def _target_path(value: object, label: str) -> str:
@@ -304,80 +312,78 @@ def _target_path(value: object, label: str) -> str:
         raise PromotionPacketError("{0} must be a non-empty path".format(label))
     if "\x00" in value or value.startswith("http://") or value.startswith("https://"):
         raise PromotionPacketError("{0} must not be a URL".format(label))
+    if not value.startswith("res://"):
+        raise PromotionPacketError("{0} must be a res:// path".format(label))
+    relative = value[6:]
+    parts = relative.split("/")
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        raise PromotionPacketError("{0} must not contain traversal".format(label))
     return value
 
 
-def _provenance_from_task(task_dir: Path, cleaned_output: Path) -> Dict[str, Any]:
-    generation = _read_json(task_dir / "generation.json", "generation.json")
-    review = _read_json(task_dir / "review.json", "review.json")
-    if not isinstance(generation, dict):
-        raise PromotionPacketError("generation.json must be an object")
-    if not isinstance(review, dict):
-        raise PromotionPacketError("review.json must be an object")
-    generation_provenance = generation.get("provenance")
-    if not isinstance(generation_provenance, dict):
-        raise PromotionPacketError("generation provenance is missing")
-    outputs = generation.get("outputs")
-    if not isinstance(outputs, dict) or not isinstance(outputs.get("raw.glb"), dict):
-        raise PromotionPacketError("generation raw output hash is missing")
-    raw_output = outputs["raw.glb"].get("sha256")
-    input_hashes = generation.get("input_sha256")
-    if input_hashes is None:
-        input_hashes = generation.get("input_image_hashes")
-    if isinstance(input_hashes, dict):
-        input_hashes = [input_hashes[key] for key in sorted(input_hashes)]
-    ai_generation = {
-        "provider": generation_provenance.get("provider"),
-        "task_id": generation.get("task_id"),
-        "model": generation_provenance.get("model"),
-        "input_sha256": input_hashes,
-        "raw_output_sha256": raw_output,
-        "cleaned_output_sha256": _hash_file(cleaned_output, "cleaned.glb"),
-        "contract_sha256": generation.get("contract_sha256"),
-        "human_cleanup": generation.get("human_cleanup", False),
-        "reviewer": review.get("reviewer"),
-    }
-    return {
-        "provenance": {
-            "license_state": generation_provenance.get("license_state"),
-            "source_platform": generation_provenance.get("source_platform", generation_provenance.get("provider")),
-        },
-        "extensions": {"ai_generation": ai_generation},
-    }
+def _default_prop_target(asset_id: str, prop_kind: str) -> str:
+    group = {
+        "component": "components",
+        "dressing": "dressing",
+        "objective": "objectives",
+    }[prop_kind]
+    return "res://assets/imported/props/{0}/{1}.sidecar.json".format(group, asset_id)
 
 
-def _resolve_envelope(
-    provenance: Optional[Mapping[str, Any]], task_dir: Path, cleaned_output: Path
-) -> Dict[str, Any]:
-    if provenance is None:
-        return _validated_envelope(_provenance_from_task(task_dir, cleaned_output))
-    return _validated_envelope(provenance)
+def _validate_prop_target(value: object) -> str:
+    target = _target_path(value, "target path")
+    if not target.startswith("res://assets/imported/props/") or not target.endswith(".sidecar.json"):
+        raise PromotionPacketError("target path must be an imported prop sidecar path")
+    return target
+
+
+def _archetype_for(asset_id: str, archetype: Optional[str]) -> str:
+    value = archetype or re.sub(r"_v[0-9]+$", "", asset_id)
+    if not value or IDENTIFIER_RE.fullmatch(value) is None:
+        raise PromotionPacketError("threat archetype must be a safe identifier")
+    return value
+
+
+def _logical_cleaned_path(root: Path, task_dir: Path) -> str:
+    cleaned = candidate_review._governed_artifact(root, task_dir, "cleaned.glb")
+    return "res://" + cleaned.relative_to(root).as_posix()
+
+
+def _validate_threat_mesh_path(
+    root: Path, task_dir: Path, mesh_path: Optional[PathLike]
+) -> str:
+    expected = _logical_cleaned_path(root, task_dir)
+    if mesh_path is None:
+        return expected
+    if isinstance(mesh_path, (Path, os.PathLike)) and not isinstance(mesh_path, str):
+        try:
+            candidate = governance.governed_task_path(
+                root, mesh_path, "threat mesh path", allow_missing=False
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            raise PromotionPacketError("threat mesh path is not governed") from exc
+        if candidate != task_dir / "cleaned.glb":
+            raise PromotionPacketError("threat mesh path must be the fixed cleaned.glb leaf")
+        return expected
+    if not isinstance(mesh_path, str) or mesh_path != expected:
+        raise PromotionPacketError("threat mesh path must be the fixed cleaned.glb leaf")
+    return expected
 
 
 def build_prop_promotion_proposal(
-    project_root: Path,
+    project_root: PathLike,
     task_dir: PathLike,
     *,
-    provenance: Optional[Mapping[str, Any]] = None,
     target_path: Optional[str] = None,
-    output_path: Optional[PathLike] = None,
-    cleaned_output: Optional[PathLike] = None,
     prop_kind: str = "dressing",
 ) -> Dict[str, Any]:
-    """Build a sidecar overlay without writing it or touching live paths."""
-    root = Path(project_root).expanduser().resolve(strict=False)
-    resolved_task, asset_id, task_id = _validate_task_dir(root, task_dir)
+    """Build a sidecar overlay from verified evidence without writing it."""
     if prop_kind not in ("component", "dressing", "objective"):
         raise PromotionPacketError("prop_kind must be component, dressing, or objective")
-    cleaned = _staging_path(root, cleaned_output or (resolved_task / "cleaned.glb"), "cleaned output path")
-    envelope = _resolve_envelope(provenance, resolved_task, cleaned)
-    ai_generation = envelope["extensions"]["ai_generation"]
-    if ai_generation["task_id"] != task_id:
-        raise PromotionPacketError("AI provenance task_id does not match task directory")
-    destination = _staging_path(root, output_path or (resolved_task / PROP_OVERLAY_NAME), "proposal output path")
-    if destination == cleaned:
-        raise PromotionPacketError("proposal output path must not replace cleaned output")
-    target = _target_path(target_path or _default_prop_target(asset_id, prop_kind), "target path")
+    root, resolved_task, asset_id, task_id, envelope, _generation = _verified_task(
+        project_root, task_dir
+    )
+    target = _validate_prop_target(target_path or _default_prop_target(asset_id, prop_kind))
     document: Dict[str, Any] = {
         "asset_id": asset_id,
         "document_kind": PROP_DOCUMENT_KIND,
@@ -388,8 +394,6 @@ def build_prop_promotion_proposal(
         "target_path": target,
         "task_id": task_id,
     }
-    # Scan the complete serialized proposal so no caller-supplied field can
-    # smuggle a URL or credential around the provenance validator.
     security_errors = _security_diagnostics(document)
     if security_errors:
         raise PromotionPacketError("unsafe promotion proposal: " + "; ".join(security_errors))
@@ -397,45 +401,18 @@ def build_prop_promotion_proposal(
     return document
 
 
-def _archetype_for(asset_id: str, archetype: Optional[str]) -> str:
-    value = archetype or re.sub(r"_v[0-9]+$", "", asset_id)
-    if not value or IDENTIFIER_RE.fullmatch(value) is None:
-        raise PromotionPacketError("threat archetype must be a safe identifier")
-    return value
-
-
 def build_threat_promotion_proposal(
-    project_root: Path,
+    project_root: PathLike,
     task_dir: PathLike,
     *,
-    provenance: Optional[Mapping[str, Any]] = None,
     mesh_path: Optional[PathLike] = None,
-    output_path: Optional[PathLike] = None,
-    provenance_output_path: Optional[PathLike] = None,
-    cleaned_output: Optional[PathLike] = None,
     archetype: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Build a threat catalog patch and generic provenance record."""
-    root = Path(project_root).expanduser().resolve(strict=False)
-    resolved_task, asset_id, task_id = _validate_task_dir(root, task_dir)
-    cleaned = _staging_path(root, cleaned_output or (resolved_task / "cleaned.glb"), "cleaned output path")
-    envelope = _resolve_envelope(provenance, resolved_task, cleaned)
-    ai_generation = envelope["extensions"]["ai_generation"]
-    if ai_generation["task_id"] != task_id:
-        raise PromotionPacketError("AI provenance task_id does not match task directory")
-    if mesh_path is None:
-        logical_mesh_path = _logical_staging_path(root, cleaned, "cleaned output path")
-    elif isinstance(mesh_path, Path):
-        logical_mesh_path = _logical_staging_path(root, mesh_path, "threat mesh output path")
-    else:
-        logical_mesh_path = _target_path(mesh_path, "threat mesh path")
-        if not logical_mesh_path.startswith("res://"):
-            raise PromotionPacketError("threat mesh path must be a contained res:// path")
-        relative = logical_mesh_path[6:]
-        if not relative or any(part in ("", ".", "..") for part in relative.split("/")):
-            raise PromotionPacketError("threat mesh path must be a contained res:// path")
-        _staging_path(root, root / Path(relative), "threat mesh output path")
-
+    """Build a threat catalog patch and provenance record without writing them."""
+    root, resolved_task, asset_id, task_id, envelope, _generation = _verified_task(
+        project_root, task_dir
+    )
+    logical_mesh_path = _validate_threat_mesh_path(root, resolved_task, mesh_path)
     archetype_id = _archetype_for(asset_id, archetype)
     patch = {
         "archetype": archetype_id,
@@ -474,62 +451,123 @@ def build_threat_promotion_proposal(
         if security_errors:
             raise PromotionPacketError("unsafe promotion proposal: " + "; ".join(security_errors))
         _copy_json(value)
-
-    _staging_path(root, output_path or (resolved_task / THREAT_PATCH_NAME), "catalog patch output path")
-    _staging_path(root, provenance_output_path or (resolved_task / ASSET_PROVENANCE_NAME), "asset provenance output path")
     return wrapper
 
 
-def _atomic_write(path: Path, value: object) -> None:
-    destination = Path(path)
-    if destination.exists() and (destination.is_symlink() or not destination.is_file()):
-        raise PromotionPacketError("proposal output must be a regular file")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix="." + destination.name + ".", suffix=".tmp", dir=str(destination.parent)
-    )
-    temporary = Path(temporary_name)
+def _layout_for_publication(
+    project_root: PathLike, task_dir: PathLike
+) -> Tuple[Path, Path]:
     try:
-        with os.fdopen(descriptor, "wb") as handle:
-            descriptor = -1
-            handle.write(canonical_json_bytes(value))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(str(temporary), str(destination))
-    finally:
-        if descriptor != -1:
-            os.close(descriptor)
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+        root, resolved_task, _asset_root, _asset_id, _task_id = candidate_review._task_layout(
+            project_root, task_dir
+        )
+        return root, resolved_task
+    except (candidate_review.ReviewError, OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise PromotionPacketError("task directory is not governed") from exc
+
+
+def _fixed_leaf(root: Path, task_dir: Path, name: str) -> Path:
+    try:
+        return governance.governed_task_path(
+            root, task_dir / name, "Meshy fixed proposal " + name, allow_missing=True
+        )
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise PromotionPacketError("fixed proposal leaf is not governed: " + name) from exc
+
+
+def _preflight_leaf(path: Path, expected: bytes, label: str) -> bool:
+    if not os.path.lexists(path):
+        return False
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise PromotionPacketError("cannot inspect existing {0}".format(label)) from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise PromotionPacketError("existing {0} must be a regular non-symlink file".format(label))
+    if stat.S_IMODE(info.st_mode) != 0o600:
+        raise PromotionPacketError("existing {0} must use mode 0600".format(label))
+    try:
+        actual = path.read_bytes()
+    except (OSError, UnicodeError) as exc:
+        raise PromotionPacketError("existing {0} cannot be read".format(label)) from exc
+    if actual != expected:
+        raise PromotionPacketError("existing {0} is not the exact canonical proposal".format(label))
+    return True
+
+
+def _publish_missing_leaf(
+    root: Path, task_dir: Path, path: Path, value: object, expected: bytes, label: str
+) -> None:
+    try:
+        governance.atomic_write_json(
+            path, value, project_root=root, allowed_root=task_dir, mode=0o600
+        )
+        _preflight_leaf(path, expected, label)
+    except PromotionPacketError:
+        raise
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise PromotionPacketError("proposal publication failed for {0}".format(label)) from exc
 
 
 def write_prop_promotion_proposal(
-    project_root: Path,
+    project_root: PathLike,
     task_dir: PathLike,
-    **kwargs: Any,
+    *,
+    target_path: Optional[str] = None,
+    prop_kind: str = "dressing",
 ) -> Dict[str, Any]:
-    """Build and write only the staged ``sidecar-overlay.json`` proposal."""
-    proposal = build_prop_promotion_proposal(project_root, task_dir, **kwargs)
-    root = Path(project_root).expanduser().resolve(strict=False)
-    destination = _staging_path(root, kwargs.get("output_path") or (Path(task_dir) / PROP_OVERLAY_NAME), "proposal output path")
-    _atomic_write(destination, proposal)
+    """Build and publish only the fixed task-local prop proposal leaf."""
+    proposal = build_prop_promotion_proposal(
+        project_root, task_dir, target_path=target_path, prop_kind=prop_kind
+    )
+    root, resolved_task = _layout_for_publication(project_root, task_dir)
+    leaf = _fixed_leaf(root, resolved_task, PROP_OVERLAY_NAME)
+    expected = canonical_json_bytes(proposal)
+    if not _preflight_leaf(leaf, expected, PROP_OVERLAY_NAME):
+        _publish_missing_leaf(root, resolved_task, leaf, proposal, expected, PROP_OVERLAY_NAME)
     return proposal
 
 
 def write_threat_promotion_proposal(
-    project_root: Path,
+    project_root: PathLike,
     task_dir: PathLike,
-    **kwargs: Any,
+    *,
+    mesh_path: Optional[PathLike] = None,
+    archetype: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Build and write only staged threat patch/provenance proposal files."""
-    proposal = build_threat_promotion_proposal(project_root, task_dir, **kwargs)
-    root = Path(project_root).expanduser().resolve(strict=False)
-    patch_destination = _staging_path(root, kwargs.get("output_path") or (Path(task_dir) / THREAT_PATCH_NAME), "catalog patch output path")
-    provenance_destination = _staging_path(root, kwargs.get("provenance_output_path") or (Path(task_dir) / ASSET_PROVENANCE_NAME), "asset provenance output path")
-    _atomic_write(patch_destination, proposal["catalog_patch"])
-    _atomic_write(provenance_destination, proposal["asset_provenance"])
+    """Build and publish provenance first, then the authoritative catalog patch."""
+    proposal = build_threat_promotion_proposal(
+        project_root, task_dir, mesh_path=mesh_path, archetype=archetype
+    )
+    root, resolved_task = _layout_for_publication(project_root, task_dir)
+    provenance_leaf = _fixed_leaf(root, resolved_task, ASSET_PROVENANCE_NAME)
+    patch_leaf = _fixed_leaf(root, resolved_task, THREAT_PATCH_NAME)
+    provenance_bytes = canonical_json_bytes(proposal["asset_provenance"])
+    patch_bytes = canonical_json_bytes(proposal["catalog_patch"])
+
+    # Both leaves are checked before either is created or changed.
+    provenance_exists = _preflight_leaf(
+        provenance_leaf, provenance_bytes, ASSET_PROVENANCE_NAME
+    )
+    patch_exists = _preflight_leaf(patch_leaf, patch_bytes, THREAT_PATCH_NAME)
+    if not provenance_exists:
+        _publish_missing_leaf(
+            root,
+            resolved_task,
+            provenance_leaf,
+            proposal["asset_provenance"],
+            provenance_bytes,
+            ASSET_PROVENANCE_NAME,
+        )
+    if not patch_exists:
+        _publish_missing_leaf(
+            root,
+            resolved_task,
+            patch_leaf,
+            proposal["catalog_patch"],
+            patch_bytes,
+            THREAT_PATCH_NAME,
+        )
     return proposal
 
 
@@ -548,13 +586,11 @@ def _build_parser() -> argparse.ArgumentParser:
     prop.add_argument("--project-root", type=Path, required=True)
     prop.add_argument("--task-dir", type=Path, required=True)
     prop.add_argument("--target-path")
-    prop.add_argument("--output-path", type=Path)
+    prop.add_argument("--prop-kind", choices=("component", "dressing", "objective"), default="dressing")
     threat = subparsers.add_parser("threat", help="write staged threat catalog/provenance proposals")
     threat.add_argument("--project-root", type=Path, required=True)
     threat.add_argument("--task-dir", type=Path, required=True)
     threat.add_argument("--mesh-path")
-    threat.add_argument("--output-path", type=Path)
-    threat.add_argument("--provenance-output-path", type=Path)
     threat.add_argument("--archetype")
     return parser
 
@@ -567,7 +603,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 args.project_root,
                 args.task_dir,
                 target_path=args.target_path,
-                output_path=args.output_path,
+                prop_kind=args.prop_kind,
             )
             print("MESHY PROP PROMOTION PROPOSAL PASS asset={0}".format(result["asset_id"]))
         elif args.command == "threat":
@@ -575,8 +611,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                 args.project_root,
                 args.task_dir,
                 mesh_path=args.mesh_path,
-                output_path=args.output_path,
-                provenance_output_path=args.provenance_output_path,
                 archetype=args.archetype,
             )
             print("MESHY THREAT PROMOTION PROPOSAL PASS asset={0}".format(result["asset_id"]))
