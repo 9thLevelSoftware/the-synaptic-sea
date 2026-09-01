@@ -541,3 +541,131 @@ print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','Co
         glb_info = _run_blender_inspection(blender, runs[0]["master"], glb_expression)
         assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
         assert glb_info["actions"] == ["lid_open"]
+
+
+def test_real_blender_recipe_rejects_unowned_generated_name_collision(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_blender_master
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    case = tmp_path / "collision-case"
+    master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = case / "task"
+    evidence = case / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+
+    seed_expression = (
+        "import bpy; "
+        "mesh=bpy.data.meshes.new('AuthoredColliderMesh'); "
+        "obj=bpy.data.objects.new('ContainerRoot', mesh); "
+        "bpy.data.collections['WORKING'].objects.link(obj); "
+        "obj['authored_collider']=True; "
+        "bpy.ops.wm.save_as_mainfile(filepath=r'''%s''')"
+    ) % str(master)
+    seeded = meshy_blender_master._run_bounded_process(
+        [str(blender), "--background", str(master), "--python-expr", seed_expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    assert seeded.returncode == 0, seeded.stderr
+
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+    with pytest.raises(RuntimeError) as failure:
+        recipe.run_blender_recipe(paths, contract, "preview")
+    assert "generated-name collision: object ContainerRoot is not recipe-owned" in str(failure.value)
+
+    master_info = _run_blender_inspection(
+        blender,
+        master,
+        """import bpy, json
+obj=bpy.data.objects.get('ContainerRoot')
+print('TASK2_JSON='+json.dumps({'authored':bool(obj and obj.get('authored_collider')),'objects':sorted(o.name for o in bpy.data.objects),'actions':sorted(a.name for a in bpy.data.actions),'materials':sorted(m.name for m in bpy.data.materials)}))""",
+    )
+    assert master_info["authored"] is True
+    assert "ContainerRoot.001" not in master_info["objects"]
+    assert not any(
+        name.endswith((".001", ".002"))
+        for name in master_info["objects"] + master_info["actions"] + master_info["materials"]
+    )
+    for leaf in recipe.RENDER_LEAVES + ("cleaned.preview.glb", "build_recipe_manifest.json"):
+        assert not (evidence / leaf).exists()
+    assert not (master.parent / "build_recipe_manifest.json").exists()
+
+
+def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    master = tmp_path / "generated" / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = tmp_path / "generated" / "task"
+    evidence = tmp_path / "generated" / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+
+    first = recipe.run_blender_recipe(paths, contract, "preview")
+    second = recipe.run_blender_recipe(paths, contract, "preview")
+    for result in (first, second):
+        assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert result["runtime_evidence"]["source_action_names"] == ["lid_open"]
+        assert result["runtime_evidence"]["source_materials"] == ["painted_ship_alloy", "warning_accent"]
+
+    master_info = _run_blender_inspection(
+        blender,
+        master,
+        """import bpy, json
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+recipe_objects=required+['RecipeCamera','RecipeStudioLight']
+datablocks={
+    'objects':[obj for obj in bpy.data.objects],
+    'actions':[action for action in bpy.data.actions],
+    'materials':[material for material in bpy.data.materials],
+    'meshes':[mesh for mesh in bpy.data.meshes],
+    'cameras':[camera for camera in bpy.data.cameras],
+    'lights':[light for light in bpy.data.lights],
+}
+owned_suffixes=sorted(datablock.name for datablocks in datablocks.values() for datablock in datablocks if datablock.get('meshy_recipe_owner') == 'loot_container_derelict_v1' and datablock.name.endswith(('.001','.002')))
+print('TASK2_JSON='+json.dumps({'export_objects':[name for name in required if bpy.data.objects.get(name)],'recipe_objects':[name for name in recipe_objects if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions),'recipe_materials':[name for name in ['painted_ship_alloy','warning_accent'] if bpy.data.materials.get(name)],'working_scaffold':bool(bpy.data.objects.get('mesh_node_WORKING')),'owned_suffixes':owned_suffixes}))""",
+    )
+    assert master_info["export_objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+    assert master_info["recipe_objects"] == list(recipe.EXPORT_OBJECT_NAMES) + ["RecipeCamera", "RecipeStudioLight"]
+    assert master_info["actions"] == ["lid_open"]
+    assert master_info["recipe_materials"] == ["painted_ship_alloy", "warning_accent"]
+    assert master_info["working_scaffold"] is False
+    assert master_info["owned_suffixes"] == []

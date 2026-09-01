@@ -87,6 +87,23 @@ EXPORT_OBJECT_NAMES = (
     "LatchRight",
     "LootVisual",
 )
+_BOX_PART_NAMES = (
+    "BodyFloor",
+    "BodyFront",
+    "BodyRear",
+    "BodyLeft",
+    "BodyRight",
+    "LidTop",
+    "LidFront",
+    "LidRear",
+    "LidLeft",
+    "LidRight",
+    "HandleLeft",
+    "HandleRight",
+    "HandleGrip",
+)
+_RECIPE_OWNER_KEY = "meshy_recipe_owner"
+_RECIPE_OWNER_VALUE = ASSET_ID
 RENDER_LEAVES = ("closed.png", "open.png", "looted.png", "states_contact_sheet.png")
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 _ALLOWED_MODES = frozenset(("preview", "publish-cleaned"))
@@ -424,24 +441,59 @@ def _link_only(obj: Any, collection: Any) -> None:
     collection.objects.link(obj)
 
 
+def _recipe_owned(datablock: Any) -> bool:
+    return datablock.get(_RECIPE_OWNER_KEY) == _RECIPE_OWNER_VALUE
+
+
+def _mark_recipe_owned(datablock: Any) -> Any:
+    datablock[_RECIPE_OWNER_KEY] = _RECIPE_OWNER_VALUE
+    return datablock
+
+
+def _preflight_generated_name_collisions(bpy: Any) -> None:
+    generated = (
+        ("object", bpy.data.objects, set(EXPORT_OBJECT_NAMES) | set(_BOX_PART_NAMES) | {"RecipeCamera", "RecipeStudioLight"}),
+        ("action", bpy.data.actions, {"lid_open"}),
+        ("material", bpy.data.materials, set(_MANIFEST_MATERIALS)),
+        ("camera", bpy.data.cameras, {"RecipeCamera"}),
+        ("light", bpy.data.lights, {"RecipeStudioLight"}),
+    )
+    collisions = [
+        "{0} {1} is not recipe-owned".format(kind, datablock.name)
+        for kind, datablocks, names in generated
+        for datablock in datablocks
+        if datablock.name in names and not _recipe_owned(datablock)
+    ]
+    if collisions:
+        raise RuntimeError("generated-name collision: " + "; ".join(sorted(collisions)))
+
+
 def _remove_owned_objects(bpy: Any) -> None:
-    names = set(EXPORT_OBJECT_NAMES) | {
-        "mesh_node_WORKING",
+    names = set(EXPORT_OBJECT_NAMES) | set(_BOX_PART_NAMES) | {
         "RecipeCamera",
         "RecipeStudioLight",
     }
     for obj in list(bpy.data.objects):
-        if obj.name not in names:
+        object_name = obj.name
+        is_scaffold = object_name == "mesh_node_WORKING"
+        if not is_scaffold and (object_name not in names or not _recipe_owned(obj)):
             continue
-        data = obj.data if obj.type == "MESH" else None
+        obj_type = obj.type
+        data = obj.data if obj_type in {"MESH", "CAMERA", "LIGHT"} else None
         bpy.data.objects.remove(obj, do_unlink=True)
         if data is not None and data.users == 0:
-            bpy.data.meshes.remove(data)
+            if is_scaffold or _recipe_owned(data):
+                if obj_type == "MESH":
+                    bpy.data.meshes.remove(data)
+                elif obj_type == "CAMERA":
+                    bpy.data.cameras.remove(data)
+                elif obj_type == "LIGHT":
+                    bpy.data.lights.remove(data)
     for action in list(bpy.data.actions):
-        if action.name == "lid_open":
+        if action.name == "lid_open" and _recipe_owned(action):
             bpy.data.actions.remove(action)
     for material in list(bpy.data.materials):
-        if material.name in _MANIFEST_MATERIALS and material.users == 0:
+        if material.name in _MANIFEST_MATERIALS and material.users == 0 and _recipe_owned(material):
             bpy.data.materials.remove(material)
 
 
@@ -449,6 +501,7 @@ def _make_material(bpy: Any, name: str, color: tuple[float, float, float, float]
     material = bpy.data.materials.get(name)
     if material is None:
         material = bpy.data.materials.new(name)
+    _mark_recipe_owned(material)
     material.diffuse_color = color
     material.use_nodes = True
     node = material.node_tree.nodes.get("Principled BSDF")
@@ -469,6 +522,8 @@ def _add_box(bpy: Any, name: str, center: tuple[float, float, float], size: tupl
     _deselect_all(bpy)
     _require_finished(bpy.ops.mesh.primitive_cube_add(size=1.0, location=center), "add box " + name)
     obj = bpy.context.object
+    _mark_recipe_owned(obj)
+    _mark_recipe_owned(obj.data)
     obj.name = name
     obj.dimensions = size
     _require_finished(bpy.ops.object.transform_apply(location=False, rotation=False, scale=True), "apply box dimensions " + name)
@@ -493,6 +548,8 @@ def _join_as(bpy: Any, name: str, objects: list[Any]) -> Any:
     bpy.context.view_layer.objects.active = objects[0]
     _require_finished(bpy.ops.object.join(), "join " + name)
     objects[0].name = name
+    _mark_recipe_owned(objects[0])
+    _mark_recipe_owned(objects[0].data)
     return objects[0]
 
 
@@ -552,6 +609,7 @@ def _unwrap_object(bpy: Any, obj: Any) -> None:
 
 def _build_animation(bpy: Any, hinge: Any, loot: Any, scene: Any) -> Any:
     action = bpy.data.actions.new("lid_open")
+    _mark_recipe_owned(action)
     hinge.rotation_mode = "XYZ"
     hinge.animation_data_create()
     hinge.animation_data.action = action
@@ -583,11 +641,10 @@ def _build_animation(bpy: Any, hinge: Any, loot: Any, scene: Any) -> Any:
 
 
 def _configure_preview_scene(bpy: Any, scene: Any, root: Any) -> None:
-    for obj in list(bpy.data.objects):
-        if obj.name in ("RecipeCamera", "RecipeStudioLight"):
-            bpy.data.objects.remove(obj, do_unlink=True)
     camera_data = bpy.data.cameras.new("RecipeCamera")
+    _mark_recipe_owned(camera_data)
     camera = bpy.data.objects.new("RecipeCamera", camera_data)
+    _mark_recipe_owned(camera)
     scene.collection.objects.link(camera)
     camera.location = (1.35, -1.35, 1.05)
     target = (0.0, 0.0, 0.28)
@@ -598,7 +655,9 @@ def _configure_preview_scene(bpy: Any, scene: Any, root: Any) -> None:
     scene.camera = camera
 
     light_data = bpy.data.lights.new("RecipeStudioLight", type="AREA")
+    _mark_recipe_owned(light_data)
     light = bpy.data.objects.new("RecipeStudioLight", light_data)
+    _mark_recipe_owned(light)
     scene.collection.objects.link(light)
     light.location = (1.5, -2.0, 3.0)
     light_data.energy = 600.0
@@ -728,6 +787,7 @@ def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run
     import bpy  # type: ignore
 
     scene = bpy.context.scene
+    _preflight_generated_name_collisions(bpy)
     _remove_owned_objects(bpy)
     export_collection = _ensure_collection(bpy, scene, "EXPORT")
     source_raw = _ensure_collection(bpy, scene, "SOURCE_RAW")
@@ -740,6 +800,7 @@ def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run
     alloy = _make_material(bpy, "painted_ship_alloy", (0.23, 0.29, 0.34, 1.0), 0.65, 0.48)
     accent = _make_material(bpy, "warning_accent", (0.65, 0.18, 0.06, 1.0), 0.4, 0.42)
     root = bpy.data.objects.new("ContainerRoot", None)
+    _mark_recipe_owned(root)
     root.location = (0.0, 0.0, 0.0)
     export_collection.objects.link(root)
     root["required_states"] = "closed,open,looted"
@@ -752,6 +813,7 @@ def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run
     root["source_task_id"] = SELECTED_TASK_ID
 
     hinge = bpy.data.objects.new("HingePivot", None)
+    _mark_recipe_owned(hinge)
     hinge.location = (0.0, 0.245, 0.43)
     hinge.parent = root
     export_collection.objects.link(hinge)
