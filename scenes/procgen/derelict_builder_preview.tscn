@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/procgen/derelict_builder_preview.gd" id="1_preview"]
+
+[node name="DerelictBuilderPreview" type="Node3D"]
+script = ExtResource("1_preview")
+
+[node name="PreviewCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.819152, 0.573576, 0, -0.573576, 0.819152, 28, 38, 42)
+current = true
+
+[node name="PreviewLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, 34, 0)
+light_energy = 1.5
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]

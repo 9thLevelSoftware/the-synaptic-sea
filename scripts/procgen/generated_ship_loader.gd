@@ -8,6 +8,10 @@ const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
+const PropVisualBindingCatalogScript := preload("res://scripts/systems/prop_visual_binding_catalog.gd")
+const RuntimePropVisualBinderScript := preload("res://scripts/procgen/runtime_prop_visual_binder.gd")
+const AuthoredPortalRuntimeScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
 
 const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
 
@@ -16,7 +20,11 @@ signal load_failed(reason: String)
 
 const CELL_SIZE: float = 4.0
 const FLOOR_Y_OFFSET: float = 0.12
+const ATMOSPHERE_VOLUME_HALF_WIDTH: float = CELL_SIZE * 0.5
+const ATMOSPHERE_VOLUME_HEIGHT: float = 2.5
 const OBJECTIVE_TRIGGER_RADIUS: float = 1.5
+const RADIATION_VOLUME_HALF_WIDTH: float = 1.25
+const RADIATION_VOLUME_AXIAL_END_PADDING: float = 1.0
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 
 var layout_doc: Dictionary = {}
@@ -29,10 +37,21 @@ var landmark_nodes: Array[Node3D] = []
 var blocked_route_nodes: Array[Node3D] = []
 var visible_vertical_transition_nodes: Array[Node3D] = []
 var breach_zone_markers: Array[Vector3] = []
+var breach_zone_specs: Array = []
 var fire_zone_markers: Array[Vector3] = []
 var fire_zone_specs: Array = []
 var arc_zone_markers: Array[Vector3] = []
 var arc_zone_specs: Array = []
+var radiation_zone_markers: Array[Vector3] = []
+var radiation_zone_specs: Array = []
+var radiation_zone_segments: Array = []
+var authored_atmosphere_specs: Array = []
+var authored_atmosphere_volumes: Array[Area3D] = []
+var placed_prop_specs: Array = []
+var placed_prop_nodes: Array[Node3D] = []
+var placed_prop_errors: Array[String] = []
+var authored_portal_specs: Array = []
+var authored_portal_nodes: Array[Area3D] = []
 var start_position: Vector3 = Vector3.INF
 var goal_position: Vector3 = Vector3.INF
 var structural_root: Node3D
@@ -56,10 +75,21 @@ func clear_loaded_ship() -> void:
 	blocked_route_nodes = []
 	visible_vertical_transition_nodes = []
 	breach_zone_markers = []
+	breach_zone_specs = []
 	fire_zone_markers = []
 	fire_zone_specs = []
 	arc_zone_markers = []
 	arc_zone_specs = []
+	radiation_zone_markers = []
+	radiation_zone_specs = []
+	radiation_zone_segments = []
+	authored_atmosphere_specs = []
+	authored_atmosphere_volumes = []
+	placed_prop_specs = []
+	placed_prop_nodes = []
+	placed_prop_errors = []
+	authored_portal_specs = []
+	authored_portal_nodes = []
 	start_position = Vector3.INF
 	goal_position = Vector3.INF
 	structural_root = null
@@ -183,6 +213,8 @@ func load_from_documents(
 	var vertical_link_count: int = _add_vertical_links(layout_doc, structural_root)
 
 	_add_coherence_runtime_nodes(layout_doc, structural_root)
+	_add_authored_placed_props(layout_doc, gameplay_doc, structural_root)
+	_add_authored_portal_runtime_nodes(layout_doc, structural_root)
 	# PKG-B5.1: apply dressing fog/tint/light meta per room variant descriptors.
 	_apply_dressing_visuals(layout_doc, structural_root)
 	_apply_slice_atmosphere(layout_doc, apply_atmosphere)
@@ -266,20 +298,42 @@ func get_loot_container_specs_copy() -> Array:
 	return loot_container_specs.duplicate(true)
 
 
+func get_placed_prop_specs_copy() -> Array:
+	return placed_prop_specs.duplicate(true)
+
+
+func get_placed_prop_nodes() -> Array[Node3D]:
+	return placed_prop_nodes.duplicate()
+
+
+func get_placed_prop_errors() -> Array[String]:
+	return placed_prop_errors.duplicate()
+
+func get_authored_portal_specs_copy() -> Array:
+	return authored_portal_specs.duplicate(true)
+
+func get_authored_portal_nodes() -> Array[Area3D]:
+	return authored_portal_nodes.duplicate()
+
+
 func count_collision_shapes() -> int:
 	if structural_root == null:
 		return 0
-	return _count_collision_shapes_recursive(structural_root)
+	# Only structural wrapper collisions represent the generated ship's
+	# collision contract.  Portal blockers, hazard volumes, and marker shapes
+	# are also children of StructuralRoot but are runtime overlays.
+	return _count_collision_shapes_recursive(structural_root, false)
 
 
-func _count_collision_shapes_recursive(node: Node) -> int:
+func _count_collision_shapes_recursive(node: Node, in_structural_wrapper: bool) -> int:
 	var count: int = 0
-	if node is CollisionShape3D:
+	var structural_context := in_structural_wrapper or node.has_meta("structural_kind")
+	if structural_context and node is CollisionShape3D:
 		var collision_shape: CollisionShape3D = node
 		if collision_shape.shape != null:
 			count += 1
 	for child in node.get_children():
-		count += _count_collision_shapes_recursive(child)
+		count += _count_collision_shapes_recursive(child, structural_context)
 	return count
 
 
@@ -533,6 +587,10 @@ func _build_loot_container_specs(layout_doc: Dictionary, gameplay_doc: Dictionar
 		if c.has("slot_kind"):
 			loot_spec["slot_kind"] = str(c.get("slot_kind", ""))
 			loot_spec["slot_index"] = int(c.get("slot_index", 0))
+		# Explicit authored stacks must survive into the coordinator; omitting
+		# this key is why golden/builder contents never reached in-game loot.
+		if c.has("contents") and typeof(c.get("contents")) == TYPE_ARRAY:
+			loot_spec["contents"] = (c.get("contents") as Array).duplicate(true)
 		out.append(loot_spec)
 	return out
 
@@ -898,12 +956,37 @@ func _build_navigation_region(_rooms: Array, ship_root: Node3D) -> NavigationReg
 
 	var nav_mesh: NavigationMesh = NavigationMesh.new()
 	NavigationMeshGenerator.bake_from_source_geometry_data(nav_mesh, source)
+	_orient_navigation_polygons_up(nav_mesh)
 
 	var nav_region: NavigationRegion3D = NavigationRegion3D.new()
 	nav_region.name = "GameplayNavigationRegion"
-	nav_region.navigation_mesh = nav_mesh
 	ship_root.add_child(nav_region)
+	nav_region.navigation_mesh = nav_mesh
+	NavigationServer3D.region_set_navigation_mesh(nav_region.get_rid(), nav_mesh)
+	var navigation_map := nav_region.get_navigation_map()
+	if navigation_map.is_valid():
+		NavigationServer3D.map_set_active(navigation_map, true)
 	return nav_region
+
+
+func _orient_navigation_polygons_up(nav_mesh: NavigationMesh) -> void:
+	var vertices := nav_mesh.get_vertices()
+	var polygons: Array[PackedInt32Array] = []
+	for index in range(nav_mesh.get_polygon_count()):
+		var polygon := nav_mesh.get_polygon(index)
+		if polygon.size() >= 3:
+			var a: Vector3 = vertices[polygon[0]]
+			var b: Vector3 = vertices[polygon[1]]
+			var c: Vector3 = vertices[polygon[2]]
+			if (b - a).cross(c - a).y < 0.0:
+				var reversed := PackedInt32Array()
+				for vertex_index in range(polygon.size() - 1, -1, -1):
+					reversed.append(polygon[vertex_index])
+				polygon = reversed
+		polygons.append(polygon)
+	nav_mesh.clear_polygons()
+	for polygon in polygons:
+		nav_mesh.add_polygon(polygon)
 
 
 func _read_placement_position(placement: Dictionary) -> Array:
@@ -1081,6 +1164,10 @@ func get_visible_vertical_transition_nodes() -> Array[Node3D]:
 
 func get_breach_zone_markers() -> Array[Vector3]:
 	return breach_zone_markers.duplicate()
+
+
+func get_breach_zone_specs() -> Array:
+	return breach_zone_specs.duplicate(true)
 
 
 func get_fire_zone_markers() -> Array[Vector3]:
@@ -1519,6 +1606,276 @@ func _add_arc_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void:
 		arc_zone_specs.append(_normalize_zone_spec(zone))
 
 
+func _add_radiation_zone_markers(source_layout: Dictionary, ship_root: Node3D) -> void:
+	var raw_zones: Variant = source_layout.get("radiation_zones", [])
+	if typeof(raw_zones) != TYPE_ARRAY:
+		return
+	for zone_variant in raw_zones:
+		if typeof(zone_variant) != TYPE_DICTIONARY:
+			continue
+		var zone: Dictionary = zone_variant
+		var from_pos: Vector3 = _cell_world_from_link_endpoint(zone, "from_cell", "from_room", source_layout)
+		var to_pos: Vector3 = _cell_world_from_link_endpoint(zone, "to_cell", "to_room", source_layout)
+		if from_pos == Vector3.INF:
+			from_pos = _room_center_for_blocked_link(zone, "from_room", source_layout)
+		if to_pos == Vector3.INF:
+			to_pos = _room_center_for_blocked_link(zone, "to_room", source_layout)
+		if from_pos == Vector3.INF or to_pos == Vector3.INF:
+			continue
+		var midpoint: Vector3 = (from_pos + to_pos) * 0.5
+		radiation_zone_markers.append(midpoint)
+		radiation_zone_specs.append(_normalize_zone_spec(zone))
+		radiation_zone_segments.append({"from": from_pos, "to": to_pos})
+		var length: float = maxf(
+			RADIATION_VOLUME_AXIAL_END_PADDING * 2.0,
+			from_pos.distance_to(to_pos) + RADIATION_VOLUME_AXIAL_END_PADDING * 2.0)
+		ship_root.add_child(_make_oriented_trigger_volume(
+			"RadiationZone_%s" % str(zone.get("id", radiation_zone_markers.size() - 1)), midpoint,
+			Color(0.65, 0.2, 0.9, 0.3), Vector3(length, 2.5, 2.5), from_pos, to_pos))
+
+
+func _add_authored_atmosphere_volumes(source_layout: Dictionary, ship_root: Node3D) -> void:
+	var rooms_variant: Variant = source_layout.get("rooms", [])
+	var plan_variant: Variant = source_layout.get("structural_plan", {})
+	if typeof(rooms_variant) != TYPE_ARRAY or typeof(plan_variant) != TYPE_DICTIONARY:
+		return
+	var floors_variant: Variant = (plan_variant as Dictionary).get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
+		return
+	for floor_variant in floors_variant:
+		if typeof(floor_variant) != TYPE_DICTIONARY:
+			continue
+		var floor: Dictionary = floor_variant
+		var room_id: String = str(floor.get("room_id", ""))
+		var room: Dictionary = _find_room(rooms_variant as Array, room_id)
+		if room.is_empty() or not _room_has_atmosphere(room):
+			continue
+		var position_array: Array = _read_placement_position(floor)
+		if position_array.size() < 3:
+			continue
+		var position := Vector3(float(position_array[0]), float(position_array[1]) + FLOOR_Y_OFFSET, float(position_array[2]))
+		var spec: Dictionary = {
+			"room_id": room_id,
+			"position": position,
+			"depressurized": bool(room.get("depressurized", false)),
+			"vented": bool(room.get("vented", false)),
+			"radiation_bp": int(room.get("radiation_bp", 0)),
+		}
+		if room.has("atmosphere_bp") or room.has("oxygen_bp"):
+			spec["oxygen_bp"] = int(room.get("atmosphere_bp", room.get("oxygen_bp", 10000)))
+		if room.has("temperature_c"):
+			spec["temperature_c"] = float(room["temperature_c"])
+		authored_atmosphere_specs.append(spec)
+		var volume := _make_trigger_volume(
+			"AuthoredAtmosphere_%s_%d" % [room_id, authored_atmosphere_specs.size() - 1], position,
+			Color(0.15, 0.7, 0.9, 0.08), Vector3(CELL_SIZE, 2.5, CELL_SIZE))
+		volume.set_meta("atmosphere", spec.duplicate(true))
+		ship_root.add_child(volume)
+		authored_atmosphere_volumes.append(volume)
+
+
+func _room_has_atmosphere(room: Dictionary) -> bool:
+	return room.has("atmosphere_bp") or room.has("oxygen_bp") or room.has("depressurized") or room.has("vented") or room.has("radiation_bp") or room.has("temperature_c")
+
+
+func _runtime_portal_sources(source_layout: Dictionary) -> Array:
+	var authored_by_edge: Dictionary = {}
+	var authored_variant: Variant = source_layout.get("portals", source_layout.get("connections", []))
+	if typeof(authored_variant) == TYPE_ARRAY:
+		for raw in authored_variant as Array:
+			if raw is Dictionary:
+				var authored: Dictionary = raw as Dictionary
+				var authored_key: String = str(authored.get("edge_key", ""))
+				if not authored_key.is_empty():
+					authored_by_edge[authored_key] = authored.duplicate(true)
+	var plan_variant: Variant = source_layout.get("structural_plan", {})
+	if typeof(plan_variant) != TYPE_DICTIONARY:
+		return (authored_variant as Array).duplicate(true) if authored_variant is Array else []
+	var edges_variant: Variant = (plan_variant as Dictionary).get("edges", {})
+	if typeof(edges_variant) != TYPE_DICTIONARY:
+		return (authored_variant as Array).duplicate(true) if authored_variant is Array else []
+	var sources: Array = []
+	for edge_raw in (edges_variant as Dictionary).values():
+		if not (edge_raw is Dictionary):
+			continue
+		var edge: Dictionary = edge_raw as Dictionary
+		if not bool(edge.get("portal", false)):
+			continue
+		var edge_key: String = str(edge.get("edge_key", edge.get("key", "")))
+		var source: Dictionary = (authored_by_edge.get(edge_key, {}) as Dictionary).duplicate(true)
+		source["id"] = str(source.get("id", "edge:%s" % edge_key))
+		source["edge_key"] = edge_key
+		source["state"] = str(edge.get("kind", source.get("state", "DOOR")))
+		source["kind"] = source["state"]
+		source["exterior"] = bool(edge.get("exterior", source.get("exterior", false)))
+		source["yaw_degrees"] = float(edge.get("yaw_degrees", source.get("yaw_degrees", 0.0)))
+		var source_cells: Variant = edge.get("source_cells", [])
+		if source_cells is Array and (source_cells as Array).size() >= 2:
+			source["from_cell"] = (source_cells as Array)[0]
+			source["to_cell"] = (source_cells as Array)[1]
+		var room_ids: Variant = edge.get("room_ids", [])
+		if room_ids is Array and (room_ids as Array).size() >= 2:
+			source["from_room"] = str((room_ids as Array)[0])
+			source["to_room"] = str((room_ids as Array)[1])
+		sources.append(source)
+	return sources
+
+
+func _add_authored_portal_runtime_nodes(source_layout: Dictionary, ship_root: Node3D) -> void:
+	var portal_sources: Array = _runtime_portal_sources(source_layout)
+	if ship_root == null:
+		return
+	for index in range(portal_sources.size()):
+		var source: Dictionary = portal_sources[index] as Dictionary
+		var from_pos := _cell_world_from_link_endpoint(source, "from_cell", "from_room", source_layout)
+		var to_pos := _cell_world_from_link_endpoint(source, "to_cell", "to_room", source_layout)
+		if from_pos == Vector3.INF:
+			from_pos = _room_center_for_blocked_link(source, "from_room", source_layout)
+		if to_pos == Vector3.INF:
+			to_pos = _room_center_for_blocked_link(source, "to_room", source_layout)
+		if from_pos == Vector3.INF and to_pos == Vector3.INF:
+			continue
+		var endpoint_midpoint := to_pos if from_pos == Vector3.INF else from_pos if to_pos == Vector3.INF else (from_pos + to_pos) * 0.5
+		var spec := source.duplicate(true)
+		spec["runtime_position"] = endpoint_midpoint
+		spec["from_position"] = from_pos
+		spec["to_position"] = to_pos
+		var portal := AuthoredPortalRuntimeScript.new()
+		portal.name = "AuthoredPortal_%s" % str(source.get("id", index))
+		portal.configure(spec, endpoint_midpoint)
+		ship_root.add_child(portal)
+		if portal.portal_kind == "LOCKED" or portal.portal_kind == "HATCH":
+			var structural_blocker := _find_structural_portal_blocker(
+				ship_root, str(spec.get("edge_key", "")), portal.portal_kind)
+			if structural_blocker != null:
+				portal.bind_structural_blocker(structural_blocker)
+		authored_portal_specs.append(spec)
+		authored_portal_nodes.append(portal)
+
+
+func _find_structural_portal_blocker(ship_root: Node3D, edge_key: String, portal_kind: String) -> Node3D:
+	if ship_root == null or edge_key.is_empty():
+		return null
+	var expected_module := "doorway_frame_blocked_1x1" if portal_kind == "LOCKED" else "bulkhead_portal_2x1"
+	for child in ship_root.get_children():
+		if child is Node3D \
+				and str(child.get_meta("structural_edge_key", "")) == edge_key \
+				and str(child.get_meta("module_kind", "")) == expected_module:
+			return child as Node3D
+	return null
+
+
+## Materialize builder-authored visuals only. Structural doors and vertical
+## links are compiled elsewhere and deliberately never become placed props.
+## A placement is anchored to its authored room/cell so it follows the same
+## compiled floor coordinates as objectives and loot containers.
+func _add_authored_placed_props(source_layout: Dictionary, source_gameplay: Dictionary, ship_root: Node3D) -> void:
+	var raw_variant: Variant = source_gameplay.get("placed_props", [])
+	if typeof(raw_variant) != TYPE_ARRAY or ship_root == null:
+		return
+	var prop_catalog: Dictionary = GameplayPropFactoryScript.load_catalog().get("props", {}) as Dictionary
+	var visual_catalog = PropVisualBindingCatalogScript.new()
+	var visual_catalog_loaded: bool = visual_catalog.load_from_path()
+	for raw_prop in (raw_variant as Array):
+		if typeof(raw_prop) != TYPE_DICTIONARY:
+			continue
+		var authored: Dictionary = raw_prop as Dictionary
+		var prop_id: String = str(authored.get("visual_id", "")).strip_edges()
+		if prop_id.is_empty():
+			prop_id = str(authored.get("prop_id", authored.get("asset_id", authored.get("proto", "")))).strip_edges()
+		if prop_id.is_empty():
+			continue
+		var room_id: String = str(authored.get("room_id", "")).strip_edges()
+		var cell_variant: Variant = authored.get("cell", authored.get("approach_cell", []))
+		if room_id.is_empty() or typeof(cell_variant) != TYPE_ARRAY:
+			continue
+		var cell: Array = cell_variant as Array
+		if cell.size() < 2:
+			continue
+		var room: Dictionary = _find_room(source_layout.get("rooms", []) as Array, room_id)
+		if room.is_empty():
+			continue
+		var position: Vector3 = _room_cell_world(room, cell)
+		if position == Vector3.INF:
+			continue
+		var dressing_binding: Dictionary = visual_catalog.get_dressing_binding(prop_id) \
+			if visual_catalog_loaded else {}
+		if not prop_catalog.has(prop_id) and dressing_binding.is_empty():
+			placed_prop_errors.append("unknown authored placed prop visual_id '%s'" % prop_id)
+			continue
+		var quarter_turns: int = 0
+		if authored.has("quarter_turn"):
+			quarter_turns = int(authored.get("quarter_turn", 0))
+		elif authored.has("rotation"):
+			quarter_turns = int(authored.get("rotation", 0))
+		elif authored.has("yaw_degrees"):
+			quarter_turns = roundi(float(authored.get("yaw_degrees", 0.0)) / 90.0)
+		quarter_turns = posmod(quarter_turns, 4)
+		var spec: Dictionary = authored.duplicate(true)
+		spec["visual_id"] = prop_id
+		spec["room_id"] = room_id
+		spec["cell"] = cell.duplicate(true)
+		spec["position"] = position
+		spec["quarter_turn"] = quarter_turns
+		var prop: Node3D
+		if not dressing_binding.is_empty():
+			var imported_visual: Node3D = RuntimePropVisualBinderScript.create_dressing_visual(dressing_binding)
+			if imported_visual == null:
+				placed_prop_errors.append("authored placed prop visual_id '%s' could not be materialized" % prop_id)
+				continue
+			prop = Node3D.new()
+			prop.position = position
+			prop.add_child(imported_visual)
+		else:
+			prop = GameplayPropFactoryScript.build(prop_id, position)
+		prop.name = "PlacedProp_%s" % str(authored.get("id", placed_prop_specs.size()))
+		prop.rotation_degrees.y = float(quarter_turns * 90)
+		prop.set_meta("placed_prop", spec.duplicate(true))
+		prop.set_meta("placed_prop_id", str(authored.get("id", "")))
+		prop.set_meta("authored_position", position)
+		ship_root.add_child(prop)
+		placed_prop_specs.append(spec)
+		placed_prop_nodes.append(prop)
+
+
+func _make_trigger_volume(node_name: String, world_position: Vector3, color: Color, size: Vector3) -> Area3D:
+	var area := Area3D.new()
+	area.name = node_name
+	area.position = world_position
+	area.monitoring = true
+	area.monitorable = true
+	area.collision_layer = 0
+	area.collision_mask = 1
+	var shape_node := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	shape_node.shape = shape
+	shape_node.position.y = size.y * 0.5
+	area.add_child(shape_node)
+	var mesh_node := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh_node.mesh = mesh
+	mesh_node.position.y = size.y * 0.5
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = color
+	mesh_node.material_override = material
+	area.add_child(mesh_node)
+	return area
+
+
+func _make_oriented_trigger_volume(
+	node_name: String, world_position: Vector3, color: Color, size: Vector3,
+	from_pos: Vector3, to_pos: Vector3) -> Area3D:
+	var area := _make_trigger_volume(node_name, world_position, color, size)
+	var segment := to_pos - from_pos
+	if segment.length_squared() > 0.000001:
+		area.quaternion = Quaternion(Vector3.RIGHT, segment.normalized())
+	return area
+
+
 func get_fire_zone_specs() -> Array:
 	return fire_zone_specs.duplicate(true)
 
@@ -1533,6 +1890,91 @@ func get_arc_zone_markers() -> Array[Vector3]:
 
 func get_arc_zone_specs() -> Array:
 	return arc_zone_specs.duplicate(true)
+
+
+func get_radiation_zone_markers() -> Array[Vector3]:
+	return radiation_zone_markers.duplicate()
+
+
+func get_radiation_zone_specs() -> Array:
+	return radiation_zone_specs.duplicate(true)
+
+
+func get_radiation_zone_segments() -> Array:
+	return radiation_zone_segments.duplicate(true)
+
+
+func get_radiation_zone_at(local_position: Vector3, radius: float = RADIATION_VOLUME_HALF_WIDTH) -> Dictionary:
+	var best: Dictionary = {}
+	var best_distance: float = INF
+	var half_width := maxf(0.0, radius)
+	for index in range(radiation_zone_markers.size()):
+		var contains := false
+		if index < radiation_zone_segments.size() and radiation_zone_segments[index] is Dictionary:
+			var segment: Dictionary = radiation_zone_segments[index]
+			var from_pos: Variant = segment.get("from", Vector3.INF)
+			var to_pos: Variant = segment.get("to", Vector3.INF)
+			if from_pos is Vector3 and to_pos is Vector3:
+				contains = _point_in_radiation_box(local_position, from_pos, to_pos, half_width)
+		else:
+			contains = local_position.distance_to(radiation_zone_markers[index]) <= half_width
+		var distance: float = local_position.distance_to(radiation_zone_markers[index])
+		if contains and distance <= best_distance:
+			best_distance = distance
+			if index < radiation_zone_specs.size() and radiation_zone_specs[index] is Dictionary:
+				best = (radiation_zone_specs[index] as Dictionary).duplicate(true)
+	return best
+
+
+func _point_in_radiation_box(point: Vector3, from_pos: Vector3, to_pos: Vector3, half_width: float) -> bool:
+	var segment := to_pos - from_pos
+	var midpoint := (from_pos + to_pos) * 0.5
+	var basis := Basis.IDENTITY
+	if segment.length_squared() > 0.000001:
+		basis = Basis(Quaternion(Vector3.RIGHT, segment.normalized()))
+	var box_position := basis.inverse() * (point - midpoint)
+	var half_length := maxf(
+		RADIATION_VOLUME_AXIAL_END_PADDING,
+		segment.length() * 0.5 + RADIATION_VOLUME_AXIAL_END_PADDING)
+	return absf(box_position.x) <= half_length \
+			and absf(box_position.y) <= half_width \
+			and absf(box_position.z) <= half_width
+
+
+func get_authored_atmosphere_at(local_position: Vector3) -> Dictionary:
+	var best: Dictionary = {}
+	var best_distance: float = INF
+	for spec_variant in authored_atmosphere_specs:
+		if not (spec_variant is Dictionary):
+			continue
+		var spec: Dictionary = spec_variant
+		var placement_position: Variant = spec.get("position", Vector3.INF)
+		if not (placement_position is Vector3):
+			continue
+		var delta: Vector3 = local_position - placement_position
+		var within_box := absf(delta.x) <= ATMOSPHERE_VOLUME_HALF_WIDTH \
+			and delta.y >= 0.0 and delta.y <= ATMOSPHERE_VOLUME_HEIGHT \
+			and absf(delta.z) <= ATMOSPHERE_VOLUME_HALF_WIDTH
+		var distance: float = delta.length_squared()
+		if within_box and distance < best_distance:
+			best_distance = distance
+			best = spec.duplicate(true)
+	return best
+
+
+func get_authored_atmosphere_drain_multiplier_at(local_position: Vector3) -> float:
+	var atmosphere: Dictionary = get_authored_atmosphere_at(local_position)
+	if atmosphere.is_empty():
+		return 1.0
+	# A vented compartment is depressurized even when older authored documents
+	# omit oxygen_bp and depressurized. Keep this semantic at the loader boundary
+	# so every runtime consumer observes the same hostile atmosphere.
+	if bool(atmosphere.get("depressurized", false)) or bool(atmosphere.get("vented", false)):
+		return 1.0
+	if not atmosphere.has("oxygen_bp"):
+		return 1.0
+	var oxygen_bp: float = clampf(float(atmosphere.get("oxygen_bp", 10000)), 0.0, 10000.0)
+	return clampf(1.0 - oxygen_bp / 10000.0, 0.0, 1.0)
 
 
 func _find_room_in_layout(room_id: String) -> Dictionary:
@@ -1565,6 +2007,8 @@ func _add_coherence_runtime_nodes(layout_doc: Dictionary, ship_root: Node3D) -> 
 	_add_breach_zone_markers(layout_doc, ship_root)
 	_add_fire_zone_markers(layout_doc, ship_root)
 	_add_arc_zone_markers(layout_doc, ship_root)
+	_add_radiation_zone_markers(layout_doc, ship_root)
+	_add_authored_atmosphere_volumes(layout_doc, ship_root)
 
 
 func _add_landmark_nodes(layout_doc: Dictionary, ship_root: Node3D) -> void:
@@ -1679,7 +2123,11 @@ func _add_breach_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void
 			to_pos = _room_center_for_blocked_link(zone, "to_room", layout_doc)
 		if from_pos == Vector3.INF or to_pos == Vector3.INF:
 			continue
-		breach_zone_markers.append((from_pos + to_pos) * 0.5)
+		var midpoint: Vector3 = (from_pos + to_pos) * 0.5
+		breach_zone_markers.append(midpoint)
+		var spec: Dictionary = _normalize_zone_spec(zone)
+		spec["position"] = midpoint
+		breach_zone_specs.append(spec)
 
 
 func _room_center_for_blocked_link(link: Dictionary, room_key: String, layout_doc: Dictionary) -> Vector3:

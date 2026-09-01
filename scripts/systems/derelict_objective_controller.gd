@@ -27,11 +27,10 @@ static func create() -> DerelictObjectiveController:
 func is_configured() -> bool:
 	return reach_goal_sequence != 0 or not progress.get_summary().is_empty()
 
-## Registers the generated objective set. First-visit only: idempotent once configured
-## so re-boarding a derelict (or building interactables after a restore) preserves progress.
+## Registers or reconciles the generated objective set. Reconciliation preserves
+## restored completion IDs while migrating legacy placeholder step counts to the
+## current authored contract.
 func configure(objective_specs: Array) -> void:
-	if is_configured():
-		return
 	for spec_variant in objective_specs:
 		if typeof(spec_variant) != TYPE_DICTIONARY:
 			continue
@@ -39,19 +38,35 @@ func configure(objective_specs: Array) -> void:
 		var sequence: int = int(spec.get("sequence", 0))
 		if sequence <= 0:
 			continue
-		progress.register_objective(sequence, str(spec.get("type", "objective")), 1)
+		var required_steps := 1
+		var steps_variant: Variant = spec.get("steps", [])
+		if str(spec.get("kind", "single")) == "repair_junction" and steps_variant is Array:
+			required_steps = maxi(1, (steps_variant as Array).size())
+		progress.reconcile_objective(sequence, str(spec.get("type", "objective")), required_steps)
 		if str(spec.get("id", "")) == REACH_GOAL_ID:
 			reach_goal_sequence = sequence
 
 ## Completes a single-step objective by sequence. Returns true if newly completed.
 ## Sets `cleared` when the reach_goal sequence becomes complete.
-func complete(sequence: int) -> bool:
+func complete(sequence: int, step_id: String = STEP_ID) -> bool:
 	if progress == null:
 		return false
-	var changed: bool = progress.complete_step(sequence, STEP_ID)
+	var resolved_step_id := step_id if not step_id.is_empty() else STEP_ID
+	var changed: bool = progress.complete_step(sequence, resolved_step_id)
 	if reach_goal_sequence != 0 and progress.is_sequence_complete(reach_goal_sequence):
 		cleared = true
 	return changed
+
+
+func get_step_progress(sequence: int) -> Dictionary:
+	return progress.get_step_progress(sequence) if progress != null else {}
+
+
+func is_step_complete(sequence: int, step_id: String) -> bool:
+	if progress == null:
+		return false
+	var resolved_step_id := step_id if not step_id.is_empty() else STEP_ID
+	return (progress.get_step_progress(sequence).get("completed_step_ids", []) as Array).has(resolved_step_id)
 
 func is_objective_complete(sequence: int) -> bool:
 	return progress != null and progress.is_sequence_complete(sequence)

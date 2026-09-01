@@ -77,6 +77,11 @@ var pending_corpse_loot: Array = []
 # revisited derelict remembers which passages are already open.
 var bypassed_hatch_ids: Array = []
 
+# Authored portal interaction state. Unlock identity is separate from open state
+# so a consumed lock remains free to reopen after it is closed and rebuilt.
+var authored_unlocked_portal_ids: Array = []
+var authored_open_portal_ids: Array = []
+
 # Task 06: per-ship combat/threat persistence. The live ThreatManager node belongs to
 # the coordinator; this summary lets traveled ships free/rebuild scene roots without
 # losing threat positions, detection memory, or the last combat result.
@@ -99,6 +104,9 @@ var fire_seeded: bool = false
 # derelict. Persisted so a revisit/reload does NOT re-breach compartments the player
 # already sealed. Set even when the variant scan yields no breaches.
 var breach_seeded: bool = false
+# Scene-level breach environment belongs to this ship; player oxygen remains
+# coordinator-owned so it follows the player between hulls.
+var breach_environment_summary: Dictionary = {}
 
 # Live Persistent Ships Phase 2a: per-ship structural state, mirroring `fire`. The
 # coordinator configures these from tuning before seeding/use. hull holds breach/health
@@ -151,6 +159,10 @@ func get_summary() -> Dictionary:
 		result["pending_corpse_loot"] = pending_corpse_loot.duplicate(true)
 	if not bypassed_hatch_ids.is_empty():
 		result["bypassed_hatches"] = bypassed_hatch_ids.duplicate()
+	if not authored_unlocked_portal_ids.is_empty():
+		result["authored_unlocked_portals"] = authored_unlocked_portal_ids.duplicate()
+	if not authored_open_portal_ids.is_empty():
+		result["authored_open_portals"] = authored_open_portal_ids.duplicate()
 	if not combat_summary.is_empty():
 		result["combat"] = combat_summary.duplicate(true)
 	if access != null:
@@ -164,7 +176,10 @@ func get_summary() -> Dictionary:
 		for c in carts:
 			cart_dicts.append(c.get_summary())
 		result["carts"] = cart_dicts
-	if has_fire():
+	# Persist whenever seeded or vented, not only while something still burns.
+	# A vents-only / extinguished derelict keeps fire_seeded=true; omitting the
+	# blob would skip seed on load and drop vented_compartments.
+	if fire != null and (fire_seeded or has_fire() or not fire.vented_compartments.is_empty()):
 		result["fire"] = fire.get_summary()
 	if not arc_summary.is_empty():
 		result["arc"] = arc_summary.duplicate(true)
@@ -172,6 +187,8 @@ func get_summary() -> Dictionary:
 		result["fire_seeded"] = true
 	if breach_seeded:
 		result["breach_seeded"] = true
+	if not breach_environment_summary.is_empty():
+		result["breach_environment"] = breach_environment_summary.duplicate(true)
 	if has_hull():
 		result["hull"] = hull.get_summary()
 	if web != null and (not web.attached_to_web or web.coverage > 0.0):
@@ -219,6 +236,16 @@ func apply_summary(summary) -> bool:
 		bypassed_hatch_ids = []
 		for hid in (bypassed_variant as Array):
 			bypassed_hatch_ids.append(String(hid))
+	var unlocked_portals_variant: Variant = summary.get("authored_unlocked_portals", null)
+	if typeof(unlocked_portals_variant) == TYPE_ARRAY:
+		authored_unlocked_portal_ids = []
+		for portal_id in (unlocked_portals_variant as Array):
+			authored_unlocked_portal_ids.append(String(portal_id))
+	var open_portals_variant: Variant = summary.get("authored_open_portals", null)
+	if typeof(open_portals_variant) == TYPE_ARRAY:
+		authored_open_portal_ids = []
+		for portal_id in (open_portals_variant as Array):
+			authored_open_portal_ids.append(String(portal_id))
 	var combat_variant: Variant = summary.get("combat", null)
 	if typeof(combat_variant) == TYPE_DICTIONARY:
 		combat_summary = (combat_variant as Dictionary).duplicate(true)
@@ -247,6 +274,9 @@ func apply_summary(summary) -> bool:
 		arc_summary = (arc_variant as Dictionary).duplicate(true)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	breach_seeded = bool(summary.get("breach_seeded", breach_seeded))
+	var breach_environment_variant: Variant = summary.get("breach_environment", null)
+	if typeof(breach_environment_variant) == TYPE_DICTIONARY:
+		breach_environment_summary = (breach_environment_variant as Dictionary).duplicate(true)
 	var hull_summary: Variant = summary.get("hull", null)
 	if typeof(hull_summary) == TYPE_DICTIONARY and not (hull_summary as Dictionary).is_empty():
 		get_hull().apply_summary(hull_summary as Dictionary)

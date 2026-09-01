@@ -67,6 +67,14 @@ static func create_objective_visual(binding: Dictionary) -> Node3D:
 	return _create_imported_visual(binding)
 
 
+static func create_dressing_visual(binding: Dictionary) -> Node3D:
+	if binding.is_empty():
+		return null
+	if not _is_safe_binding(binding, "dressing"):
+		return null
+	return _create_imported_visual(binding)
+
+
 static func _instantiate_visual_scene(path: String) -> Node:
 	if not FileAccess.file_exists(path):
 		return null
@@ -160,6 +168,7 @@ static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) ->
 	var expected_namespace: String = {
 		"component": "component_id",
 		"objective": "gameplay_placement_id",
+		"dressing": "visual_prop_id",
 	}.get(expected_prop_kind, "")
 	if expected_namespace.is_empty():
 		return false
@@ -186,7 +195,12 @@ static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) ->
 		if typeof(asset_id) != TYPE_STRING or ids.size() != 1 or ids[0] != asset_id:
 			return false
 	var scene_path: Variant = binding.get("visual_scene_path", "")
-	if not _is_canonical_scene_path(scene_path, expected_prop_kind + "s"):
+	var expected_group: String = {
+		"component": "components",
+		"objective": "objectives",
+		"dressing": "dressing",
+	}.get(expected_prop_kind, "")
+	if not _is_canonical_scene_path(scene_path, expected_group):
 		return false
 	if str(scene_path).get_file().trim_suffix(".glb") != str(binding.get("asset_id", "")):
 		return false

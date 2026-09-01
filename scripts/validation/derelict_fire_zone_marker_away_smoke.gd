@@ -23,6 +23,7 @@ extends SceneTree
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 300
 const SENTINEL: Vector3 = Vector3(123.0, 4.0, -77.0)
+const SENTINEL_SECOND: Vector3 = Vector3(131.0, 4.0, -69.0)
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -84,21 +85,24 @@ func _validate() -> void:
 
 	# --- Declare a layout fire zone on the derelict's loader (the arrays the
 	# goldens populate through _add_fire_zone_markers) and ignite a fire ---
-	var declared_markers: Array[Vector3] = [SENTINEL]
+	var declared_markers: Array[Vector3] = [SENTINEL, SENTINEL_SECOND]
 	derelict_root.fire_zone_markers = declared_markers
 	derelict_root.fire_zone_specs = [{
 		"zone_id": "declared_test_fire", "kind": "timed_fire",
-		"from_room": "room_a", "to_room": "room_b",
+		"compartment_id": "cargo", "from_room": "room_a", "to_room": "room_b",
+	}, {
+		"zone_id": "declared_test_fire_second", "kind": "timed_fire",
+		"compartment_id": "cargo", "from_room": "room_c", "to_room": "room_d",
 	}]
 	var fs = playable.get_current_ship().get_fire()
 	if fs == null:
 		_fail("derelict has no fire state")
 		return
-	fs.ignite("cargo_hold", 1.0)
+	fs.ignite("cargo", 1.0)
 	var combined_status_lines: PackedStringArray = playable.get_combined_system_status_lines()
 	var derelict_fire_visible: bool = false
 	for line in combined_status_lines:
-		if String(line).begins_with("Fire cargo_hold intensity="):
+		if String(line).begins_with("Fire cargo intensity="):
 			derelict_fire_visible = true
 			break
 	if not derelict_fire_visible:
@@ -111,19 +115,39 @@ func _validate() -> void:
 		return
 	var marker_used: bool = false
 	var spec_meta: bool = false
+	var second_marker_used: bool = false
+	var second_spec_meta: bool = false
+	var cargo_zones: Array = []
 	for cid in playable.fire_zone_nodes:
 		var zone = playable.fire_zone_nodes[cid]
+		if zone.get_meta("fire_compartment_id", "") == "cargo":
+			cargo_zones.append(zone)
 		if zone is Node3D and (zone as Node3D).position.distance_to(SENTINEL) < 0.01:
 			marker_used = true
 			if str(zone.get_meta("fire_zone_layout_id", "")) == "declared_test_fire":
 				spec_meta = true
-			break
+		if zone is Node3D and (zone as Node3D).position.distance_to(SENTINEL_SECOND) < 0.01:
+			second_marker_used = true
+			if str(zone.get_meta("fire_zone_layout_id", "")) == "declared_test_fire_second":
+				second_spec_meta = true
 	if not marker_used:
 		_fail("layout-declared fire marker ignored — no fire zone node at the declared position (loader getters dead)")
 		return
 	if not spec_meta:
 		_fail("fire zone node at the declared position carries no layout spec metadata (get_fire_zone_specs dead)")
 		return
+	if cargo_zones.size() != 2 or not second_marker_used or not second_spec_meta:
+		_fail("multiple authored fire links for cargo_hold did not materialize as two stable marker nodes")
+		return
+	if playable.player == null:
+		_fail("player missing for fire spatial lookup")
+		return
+	for zone in cargo_zones:
+		playable.player.global_position = zone.global_position
+		playable.player.force_update_transform()
+		if playable._player_fire_intensity() <= 0.0:
+			_fail("cargo fire marker did not affect spatial intensity lookup burning=%s dist=%.3f" % [str(playable._active_fire_state().get_burning_compartments()), zone.global_position.distance_to(playable.player.global_position)])
+			return
 
 	# --- Fallback: with no declared markers the distributed positions still
 	# place every burning compartment's zone (the pre-existing behavior) ---
