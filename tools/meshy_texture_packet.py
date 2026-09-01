@@ -9,18 +9,17 @@ this tool never changes ``cleaned.glb`` or any runtime asset surface.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
-import stat
-import struct
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools import meshy_governance as governance  # noqa: E402
 from tools.meshy_asset_contract import (  # noqa: E402
     AssetContract,
     canonical_json_bytes,
@@ -35,6 +34,7 @@ MATERIAL_VOCABULARY_PATH = (
 TEXTURE_REQUEST_NAME = "texture_request.json"
 TEXTURE_MODEL = "meshy-7"
 ESTIMATED_TEXTURE_CREDITS = 10
+_CANONICAL_JSON_MAX_BYTES = 16 * 1024 * 1024
 
 PathLike = Union[str, os.PathLike]
 
@@ -43,7 +43,7 @@ class TexturePacketError(ValueError):
     """Raised when a Meshy texture request fails a governance gate."""
 
 
-def _reject_duplicate_keys(pairs: list[Tuple[str, Any]]) -> Dict[str, Any]:
+def _reject_duplicate_keys(pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
@@ -144,132 +144,210 @@ def load_material_vocabulary(path: Optional[PathLike] = None) -> Dict[str, Dict[
     return families
 
 
-def _coerce_contract(contract: Union[AssetContract, PathLike]) -> AssetContract:
+def _coerce_contract(contract: Union[AssetContract, PathLike], root: Path) -> AssetContract:
     if isinstance(contract, AssetContract):
         return contract
+    contract_path = Path(contract).expanduser()
+    if not contract_path.is_absolute():
+        contract_path = root / contract_path
     try:
-        return load_contract(Path(contract))
+        return load_contract(contract_path)
     except (OSError, ValueError) as exc:
         raise TexturePacketError("contract is invalid: {0}".format(exc)) from exc
 
 
-def _regular_task_directory(task_dir: PathLike) -> Path:
-    path = Path(task_dir).expanduser()
+def _load_canonical_artifact(
+    root: Path, task_dir: Path, name: str, label: str
+) -> Tuple[Path, Dict[str, Any], bytes]:
+    if not isinstance(name, str) or not name or Path(name).name != name or name in (".", ".."):
+        raise TexturePacketError("{0} name must be a basename".format(label))
     try:
-        mode = path.lstat().st_mode
+        path = governance.governed_task_path(
+            root, task_dir / name, "Meshy texture " + label, allow_missing=False
+        )
+        record, raw = governance.strict_load_json_bytes(
+            path, "Meshy texture " + label, _CANONICAL_JSON_MAX_BYTES
+        )
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise TexturePacketError("{0} is not available: {1}".format(label, exc)) from exc
+    try:
+        canonical = canonical_json_bytes(record)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise TexturePacketError("{0} cannot be canonicalized".format(label)) from exc
+    if raw != canonical:
+        raise TexturePacketError("{0} is not canonical JSON".format(label))
+    return path, record, raw
+
+
+def _load_bound_task(
+    project_root: PathLike, contract: Union[AssetContract, PathLike], task_dir: PathLike,
+    material_family: str, vocabulary_path: Optional[PathLike] = None,
+) -> Tuple[Path, AssetContract, Path, Dict[str, Any], Dict[str, Any], AssetContract]:
+    """Load the selected task and every canonical upstream/R4 evidence record."""
+    try:
+        root = governance.physical_project_root(project_root)
+    except (OSError, TypeError, ValueError) as exc:
+        raise TexturePacketError("project root is invalid: {0}".format(exc)) from exc
+    caller_contract = _coerce_contract(contract, root)
+
+    try:
+        from tools import meshy_candidate_review as candidate_review
+
+        review_path, review, generation, loaded_root, _asset_root = candidate_review._load_task_record(
+            project_root, task_dir
+        )
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise TexturePacketError("task evidence is not fully governed: {0}".format(exc)) from exc
+    if loaded_root != root:
+        raise TexturePacketError("task evidence resolved to a different project root")
+    resolved_task = Path(review_path).parent
+    if review.get("state") != "selected":
+        raise TexturePacketError("texture request requires selected review evidence")
+    if generation.get("status") != "SUCCEEDED":
+        raise TexturePacketError("texture request requires SUCCEEDED generation evidence")
+
+    _review_path, bound_review, review_raw = _load_canonical_artifact(
+        root, resolved_task, "review.json", "review evidence"
+    )
+    _generation_path, bound_generation, generation_raw = _load_canonical_artifact(
+        root, resolved_task, "generation.json", "generation evidence"
+    )
+    if bound_review != review or bound_generation != generation:
+        raise TexturePacketError("canonical task evidence changed during loading")
+
+    task_contract_path, task_document, task_contract_raw = _load_canonical_artifact(
+        root, resolved_task, "contract.json", "task contract"
+    )
+    try:
+        task_contract = load_contract(task_contract_path)
+    except (OSError, TypeError, ValueError) as exc:
+        raise TexturePacketError("task contract is invalid: {0}".format(exc)) from exc
+    if task_contract_raw != task_contract.snapshot_bytes():
+        raise TexturePacketError("task contract snapshot is not canonical")
+    if task_contract.document != task_document:
+        raise TexturePacketError("task contract authority changed during loading")
+    if caller_contract.asset_id != task_contract.asset_id or caller_contract.document != task_contract.document:
+        raise TexturePacketError("caller contract does not match the task contract")
+    if generation.get("contract_sha256") != caller_contract.sha256:
+        raise TexturePacketError("generation contract hash does not match caller contract")
+    if generation.get("contract_artifact_sha256") != task_contract.sha256:
+        raise TexturePacketError("generation contract artifact is not bound to task contract")
+
+    report_path, report, report_raw = _load_canonical_artifact(
+        root, resolved_task, "blender-validation.json", "Blender validation evidence"
+    )
+    try:
+        from tools.meshy_blender_validate import _validate_report_record
+
+        _validate_report_record(report)
+    except (ImportError, OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise TexturePacketError("Blender validation evidence is not canonical R4: {0}".format(exc)) from exc
+    if report.get("task_id") != resolved_task.name:
+        raise TexturePacketError("validation report task_id does not match task")
+    if report.get("asset_id") != task_contract.asset_id or report.get("asset_id") != generation.get("asset_id"):
+        raise TexturePacketError("validation report asset_id does not match task evidence")
+    if report.get("contract_sha256") != caller_contract.sha256 or report.get("contract_sha256") != generation.get("contract_sha256"):
+        raise TexturePacketError("validation report contract hash does not match task evidence")
+    if (
+        report.get("status") != "PASS"
+        or report.get("uvs_present") is not True
+        or not isinstance(report.get("uv_evidence"), list)
+        or not report["uv_evidence"]
+        or report.get("blender_reimport_passed") is not True
+    ):
+        raise TexturePacketError("Blender validation does not contain canonical PASS/UV/re-import evidence")
+
+    cleaned = resolved_task / "cleaned.glb"
+    try:
+        cleaned_info = os.lstat(cleaned)
     except OSError as exc:
-        raise TexturePacketError("task directory does not exist: {0}".format(path)) from exc
-    if stat.S_ISLNK(mode) or not stat.S_ISDIR(mode):
-        raise TexturePacketError("task directory must be a regular directory: {0}".format(path))
-    return path
-
-
-def _validation_status(report: Mapping[str, Any]) -> bool:
-    for field in ("status", "validation_status", "result", "outcome", "validation"):
-        value = report.get(field)
-        if isinstance(value, str):
-            return value.upper() == "PASS"
-    return report.get("passed") is True
-
-
-def _report_uv_state(report: Mapping[str, Any]) -> Optional[bool]:
-    for field in ("uvs_present", "uv_present", "has_uvs", "has_uv"):
-        if field in report:
-            return report[field] if isinstance(report[field], bool) else False
-    for field in ("uvs", "uv", "uv_maps"):
-        value = report.get(field)
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, dict):
-            for nested in ("present", "available", "has_uvs", "has_uv"):
-                if nested in value:
-                    return value[nested] if isinstance(value[nested], bool) else False
-    attributes = report.get("attributes")
-    if isinstance(attributes, dict) and "TEXCOORD_0" in attributes:
-        return bool(attributes["TEXCOORD_0"])
-    return None
-
-
-def _cleaned_glb_has_uv(task_dir: Path) -> bool:
-    """Use the normalized GLB as a fallback when the report omits UV metadata."""
-    cleaned = task_dir / "cleaned.glb"
+        raise TexturePacketError("cleaned.glb evidence is unavailable") from exc
+    if not (os.path.isfile(cleaned) and not os.path.islink(cleaned)):
+        raise TexturePacketError("cleaned.glb must be a regular file")
+    if cleaned_info.st_size <= 0:
+        raise TexturePacketError("cleaned.glb must be non-empty")
     try:
-        if cleaned.is_symlink() or not cleaned.is_file():
-            return False
-        raw = cleaned.read_bytes()
-    except OSError:
-        return False
-    try:
-        # The parser is host-Python-only and does not import bpy.
-        from tools.meshy_blender_validate import _parse_glb
+        cleaned_hash = governance.file_sha256(cleaned)
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise TexturePacketError("cleaned.glb evidence is unavailable: {0}".format(exc)) from exc
+    if report.get("sha256") != cleaned_hash or report.get("byte_size") != cleaned_info.st_size:
+        raise TexturePacketError("Blender validation report does not match cleaned.glb")
 
-        document = _parse_glb(raw).document
-    except (ImportError, OSError, ValueError, TypeError, struct.error):  # type: ignore[name-defined]
-        return False
-    meshes = document.get("meshes")
-    if not isinstance(meshes, list):
-        return False
-    for mesh in meshes:
-        if not isinstance(mesh, dict):
-            continue
-        primitives = mesh.get("primitives")
-        if not isinstance(primitives, list):
-            continue
-        for primitive in primitives:
-            if not isinstance(primitive, dict):
-                continue
-            attributes = primitive.get("attributes")
-            if isinstance(attributes, dict) and isinstance(attributes.get("TEXCOORD_0"), int):
-                return True
-    return False
-
-
-def _load_blender_validation(task_dir: Path) -> Dict[str, Any]:
-    report_path = task_dir / "blender-validation.json"
-    try:
-        mode = report_path.lstat().st_mode
-    except OSError as exc:
-        raise TexturePacketError(
-            "Blender validation report blender-validation.json is required"
-        ) from exc
-    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
-        raise TexturePacketError("blender-validation.json must be a regular file")
-    report = _load_json(report_path, "blender-validation.json")
-    if not isinstance(report, dict):
-        raise TexturePacketError("blender-validation.json must be an object")
-    if not _validation_status(report):
-        raise TexturePacketError("Blender validation did not PASS")
-    uv_state = _report_uv_state(report)
-    if uv_state is False or (uv_state is None and not _cleaned_glb_has_uv(task_dir)):
-        raise TexturePacketError("Blender validation does not confirm UVs are present")
-    return report
-
-
-def _generation_claims_emission(task_dir: Path) -> bool:
-    """Reject staged metadata that attributes an emission map to Meshy 7."""
-    generation_path = task_dir / "generation.json"
-    if not generation_path.exists():
-        return False
-    try:
-        mode = generation_path.lstat().st_mode
-    except OSError as exc:
-        raise TexturePacketError("generation.json could not be inspected") from exc
-    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
-        raise TexturePacketError("generation.json must be a regular file")
-    generation = _load_json(generation_path, "generation.json")
-    if not isinstance(generation, dict):
-        raise TexturePacketError("generation.json must be an object")
-
-    for field in ("emission", "has_emission", "emission_map", "claims_emission", "meshy_emission"):
-        if field not in generation:
-            continue
-        value = generation[field]
-        if value is True or (field == "emission_map" and value not in (None, False, {}, [])):
-            return True
     outputs = generation.get("outputs")
-    if isinstance(outputs, dict) and "emission" in outputs and outputs["emission"] not in (None, False, {}, []):
-        return True
-    return False
+    raw_output = outputs.get("raw.glb") if isinstance(outputs, dict) else None
+    if not isinstance(raw_output, dict) or set(raw_output) != {"sha256", "byte_size"}:
+        raise TexturePacketError("generation raw.glb output evidence is not canonical")
+    evidence = {
+        "generation": {
+            "basename": "generation.json",
+            "sha256": hashlib.sha256(generation_raw).hexdigest(),
+            "status": generation["status"],
+            "raw_glb": {
+                "basename": "raw.glb",
+                "sha256": raw_output["sha256"].lower(),
+                "byte_size": raw_output["byte_size"],
+            },
+        },
+        "review": {
+            "basename": "review.json",
+            "sha256": hashlib.sha256(review_raw).hexdigest(),
+            "state": review["state"],
+        },
+        "blender_validation": {
+            "basename": "blender-validation.json",
+            "sha256": hashlib.sha256(report_raw).hexdigest(),
+            "status": report["status"],
+            "uvs_present": report["uvs_present"],
+            "uv_evidence": True,
+            "blender_reimport_passed": report["blender_reimport_passed"],
+        },
+        "cleaned_glb": {
+            "basename": "cleaned.glb",
+            "sha256": cleaned_hash.lower(),
+            "byte_size": cleaned_info.st_size,
+        },
+    }
+    vocabulary = load_material_vocabulary(vocabulary_path)
+    if not isinstance(material_family, str) or material_family not in vocabulary:
+        raise TexturePacketError("unknown material family: {0}".format(material_family))
+    return root, caller_contract, resolved_task, vocabulary[material_family], evidence, task_contract
+
+
+def _require_request_options(
+    asset_contract: AssetContract,
+    material_family: str,
+    family: Mapping[str, Any],
+    resolution: int,
+    reviewer: str,
+    *,
+    remove_lighting: bool,
+    pbr_enabled: bool,
+    meshy_emission: bool,
+    approved_credits: Optional[int],
+    client: Any,
+) -> None:
+    if not isinstance(remove_lighting, bool) or not remove_lighting:
+        raise TexturePacketError("remove_lighting must be true")
+    if not isinstance(pbr_enabled, bool) or not pbr_enabled:
+        raise TexturePacketError("PBR must be enabled")
+    if not isinstance(meshy_emission, bool) or meshy_emission:
+        raise TexturePacketError("Meshy 7 emission claims are forbidden")
+    if not isinstance(resolution, int) or isinstance(resolution, bool) or resolution <= 0:
+        raise TexturePacketError("texture resolution must be a positive integer")
+
+    budget = asset_contract.document.get("budget")
+    budget_resolution = budget.get("texture_resolution") if isinstance(budget, dict) else None
+    if not isinstance(budget_resolution, int) or isinstance(budget_resolution, bool):
+        raise TexturePacketError("contract texture resolution budget is invalid")
+    if resolution > budget_resolution:
+        raise TexturePacketError(
+            "texture resolution {0} exceeds contract budget {1}".format(
+                resolution, budget_resolution
+            )
+        )
+    if not isinstance(reviewer, str) or not reviewer.strip():
+        raise TexturePacketError("reviewer must be non-empty text")
+    _require_credit_gate(approved_credits, client)
 
 
 def _require_credit_gate(approved_credits: Optional[int], client: Any) -> None:
@@ -320,7 +398,41 @@ def _texture_prompt(profile_prompt: str, family_id: str, family: Mapping[str, An
     )
 
 
+def _validated_inputs(
+    project_root: PathLike,
+    contract: Union[AssetContract, PathLike],
+    task_dir: PathLike,
+    material_family: str,
+    resolution: int,
+    reviewer: str,
+    *,
+    remove_lighting: bool,
+    pbr_enabled: bool,
+    meshy_emission: bool,
+    approved_credits: Optional[int],
+    client: Any,
+    vocabulary_path: Optional[PathLike],
+) -> Tuple[Path, AssetContract, Path, Dict[str, Any], Dict[str, Any]]:
+    root, asset_contract, task_path, family, evidence, _task_contract = _load_bound_task(
+        project_root, contract, task_dir, material_family, vocabulary_path
+    )
+    _require_request_options(
+        asset_contract,
+        material_family,
+        family,
+        resolution,
+        reviewer,
+        remove_lighting=remove_lighting,
+        pbr_enabled=pbr_enabled,
+        meshy_emission=meshy_emission,
+        approved_credits=approved_credits,
+        client=client,
+    )
+    return root, asset_contract, task_path, family, evidence
+
+
 def validate_texture_inputs(
+    project_root: PathLike,
     contract: Union[AssetContract, PathLike],
     task_dir: PathLike,
     material_family: str,
@@ -334,45 +446,32 @@ def validate_texture_inputs(
     client: Any = None,
     vocabulary_path: Optional[PathLike] = None,
 ) -> Tuple[AssetContract, Path, Dict[str, Any]]:
-    """Validate all non-network gates and return normalized request inputs."""
-    asset_contract = _coerce_contract(contract)
-    task_path = _regular_task_directory(task_dir)
-    _load_blender_validation(task_path)
-
-    vocabulary = load_material_vocabulary(vocabulary_path)
-    if not isinstance(material_family, str) or material_family not in vocabulary:
-        raise TexturePacketError("unknown material family: {0}".format(material_family))
-    family = vocabulary[material_family]
-
-    if _generation_claims_emission(task_path):
-        raise TexturePacketError("Meshy 7 emission claims are forbidden")
-    if not isinstance(remove_lighting, bool) or not remove_lighting:
-        raise TexturePacketError("remove_lighting must be true")
-    if not isinstance(pbr_enabled, bool) or not pbr_enabled:
-        raise TexturePacketError("PBR must be enabled")
-    if not isinstance(meshy_emission, bool) or meshy_emission:
-        raise TexturePacketError("Meshy 7 emission claims are forbidden")
-    if not isinstance(resolution, int) or isinstance(resolution, bool) or resolution <= 0:
-        raise TexturePacketError("texture resolution must be a positive integer")
-
-    budget = asset_contract.document.get("budget")
-    budget_resolution = budget.get("texture_resolution") if isinstance(budget, dict) else None
-    if not isinstance(budget_resolution, int) or isinstance(budget_resolution, bool):
-        raise TexturePacketError("contract texture resolution budget is invalid")
-    if resolution > budget_resolution:
-        raise TexturePacketError(
-            "texture resolution {0} exceeds contract budget {1}".format(
-                resolution, budget_resolution
-            )
-        )
-    if not isinstance(reviewer, str) or not reviewer.strip():
-        raise TexturePacketError("reviewer must be non-empty text")
-
-    _require_credit_gate(approved_credits, client)
+    """Validate governed task evidence and all non-network request gates."""
+    if vocabulary_path is not None:
+        # Keep vocabulary override behavior for focused vocabulary tests, while
+        # all task/generation/review/R4 evidence remains repository-governed.
+        vocabulary = load_material_vocabulary(vocabulary_path)
+        if not isinstance(material_family, str) or material_family not in vocabulary:
+            raise TexturePacketError("unknown material family: {0}".format(material_family))
+    _root, asset_contract, task_path, family, _evidence = _validated_inputs(
+        project_root,
+        contract,
+        task_dir,
+        material_family,
+        resolution,
+        reviewer,
+        remove_lighting=remove_lighting,
+        pbr_enabled=pbr_enabled,
+        meshy_emission=meshy_emission,
+        approved_credits=approved_credits,
+        client=client,
+        vocabulary_path=vocabulary_path,
+    )
     return asset_contract, task_path, family
 
 
-def build_texture_request(
+def _build_texture_request(
+    project_root: PathLike,
     contract: Union[AssetContract, PathLike],
     task_dir: PathLike,
     material_family: str,
@@ -385,9 +484,13 @@ def build_texture_request(
     approved_credits: Optional[int] = None,
     client: Any = None,
     vocabulary_path: Optional[PathLike] = None,
-) -> Dict[str, Any]:
-    """Build a proposal-only canonical texture request."""
-    asset_contract, _task_path, family = validate_texture_inputs(
+) -> Tuple[Dict[str, Any], Path, Path]:
+    if vocabulary_path is not None:
+        vocabulary = load_material_vocabulary(vocabulary_path)
+        if not isinstance(material_family, str) or material_family not in vocabulary:
+            raise TexturePacketError("unknown material family: {0}".format(material_family))
+    root, asset_contract, task_path, family, evidence = _validated_inputs(
+        project_root,
         contract,
         task_dir,
         material_family,
@@ -402,13 +505,14 @@ def build_texture_request(
     )
     profile_packet = render_prompt_packet(asset_contract)
     prompt = _texture_prompt(profile_packet["texture_prompt"], material_family, family)
-    return {
+    request = {
         "asset_id": asset_contract.asset_id,
         "contract": {
             "asset_id": asset_contract.asset_id,
             "sha256": asset_contract.sha256,
         },
         "contract_sha256": asset_contract.sha256,
+        "evidence": evidence,
         "material_family": material_family,
         "pbr": {
             "enabled": True,
@@ -420,54 +524,93 @@ def build_texture_request(
         "remove_lighting": True,
         "resolution": resolution,
         "reviewer": reviewer.strip(),
+        "task_id": task_path.name,
     }
+    return request, root, task_path
 
 
-def write_texture_request(
+def build_texture_request(
+    project_root: PathLike,
     contract: Union[AssetContract, PathLike],
     task_dir: PathLike,
     material_family: str,
     resolution: int,
     reviewer: str,
-    **kwargs: Any,
+    *,
+    remove_lighting: bool = True,
+    pbr_enabled: bool = True,
+    meshy_emission: bool = False,
+    approved_credits: Optional[int] = None,
+    client: Any = None,
+    vocabulary_path: Optional[PathLike] = None,
 ) -> Dict[str, Any]:
-    """Validate and atomically write ``texture_request.json`` in ``task_dir``."""
-    request = build_texture_request(
+    """Build a proposal-only canonical texture request from governed evidence."""
+    request, _root, _task_path = _build_texture_request(
+        project_root,
         contract,
         task_dir,
         material_family,
         resolution,
         reviewer,
-        **kwargs,
+        remove_lighting=remove_lighting,
+        pbr_enabled=pbr_enabled,
+        meshy_emission=meshy_emission,
+        approved_credits=approved_credits,
+        client=client,
+        vocabulary_path=vocabulary_path,
     )
-    destination = Path(task_dir).expanduser() / TEXTURE_REQUEST_NAME
-    try:
-        mode = destination.lstat().st_mode
-        if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
-            raise TexturePacketError("texture_request.json must be a regular file")
-    except FileNotFoundError:
-        pass
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix="." + TEXTURE_REQUEST_NAME + ".",
-        suffix=".tmp",
-        dir=str(Path(task_dir).expanduser()),
-    )
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(canonical_json_bytes(request))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(str(temporary), str(destination))
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
     return request
 
 
-# Keep the packet terminology available to callers that use the plan's name.
+def write_texture_request(
+    project_root: PathLike,
+    contract: Union[AssetContract, PathLike],
+    task_dir: PathLike,
+    material_family: str,
+    resolution: int,
+    reviewer: str,
+    *,
+    remove_lighting: bool = True,
+    pbr_enabled: bool = True,
+    meshy_emission: bool = False,
+    approved_credits: Optional[int] = None,
+    client: Any = None,
+    vocabulary_path: Optional[PathLike] = None,
+) -> Dict[str, Any]:
+    """Validate and atomically write the fixed task-local request leaf."""
+    request, root, resolved_task = _build_texture_request(
+        project_root,
+        contract,
+        task_dir,
+        material_family,
+        resolution,
+        reviewer,
+        remove_lighting=remove_lighting,
+        pbr_enabled=pbr_enabled,
+        meshy_emission=meshy_emission,
+        approved_credits=approved_credits,
+        client=client,
+        vocabulary_path=vocabulary_path,
+    )
+    destination = resolved_task / TEXTURE_REQUEST_NAME
+    try:
+        governance.governed_task_path(
+            root, destination, "Meshy texture request output", allow_missing=True
+        )
+        governance.atomic_write_json(
+            destination,
+            request,
+            project_root=root,
+            allowed_root=resolved_task,
+            mode=0o600,
+        )
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise TexturePacketError("texture request publication failed: {0}".format(exc)) from exc
+    return request
+
+
+# Keep packet terminology available to callers that use the plan's name.  These
+# are aliases only; they intentionally expose the same explicit-root API.
 build_texture_packet = build_texture_request
 write_texture_packet = write_texture_request
 create_texture_request = build_texture_request
@@ -475,6 +618,7 @@ create_texture_request = build_texture_request
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--project-root", type=Path, required=True)
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--task-dir", type=Path, required=True)
     parser.add_argument("--material-family", required=True)
@@ -499,10 +643,11 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         request = write_texture_request(
+            args.project_root,
             args.contract,
             args.task_dir,
             args.material_family,
@@ -532,6 +677,7 @@ __all__ = [
     "ESTIMATED_TEXTURE_CREDITS",
     "MATERIAL_VOCABULARY_PATH",
     "TEXTURE_MODEL",
+    "TEXTURE_REQUEST_NAME",
     "TexturePacketError",
     "build_texture_packet",
     "build_texture_request",
