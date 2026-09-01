@@ -1,137 +1,109 @@
-# Meshy-Blender Asset Production System — Verification Proof
+# R8 Meshy production proof
 
-> **Date:** 2026-08-31
-> **Branch:** feature/meshy-blender-asset-system
-> **Base:** 65a6d1f4 (main)
-> **Head:** 0374239e
-> **Commits:** 17 (42a75445..0374239e)
-> **Files changed:** 48 (+8861 / -1)
+## Verdict and evidence binding
 
-## 1. Test Results
+- **READY FOR PR**: the source-backed branch gates required for review are complete.
+- **LIVE PILOT PENDING**: provider execution and production promotion remain post-PR work.
+- Evidence head: `35816acfef34b8eee14d11c0d0eca07592b9fa01`.
+- Lineage: origin/main baseline `8a724c4503f23ecdcffa884edbd823e5622dfa21`; merge
+  `4dc9e7d7f7aee2c5884bb72118949583737e8994`; phase-one evidence/docs
+  `2fcd4e41fabc937f5f33187203a58806b54e4c44`; portability/texture correction
+  `09b9fb6d83fae36dc3a17c34dfaab172fba57216`; final texture lower-bound correction
+  `35816acfef34b8eee14d11c0d0eca07592b9fa01`.
+- Meshy authority is ADR-0058. The R7 proof commit is
+  `ad10204ca667fa30e02817971937d8b9ee2cff1a`.
 
-### Focused Python Tests (PYTHONPATH=. python3 -m pytest)
+## Authority, authorization, and boundaries
 
-| Test file | Count | Status |
-|---|---|---|
-| test_meshy_asset_contract.py | 46 | PASS |
-| test_meshy_stage.py | 10 | PASS |
-| test_meshy_candidate_review.py | 10 | PASS |
-| test_meshy_blender_tools.py | 10 | PASS |
-| test_meshy_texture_packet.py | 11 | PASS |
-| test_meshy_promotion_packet.py | 12 | PASS |
-| test_meshy_runtime_review.py | 10 | PASS |
-| **Total** | **109** | **ALL PASS** |
+The project has standing subscription authorization for post-PR testing and removes spend bookkeeping as a
+human blocker. It does not waive contract, rights, request-integrity, immutable-record,
+reconciliation, Blender, runtime, provenance, or promotion gates.
 
-### Host Validators
+For candidate `generate` and `resume`, a current read-only plan supplies `maximum_credits` as the
+required `--approved-credits` request-integrity field; the value must equal the plan value. Each
+planned candidate record permits one creation POST attempt per planned candidate record. Ambiguous
+creation outcomes are reconciled from the immutable journal and are never automatically retried.
 
-| Validator | Exit | Output |
-|---|---|---|
-| meshy_asset_contract.py validate (5 contracts) | 0 | MESHY ASSET CONTRACT PASS assets=5 |
+The texture packet is separate and proposal-only. Its `--approved-credits` value must be greater than or equal to the current fixed 10-credit estimate, and it creates no provider task. Candidates
+must be selected before Blender cleanup or optional texturing. Godot retains collision,
+navigation, wrappers, and gameplay authority; Blender supplies cleaned visual masters and derived
+states; promotion remains a separate reviewed proposal.
 
-## 2. Architecture Verification
+## Deterministic plans and R7 pressure proof
 
-### Authority Chain (REQ-AIAP-001 through REQ-AIAP-010)
+Five read-only plans are deterministic and remain **unresolved planning envelopes** until
+rights-cleared reference files exist:
 
-| Requirement | Gate | Evidence |
-|---|---|---|
-| REQ-AIAP-001: Contract-first | validate_contract() rejects missing/invalid fields | test_meshy_asset_contract.py (46 tests) |
-| REQ-AIAP-002: Reference rights | rights_state must be explicit | test_invalid_contracts_fail_closed |
-| REQ-AIAP-003: Credit gate | approved_credits >= estimated cost | test_generate_refuses_when_estimate_exceeds_approved_credits |
-| REQ-AIAP-004: Immutable provenance | generation.json records hashes, provider, model | test_successful_generation_records_immutable_evidence |
-| REQ-AIAP-005: Blender master | meshy_blender_master.py derives .blend path | test_master_derives_correct_blend_path |
-| REQ-AIAP-006: Geometry/material/scale gate | meshy_blender_validate.py checks dimensions, triangles, materials | test_validate_report_has_required_fields |
-| REQ-AIAP-007: Wrapper gameplay ownership | collision_owner must be godot_wrapper | test_collision_owner_must_remain_with_godot_wrapper |
-| REQ-AIAP-008: Seeds 42/777 review | meshy_runtime_review.py runs 6 captures | test_review_constructs_godot_command |
-| REQ-AIAP-009: No auto-promotion | promotion_packet.py writes proposals only | test_proposal_never_writes_live_paths |
-| REQ-AIAP-010: Skill pressure tests | 8 scenarios documented in proof | meshy-skill-pressure-tests.md |
+| Asset | Candidates | Cost/candidate | Maximum credits | Plan SHA-256 |
+|---|---:|---:|---:|---|
+| `biomatter_swarm_kit_v1` | 3 | 5 | 15 | `112f99980a5c20b259e4e3ef496ee1be80d346c328d0ae6388f83bbd5fc97d95` |
+| `crafting_station_derelict_v1` | 4 | 5 | 20 | `87a5a0587a976f07a6b2d51bfcb23317eb4537bc83d9ff5212b002b74824d7f8` |
+| `hull_tendril_kit_v1` | 3 | 5 | 15 | `feb2b227820e0c1237b6a1a2789bacca8640311e878bf41c3bec17e03ed4d059` |
+| `loot_container_derelict_v1` | 4 | 5 | 20 | `8cd0b5db47d24377aac75f1e219c2c0e16feb29390ccc660f6961a90ced4ff2f` |
+| `stalker_v1` | 4 | 20 | 80 | `e44cd28c91ca73fec43b77e2002f8a5a50a9106e44a04da3b154cad009278cf9` |
 
-### Security Boundaries
+The R7 pressure proof is `R7_V211_PROOF_PASS scenarios=8 unique=8 safe=8 corrected_scenario=2 pii_free=true cardinality=4x1`. The loot-container plan is one batch of
+four candidate records, with one creation POST attempt per planned candidate record. No Meshy provider calls were made. No candidates, external Blender masters, live six-view runtime review,
+or promotions were produced.
 
-| Check | Status | Evidence |
-|---|---|---|
-| No API keys in artifacts | PASS | test_successful_generation_records_immutable_evidence checks TEST_API_KEY absent |
-| No signed URLs in artifacts | PASS | same test checks SIGNED_DOWNLOAD_TOKEN absent |
-| No writes to assets/imported | PASS | test_protected_surfaces_are_never_written |
-| No writes to data/combat | PASS | same test |
-| No writes to data/props | PASS | same test |
-| No writes to scenes/wrappers | PASS | same test |
-| Atomic staging | PASS | test_staging_uses_atomic_temp_directory_rename |
-| Duplicate JSON keys rejected | PASS | test_duplicate_json_keys_are_rejected, test_nested_duplicate_json_keys_are_rejected |
-| Non-finite numbers rejected | PASS | test_nonfinite_values_are_rejected_recursively |
-| Deep JSON handled safely | PASS | test_cli_deep_json_recursion_is_nonzero_path_scoped_without_traceback |
-| Immutable snapshots | PASS | test_prompt_packet_uses_immutable_snapshot_after_document_mutation |
-| Python 3.9.6 compatible | PASS | all tests run on /usr/bin/python3 3.9.6 |
+## Test gates and truthful baseline limits
 
-### Policy Enforcement
+The merged host-suite result was **340 passed** at the implementation snapshot. This is distinct
+from the final focused gate, which recorded **375 passed** in 185.18 seconds. Native **Blender
+5.2.0 LTS** recorded **three real Blender tests** passed. These are source-backed gate results,
+not evidence of a live provider task or an external pilot master.
 
-| Policy | Status | Evidence |
-|---|---|---|
-| No structural Meshy | PASS | test_invalid_contracts_fail_closed (structural_meshy fixture) |
-| One master for states | PASS | test_invalid_contracts_fail_closed (independent_states fixture) |
-| Biped-only Meshy rigging | PASS | test_invalid_contracts_fail_closed (rigging_target fixture) |
-| Separate reference images | PASS | test_reference_collage_input_is_rejected |
-| Untextured candidates | PASS | test_geometry_candidates_must_be_untextured |
-| Candidate count 3-6 | PASS | test_candidate_count_must_be_between_three_and_six |
-| Canonical prompt profile | PASS | test_shared_style_literal_is_only_in_versioned_prompt_profile |
-| Pilot policy matrix | PASS | test_pilot_contracts_match_exact_task_four_policy_matrix |
+The complete feature full suite remains baseline-red: **103 failed, 721 passed, 7 errors**.
+The origin/main full-suite baseline is **103 failed, 395 passed, 7 errors**. The exact failure and
+error sets are equal; there were **zero new failing or error tests**. The feature's additional
+passing tests do not convert the inherited baseline failures or errors into passes.
 
-## 3. Pilot Dry Run
+Godot recorded **9/11** required smokes. The two baseline failures are
+`generated_seed_boarded_slice_smoke` and `builder_playable_runtime_fields_smoke`; they reproduce
+on origin/main, and their failing call chain has zero feature-diff paths. They are not claimed as
+passed. The merged Godot summary records the same root String-to-Dictionary diagnostic and has
+summary SHA-256 `0b1cf89043f0cbe46499ca237e1d9bf8c05a5714c7a1ad4a26406a132e55fd03`; the origin/main
+baseline summary SHA-256 is `08f1ed5a3eb91935777228ddff7d88484789cde4d291022747054986cc5abd1c`.
 
-Five contracts validated, five deterministic prompt packets generated:
+## Verification records
 
-| Asset | Candidates | Endpoint | Mode |
-|---|---|---|---|
-| biomatter_swarm_kit_v1 | 3 | /openapi/v1/image-to-3d | smart-topology |
-| crafting_station_derelict_v1 | 4 | /openapi/v1/image-to-3d | smart-topology |
-| hull_tendril_kit_v1 | 3 | /openapi/v1/image-to-3d | smart-topology |
-| loot_container_derelict_v1 | 4 | /openapi/v1/image-to-3d | smart-topology |
-| stalker_v1 | 4 | /openapi/v1/multi-image-to-3d | standard |
+The complete verified evidence set is recorded by privacy-safe SHA-256 values:
 
-Repeated runs produce byte-identical output. No API calls made. No credits spent. No protected surfaces modified.
+| Record | SHA-256 |
+|---|---|
+| Documentation contract | `54c883a020b26f290dbf01a5de9844c8469af2e2cf4f304df650ebd149235bb9` |
+| Requirement trace | `3d804aa56b5d7b9deb814ab6156a53b2b54915693e7bcfe51ecaa0aea794a40f` |
+| Plan determinism | `b193473101ffcb8eea990b8df44b6dacf71629d8ac276fa7ca573c1c945eeb17` |
+| R7 verification | `5cdaadc63eca75ea63f80c7f81bc5832fb6bca9fef69f5eb13d693c3c444e334` |
+| Contract validation | `e7c605111b55bea0a95a920aff986314cba005ed745047606d4f3a8fe4fb4da5` |
+| Final focused 375 | `b3569c5d16e42804b95438edb76c561ee36db1759d544fc196e29b2c6e367676` |
+| Native Blender 5.2.0 LTS | `2938bbca7f20d03a4aa59490a09d818182690b49f35374b3116212b9a30b3e47` |
+| Feature full-suite log | `3ce14655810e11df6776ff50ce0d8681d1b6343fff08234ec2afbd4f0d85b894` |
+| Feature full-suite comparison | `bce893761f185692e2b3ca2d52631df62c5f51563a3c56745ccdd91ff8486d6a` |
+| origin/main full-suite log | `eff969d18845e4e96cf365cc3259acac745de5639d1aa6e0231e138f082af5f5` |
+| origin/main full-suite record | `bb1dcb7c711a235f3118ec1220cfd96e2a6a8f260c195943ad08365918064800` |
+| Merged Godot summary | `0b1cf89043f0cbe46499ca237e1d9bf8c05a5714c7a1ad4a26406a132e55fd03` |
+| origin/main Godot summary | `08f1ed5a3eb91935777228ddff7d88484789cde4d291022747054986cc5abd1c` |
+| Gitleaks report | `37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570` |
+| Scope record | `cd1e762b1a02b5eb2d349ab9c53d4885a0ad24b5c109a7c65d1ed5ebe88d5abb` |
 
-## 4. Skill Pressure Tests
+## Security, scope, and corrective review
 
-Eight scenarios tested (see docs/superpowers/proofs/meshy-skill-pressure-tests.md):
+Scope evidence covers **56 paths**. **gitleaks 8.30.1** ran across **50 commits**; **no leaks found**. The protected implementation plan remained unchanged at SHA-256
+`3e399f581aaca12e05adc8e3c163e188eb5da3b3b5661e228d12036bb50febf9`. No personal data, provider
+credentials, authorization material, signed URLs, or machine-local paths are part of this proof.
 
-1. Structural wall → REFUSED (structural geometry cannot use Meshy)
-2. Separate closed/open crates → REFUSED (one master derivation)
-3. Texture before selection → REFUSED (select first)
-4. Auto-rig Tendril → REFUSED (non-biped)
-5. Collage as one image → REFUSED (separate files)
-6. Skip contract → REFUSED (contract required)
-7. Unlimited credits → REFUSED (credit ceiling)
-8. Self-authored provenance → REFUSED (AI provenance required)
+Quality review found a machine-local path issue and a texture-lower-bound documentation issue.
+Corrections `09b9fb6d83fae36dc3a17c34dfaab172fba57216` and
+`35816acfef34b8eee14d11c0d0eca07592b9fa01` close them under the parent gates. No independent
+corrective PASS is claimed.
 
-## 5. Known Limitations
+## Post-PR live-pilot sequence
 
-- Godot headless runtime captures use dummy renderer on macOS; actual PNG rendering requires a display or CI environment with GPU.
-- `meshy_stage.py resume` CLI subcommand is documented in the skill but not yet exposed as a CLI entrypoint (the `resume_batch()` function exists and is tested).
-- Blender validation runs under system Python 3.9.6 without bpy; actual Blender validation requires `blender --background --python`.
-
-## 6. Git Diff Stat
-
-```
-48 files changed, 8861 insertions(+), 1 deletion(-)
-```
-
-## 7. Commit History
-
-```
-0374239e docs: stage five Meshy pilot prompt packets
-6a3d5b4c test: verify governed asset skill behavior
-603647f9 feat: add locked-isometric Meshy asset review
-4ad4f3f2 feat: add AI asset promotion proposals
-37dc9479 feat: govern Meshy texturing and material vocabulary
-f021b40b feat: add Blender master and GLB quality gates
-1235356e feat: add Meshy candidate review gate
-d55bae34 feat: add credit-bounded Meshy staging adapter
-0933a3bb test: define governed Meshy staging
-c8713cd3 fix: enforce Meshy pilot prompt profile
-f7111189 fix: bind Meshy contracts to immutable snapshots
-ddad2fb1 feat: define first Meshy pilot contracts
-4275ff82 feat: add deterministic Meshy asset contracts
-60a8d8f5 test: define Meshy asset contract
-edd48632 fix: make pending asset commands pasteable
-31275313 fix: block script errors in validation bundle
-42a75445 docs: define governed Meshy candidate pipeline
-```
+After PR readiness, supply separate rights-cleared reference files and their hashes, rerun each
+read-only plan, create immutable request records, and execute only the gated candidate lifecycle.
+For `loot_container_derelict_v1`, retain four candidate records and one creation POST attempt per
+planned candidate record. Then select one candidate, produce or verify the external Blender master,
+run Blender and UV gates, perform the locked-isometric six-view runtime review (seeds `42` and
+`777`; normal, emergency, and dark lighting), and emit a reviewed proposal-only promotion packet.
+Until those inputs and gates exist, the live pilot remains **LIVE PILOT PENDING**.
