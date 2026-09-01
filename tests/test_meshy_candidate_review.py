@@ -99,10 +99,11 @@ def _valid_glb() -> bytes:
 
 
 class _ReviewFakeMeshyClient:
-    def __init__(self) -> None:
+    def __init__(self, status: str = "SUCCEEDED") -> None:
         self.created_tasks = []
         self._counter = 0
         self.account_lock_id = "a" * 64
+        self.status = status
 
     def get_balance(self) -> int:
         return 10000
@@ -118,6 +119,7 @@ class _ReviewFakeMeshyClient:
         response = json.loads((API_FIXTURES / fixture).read_text(encoding="utf-8"))
         response["task_id"] = task_id
         response["consumed_credits"] = 5
+        response["status"] = self.status
         response["model_urls"]["glb"] = "https://assets.meshy.ai/{0}.glb".format(task_id)
         response["thumbnail_url"] = "https://assets.meshy.ai/{0}.png".format(task_id)
         return response
@@ -139,24 +141,31 @@ def _write_review_references(root: Path) -> dict[str, str]:
     return names
 
 
-def _real_staged_task(tmp_path: Path) -> tuple[Path, Path, AssetContract]:
+def _real_staged_task(
+    tmp_path: Path, *, generation_status: str = "SUCCEEDED"
+) -> tuple[Path, Path, AssetContract]:
     project_root = tmp_path / "project"
     project_root.mkdir()
     references = project_root / "references"
     references.mkdir()
     contract = load_contract(CONTRACT_PATH)
     specs = _write_review_references(references)
-    generate_batch(
-        contract,
-        project_root=project_root,
-        client=_ReviewFakeMeshyClient(),
-        approved_credits=100,
-        pricing_file=None,
-        reference_root=references,
-        reference_specs=specs,
-        output_license="paid-private",
-        today="2026-09-01",
-    )
+    generation_kwargs: dict[str, Any] = {
+        "contract": contract,
+        "project_root": project_root,
+        "client": _ReviewFakeMeshyClient(generation_status),
+        "approved_credits": 100,
+        "pricing_file": None,
+        "reference_root": references,
+        "reference_specs": specs,
+        "output_license": "paid-private",
+        "today": "2026-09-01",
+    }
+    if generation_status == "FAILED":
+        with pytest.raises(RuntimeError, match="Meshy task ended with status FAILED"):
+            generate_batch(**generation_kwargs)
+    else:
+        generate_batch(**generation_kwargs)
     task_root = project_root / STAGING / contract.asset_id
     task_dir = next(path for path in task_root.iterdir() if path.name != "_batches")
     return project_root, task_dir, contract
@@ -269,6 +278,54 @@ def test_verify_passes_for_complete_review(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "MESHY CANDIDATE REVIEW PASS" in result.stdout
+
+
+def test_r3_verify_rejects_selected_review_with_failed_generation(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(
+        tmp_path, generation_status="FAILED"
+    )
+    assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "FAILED"
+    selected = _read_review(task_dir)
+    selected.update(
+        {
+            "state": "selected",
+            "decision": "accept_for_cleanup",
+            "checks": _true_checks(),
+            "rejection_reasons": [],
+        }
+    )
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(selected))
+
+    with pytest.raises(ReviewError, match="selected review requires SUCCEEDED generation evidence"):
+        verify_review(project_root, task_dir)
+
+
+def test_r3_cli_verify_rejects_selected_review_with_failed_generation(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(
+        tmp_path, generation_status="FAILED"
+    )
+    selected = _read_review(task_dir)
+    selected.update(
+        {
+            "state": "selected",
+            "decision": "accept_for_cleanup",
+            "checks": _true_checks(),
+            "rejection_reasons": [],
+        }
+    )
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(selected))
+
+    result = _run(
+        "verify",
+        "--project-root",
+        str(project_root),
+        "--task-dir",
+        str(task_dir),
+    )
+
+    assert result.returncode != 0
+    assert "selected review requires SUCCEEDED generation evidence" in result.stderr
+    assert "PASS" not in result.stdout
 
 
 def test_verify_fails_for_incomplete_review(tmp_path: Path) -> None:

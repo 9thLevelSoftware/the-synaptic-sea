@@ -463,13 +463,15 @@ def verify_review(
 ) -> Dict[str, Any]:
     """Verify full bound evidence and return the canonical review record."""
 
-    _review_path, record, _generation, _root, _asset_root = _load_task_record(project_root, task_dir)
+    _review_path, record, generation, _root, _asset_root = _load_task_record(project_root, task_dir)
     state = record["state"]
     if state == "pending":
         raise ReviewError("review is still pending")
     if state == "rejected":
         return record
     if state == "selected":
+        if generation.get("status") != "SUCCEEDED":
+            raise ReviewError("selected review requires SUCCEEDED generation evidence")
         return record
     if state in _POST_SELECTED_STATES:
         raise ReviewError("evidence-not-yet-verified for post-selected review state")
