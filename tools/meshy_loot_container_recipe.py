@@ -375,7 +375,7 @@ def build_blender_command(paths: RecipePaths, contract_path: Path, mode: str) ->
         "--background",
         str(paths.master_path),
         "--python",
-        str(Path(__file__).resolve()),
+        str(paths.project_root / "tools/meshy_loot_container_recipe.py"),
         "--",
         "--project-root",
         str(paths.project_root),
@@ -406,10 +406,11 @@ def publish_cleaned(source_glb: Path, destination: Path, allowed_root: Path) -> 
     digest = hashlib.sha256(payload).hexdigest()
     size = len(payload)
 
-    root = _resolve_path(allowed_root)
+    allowed_root_lexical = _lexical_path(allowed_root)
+    _reject_symlink_components(allowed_root_lexical, "allowed root")
+    root = allowed_root_lexical.resolve(strict=False)
     if not root.is_dir() or root.is_symlink():
         raise ValueError("allowed root must be a regular directory")
-    _reject_symlink_components(root, "allowed root")
     target = _lexical_path(destination)
     _reject_symlink_components(target, "cleaned GLB destination")
     resolved_target = target.resolve(strict=False)

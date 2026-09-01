@@ -304,6 +304,21 @@ def test_publish_cleaned_rejects_destination_escape_and_symlink(tmp_path: Path) 
     assert outside.read_bytes() == b"untouched"
 
 
+def test_publish_cleaned_rejects_symlinked_allowed_root(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import publish_cleaned
+
+    canonical_tmp_path = tmp_path.resolve()
+    real_allowed_root = canonical_tmp_path / "real-evidence"
+    real_allowed_root.mkdir(mode=0o700)
+    symlinked_allowed_root = canonical_tmp_path / "alias-evidence"
+    symlinked_allowed_root.symlink_to(real_allowed_root, target_is_directory=True)
+    source = canonical_tmp_path / "source.glb"
+    source.write_bytes(b"source")
+
+    with pytest.raises(ValueError, match="allowed root.*symlink|symlink"):
+        publish_cleaned(source, real_allowed_root / "cleaned.glb", symlinked_allowed_root)
+
+
 def test_build_blender_command_has_exact_argv(tmp_path: Path) -> None:
     from tools.meshy_loot_container_recipe import build_blender_command, derive_recipe_paths
 
@@ -327,7 +342,7 @@ def test_build_blender_command_has_exact_argv(tmp_path: Path) -> None:
         "--background",
         str(paths.master_path),
         "--python",
-        str(Path(recipe.__file__).resolve()),
+        str(paths.project_root / "tools/meshy_loot_container_recipe.py"),
         "--",
         "--project-root",
         str(paths.project_root),
