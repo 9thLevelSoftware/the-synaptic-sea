@@ -5,7 +5,9 @@ The runtime review is intentionally task-bound.  It consumes only a selected
 Meshy task's canonical contract, SUCCEEDED generation record, cleaned GLB, and
 R4 Blender validation report.  Godot runs in a disposable project overlay and
 publishes six fixed captures followed by one immutable report through the
-shared governance writer.
+shared governance writer.  Fixed leaves and atomic writes constrain this
+Python API; same-UID malicious raw filesystem writes outside this API remain
+outside its trusted-workspace guarantee.
 """
 
 from __future__ import annotations
@@ -59,6 +61,16 @@ TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 SCHEMA_VERSION = "1.0.0"
 DOCUMENT_KIND = "meshy_runtime_review"
+LOCKED_CAMERA_DIRECTION = (16.0, 14.0, 16.0)
+LOCKED_CAMERA_DIRECTION_TOLERANCE = 1e-4
+CAMERA_SIZE_MIN = 1.5
+CAMERA_SIZE_MAX = 4096.0
+CAMERA_SIZE_DIMENSION_SCALE = 16.0
+STAGED_SAMPLE_STEP_X = max(1, CAPTURE_SIZE[0] // 64)
+STAGED_SAMPLE_STEP_Y = max(1, CAPTURE_SIZE[1] // 36)
+STAGED_SAMPLE_MAX = len(range(0, CAPTURE_SIZE[0], STAGED_SAMPLE_STEP_X)) * len(
+    range(0, CAPTURE_SIZE[1], STAGED_SAMPLE_STEP_Y)
+)
 RUNTIME_DOCUMENT_FIELDS = frozenset(
     (
         "schema_version",
@@ -96,9 +108,9 @@ FIXED_OUTPUT_NAMES = tuple(
 # never use this value as evidence; they record the marker's actual transform.
 DEFAULT_CAMERA_TRANSFORM: Dict[str, Any] = {
     "projection": "orthogonal",
-    "position": [16.0, 14.0, 16.0],
-    "target": [0.0, 0.0, 0.0],
-    "size": 18.0,
+    "position": [19.742138317, 18.236871003, 19.242143317],
+    "target": [0.5, 1.399999976, 0.000005],
+    "size": 1.5,
 }
 
 
@@ -123,6 +135,7 @@ class ValidatedTask:
     blender_validation_hash: str = ""
     cleaned_glb_size: int = 0
     category: str = ""
+    bounds_dimensions: Optional[Tuple[float, float, float]] = None
 
 
 @dataclass(frozen=True)
@@ -268,6 +281,11 @@ def validate_task_dir(task_dir: Path, contract: AssetContract) -> ValidatedTask:
         blender_validation_hash=hashlib.sha256(raw_validation).hexdigest(),
         cleaned_glb_size=cleaned_glb.stat().st_size,
         category=str(contract.document.get("category", "")),
+        bounds_dimensions=(
+            float(validation["bounds"]["dimensions"][0]),
+            float(validation["bounds"]["dimensions"][1]),
+            float(validation["bounds"]["dimensions"][2]),
+        ),
     )
 
 
@@ -541,6 +559,60 @@ def _parse_finite_vector(value: str, label: str) -> list[float]:
     return numbers
 
 
+def _camera_size_limit(
+    bounds_dimensions: Optional[Tuple[float, float, float]] = None,
+) -> float:
+    if bounds_dimensions is None:
+        return CAMERA_SIZE_MAX
+    diagonal = math.sqrt(sum(float(value) ** 2 for value in bounds_dimensions))
+    if not math.isfinite(diagonal) or diagonal < 0.0:
+        raise ReviewError("runtime GLB bounds dimensions are invalid")
+    return min(CAMERA_SIZE_MAX, max(CAMERA_SIZE_MIN, diagonal * CAMERA_SIZE_DIMENSION_SCALE))
+
+
+def _validate_camera_transform(
+    value: object,
+    *,
+    bounds_dimensions: Optional[Tuple[float, float, float]] = None,
+) -> Dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"projection", "position", "target", "size"}:
+        raise ReviewError("camera transform is not canonical")
+    if value.get("projection") != "orthogonal":
+        raise ReviewError("camera projection is not orthogonal")
+    vectors: Dict[str, list[float]] = {}
+    for field in ("position", "target"):
+        raw_values = value.get(field)
+        if not isinstance(raw_values, list) or len(raw_values) != 3:
+            raise ReviewError("camera transform vector is invalid")
+        values = [float(item) for item in raw_values] if all(
+            not isinstance(item, bool) and isinstance(item, (int, float)) for item in raw_values
+        ) else []
+        if len(values) != 3 or any(not math.isfinite(item) for item in values):
+            raise ReviewError("camera transform vector is invalid")
+        vectors[field] = values
+    delta = [vectors["position"][index] - vectors["target"][index] for index in range(3)]
+    distance = math.sqrt(sum(item * item for item in delta))
+    if not math.isfinite(distance) or distance <= 1e-9:
+        raise ReviewError("camera position and target must be distinct and finite")
+    locked_length = math.sqrt(sum(item * item for item in LOCKED_CAMERA_DIRECTION))
+    normalized = [item / distance for item in delta]
+    locked = [item / locked_length for item in LOCKED_CAMERA_DIRECTION]
+    if math.sqrt(sum((normalized[index] - locked[index]) ** 2 for index in range(3))) > LOCKED_CAMERA_DIRECTION_TOLERANCE:
+        raise ReviewError("camera transform direction is not locked isometric")
+    size = value.get("size")
+    if isinstance(size, bool) or not isinstance(size, (int, float)):
+        raise ReviewError("camera size is invalid")
+    size = float(size)
+    if not math.isfinite(size) or size < CAMERA_SIZE_MIN or size > _camera_size_limit(bounds_dimensions):
+        raise ReviewError("camera size is outside the governed bound")
+    return {
+        "projection": "orthogonal",
+        "position": vectors["position"],
+        "target": vectors["target"],
+        "size": size,
+    }
+
+
 def _validate_staged_visibility(value: object) -> Dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"pass", "opaque_pixels", "luma_range"}:
         raise ReviewError("staged visibility evidence is not canonical")
@@ -550,13 +622,14 @@ def _validate_staged_visibility(value: object) -> Dict[str, Any]:
         value.get("pass") is not True
         or type(opaque_pixels) is not int
         or opaque_pixels < 2
-        or opaque_pixels > CAPTURE_SIZE[0] * CAPTURE_SIZE[1]
+        or opaque_pixels > STAGED_SAMPLE_MAX
         or isinstance(luma_range, bool)
         or not isinstance(luma_range, (int, float))
         or not math.isfinite(float(luma_range))
         or float(luma_range) < 0.004
+        or float(luma_range) > 1.0
     ):
-        raise ReviewError("staged visibility evidence is below the strict pixel gate")
+        raise ReviewError("staged visibility evidence is outside the strict pixel gate")
     return {
         "pass": True,
         "opaque_pixels": opaque_pixels,
@@ -590,8 +663,6 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
         size = float(match.group("size"))
     except ValueError as exc:
         raise ReviewError("camera size is not numeric") from exc
-    if not math.isfinite(size) or size <= 0.0:
-        raise ReviewError("camera size must be finite and positive")
     try:
         opaque_pixels = int(match.group("pixels"))
         luma_range = float(match.group("luma"))
@@ -604,12 +675,17 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
             "luma_range": luma_range,
         }
     )
+    camera_transform = _validate_camera_transform(
+        {
+            "projection": "orthogonal",
+            "position": _parse_finite_vector(match.group("position"), "position"),
+            "target": _parse_finite_vector(match.group("target"), "target"),
+            "size": size,
+        }
+    )
+    camera_transform["staged_visibility"] = staged_visibility
     return {
-        "projection": "orthogonal",
-        "position": _parse_finite_vector(match.group("position"), "position"),
-        "target": _parse_finite_vector(match.group("target"), "target"),
-        "size": size,
-        "staged_visibility": staged_visibility,
+        **camera_transform,
     }
 
 
@@ -849,6 +925,10 @@ def build_runtime_review_document(
         if type(seed) is not int or not isinstance(lighting, str):
             raise ReviewError("runtime capture identity is invalid")
         capture_name(seed, lighting)
+        _validate_camera_transform(
+            item.get("camera_transform"),
+            bounds_dimensions=inputs.bounds_dimensions,
+        )
         _validate_staged_visibility(item.get("staged_visibility"))
         key = (seed, lighting)
         if key in by_key:
@@ -934,81 +1014,6 @@ def _validate_existing_leaf(path: Path, expected: Optional[bytes], label: str) -
         raise ReviewError("existing {0} differs from the requested evidence".format(label))
 
 
-def _publish_fixed_captures(
-    root: Path, asset_id: str, captures: Mapping[Tuple[int, str], Path], report: Mapping[str, Any]
-) -> Path:
-    """Publish fixed PNG leaves and report-last through governance atomics."""
-
-    expected_keys = {(seed, lighting) for seed in SEEDS for lighting in LIGHTING_MODES}
-    normalised = _normalise_capture_mapping(captures)
-    if set(normalised) != expected_keys:
-        raise ReviewError("runtime review requires all six captures before publication")
-    if set(report) != RUNTIME_DOCUMENT_FIELDS or report.get("pass") is not True:
-        raise ReviewError("runtime review report is not canonical PASS")
-    destination = _fixed_preview_path(root, asset_id)
-    if destination.exists():
-        entries = _output_entries(destination)
-        if any(entry not in FIXED_OUTPUT_NAMES for entry in entries):
-            raise ReviewError("preview directory contains an unexpected entry")
-    payloads: Dict[str, bytes] = {}
-    for key, source in normalised.items():
-        _validate_png(source)
-        payloads[capture_name(*key)] = source.read_bytes()
-    report_bytes = canonical_json_bytes(dict(report))
-    report_path = destination / "runtime-review.json"
-
-    # An existing report is authoritative.  It is reusable only if every fixed
-    # byte, mode, and canonical field still matches exactly.
-    if os.path.lexists(report_path):
-        _validate_existing_leaf(report_path, report_bytes, "runtime-review.json")
-        try:
-            persisted, raw = governance.strict_load_json_bytes(
-                report_path, "runtime runtime-review.json", 4 * 1024 * 1024
-            )
-        except (OSError, TypeError, ValueError, RecursionError) as exc:
-            raise ReviewError("existing runtime-review.json is invalid") from exc
-        if raw != report_bytes or persisted != dict(report):
-            raise ReviewError("existing runtime-review.json differs from the requested evidence")
-        for name, payload in payloads.items():
-            _validate_existing_leaf(destination / name, payload, "capture " + name)
-        if sorted(_output_entries(destination)) != sorted(FIXED_OUTPUT_NAMES):
-            raise ReviewError("authoritative preview directory is incomplete")
-        return destination
-
-    # Validate all pre-existing leaves before writing any new leaf.  A malformed
-    # or mismatched leaf is never replaced, which makes resumability safe.
-    for name, payload in payloads.items():
-        _validate_existing_leaf(destination / name, payload, "capture " + name)
-
-    try:
-        for name in FIXED_OUTPUT_NAMES[:-1]:
-            target = destination / name
-            if os.path.lexists(target):
-                continue
-            governance.atomic_write_bytes(
-                target, payloads[name], project_root=root, allowed_root=destination, mode=0o600
-            )
-        # The report is deliberately the last public write.
-        governance.atomic_write_json(
-            report_path, dict(report), project_root=root, allowed_root=destination, mode=0o600
-        )
-    except (OSError, TypeError, ValueError, RuntimeError) as exc:
-        raise ReviewError("runtime evidence publication failed: " + str(exc)) from exc
-
-    _validate_existing_leaf(report_path, report_bytes, "runtime-review.json")
-    try:
-        persisted, raw = governance.strict_load_json_bytes(
-            report_path, "published runtime-review.json", 4 * 1024 * 1024
-        )
-    except (OSError, TypeError, ValueError, RecursionError) as exc:
-        raise ReviewError("published runtime-review.json is invalid") from exc
-    if raw != report_bytes or persisted != dict(report):
-        raise ReviewError("published runtime-review.json was not exact")
-    for name, payload in payloads.items():
-        _validate_existing_leaf(destination / name, payload, "capture " + name)
-    return destination
-
-
 def snapshot_runtime_surfaces(project_root: Path) -> tuple[Any, ...]:
     """Use the shared immutable protected-surface authority."""
 
@@ -1081,12 +1086,8 @@ def _load_runtime_inputs(
         from tools import meshy_blender_validate as blender_validate
 
         try:
-            blender_validate.verify_validation_report(
-                cleaned,
-                task_contract_path,
-                r4,
-                task_id=resolved_task.name,
-                reimport=blender_validate._reimport_with_blender_process,
+            expected_r4 = blender_validate.verify_validation_report(
+                cleaned, task_contract_path, r4, task_id=resolved_task.name
             )
         except (OSError, TypeError, ValueError, RuntimeError) as exc:
             raise ReviewError("R4 Blender evidence does not match the current task: " + str(exc)) from exc
@@ -1101,6 +1102,11 @@ def _load_runtime_inputs(
             blender_validation_hash=hashlib.sha256(r4_raw).hexdigest(),
             cleaned_glb_size=cleaned_info.st_size,
             category=str(task_contract_model.document.get("category", "")),
+            bounds_dimensions=(
+                float(expected_r4["bounds"]["dimensions"][0]),
+                float(expected_r4["bounds"]["dimensions"][1]),
+                float(expected_r4["bounds"]["dimensions"][2]),
+            ),
         )
         return inputs, review, generation, root
     except ReviewError:
@@ -1171,21 +1177,10 @@ def _validate_runtime_document(
         output_sha = item.get("output_sha256")
         if not isinstance(output_sha, str) or HASH_RE.fullmatch(output_sha) is None:
             raise ReviewError("runtime capture output hash is invalid")
-        transform = item.get("camera_transform")
-        if not isinstance(transform, dict) or set(transform) != {"projection", "position", "target", "size"}:
-            raise ReviewError("runtime camera transform is not canonical")
-        if transform.get("projection") != "orthogonal":
-            raise ReviewError("runtime camera projection is not orthogonal")
-        for field in ("position", "target"):
-            values = transform.get(field)
-            if not isinstance(values, list) or len(values) != 3 or any(
-                isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
-                for value in values
-            ):
-                raise ReviewError("runtime camera transform vector is invalid")
-        size = transform.get("size")
-        if isinstance(size, bool) or not isinstance(size, (int, float)) or not math.isfinite(float(size)) or float(size) <= 0.0:
-            raise ReviewError("runtime camera size is invalid")
+        _validate_camera_transform(
+            item.get("camera_transform"),
+            bounds_dimensions=inputs.bounds_dimensions,
+        )
         _validate_staged_visibility(item.get("staged_visibility"))
     if set(by_key) != set(expected):
         raise ReviewError("runtime review capture identity is invalid")
@@ -1254,6 +1249,85 @@ def run(args: argparse.Namespace) -> RunResult:
             _compare_surfaces(before, root, "during dry-run")
             result = RunResult(0, "dry-run validation passed; no outputs written", dry_run=True)
         else:
+            def publish_fixed_captures() -> Path:
+                """Publish only this run's real captures, report last."""
+
+                expected_keys = {(seed, lighting) for seed in SEEDS for lighting in LIGHTING_MODES}
+                normalised = _normalise_capture_mapping(captures)
+                if set(normalised) != expected_keys:
+                    raise ReviewError("runtime review requires all six captures before publication")
+                if set(document) != RUNTIME_DOCUMENT_FIELDS or document.get("pass") is not True:
+                    raise ReviewError("runtime review report is not canonical PASS")
+                destination = _fixed_preview_path(root, inputs.asset_id)
+                if destination.exists():
+                    entries = _output_entries(destination)
+                    if any(entry not in FIXED_OUTPUT_NAMES for entry in entries):
+                        raise ReviewError("preview directory contains an unexpected entry")
+                payloads: Dict[str, bytes] = {}
+                for key, source in normalised.items():
+                    _validate_png(source)
+                    payloads[capture_name(*key)] = source.read_bytes()
+                report_bytes = canonical_json_bytes(document)
+                report_path = destination / "runtime-review.json"
+
+                # An existing report is authoritative.  It is reusable only if
+                # every fixed byte, mode, and canonical field still matches.
+                if os.path.lexists(report_path):
+                    _validate_existing_leaf(report_path, report_bytes, "runtime-review.json")
+                    try:
+                        persisted, raw = governance.strict_load_json_bytes(
+                            report_path, "runtime runtime-review.json", 4 * 1024 * 1024
+                        )
+                    except (OSError, TypeError, ValueError, RecursionError) as exc:
+                        raise ReviewError("existing runtime-review.json is invalid") from exc
+                    if raw != report_bytes or persisted != document:
+                        raise ReviewError("existing runtime-review.json differs from the requested evidence")
+                    for name, payload in payloads.items():
+                        _validate_existing_leaf(destination / name, payload, "capture " + name)
+                    if sorted(_output_entries(destination)) != sorted(FIXED_OUTPUT_NAMES):
+                        raise ReviewError("authoritative preview directory is incomplete")
+                    return destination
+
+                # Validate all pre-existing leaves before writing any new leaf.
+                for name, payload in payloads.items():
+                    _validate_existing_leaf(destination / name, payload, "capture " + name)
+
+                try:
+                    for name in FIXED_OUTPUT_NAMES[:-1]:
+                        target = destination / name
+                        if os.path.lexists(target):
+                            continue
+                        governance.atomic_write_bytes(
+                            target,
+                            payloads[name],
+                            project_root=root,
+                            allowed_root=destination,
+                            mode=0o600,
+                        )
+                    # The report is deliberately the last public write.
+                    governance.atomic_write_json(
+                        report_path,
+                        document,
+                        project_root=root,
+                        allowed_root=destination,
+                        mode=0o600,
+                    )
+                except (OSError, TypeError, ValueError, RuntimeError) as exc:
+                    raise ReviewError("runtime evidence publication failed: " + str(exc)) from exc
+
+                _validate_existing_leaf(report_path, report_bytes, "runtime-review.json")
+                try:
+                    persisted, raw = governance.strict_load_json_bytes(
+                        report_path, "published runtime-review.json", 4 * 1024 * 1024
+                    )
+                except (OSError, TypeError, ValueError, RecursionError) as exc:
+                    raise ReviewError("published runtime-review.json is invalid") from exc
+                if raw != report_bytes or persisted != document:
+                    raise ReviewError("published runtime-review.json was not exact")
+                for name, payload in payloads.items():
+                    _validate_existing_leaf(destination / name, payload, "capture " + name)
+                return destination
+
             category = inputs.category
             captures: Dict[Tuple[int, str], Path] = {}
             capture_records = []
@@ -1274,7 +1348,7 @@ def run(args: argparse.Namespace) -> RunResult:
                         captures[(seed, lighting)] = output
                 _compare_surfaces(before, root, "before publication")
                 document = build_runtime_review_document(inputs, capture_records)
-                destination = _publish_fixed_captures(root, inputs.asset_id, captures, document)
+                destination = publish_fixed_captures()
                 _compare_surfaces(before, root, "after capture publication")
             from tools import meshy_candidate_review as candidate_review
 

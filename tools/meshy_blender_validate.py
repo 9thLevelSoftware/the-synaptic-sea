@@ -967,16 +967,16 @@ def verify_validation_report(
     report: Dict[str, Any],
     *,
     task_id: Optional[str] = None,
-    reimport: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Recompute and re-import one fixed R4 report without publishing it."""
 
     _validate_report_record(report)
     expected = validate_cleaned_glb(cleaned_glb, contract, task_id=task_id)
     expected["blender_reimport_passed"] = True
-    authority = reimport or _reimport_with_blender
     try:
-        reimport_evidence = authority(Path(cleaned_glb), int(expected["triangle_count"]))
+        reimport_evidence = _reimport_with_blender(
+            Path(cleaned_glb), int(expected["triangle_count"])
+        )
     except BlenderValidationError:
         raise
     except Exception as exc:
@@ -1080,8 +1080,11 @@ def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> _BlenderR
 
     try:
         import bpy  # type: ignore
-    except Exception as exc:
-        raise BlenderValidationError("Blender runtime is unavailable for re-import") from exc
+    except Exception:
+        # The authority remains this fixed function even for the host Python
+        # process.  It obtains the same evidence from a clean bounded Blender
+        # child; callers cannot replace the authority with an injected callable.
+        return _reimport_with_blender_process(glb_path, expected_triangles)
 
     try:
         for obj in list(bpy.data.objects):

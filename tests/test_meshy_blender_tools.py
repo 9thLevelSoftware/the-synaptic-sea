@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 import shutil
@@ -559,6 +560,48 @@ def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_pat
     honest["blender_reimport_passed"] = True
     with pytest.raises(BlenderValidationError, match="runtime|re-import"):
         write_validation_report(project_root, task_dir, honest)
+
+
+def test_verify_validation_report_has_no_caller_reimport_authority(contract) -> None:
+    report = validate_cleaned_glb(GLB_PATH, contract, task_id="task-1")
+    report["blender_reimport_passed"] = True
+    signature = inspect.signature(validate_module.verify_validation_report)
+
+    assert "reimport" not in signature.parameters
+    with pytest.raises(TypeError):
+        validate_module.verify_validation_report(
+            GLB_PATH,
+            contract,
+            report,
+            task_id="task-1",
+            reimport=lambda *_args: SimpleNamespace(
+                sha256=report["sha256"],
+                byte_size=report["byte_size"],
+                triangle_count=report["triangle_count"],
+            ),
+        )
+
+
+def test_verify_validation_report_calls_only_fixed_reimport_authority(
+    contract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = validate_cleaned_glb(GLB_PATH, contract, task_id="task-1")
+    report["blender_reimport_passed"] = True
+    calls = []
+
+    def fixed_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        calls.append((glb_path, expected_triangles))
+        return SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fixed_reimport)
+    expected = validate_module.verify_validation_report(GLB_PATH, contract, report, task_id="task-1")
+
+    assert expected["blender_reimport_passed"] is True
+    assert calls == [(GLB_PATH, report["triangle_count"])]
 
 
 

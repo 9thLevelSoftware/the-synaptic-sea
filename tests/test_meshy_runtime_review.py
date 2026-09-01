@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import binascii
 import hashlib
+import inspect
 import json
+import math
 import shutil
 import struct
 import sys
@@ -125,12 +127,7 @@ def test_review_bounds_godot_runtime() -> None:
 
 
 def test_review_rejects_unexpected_diagnostics() -> None:
-    marker = (
-        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
-        "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
-        "camera_size=7.5 staged_visibility=pass staged_opaque_pixels=100 "
-        "staged_luma_range=1.0 output=/private/tmp/capture.png"
-    )
+    marker = _locked_real_marker()
     assert review.check_capture_output(marker, "", 42, "normal")
     assert not review.check_capture_output(marker + "\nWARNING: injected", "", 42, "normal")
     assert not review.check_capture_output(marker, "ERROR: injected", 42, "normal")
@@ -139,6 +136,141 @@ def test_review_rejects_unexpected_diagnostics() -> None:
 
 def test_review_does_not_expose_arbitrary_capture_publisher() -> None:
     assert not hasattr(review, "publish_captures")
+    assert not hasattr(review, "_publish_fixed_captures")
+    assert not any("publish" in name.lower() for name, value in inspect.getmembers(review, callable))
+
+
+def _locked_real_marker(
+    *,
+    position: str = "19.742138317,18.236871003,19.242143317",
+    target: str = "0.500000000,1.399999976,0.000005000",
+    size: str = "1.500000000",
+    pixels: str = "2304",
+    luma: str = "1.000000000",
+) -> str:
+    return (
+        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
+        f"camera_position={position} camera_target={target} camera_size={size} "
+        f"staged_visibility=pass staged_opaque_pixels={pixels} staged_luma_range={luma}"
+    )
+
+
+def test_staged_visibility_uses_exact_sampling_grid_bounds() -> None:
+    assert review._validate_staged_visibility(
+        {"pass": True, "opaque_pixels": 2304, "luma_range": 1.0}
+    ) == {"pass": True, "opaque_pixels": 2304, "luma_range": 1.0}
+    for opaque_pixels in (1, 2305):
+        with pytest.raises(review.ReviewError, match="staged|pixel"):
+            review._validate_staged_visibility(
+                {"pass": True, "opaque_pixels": opaque_pixels, "luma_range": 1.0}
+            )
+    for luma_range in (0.003, -1.0, math.nan, math.inf, 1.000001):
+        with pytest.raises(review.ReviewError, match="staged|pixel"):
+            review._validate_staged_visibility(
+                {"pass": True, "opaque_pixels": 100, "luma_range": luma_range}
+            )
+
+
+def test_capture_marker_requires_locked_camera_and_real_world_target() -> None:
+    parsed = review.parse_capture_marker(_locked_real_marker(), 42, "normal")
+    assert parsed["target"] == [0.5, 1.399999976, 0.000005]
+    assert parsed["size"] == 1.5
+
+    forged_markers = (
+        _locked_real_marker(
+            position="0.500000000,1.399999976,0.000005000",
+        ),
+        _locked_real_marker(
+            position="1.500000000,2.399999976,1.000005000",
+        ),
+        _locked_real_marker(size="nan"),
+        _locked_real_marker(size="1000000000.0"),
+    )
+    for marker in forged_markers:
+        with pytest.raises(review.ReviewError, match="camera|transform|size"):
+            review.parse_capture_marker(marker, 42, "normal")
+
+
+def _visible_png_bytes() -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    dark = b"\x00\x00\x00\xff" * 800
+    light = b"\xff\xff\xff\xff" * 800
+    row = b"\x00" + dark + light
+    rows = row * review.CAPTURE_SIZE[1]
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1600, 900, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+def test_binder_rejects_forged_runtime_document_before_promotion_ready(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path)
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=review.governance.file_sha256(glb_path),
+            byte_size=glb_path.stat().st_size,
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport, raising=False)
+    monkeypatch.setattr(validate_module, "_reimport_with_blender_process", fake_reimport, raising=False)
+    inputs, _review, _generation, root = review._load_runtime_inputs(project_root, None, task_dir)
+    png = _visible_png_bytes()
+    preview = root / review.PREVIEW_ROOT_RELATIVE / contract.asset_id
+    preview.mkdir(parents=True, mode=0o700)
+    preview.chmod(0o700)
+    capture_records = []
+    for seed in SEEDS:
+        for lighting in LIGHTING:
+            name = review.capture_name(seed, lighting)
+            path = tmp_path / name
+            path.write_bytes(png)
+            capture_records.append(
+                {
+                    "seed": seed,
+                    "lighting": lighting,
+                    "camera_transform": {
+                        "projection": "orthogonal",
+                        "position": [19.742138317, 18.236871003, 19.242143317],
+                        "target": [0.5, 1.399999976, 0.000005],
+                        "size": 1.5,
+                    },
+                    "staged_visibility": {
+                        "pass": True,
+                        "opaque_pixels": 2304,
+                        "luma_range": 1.0,
+                    },
+                    "output_sha256": hashlib.sha256(png).hexdigest(),
+                    "pass": True,
+                    "reason": "pass",
+                }
+            )
+            (preview / name).write_bytes(png)
+            (preview / name).chmod(0o600)
+    document = review.build_runtime_review_document(inputs, capture_records)
+    document["captures"][0]["camera_transform"]["target"] = [0.0, 0.0, 0.0]
+    document["captures"][1]["staged_visibility"]["opaque_pixels"] = 999999
+    (preview / "runtime-review.json").write_bytes(canonical_json_bytes(document))
+    (preview / "runtime-review.json").chmod(0o600)
+
+    from tools import meshy_candidate_review as candidate_review
+
+    with pytest.raises((review.ReviewError, candidate_review.ReviewError), match="camera|staged|visibility"):
+        candidate_review.bind_promotion_evidence(root, task_dir)
+    persisted_review = json.loads((task_dir / "review.json").read_text(encoding="utf-8"))
+    assert persisted_review["state"] == "selected"
 
 
 def test_review_leaves_live_surfaces_unchanged(tmp_path: Path) -> None:
@@ -205,21 +337,16 @@ def test_runtime_command_binds_asset_and_category_as_user_args(tmp_path: Path) -
 
 
 def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
-    marker = (
-        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
-        "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
-        "camera_size=7.5 staged_visibility=pass staged_opaque_pixels=100 "
-        "staged_luma_range=1.0 output=/private/tmp/capture.png"
-    )
+    marker = _locked_real_marker()
 
     parsed = review.parse_capture_marker(marker, 42, "normal")
 
     assert parsed == {
         "projection": "orthogonal",
-        "position": [12.5, 8.25, -4.0],
-        "target": [1.0, 2.0, 3.0],
-        "size": 7.5,
-        "staged_visibility": {"pass": True, "opaque_pixels": 100, "luma_range": 1.0},
+        "position": [19.742138317, 18.236871003, 19.242143317],
+        "target": [0.5, 1.399999976, 0.000005],
+        "size": 1.5,
+        "staged_visibility": {"pass": True, "opaque_pixels": 2304, "luma_range": 1.0},
     }
 
 
