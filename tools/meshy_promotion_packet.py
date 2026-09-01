@@ -181,7 +181,8 @@ def validate_ai_provenance(value: object) -> List[str]:
             else:
                 if any(not isinstance(item, str) for item in inputs):
                     errors.append("extensions.ai_generation.input_sha256 must contain hashes")
-                if len(inputs) != len(set(inputs)):
+                string_inputs = [item for item in inputs if isinstance(item, str)]
+                if len(string_inputs) != len(set(string_inputs)):
                     errors.append("extensions.ai_generation.input_sha256 must contain unique hashes")
                 for index, item in enumerate(inputs):
                     _hash_diagnostic(item, "extensions.ai_generation.input_sha256[{0}]".format(index), errors)

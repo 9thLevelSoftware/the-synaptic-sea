@@ -161,6 +161,43 @@ def _make_live_surfaces(project_root: Path) -> Dict[str, bytes]:
     return expected
 
 
+@pytest.mark.parametrize(
+    "inputs",
+    (
+        [["not-a-hash"]],
+        [{"not-a-hash": True}],
+    ),
+)
+def test_unhashable_input_entries_return_deterministic_diagnostics(inputs: list[object]) -> None:
+    value = {
+        "provenance": {"provider": "meshy", "license_state": "paid-private"},
+        "extensions": {
+            "ai_generated": True,
+            "ai_generation": {
+                "provider": "meshy",
+                "task_id": "task-1",
+                "model": "model-1",
+                "input_sha256": inputs,
+                "raw_output_sha256": "0" * 64,
+                "cleaned_output_sha256": "1" * 64,
+                "contract_sha256": "2" * 64,
+                "human_cleanup": True,
+                "reviewer": "reviewer-1",
+            },
+        },
+    }
+
+    diagnostics = validate_ai_provenance(value)
+
+    assert diagnostics == validate_ai_provenance(value)
+    assert diagnostics == sorted(diagnostics)
+    assert "extensions.ai_generation.input_sha256 must contain hashes" in diagnostics
+    assert (
+        "extensions.ai_generation.input_sha256[0] must be 64 lowercase hexadecimal characters"
+        in diagnostics
+    )
+
+
 def test_positive_prop_is_derived_from_canonical_promotion_ready_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
