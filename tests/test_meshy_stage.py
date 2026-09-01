@@ -1837,6 +1837,304 @@ def _historical_failed_batch(tmp_path: Path, valid_contract: AssetContract) -> T
     return generated, journal_path, task_dir, generation_kwargs
 
 
+def test_r9_crash_after_outputs_before_cas_is_retryable(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    original = stage_module._cas_replace_generation
+
+    def crash(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("injected after outputs")
+
+    monkeypatch.setattr(stage_module, "_cas_replace_generation", crash)
+    with pytest.raises(RuntimeError, match="injected after outputs"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+        )
+
+    assert (task_dir / "raw.glb").is_file()
+    assert (task_dir / "thumbnail.png").is_file()
+    assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "FAILED"
+    monkeypatch.setattr(stage_module, "_cas_replace_generation", original)
+    retry_client = FakeMeshyClient()
+    retry_client._task_counter = 100
+    retry = stage_module.continue_batch(
+        valid_contract, tmp_path, retry_client, journal_path, 100, **generation_kwargs
+    )
+    assert retry["state"] == "COMPLETED"
+    assert retry["pass"] is True
+    assert generated["task_ids"][0] in retry["recovered"]
+
+
+def test_r9_crash_after_cas_before_journal_update_is_retryable(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    failed_task_id = task_dir.name
+    original = stage_module._resume_journal_update
+    calls = {"count": 0}
+
+    def crash(preflight: Any, journal: dict, tasks: List[dict], cumulative: int) -> None:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("injected after cas")
+        original(preflight, journal, tasks, cumulative)
+
+    monkeypatch.setattr(stage_module, "_resume_journal_update", crash)
+    with pytest.raises(RuntimeError, match="injected after cas"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+        )
+
+    assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "SUCCEEDED"
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["tasks"][0]["state"] == "FAILED"
+    generation_after_cas = (task_dir / "generation.json").read_bytes()
+    archive_after_cas = (task_dir / "generation.failed.json").read_bytes()
+
+    monkeypatch.setattr(stage_module, "_resume_journal_update", original)
+    retry_client = FakeMeshyClient()
+    retry_client._task_counter = 100
+    retry = stage_module.continue_batch(
+        valid_contract, tmp_path, retry_client, journal_path, 100, **generation_kwargs
+    )
+    assert retry["state"] == "COMPLETED"
+    assert retry["pass"] is True
+    assert len(retry_client.created_tasks) == 3
+    assert failed_task_id not in retry_client.poll_task_ids
+    assert not any(
+        failed_task_id in repr(call)
+        for call in retry_client.calls
+        if call[0] in {"poll_task", "download_bytes", "create_task"}
+    )
+    assert (task_dir / "generation.json").read_bytes() == generation_after_cas
+    assert (task_dir / "generation.failed.json").read_bytes() == archive_after_cas
+
+
+def test_r9_archive_before_outputs_crash_is_retryable(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    original = stage_module._write_artifact_bytes
+    armed = {"value": True}
+
+    def crash(preflight: Any, directory: Path, name: str, payload: bytes) -> None:
+        if armed["value"] and name == "raw.glb":
+            armed["value"] = False
+            raise RuntimeError("injected after archive")
+        original(preflight, directory, name, payload)
+
+    monkeypatch.setattr(stage_module, "_write_artifact_bytes", crash)
+    with pytest.raises(RuntimeError, match="injected after archive"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+        )
+
+    archive = task_dir / "generation.failed.json"
+    assert archive.is_file()
+    assert archive.stat().st_mode & 0o777 == 0o600
+    assert not (task_dir / "raw.glb").exists()
+    assert not (task_dir / "thumbnail.png").exists()
+    assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "FAILED"
+
+    monkeypatch.setattr(stage_module, "_write_artifact_bytes", original)
+    retry_client = FakeMeshyClient()
+    retry_client._task_counter = 100
+    retry = stage_module.continue_batch(
+        valid_contract, tmp_path, retry_client, journal_path, 100, **generation_kwargs
+    )
+    assert retry["state"] == "COMPLETED"
+    assert retry["pass"] is True
+
+
+def test_r9_one_preexisting_matching_output_is_reused(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    raw = _valid_glb()
+    (task_dir / "raw.glb").write_bytes(raw)
+    os.chmod(task_dir / "raw.glb", 0o600)
+
+    client = FakeMeshyClient()
+    client._task_counter = 100
+    result = stage_module.continue_batch(
+        valid_contract, tmp_path, client, journal_path, 100, **generation_kwargs
+    )
+
+    assert result["state"] == "COMPLETED"
+    assert result["pass"] is True
+    assert (task_dir / "raw.glb").read_bytes() == raw
+    assert (task_dir / "thumbnail.png").is_file()
+
+
+def test_r9_suffix_published_before_journal_update_is_reconciled(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generated, journal_path, _failed_task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    original = stage_module._resume_journal_update
+    calls = {"count": 0}
+
+    def crash(preflight: Any, journal: dict, tasks: List[dict], cumulative: int) -> None:
+        if (
+            calls["count"] == 0
+            and tasks[1]["state"] == "SUCCEEDED"
+            and isinstance(tasks[1].get("task_id"), str)
+        ):
+            calls["count"] += 1
+            raise RuntimeError("injected suffix journal crash")
+        original(preflight, journal, tasks, cumulative)
+
+    monkeypatch.setattr(stage_module, "_resume_journal_update", crash)
+    first_client = FakeMeshyClient()
+    first_client._task_counter = 100
+    with pytest.raises(RuntimeError, match="injected suffix journal crash"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, first_client, journal_path, 100, **generation_kwargs
+        )
+
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    suffix_id = journal["tasks"][1]["task_id"]
+    assert journal["tasks"][1]["state"] == "PENDING"
+    assert isinstance(suffix_id, str)
+    assert (task_dir := _stage_asset_root(tmp_path, valid_contract.asset_id) / suffix_id / "generation.json").is_file()
+    assert json.loads(task_dir.read_text(encoding="utf-8"))["status"] == "SUCCEEDED"
+
+    monkeypatch.setattr(stage_module, "_resume_journal_update", original)
+    retry_client = FakeMeshyClient()
+    retry_client._task_counter = 500
+    result = stage_module.continue_batch(
+        valid_contract, tmp_path, retry_client, journal_path, 100, **generation_kwargs
+    )
+
+    assert result["state"] == "COMPLETED"
+    assert result["pass"] is True
+    assert suffix_id not in retry_client.created_tasks
+    assert len(retry_client.created_tasks) == 2
+    assert suffix_id not in retry_client.poll_task_ids
+
+
+def test_r9_pending_persisted_id_without_task_dir_is_staged_without_create(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    _generated, journal_path, _failed_task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    persisted_id = "persisted-task-0001"
+    journal["tasks"][1]["task_id"] = persisted_id
+    journal_path.write_bytes(canonical_json_bytes(journal))
+
+    class Tracking(FakeMeshyClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self._task_counter = 100
+
+    client = Tracking()
+    result = stage_module.continue_batch(
+        valid_contract, tmp_path, client, journal_path, 100, **generation_kwargs
+    )
+
+    assert result["state"] == "COMPLETED"
+    assert result["pass"] is True
+    assert persisted_id not in client.created_tasks
+    assert len(client.created_tasks) == 2
+    assert not any(call[0] == "create_task" and persisted_id in call for call in client.calls)
+    assert client.poll_task_ids.count(persisted_id) == 1
+    final_journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert final_journal["tasks"][1]["state"] == "SUCCEEDED"
+    assert final_journal["tasks"][1]["consumed_credits"] == 5
+    assert final_journal["cumulative_consumed_credits"] == 20
+    assert (_stage_asset_root(tmp_path, valid_contract.asset_id) / persisted_id / "generation.json").is_file()
+
+
+@pytest.mark.parametrize("output_case", ["different", "wrong_mode", "symlink", "directory"])
+def test_r9_preexisting_output_integrity_failure_is_non_mutating(
+    tmp_path: Path, valid_contract: AssetContract, output_case: str
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    output = task_dir / "raw.glb"
+    if output_case == "different":
+        output.write_bytes(b"different-output")
+    elif output_case == "wrong_mode":
+        output.write_bytes(_valid_glb())
+        os.chmod(output, 0o644)
+    elif output_case == "symlink":
+        target = tmp_path / "raw-target"
+        target.write_bytes(_valid_glb())
+        output.symlink_to(target)
+    else:
+        output.mkdir()
+    generation_before = (task_dir / "generation.json").read_bytes()
+    journal_before = journal_path.read_bytes()
+    client = FakeMeshyClient()
+
+    with pytest.raises(ValueError, match="recovery output|output|symlink component|task artifact"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, client, journal_path, 100, **generation_kwargs
+        )
+
+    assert (task_dir / "generation.json").read_bytes() == generation_before
+    assert journal_path.read_bytes() == journal_before
+    assert not (task_dir / "generation.failed.json").exists()
+    if output_case == "directory":
+        assert output.is_dir()
+    elif output_case == "symlink":
+        assert output.is_symlink()
+    else:
+        assert output.read_bytes() == (_valid_glb() if output_case == "wrong_mode" else b"different-output")
+    assert client.created_tasks == []
+
+
+def test_r9_repeated_completed_continue_is_idempotent(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    _generated, journal_path, _failed_task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    first_client = FakeMeshyClient()
+    first_client._task_counter = 100
+    first = stage_module.continue_batch(
+        valid_contract, tmp_path, first_client, journal_path, 100, **generation_kwargs
+    )
+    assert first["state"] == "COMPLETED"
+
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    before = tuple(
+        (
+            path.relative_to(asset_root).as_posix(),
+            path.lstat().st_mode & 0o7777,
+            path.read_bytes() if path.is_file() and not path.is_symlink() else None,
+        )
+        for path in sorted(asset_root.rglob("*"))
+    )
+
+    class NoProvider(FakeMeshyClient):
+        def get_balance(self) -> int:
+            raise AssertionError("completed continue must not check balance")
+
+        def poll_task(self, endpoint: str, task_id: str) -> dict:
+            raise AssertionError("completed continue must not poll")
+
+        def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+            raise AssertionError("completed continue must not download")
+
+        def create_task(self, endpoint: str, payload: dict) -> str:
+            raise AssertionError("completed continue must not create")
+
+    second_client = NoProvider()
+    second = stage_module.continue_batch(
+        valid_contract, tmp_path, second_client, journal_path, 100, **generation_kwargs
+    )
+    after = tuple(
+        (
+            path.relative_to(asset_root).as_posix(),
+            path.lstat().st_mode & 0o7777,
+            path.read_bytes() if path.is_file() and not path.is_symlink() else None,
+        )
+        for path in sorted(asset_root.rglob("*"))
+    )
+    assert second["state"] == "COMPLETED"
+    assert second["pass"] is True
+    assert second_client.calls == []
+    assert after == before
+
+
+
 def _top_level_id_response(response: dict, task_id: str) -> dict:
     normalized = dict(response)
     normalized.pop("task_id", None)
@@ -1981,7 +2279,7 @@ def test_continue_rejects_noncontiguous_or_untrusted_missing_ids(
     _generated, journal_path, _failed_task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
     if mutation == "pending_id":
-        journal["tasks"][1]["task_id"] = "untrusted-provider-task"
+        journal["tasks"][2]["task_id"] = "untrusted-provider-task"
     else:
         journal["tasks"][0]["task_id"] = None
     journal_path.write_bytes(canonical_json_bytes(journal))
@@ -1993,7 +2291,7 @@ def test_continue_rejects_noncontiguous_or_untrusted_missing_ids(
     assert client.created_tasks == []
 
 
-@pytest.mark.parametrize("archive_case", ["symlink", "different", "malformed", "wrong_mode"])
+@pytest.mark.parametrize("archive_case", ["symlink", "different", "canonical_mismatch", "malformed", "wrong_mode"])
 def test_continue_rejects_invalid_failed_archive_without_mutation(
     tmp_path: Path, valid_contract: AssetContract, archive_case: str
 ) -> None:
@@ -2006,6 +2304,10 @@ def test_continue_rejects_invalid_failed_archive_without_mutation(
         archive.symlink_to(target)
     elif archive_case == "different":
         archive.write_bytes(b"different")
+    elif archive_case == "canonical_mismatch":
+        mismatched = json.loads(failed_bytes.decode("utf-8"))
+        mismatched["error"] = "different failed identity"
+        archive.write_bytes(canonical_json_bytes(mismatched))
     elif archive_case == "malformed":
         archive.write_bytes(b"not-json")
     else:
