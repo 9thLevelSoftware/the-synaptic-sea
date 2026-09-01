@@ -6,6 +6,7 @@ import os
 import shutil
 import struct
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -435,9 +436,15 @@ def test_validate_report_writer_uses_mode_0600_and_preserves_outside_sentinel(tm
     project_root, task_dir, contract = _bound_fixture_task(tmp_path)
     report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     report["blender_reimport_passed"] = True
+    authority = validate_module._BlenderReimportEvidence(
+        validate_module._REIMPORT_AUTHORITY,
+        report["sha256"],
+        report["byte_size"],
+        report["triangle_count"],
+    )
     sentinel = tmp_path / "outside-sentinel"
     sentinel.write_bytes(b"untouched")
-    write_validation_report(project_root, task_dir, report)
+    write_validation_report(project_root, task_dir, report, authority)
     assert (task_dir / "blender-validation.json").stat().st_mode & 0o777 == 0o600
     assert sentinel.read_bytes() == b"untouched"
     assert json.loads((task_dir / "blender-validation.json").read_text()) == report
@@ -481,3 +488,221 @@ def test_real_blender_reimports_fixture_and_publishes_report(tmp_path: Path) -> 
     persisted = json.loads((task_dir / "blender-validation.json").read_text())
     assert persisted["blender_reimport_passed"] is True
     assert (task_dir / "blender-validation.json").stat().st_mode & 0o777 == 0o600
+
+
+def test_real_blender_rejects_non_affine_matrix_with_failure_marker(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", os.environ.get("BLENDER_PATH", "/Applications/Blender.app/Contents/MacOS/Blender")))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["matrix"] = [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 2.0,
+    ]
+    (task_dir / "cleaned.glb").write_bytes(_pack_glb(document, binary))
+    command = [
+        str(blender), "--background", "--factory-startup", "--python",
+        str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"), "--",
+        "--project-root", str(project_root), "--contract", str(CONTRACT_PATH),
+        "--task-dir", str(task_dir),
+    ]
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert "MESHY BLENDER VALIDATION PASS" not in result.stdout
+    assert "affine" in result.stderr.lower() or "matrix" in result.stderr.lower()
+    assert not (task_dir / "blender-validation.json").exists()
+
+
+def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_path: Path) -> None:
+    project_root, task_dir, contract = _bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    report["triangle_count"] = 99
+    with pytest.raises(ValueError, match="semantic|re-import|evidence|match"):
+        write_validation_report(project_root, task_dir, report)
+
+    honest = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    honest["blender_reimport_passed"] = True
+    with pytest.raises(ValueError, match="authority|re-import|evidence"):
+        write_validation_report(project_root, task_dir, honest)
+
+
+def test_report_writer_rejects_forged_bounds_materials_and_uv_evidence(tmp_path: Path) -> None:
+    project_root, task_dir, contract = _bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    expected = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    authority = validate_module._BlenderReimportEvidence(
+        validate_module._REIMPORT_AUTHORITY,
+        expected["sha256"],
+        expected["byte_size"],
+        expected["triangle_count"],
+    )
+    report["bounds"]["max"][0] = 999.0
+    report["bounds"]["dimensions"][0] = 999.0
+    report["material_names"] = ["ForgedMaterial"]
+    report["uv_evidence"][0]["accessor"] = 999
+    with pytest.raises(ValueError, match="semantic|re-import|evidence|match|bounds"):
+        write_validation_report(project_root, task_dir, report, authority)
+
+
+def _run_python_process(script: str) -> list[str]:
+    return ["/usr/bin/python3", "-c", script]
+
+
+def _kill_pid_if_alive(pid_file: Path) -> None:
+    try:
+        pid = int(pid_file.read_text())
+    except (OSError, ValueError):
+        return
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return
+    try:
+        os.kill(pid, 9)
+    except OSError:
+        pass
+
+
+def test_master_timeout_is_failure_when_leader_exits_zero_but_descendant_holds_pipes(tmp_path: Path, monkeypatch) -> None:
+    child_pid = tmp_path / "child.pid"
+    script = (
+        "import pathlib, subprocess, sys, time; "
+        "p=subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)']); "
+        "pathlib.Path(" + repr(str(child_pid)) + ").write_text(str(p.pid)); "
+        "sys.exit(0)"
+    )
+    try:
+        monkeypatch.setattr(master_module, "_PROCESS_GRACE", 0.05)
+        completed = master_module._run_bounded_process(
+            _run_python_process(script), cwd=tmp_path, timeout=0.05
+        )
+        assert completed.returncode != 0
+    finally:
+        _kill_pid_if_alive(child_pid)
+
+
+def test_master_output_cap_is_failure_even_when_leader_exits_zero(tmp_path: Path, monkeypatch) -> None:
+    try:
+        monkeypatch.setattr(master_module, "_MAX_PROCESS_OUTPUT", 64)
+        completed = master_module._run_bounded_process(
+            _run_python_process("import sys; sys.stdout.write('x' * 128); sys.stdout.flush()"),
+            cwd=tmp_path,
+            timeout=1.0,
+        )
+        assert completed.returncode != 0
+    finally:
+        pass
+
+
+def test_master_post_launch_setup_failure_cleans_up_and_reaps_process(tmp_path: Path, monkeypatch) -> None:
+    leader_pid = tmp_path / "leader.pid"
+    script = (
+        "import os, pathlib, time; "
+        "pathlib.Path(" + repr(str(leader_pid)) + ").write_text(str(os.getpid())); "
+        "time.sleep(30)"
+    )
+    original_group_check = master_module._isolated_process_group_id
+
+    def fail_after_process_starts(process):
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline and not leader_pid.exists():
+            time.sleep(0.01)
+        raise master_module.BlenderMasterError("inspection boom")
+
+    monkeypatch.setattr(master_module, "_isolated_process_group_id", fail_after_process_starts)
+    monkeypatch.setattr(master_module, "_PROCESS_GRACE", 0.05)
+    try:
+        with pytest.raises(ValueError, match="inspection boom"):
+            master_module._run_bounded_process(_run_python_process(script), cwd=tmp_path, timeout=1.0)
+        assert leader_pid.exists()
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            try:
+                os.kill(int(leader_pid.read_text()), 0)
+            except OSError:
+                break
+            time.sleep(0.01)
+        else:
+            pytest.fail("post-launch setup failure leaked the leader")
+    finally:
+        monkeypatch.setattr(master_module, "_isolated_process_group_id", original_group_check)
+        _kill_pid_if_alive(leader_pid)
+
+
+def test_parse_glb_rejects_newline_before_space_padding() -> None:
+    document, binary = _fixture_document_and_binary()
+    json_chunk = json.dumps(document, separators=(",", ":")).encode("utf-8") + b"\n"
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    binary_chunk = binary + b"\0" * ((-len(binary)) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(binary_chunk)
+    raw = b"glTF" + struct.pack("<II", 2, total)
+    raw += struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little")) + json_chunk
+    raw += struct.pack("<II", len(binary_chunk), int.from_bytes(b"BIN\0", "little")) + binary_chunk
+    with pytest.raises(ValueError, match="padding"):
+        _parse_glb(raw)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda d: d.update(materials=[{"name": "Paint", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}], textures=[]),
+        lambda d: d.update(materials=[{"name": "Paint", "extensions": {"KHR_materials_clearcoat": {"clearcoatNormalTexture": {"index": 0}}}}], textures=[]),
+        lambda d: d.update(materials=[{"name": "Paint", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}], textures=[{"source": 9}], images=[{"uri": "paint.png"}]),
+        lambda d: d.update(materials=[{"name": "Paint", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}], textures=[{"sampler": 9}], samplers=[{}]),
+    ],
+)
+def test_validate_rejects_invalid_material_texture_graph_references(contract, tmp_path: Path, mutate) -> None:
+    document, binary = _fixture_document_and_binary()
+    mutate(document)
+    path = tmp_path / "invalid-texture-graph.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="Texture|texture|image|sampler"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_checks_secondary_scene_references_and_uses_default_scene_bounds(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"].append({"mesh": 0, "name": "TriangleSecondary"})
+    document["scenes"].append({"nodes": [1]})
+    path = tmp_path / "secondary-scene.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    report = validate_cleaned_glb(path, contract)
+    assert report["mesh_count"] == 1
+    assert report["triangle_count"] == 1
+    assert report["bounds"]["max"] == [1.0, 1.0, 0.0]
+
+
+def test_validate_rejects_invalid_secondary_scene_root(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["scenes"].append({"nodes": [99]})
+    path = tmp_path / "invalid-secondary-scene.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="scene node|scene"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_report_uv_evidence_requires_positive_counts(contract) -> None:
+    report = validate_cleaned_glb(GLB_PATH, contract, task_id="task-1")
+    report["blender_reimport_passed"] = True
+    report["uv_evidence"][0]["vertex_count"] = 0
+    report["uv_evidence"][0]["uv_count"] = 0
+    with pytest.raises(ValueError, match="UV evidence"):
+        validate_module._validate_report_record(report)
+
+
+def test_validate_rejects_non_affine_glb_matrix(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["matrix"] = [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 2.0,
+    ]
+    path = tmp_path / "non-affine.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="affine|matrix"):
+        validate_cleaned_glb(path, contract)

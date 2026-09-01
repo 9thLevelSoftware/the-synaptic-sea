@@ -255,6 +255,11 @@ def _kill_process_group(process: Any, sig: int) -> None:
         os.killpg(process.pid, sig)
     except ProcessLookupError:
         return
+    except PermissionError:
+        poll = getattr(process, "poll", None)
+        if getattr(process, "returncode", None) is not None or callable(poll) and poll() is not None:
+            return
+        raise BlenderMasterError("Blender process group cleanup failed")
     except OSError as exc:
         raise BlenderMasterError("Blender process group cleanup failed") from exc
 
@@ -283,19 +288,50 @@ def _isolated_process_group_id(process: Any) -> int:
 
 
 def _terminate_and_drain(process: Any, selector: Any) -> None:
-    group_id = _isolated_process_group_id(process)
-    _kill_process_group(process, signal.SIGTERM)
+    pid = getattr(process, "pid", None)
+    try:
+        group_id = _isolated_process_group_id(process)
+    except BlenderMasterError:
+        if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+            try:
+                process.wait(timeout=_PROCESS_GRACE)
+            except subprocess.TimeoutExpired:
+                pass
+            _drain_selector(selector)
+            raise
+        group_id = pid
+    _signal_process_group(group_id, signal.SIGTERM, process)
     try:
         process.wait(timeout=_PROCESS_GRACE)
     except subprocess.TimeoutExpired:
         pass
     # Always issue the escalation signal: descendants can retain inherited
     # pipes after the session leader has exited.
-    _kill_process_group(process, signal.SIGKILL)
+    _signal_process_group(group_id, signal.SIGKILL, process)
     try:
         process.wait(timeout=_PROCESS_GRACE)
     except subprocess.TimeoutExpired as exc:
         raise BlenderMasterError("Blender process could not be reaped") from exc
+    _drain_selector(selector)
+
+
+def _signal_process_group(group_id: int, sig: int, process: Any) -> None:
+    try:
+        os.killpg(group_id, sig)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        poll = getattr(process, "poll", None)
+        if getattr(process, "returncode", None) is not None or callable(poll) and poll() is not None:
+            return
+        raise BlenderMasterError("Blender process group cleanup failed")
+    except OSError as exc:
+        raise BlenderMasterError("Blender process group cleanup failed") from exc
+
+
+def _drain_selector(selector: Any) -> None:
+    if selector is None:
+        return
     deadline = time.monotonic() + _PROCESS_GRACE
     while selector.get_map() and time.monotonic() < deadline:
         events = selector.select(max(0.0, deadline - time.monotonic()))
@@ -363,13 +399,18 @@ def _run_with_bounded_streams(process: Any, command: Sequence[str], timeout: flo
                 returncode = process.wait(timeout=max(0.0, deadline - time.monotonic()))
             except subprocess.TimeoutExpired:
                 reason = "timeout"
+                _terminate_and_drain(process, selector)
                 returncode = -signal.SIGKILL
         else:
             _terminate_and_drain(process, selector)
-            returncode = getattr(process, "returncode", None)
-            if returncode is None:
-                returncode = -signal.SIGKILL
+            returncode = -signal.SIGKILL
         return subprocess.CompletedProcess(list(command), returncode, bytes(captured["stdout"]), bytes(captured["stderr"]))
+    except Exception:
+        try:
+            _terminate_and_drain(process, selector)
+        except Exception:
+            pass
+        raise
     finally:
         selector.close()
         for _label, stream in streams:
@@ -390,7 +431,7 @@ def _run_with_bounded_communicate(process: Any, command: Sequence[str], timeout:
             timed_out = True
             stdout = _text_output(exc.stdout)
             stderr = _text_output(exc.stderr)
-            _kill_process_group(process, signal.SIGTERM)
+            _terminate_and_drain(process, None)
             try:
                 tail_out, tail_err = process.communicate(timeout=_PROCESS_GRACE)
                 stdout += _text_output(tail_out)
@@ -398,14 +439,14 @@ def _run_with_bounded_communicate(process: Any, command: Sequence[str], timeout:
             except subprocess.TimeoutExpired as second:
                 stdout += _text_output(second.stdout)
                 stderr += _text_output(second.stderr)
-                _kill_process_group(process, signal.SIGKILL)
-                tail_out, tail_err = process.communicate(timeout=_PROCESS_GRACE)
-                stdout += _text_output(tail_out)
-                stderr += _text_output(tail_err)
         returncode = process.wait(timeout=_PROCESS_GRACE)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise BlenderMasterError("Blender process cleanup failed") from exc
-    if timed_out and returncode is None:
+    except Exception as exc:
+        try:
+            _terminate_and_drain(process, None)
+        except Exception:
+            pass
+        raise BlenderMasterError("Blender process cleanup failed: " + str(exc)) from exc
+    if timed_out:
         returncode = -signal.SIGKILL
     return subprocess.CompletedProcess(list(command), returncode, _text_output(stdout)[-_MAX_PROCESS_OUTPUT:], _text_output(stderr)[-_MAX_PROCESS_OUTPUT:])
 
@@ -425,17 +466,25 @@ def _run_bounded_process(command: Sequence[str], *, cwd: PathLike, timeout: floa
         )
     except (OSError, TypeError) as exc:
         raise BlenderMasterError("Blender could not be launched") from exc
-    if process.pid is None:
-        raise BlenderMasterError("Blender process did not establish a process group")
     try:
+        if not isinstance(process.pid, int) or isinstance(process.pid, bool) or process.pid <= 1:
+            raise BlenderMasterError("Blender process did not establish a process group")
         _isolated_process_group_id(process)
         if getattr(process, "stdout", None) is None or not callable(getattr(process, "poll", None)):
             return _run_with_bounded_communicate(process, command, limit)
         return _run_with_bounded_streams(process, command, limit)
-    except BlenderMasterError:
+    except Exception:
+        try:
+            _terminate_and_drain(process, None)
+        except Exception:
+            pass
+        for stream in (getattr(process, "stdout", None), getattr(process, "stderr", None)):
+            if stream is not None:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
         raise
-    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
-        raise BlenderMasterError("Blender process cleanup failed") from exc
 
 
 def _ensure_collection(bpy: object, scene: object, name: str) -> object:

@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import stat
 import struct
 import sys
@@ -58,6 +59,19 @@ class AccessorData:
     component_type: int
     accessor_type: str
     count: int
+
+
+@dataclass(frozen=True)
+class _BlenderReimportEvidence:
+    authority: object
+    sha256: str
+    byte_size: int
+    triangle_count: int
+
+
+_REIMPORT_AUTHORITY = object()
+_TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+_ASSET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 @dataclass(frozen=True)
@@ -154,23 +168,16 @@ def _parse_glb(raw: bytes) -> ParsedGlb:
     if len(json_chunk) > _MAX_JSON_BYTES:
         raise BlenderValidationError("GLB JSON chunk exceeds the validator limit")
 
-    # The glTF 2.0 JSON chunk is padded with spaces only.  Tabs/newlines are
-    # valid JSON whitespace in general but are not valid GLB padding here.
-    json_end = len(json_chunk)
-    while json_end and json_chunk[json_end - 1] == 0x20:
-        json_end -= 1
-    if json_chunk and json_chunk[-1] in (0x09, 0x0A, 0x0D):
-        raise BlenderValidationError("GLB JSON padding must contain spaces only")
-    if not json_chunk[:json_end]:
-        raise BlenderValidationError("GLB JSON chunk is empty")
     try:
-        text = json_chunk[:json_end].decode("utf-8")
-        document = json.loads(
-            text,
+        text = json_chunk.decode("utf-8")
+        leading = len(text) - len(text.lstrip(" \t\r\n"))
+        document, json_end = json.JSONDecoder(
             object_pairs_hook=_reject_duplicate_keys,
             parse_constant=_reject_constant,
             parse_float=_parse_finite_float,
-        )
+        ).raw_decode(text, leading)
+        if any(character != " " for character in text[json_end:]):
+            raise BlenderValidationError("GLB JSON padding must contain spaces only")
         _check_json_depth(document)
     except RecursionError as exc:
         raise BlenderValidationError("GLB JSON nesting depth exceeds the limit") from exc
@@ -338,6 +345,8 @@ def _matrix_determinant3(matrix: Matrix4) -> float:
 def _local_matrix(node: Dict[str, Any]) -> Matrix4:
     if "matrix" in node:
         values = _finite_vector(node["matrix"], "node matrix", 16)
+        if values[3] != 0.0 or values[7] != 0.0 or values[11] != 0.0 or values[15] != 1.0:
+            raise BlenderValidationError("node matrix must be affine")
         # glTF matrices are column-major; internal matrices are row-major.
         return tuple(values[column * 4 + row] for row in range(4) for column in range(4))
     translation = _finite_vector(node.get("translation", [0.0, 0.0, 0.0]), "node translation", 3)
@@ -408,6 +417,56 @@ def _material_names(document: Dict[str, Any]) -> List[str]:
     return names
 
 
+def _texture_reference(value: Any, limit: int, label: str) -> None:
+    index = _integer(value, label + " index")
+    if index >= limit:
+        raise BlenderValidationError(label + " index is out of range")
+
+
+def _validate_material_texture_infos(value: Any, texture_count: int, label: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_label = label + "." + str(key)
+            if isinstance(key, str) and key.endswith("Texture"):
+                if not isinstance(child, dict):
+                    raise BlenderValidationError(child_label + " must be a texture info object")
+                _texture_reference(child.get("index"), texture_count, child_label)
+                _validate_material_texture_infos(child, texture_count, child_label)
+            else:
+                _validate_material_texture_infos(child, texture_count, child_label)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _validate_material_texture_infos(child, texture_count, label + "[" + str(index) + "]")
+
+
+def _validate_material_texture_graph(document: Dict[str, Any]) -> None:
+    materials = document.get("materials", [])
+    textures = document.get("textures", [])
+    images = document.get("images", [])
+    samplers = document.get("samplers", [])
+    if not isinstance(materials, list) or not isinstance(textures, list):
+        raise BlenderValidationError("materials and textures must be arrays")
+    if not isinstance(images, list) or not isinstance(samplers, list):
+        raise BlenderValidationError("images and samplers must be arrays")
+    for index, texture in enumerate(textures):
+        if not isinstance(texture, dict):
+            raise BlenderValidationError("texture " + str(index) + " must be an object")
+        if "source" in texture:
+            _texture_reference(texture.get("source"), len(images), "texture " + str(index) + " source")
+        if "sampler" in texture:
+            _texture_reference(texture.get("sampler"), len(samplers), "texture " + str(index) + " sampler")
+        extensions = texture.get("extensions", {})
+        if not isinstance(extensions, dict):
+            raise BlenderValidationError("texture extensions must be an object")
+        for extension_name, extension in extensions.items():
+            if not isinstance(extension, dict):
+                raise BlenderValidationError("texture extension must be an object")
+            if "source" in extension:
+                _texture_reference(extension.get("source"), len(images), "texture " + str(index) + " " + str(extension_name) + " source")
+    for index, material in enumerate(materials):
+        _validate_material_texture_infos(material, len(textures), "material " + str(index))
+
+
 def _validate_images(document: Dict[str, Any], views: List[Dict[str, Any]], declared_length: int) -> None:
     images = document.get("images", [])
     if not isinstance(images, list):
@@ -442,7 +501,46 @@ def _state_tokens(contract_document: Dict[str, Any]) -> List[str]:
     return [value.strip().lower() for value in states]
 
 
-def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4], bounds_min: Vector3, bounds_max: Vector3, contract_document: Dict[str, Any]) -> None:
+def _scene_reachable_nodes(document: Dict[str, Any]) -> set:
+    nodes = document.get("nodes")
+    scenes = document.get("scenes")
+    scene_index = document.get("scene", 0)
+    if not isinstance(nodes, list) or not nodes:
+        raise BlenderValidationError("GLB has no nodes")
+    if not isinstance(scenes, list) or not scenes or not isinstance(scene_index, int) or isinstance(scene_index, bool) or not 0 <= scene_index < len(scenes):
+        raise BlenderValidationError("default scene is invalid")
+    reachable = set()
+    default_reachable = set()
+
+    def mark(index: Any, target: set) -> None:
+        node_index = _integer(index, "scene node index")
+        if node_index >= len(nodes):
+            raise BlenderValidationError("scene node index is invalid")
+        if node_index in target:
+            return
+        node = nodes[node_index]
+        if not isinstance(node, dict):
+            raise BlenderValidationError("scene node must be an object")
+        target.add(node_index)
+        for child in node.get("children", []):
+            mark(child, target)
+
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise BlenderValidationError("scene " + str(index) + " must be an object")
+        roots = scene.get("nodes", [])
+        if not isinstance(roots, list):
+            raise BlenderValidationError("scene nodes must be an array")
+        for root in roots:
+            mark(root, reachable)
+            if index == scene_index:
+                mark(root, default_reachable)
+    if reachable != set(range(len(nodes))):
+        raise BlenderValidationError("GLB contains nodes outside declared scenes")
+    return default_reachable
+
+
+def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4], bounds_min: Vector3, bounds_max: Vector3, contract_document: Dict[str, Any], default_reachable: Optional[set] = None) -> None:
     nodes = document.get("nodes")
     if not isinstance(nodes, list) or not nodes:
         raise BlenderValidationError("GLB has no nodes")
@@ -455,29 +553,8 @@ def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4]
     extensions_used = document.get("extensionsUsed", [])
     if not isinstance(extensions_used, list) or "KHR_lights_punctual" in extensions_used:
         raise BlenderValidationError("visual GLB contains lights")
-    scenes = document.get("scenes")
-    scene_index = document.get("scene", 0)
-    if not isinstance(scenes, list) or not isinstance(scene_index, int) or isinstance(scene_index, bool) or not 0 <= scene_index < len(scenes) or not isinstance(scenes[scene_index], dict):
-        raise BlenderValidationError("default scene is invalid")
-    roots = scenes[scene_index].get("nodes", [])
-    if not isinstance(roots, list):
-        raise BlenderValidationError("scene nodes must be an array")
-    reachable = set()
-
-    def mark(index: int) -> None:
-        if index in reachable:
-            return
-        if not 0 <= index < len(nodes):
-            raise BlenderValidationError("scene node index is invalid")
-        reachable.add(index)
-        children = nodes[index].get("children", [])
-        for child in children:
-            mark(child)
-
-    for root in roots:
-        mark(_integer(root, "scene node index"))
-    if reachable != set(range(len(nodes))):
-        raise BlenderValidationError("GLB contains nodes outside the default scene")
+    if default_reachable is None:
+        default_reachable = _scene_reachable_nodes(document)
 
     state_tokens = _state_tokens(contract_document)
     found_states = set()
@@ -688,13 +765,15 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     document = parsed.document
     buffers, views, _accessors = _validate_document_layout(document, parsed.binary)
     material_names = _material_names(document)
+    _validate_material_texture_graph(document)
     primitives, _all_positions, _mesh_triangle_count, all_uv_evidence = _mesh_primitives(document, parsed.binary, material_names)
     worlds = _node_world_matrices(document)
     nodes = document.get("nodes")
     assert isinstance(nodes, list)
+    default_reachable = _scene_reachable_nodes(document)
     materialized_nodes = [
-        node for node in nodes
-        if isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool)
+        node for node_index, node in enumerate(nodes)
+        if isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool) and node_index in default_reachable
     ]
     materialized_meshes = {node["mesh"] for node in materialized_nodes}
     triangle_count = sum(
@@ -706,7 +785,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     uv_evidence = [item for item in all_uv_evidence if item["mesh_index"] in materialized_meshes]
     transformed_positions: List[Vector3] = []
     for node_index, node in enumerate(nodes):
-        if isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool):
+        if isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool) and node_index in default_reachable:
             mesh_index = node["mesh"]
             for primitive in primitives:
                 if primitive.mesh_index == mesh_index:
@@ -735,7 +814,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
         raise BlenderValidationError("material slot count exceeds contract budget")
     declared_length = _integer(buffers[0].get("byteLength"), "buffer byteLength")
     _validate_images(document, views, declared_length)
-    _validate_node_policies(document, worlds, bounds_min, bounds_max, contract_document)
+    _validate_node_policies(document, worlds, bounds_min, bounds_max, contract_document, default_reachable)
     animations = document.get("animations", [])
     skins = document.get("skins", [])
     if not isinstance(animations, list) or not isinstance(skins, list):
@@ -753,7 +832,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
         "contract_sha256": asset_contract.sha256,
         "sha256": hashlib.sha256(raw).hexdigest(),
         "byte_size": len(raw),
-        "mesh_count": len({node["mesh"] for node in nodes if isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool)}),
+        "mesh_count": len({node["mesh"] for index, node in enumerate(nodes) if index in default_reachable and isinstance(node, dict) and isinstance(node.get("mesh"), int) and not isinstance(node.get("mesh"), bool)}),
         "triangle_count": triangle_count,
         "material_names": material_names,
         "bounds": {"min": [float(value) for value in bounds_min], "max": [float(value) for value in bounds_max], "dimensions": [float(value) for value in dimensions]},
@@ -780,8 +859,8 @@ def _validate_report_record(report: Any) -> None:
     for field in ("task_id", "asset_id", "contract_sha256", "sha256"):
         if not isinstance(report.get(field), str) or not report[field].strip():
             raise BlenderValidationError("validation report " + field + " is invalid")
-    if any(character in report["task_id"] for character in "/\\") or report["task_id"].startswith("."):
-        raise BlenderValidationError("validation report task_id must not contain a host path")
+    if _TASK_ID_RE.fullmatch(report["task_id"]) is None or _ASSET_ID_RE.fullmatch(report["asset_id"]) is None:
+        raise BlenderValidationError("validation report identifier is invalid")
     if len(report["contract_sha256"]) != 64 or len(report["sha256"]) != 64 or any(char not in "0123456789abcdef" for char in report["contract_sha256"] + report["sha256"]):
         raise BlenderValidationError("validation report hash is invalid")
     if not isinstance(report.get("byte_size"), int) or isinstance(report["byte_size"], bool) or report["byte_size"] <= 0:
@@ -800,6 +879,10 @@ def _validate_report_record(report: Any) -> None:
             raise BlenderValidationError("validation report bounds are invalid")
         for value in bounds[field]:
             _report_number(value, "validation report bounds")
+    if any(bounds["min"][index] > bounds["max"][index] for index in range(3)):
+        raise BlenderValidationError("validation report bounds are invalid")
+    if any(abs(bounds["dimensions"][index] - (bounds["max"][index] - bounds["min"][index])) > 1e-9 for index in range(3)):
+        raise BlenderValidationError("validation report bounds dimensions are invalid")
     if report.get("uvs_present") is not True or report.get("blender_reimport_passed") is not True:
         raise BlenderValidationError("validation report requires UV and Blender re-import evidence")
     if report.get("master_provenance") is not None:
@@ -812,7 +895,8 @@ def _validate_report_record(report: Any) -> None:
         if not isinstance(item, dict) or set(item) != required_evidence:
             raise BlenderValidationError("validation report UV evidence is not canonical")
         for field in ("mesh_index", "primitive_index", "accessor", "vertex_count", "uv_count"):
-            if not isinstance(item[field], int) or isinstance(item[field], bool) or item[field] < 0:
+            minimum = 1 if field in ("vertex_count", "uv_count") else 0
+            if not isinstance(item[field], int) or isinstance(item[field], bool) or item[field] < minimum:
                 raise BlenderValidationError("validation report UV evidence types are invalid")
         if item["finite"] is not True or item["range_valid"] is not True or item["uv_count"] != item["vertex_count"]:
             raise BlenderValidationError("validation report UV evidence failed")
@@ -862,12 +946,14 @@ def _resolve_task_inputs(project_root: PathLike, contract_path: PathLike, task_d
     return contract, cleaned, report
 
 
-def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None) -> None:
+def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None, reimport_evidence: Optional[_BlenderReimportEvidence] = None) -> None:
     """Publish one fully validated PASS at the fixed task-local report leaf."""
 
     if report is None:
         raise BlenderValidationError("write_validation_report requires project root, task directory, and report")
     _validate_report_record(report)
+    if not isinstance(reimport_evidence, _BlenderReimportEvidence) or reimport_evidence.authority is not _REIMPORT_AUTHORITY:
+        raise BlenderValidationError("report publication requires runtime Blender re-import authority")
     try:
         from tools import meshy_candidate_review as candidate_review
         review_path, review, generation, root, _asset_root = candidate_review._load_task_record(project_root, task_dir)
@@ -896,6 +982,16 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
         raise BlenderValidationError("cleaned.glb evidence is unavailable") from exc
     if stat.S_ISLNK(cleaned_info.st_mode) or not stat.S_ISREG(cleaned_info.st_mode) or report.get("byte_size") != cleaned_info.st_size or report.get("sha256") != cleaned_hash:
         raise BlenderValidationError("validation report does not match cleaned.glb")
+    expected = validate_cleaned_glb(cleaned, task_contract, task_id=resolved_task.name)
+    expected["blender_reimport_passed"] = True
+    if (
+        reimport_evidence.sha256 != expected["sha256"]
+        or reimport_evidence.byte_size != expected["byte_size"]
+        or reimport_evidence.triangle_count != expected["triangle_count"]
+    ):
+        raise BlenderValidationError("runtime Blender re-import evidence does not match cleaned.glb")
+    if any(report[field] != expected[field] for field in _CANONICAL_FIELDS):
+        raise BlenderValidationError("validation report semantic fields do not match cleaned.glb")
     try:
         governance.atomic_write_json(target, report, project_root=root, allowed_root=resolved_task, mode=0o600)
         persisted, raw = governance.strict_load_json_bytes(target, "Blender validation report", 4 * 1024 * 1024)
@@ -907,7 +1003,7 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
         raise BlenderValidationError("validation report mode is not 0600")
 
 
-def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> None:
+def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> _BlenderReimportEvidence:
     """Re-import the exact GLB in Blender and compare actual mesh triangles."""
 
     import bpy  # type: ignore
@@ -932,6 +1028,14 @@ def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> None:
         imported_triangles += sum(max(len(polygon.vertices) - 2, 0) for polygon in obj.data.polygons)
     if imported_triangles != expected_triangles:
         raise BlenderValidationError("Blender re-import triangle count differs from GLB count: " + str(imported_triangles) + " != " + str(expected_triangles))
+    try:
+        info = os.lstat(glb_path)
+        digest = governance.file_sha256(glb_path, max_bytes=_MAX_GLB_BYTES)
+    except (OSError, ValueError) as exc:
+        raise BlenderValidationError("cleaned.glb evidence is unavailable after Blender re-import") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise BlenderValidationError("cleaned.glb must remain a regular file after Blender re-import")
+    return _BlenderReimportEvidence(_REIMPORT_AUTHORITY, digest, info.st_size, imported_triangles)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -976,9 +1080,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report = validate_cleaned_glb(cleaned, contract, task_id=cleaned.parent.name)
         if not runtime:
             raise BlenderValidationError("real Blender re-import is required before PASS publication")
-        _reimport_with_blender(cleaned, int(report["triangle_count"]))
+        reimport_evidence = _reimport_with_blender(cleaned, int(report["triangle_count"]))
         report["blender_reimport_passed"] = True
-        write_validation_report(args.project_root, cleaned.parent, report)
+        write_validation_report(args.project_root, cleaned.parent, report, reimport_evidence)
         print("MESHY BLENDER VALIDATION PASS asset={0} triangles={1} materials={2}".format(report["asset_id"], report["triangle_count"], len(report["material_names"])))
         return 0
     except (BlenderValidationError, OSError, ValueError) as exc:
