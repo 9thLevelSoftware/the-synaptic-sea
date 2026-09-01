@@ -83,6 +83,7 @@ func _initialize() -> void:
 		return
 
 	capture_viewport.size = IMAGE_SIZE
+	capture_viewport.transparent_bg = true
 	_configure_lighting()
 	seed(seed_value)
 	if not _load_derelict():
@@ -315,12 +316,24 @@ func _expand_visual_bounds(node: Node, bounds: Array, parent_transform: Transfor
 		_expand_visual_bounds(child as Node, bounds, world_transform)
 
 
+func _harness_transform(node: Node) -> Transform3D:
+	var result: Transform3D = Transform3D.IDENTITY
+	var current: Node = node
+	while current != null and current != capture_viewport:
+		if current is Node3D:
+			result = (current as Node3D).transform * result
+		current = current.get_parent()
+	return result
+
+
 func _fit_locked_isometric_camera() -> bool:
 	if staged_visual_root == null:
 		_fail("staged visual root is missing")
 		return false
 	var bounds: Array = [false, AABB()]
-	_expand_visual_bounds(staged_visual_root, bounds, Transform3D.IDENTITY)
+	var visual_parent: Node3D = staged_visual_root.get_parent_node_3d()
+	var parent_transform: Transform3D = _harness_transform(visual_parent) if visual_parent != null else Transform3D.IDENTITY
+	_expand_visual_bounds(staged_visual_root, bounds, parent_transform)
 	if not bounds[0]:
 		_fail("staged visual has no mesh geometry")
 		return false
@@ -329,15 +342,36 @@ func _fit_locked_isometric_camera() -> bool:
 		_fail("staged visual bounds are empty")
 		return false
 	staged_camera_target = visual_bounds.position + visual_bounds.size * 0.5
-	var horizontal_extent: float = max(visual_bounds.size.x, visual_bounds.size.z)
-	var vertical_extent: float = visual_bounds.size.y
-	staged_camera_size = max(max(horizontal_extent * 0.90, vertical_extent * 1.35), 1.5)
 	var locked_direction: Vector3 = Vector3(16.0, 14.0, 16.0).normalized()
 	var camera_distance: float = max(visual_bounds.size.length() * 2.5, 32.0)
 	var camera_position: Vector3 = staged_camera_target + locked_direction * camera_distance
+	var camera_parent: Node3D = review_camera.get_parent_node_3d()
+	var camera_parent_transform: Transform3D = _harness_transform(camera_parent) if camera_parent != null else Transform3D.IDENTITY
+	var camera_parent_inverse: Transform3D = camera_parent_transform.affine_inverse()
 	review_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	review_camera.look_at_from_position(camera_parent_inverse * camera_position, camera_parent_inverse * staged_camera_target, Vector3.UP)
+	var camera_inverse: Transform3D = review_camera.transform.affine_inverse() * camera_parent_inverse
+	var projected_horizontal: float = 0.0
+	var projected_vertical: float = 0.0
+	var corners: Array[Vector3] = [
+		visual_bounds.position,
+		visual_bounds.position + Vector3(visual_bounds.size.x, 0.0, 0.0),
+		visual_bounds.position + Vector3(0.0, visual_bounds.size.y, 0.0),
+		visual_bounds.position + Vector3(0.0, 0.0, visual_bounds.size.z),
+		visual_bounds.position + Vector3(visual_bounds.size.x, visual_bounds.size.y, 0.0),
+		visual_bounds.position + Vector3(visual_bounds.size.x, 0.0, visual_bounds.size.z),
+		visual_bounds.position + Vector3(0.0, visual_bounds.size.y, visual_bounds.size.z),
+		visual_bounds.end,
+	]
+	for corner in corners:
+		var camera_point: Vector3 = camera_inverse * corner
+		projected_horizontal = max(projected_horizontal, abs(camera_point.x))
+		projected_vertical = max(projected_vertical, abs(camera_point.y))
+	var aspect_ratio: float = float(IMAGE_SIZE.x) / float(IMAGE_SIZE.y)
+	var required_vertical_size: float = projected_vertical * 2.0
+	var required_horizontal_size: float = projected_horizontal * 2.0 / aspect_ratio
+	staged_camera_size = max(max(required_vertical_size, required_horizontal_size) * 1.15, 1.5)
 	review_camera.size = staged_camera_size
-	review_camera.look_at_from_position(camera_position, staged_camera_target, Vector3.UP)
 	review_camera.current = true
 	return true
 
@@ -360,11 +394,71 @@ func _has_visible_variance(image: Image) -> bool:
 	return opaque_count >= max(2, sample_count / 8) and maximum - minimum >= 0.004
 
 
+func _staged_visibility_evidence(image: Image) -> Dictionary:
+	if image == null or image.get_size() != IMAGE_SIZE:
+		return {"pass": false, "opaque_pixels": 0, "luma_range": 0.0}
+	var minimum: float = 1.0
+	var maximum: float = 0.0
+	var opaque_count: int = 0
+	var sample_count: int = 0
+	var step_x: int = max(1, int(IMAGE_SIZE.x / 64))
+	var step_y: int = max(1, int(IMAGE_SIZE.y / 36))
+	for y in range(0, IMAGE_SIZE.y, step_y):
+		for x in range(0, IMAGE_SIZE.x, step_x):
+			var pixel: Color = image.get_pixel(x, y)
+			if pixel.a >= 0.05:
+				opaque_count += 1
+			var luminance: float = 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b
+			minimum = min(minimum, luminance)
+			maximum = max(maximum, luminance)
+			sample_count += 1
+	var luma_range: float = maximum - minimum
+	return {
+		"pass": opaque_count >= 2 and sample_count > 0 and luma_range >= 0.004,
+		"opaque_pixels": opaque_count,
+		"luma_range": luma_range,
+	}
+
+
+func _capture_staged_visibility() -> Dictionary:
+	var staged_mount: Node3D = staged_visual_root.get_parent_node_3d() if staged_visual_root != null else null
+	var hidden_nodes: Array = []
+	for child in generated_root.get_children():
+		if child is Node3D and child != staged_mount:
+			var node: Node3D = child as Node3D
+			hidden_nodes.append({"node": node, "visible": node.visible})
+			node.visible = false
+	var hidden_mount_children: Array = []
+	if staged_mount != null:
+		for child in staged_mount.get_children():
+			if child is Node3D and child != staged_visual_root:
+				var node: Node3D = child as Node3D
+				hidden_mount_children.append({"node": node, "visible": node.visible})
+				node.visible = false
+	var previous_environment: Environment = review_environment.environment
+	review_environment.environment = null
+	for _frame_index in 6:
+		await process_frame
+	var evidence: Dictionary = _staged_visibility_evidence(capture_viewport.get_texture().get_image())
+	for item in hidden_mount_children:
+		var mount_child: Node3D = item["node"] as Node3D
+		mount_child.visible = bool(item["visible"])
+	for item in hidden_nodes:
+		var hidden_node: Node3D = item["node"] as Node3D
+		hidden_node.visible = bool(item["visible"])
+	review_environment.environment = previous_environment
+	return evidence
+
+
 func _format_vector(value: Vector3) -> String:
 	return "%.9f,%.9f,%.9f" % [value.x, value.y, value.z]
 
 
 func _capture_after_frames() -> void:
+	var staged_visibility: Dictionary = await _capture_staged_visibility()
+	if staged_visibility.get("pass") != true:
+		_fail("staged visual visibility evidence failed")
+		return
 	for _frame_index in 6:
 		await process_frame
 	var image: Image = capture_viewport.get_texture().get_image()
@@ -383,7 +477,7 @@ func _capture_after_frames() -> void:
 	if save_error != OK:
 		_fail("PNG capture failed error=%d" % save_error)
 		return
-	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_position=%s camera_target=%s camera_size=%.9f output=%s" % [seed_value, lighting_mode, _format_vector(review_camera.global_position), _format_vector(staged_camera_target), staged_camera_size, output_path])
+	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_position=%s camera_target=%s camera_size=%.9f staged_visibility=pass staged_opaque_pixels=%d staged_luma_range=%.9f output=%s" % [seed_value, lighting_mode, _format_vector(review_camera.global_position), _format_vector(staged_camera_target), staged_camera_size, int(staged_visibility["opaque_pixels"]), float(staged_visibility["luma_range"]), output_path])
 	quit(0)
 
 

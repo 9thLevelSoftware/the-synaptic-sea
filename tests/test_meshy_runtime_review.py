@@ -8,10 +8,12 @@ import struct
 import sys
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from tools import meshy_runtime_review as review
+from tools import meshy_blender_validate as validate_module
 from tools.meshy_asset_contract import canonical_json_bytes, load_contract
 from tools.meshy_blender_validate import validate_cleaned_glb
 
@@ -123,37 +125,20 @@ def test_review_bounds_godot_runtime() -> None:
 
 
 def test_review_rejects_unexpected_diagnostics() -> None:
-    marker = "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal"
-    assert review.check_capture_output(marker, "")
-    assert not review.check_capture_output(marker + "\nWARNING: injected", "")
-    assert not review.check_capture_output(marker, "ERROR: injected")
-    assert not review.check_capture_output("", "")
-
-
-def test_review_publishes_captures_only_after_all_pass(tmp_path: Path) -> None:
-    staged = tmp_path / "staged"
-    staged.mkdir()
-    paths = {}
-    for seed in SEEDS:
-        for lighting in LIGHTING:
-            source = staged / (review.capture_name(seed, lighting))
-            source.write_bytes(_png_bytes())
-            paths[(seed, lighting)] = source
-
-    output_dir = tmp_path / "published"
-    report = {"kind": "meshy_runtime_review", "pass": True}
-    incomplete = dict(paths)
-    incomplete.pop((777, "dark"))
-    with pytest.raises(ValueError, match="six|captures"):
-        review.publish_captures(incomplete, output_dir, report)
-    assert not output_dir.exists()
-
-    review.publish_captures(paths, output_dir, report)
-    assert sorted(path.name for path in output_dir.iterdir()) == sorted(
-        [review.capture_name(seed, lighting) for seed in SEEDS for lighting in LIGHTING]
-        + ["runtime-review.json"]
+    marker = (
+        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
+        "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
+        "camera_size=7.5 staged_visibility=pass staged_opaque_pixels=100 "
+        "staged_luma_range=1.0 output=/private/tmp/capture.png"
     )
-    assert json.loads((output_dir / "runtime-review.json").read_text(encoding="utf-8")) == report
+    assert review.check_capture_output(marker, "", 42, "normal")
+    assert not review.check_capture_output(marker + "\nWARNING: injected", "", 42, "normal")
+    assert not review.check_capture_output(marker, "ERROR: injected", 42, "normal")
+    assert not review.check_capture_output("", "", 42, "normal")
+
+
+def test_review_does_not_expose_arbitrary_capture_publisher() -> None:
+    assert not hasattr(review, "publish_captures")
 
 
 def test_review_leaves_live_surfaces_unchanged(tmp_path: Path) -> None:
@@ -223,7 +208,8 @@ def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
     marker = (
         "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
         "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
-        "camera_size=7.5 output=/private/tmp/capture.png"
+        "camera_size=7.5 staged_visibility=pass staged_opaque_pixels=100 "
+        "staged_luma_range=1.0 output=/private/tmp/capture.png"
     )
 
     parsed = review.parse_capture_marker(marker, 42, "normal")
@@ -233,7 +219,86 @@ def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
         "position": [12.5, 8.25, -4.0],
         "target": [1.0, 2.0, 3.0],
         "size": 7.5,
+        "staged_visibility": {"pass": True, "opaque_pixels": 100, "luma_range": 1.0},
     }
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        "",
+        "staged_visibility=fail staged_opaque_pixels=0 staged_luma_range=0.0",
+        "staged_visibility=pass staged_opaque_pixels=1 staged_luma_range=1.0",
+        "staged_visibility=pass staged_opaque_pixels=100 staged_luma_range=0.0",
+    ],
+)
+def test_capture_rejects_missing_or_false_staged_visibility_evidence(evidence: str) -> None:
+    marker = (
+        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
+        "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
+        "camera_size=7.5 " + evidence
+    ).rstrip()
+    with pytest.raises(review.ReviewError, match="staged|visibility|canonical"):
+        review.parse_capture_marker(marker, 42, "normal")
+
+
+def _bound_runtime_fixture(tmp_path: Path):
+    from tests.test_meshy_blender_tools import _bound_fixture_task
+
+    project_root, task_dir, contract = _bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    (task_dir / "blender-validation.json").write_bytes(canonical_json_bytes(report))
+    return project_root, task_dir, contract
+
+
+def test_reverification_without_caller_contract_rejects_forged_generation_hash(
+    tmp_path: Path,
+) -> None:
+    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path)
+    forged_hash = "f" * 64
+    generation_path = task_dir / "generation.json"
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["contract_sha256"] = forged_hash
+    generation_path.write_bytes(canonical_json_bytes(generation))
+    journal_path = task_dir.parent / "_batches" / (generation["batch_id"] + ".json")
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    journal["approval"]["contract_sha256"] = forged_hash
+    journal_path.write_bytes(canonical_json_bytes(journal))
+    r4_path = task_dir / "blender-validation.json"
+    r4 = json.loads(r4_path.read_text(encoding="utf-8"))
+    r4["contract_sha256"] = forged_hash
+    r4_path.write_bytes(canonical_json_bytes(r4))
+
+    with pytest.raises(review.ReviewError, match="contract"):
+        review._load_runtime_inputs(project_root, None, task_dir)
+
+    assert json.loads((task_dir / "contract.json").read_text(encoding="utf-8")) == contract.document
+
+
+def test_reverification_recomputes_forged_r4_semantics_from_cleaned_glb(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path)
+    r4_path = task_dir / "blender-validation.json"
+    forged = json.loads(r4_path.read_text(encoding="utf-8"))
+    forged["triangle_count"] = 999
+    r4_path.write_bytes(canonical_json_bytes(forged))
+    cleaned_before = (task_dir / "cleaned.glb").read_bytes()
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=review.governance.file_sha256(glb_path),
+            byte_size=glb_path.stat().st_size,
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(
+        validate_module, "_reimport_with_blender_process", fake_reimport, raising=False
+    )
+    with pytest.raises(review.ReviewError, match="semantic|match|triangle|re-import"):
+        review._load_runtime_inputs(project_root, None, task_dir)
+    assert (task_dir / "cleaned.glb").read_bytes() == cleaned_before
 
 
 def test_preview_directory_must_be_fixed_to_asset_leaf(tmp_path: Path) -> None:

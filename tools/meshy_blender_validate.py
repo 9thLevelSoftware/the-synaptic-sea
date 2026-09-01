@@ -961,6 +961,37 @@ def _validate_report_record(report: Any) -> None:
             raise BlenderValidationError("validation report UV evidence failed")
 
 
+def verify_validation_report(
+    cleaned_glb: PathLike,
+    contract: Union[AssetContract, PathLike],
+    report: Dict[str, Any],
+    *,
+    task_id: Optional[str] = None,
+    reimport: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Recompute and re-import one fixed R4 report without publishing it."""
+
+    _validate_report_record(report)
+    expected = validate_cleaned_glb(cleaned_glb, contract, task_id=task_id)
+    expected["blender_reimport_passed"] = True
+    authority = reimport or _reimport_with_blender
+    try:
+        reimport_evidence = authority(Path(cleaned_glb), int(expected["triangle_count"]))
+    except BlenderValidationError:
+        raise
+    except Exception as exc:
+        raise BlenderValidationError("Blender re-import authority failed: " + str(exc)) from exc
+    if (
+        reimport_evidence.sha256 != expected["sha256"]
+        or reimport_evidence.byte_size != expected["byte_size"]
+        or reimport_evidence.triangle_count != expected["triangle_count"]
+    ):
+        raise BlenderValidationError("runtime Blender re-import evidence does not match cleaned.glb")
+    if any(report[field] != expected[field] for field in _CANONICAL_FIELDS):
+        raise BlenderValidationError("validation report semantic fields do not match cleaned.glb")
+    return expected
+
+
 def _resolve_task_inputs(project_root: PathLike, contract_path: PathLike, task_dir: PathLike, glb_alias: Optional[PathLike] = None, report_alias: Optional[PathLike] = None) -> Tuple[AssetContract, Path, Path]:
     """Resolve only selected-task ``cleaned.glb`` and fixed report leaves."""
 
@@ -1032,24 +1063,7 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
     if report.get("contract_sha256") != generation.get("contract_sha256"):
         raise BlenderValidationError("validation report contract hash is not bound")
     cleaned = resolved_task / "cleaned.glb"
-    try:
-        cleaned_info = os.lstat(cleaned)
-        cleaned_hash = governance.file_sha256(cleaned, max_bytes=_MAX_GLB_BYTES)
-    except (OSError, ValueError) as exc:
-        raise BlenderValidationError("cleaned.glb evidence is unavailable") from exc
-    if stat.S_ISLNK(cleaned_info.st_mode) or not stat.S_ISREG(cleaned_info.st_mode) or report.get("byte_size") != cleaned_info.st_size or report.get("sha256") != cleaned_hash:
-        raise BlenderValidationError("validation report does not match cleaned.glb")
-    expected = validate_cleaned_glb(cleaned, task_contract, task_id=resolved_task.name)
-    reimport_evidence = _reimport_with_blender(cleaned, int(expected["triangle_count"]))
-    expected["blender_reimport_passed"] = True
-    if (
-        reimport_evidence.sha256 != expected["sha256"]
-        or reimport_evidence.byte_size != expected["byte_size"]
-        or reimport_evidence.triangle_count != expected["triangle_count"]
-    ):
-        raise BlenderValidationError("runtime Blender re-import evidence does not match cleaned.glb")
-    if any(report[field] != expected[field] for field in _CANONICAL_FIELDS):
-        raise BlenderValidationError("validation report semantic fields do not match cleaned.glb")
+    verify_validation_report(cleaned, task_contract, report, task_id=resolved_task.name)
     try:
         governance.atomic_write_json(target, report, project_root=root, allowed_root=resolved_task, mode=0o600)
         persisted, raw = governance.strict_load_json_bytes(target, "Blender validation report", 4 * 1024 * 1024)
@@ -1101,6 +1115,59 @@ def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> _BlenderR
         raise BlenderValidationError("Blender re-import failed: " + str(exc)) from exc
 
 
+def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _BlenderReimportEvidence:
+    """Obtain re-import authority from a bounded clean Blender process."""
+
+    from tools.meshy_blender_master import _run_bounded_process
+
+    task_dir = Path(glb_path).parent
+    contract_path = task_dir / "contract.json"
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        BLENDER_PATH,
+        "--background",
+        "--factory-startup",
+        "--python",
+        str(Path(__file__).resolve()),
+        "--",
+        "--project-root",
+        str(task_dir),
+        "--contract",
+        str(contract_path),
+        "--task-dir",
+        str(task_dir),
+        "--glb",
+        str(glb_path),
+        "--report",
+        str(report_path),
+        "--verify-only",
+    ]
+    try:
+        result = _run_bounded_process(command, cwd=task_dir, timeout=120.0)
+    except Exception as exc:
+        raise BlenderValidationError("bounded Blender re-import failed: " + str(exc)) from exc
+    stdout = result.stdout.decode("utf-8", errors="replace") if isinstance(result.stdout, bytes) else str(result.stdout or "")
+    stderr = result.stderr.decode("utf-8", errors="replace") if isinstance(result.stderr, bytes) else str(result.stderr or "")
+    if len(stdout.encode("utf-8")) + len(stderr.encode("utf-8")) > _MAX_PROCESS_OUTPUT:
+        raise BlenderValidationError("Blender re-import output exceeded the bounded limit")
+    if result.returncode != 0:
+        raise BlenderValidationError("Blender re-import process failed: " + (stderr or stdout)[-4096:])
+    matches = list(re.finditer(
+        r"MESHY BLENDER VALIDATION VERIFY PASS sha256=(?P<sha256>[0-9a-f]{64}) "
+        r"byte_size=(?P<byte_size>[0-9]+) triangle_count=(?P<triangle_count>[0-9]+)",
+        stdout,
+    ))
+    if len(matches) != 1:
+        raise BlenderValidationError("Blender re-import process did not emit canonical authority")
+    match = matches[0].groupdict()
+    evidence = _BlenderReimportEvidence(
+        match["sha256"], int(match["byte_size"]), int(match["triangle_count"])
+    )
+    if evidence.triangle_count != expected_triangles:
+        raise BlenderValidationError("Blender re-import triangle count differs from expected")
+    return evidence
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, required=True)
@@ -1108,6 +1175,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task-dir", type=Path, required=True)
     parser.add_argument("--glb", type=Path, required=False)
     parser.add_argument("--report", type=Path, required=False)
+    parser.add_argument("--verify-only", action="store_true")
     return parser
 
 
@@ -1138,6 +1206,32 @@ build_validation_report = validate_cleaned_glb
 def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         args = parse_args(argv)
+        if args.verify_only:
+            if args.glb is None or args.report is None:
+                raise BlenderValidationError("verify-only requires --glb and --report")
+            task_dir = Path(args.task_dir).expanduser().resolve()
+            cleaned = Path(args.glb).expanduser().resolve()
+            report_path = Path(args.report).expanduser().resolve()
+            if cleaned != task_dir / "cleaned.glb" or report_path != task_dir / "blender-validation.json":
+                raise BlenderValidationError("verify-only paths must be exact task leaves")
+            contract_path = Path(args.contract).expanduser().resolve()
+            if contract_path != task_dir / "contract.json":
+                raise BlenderValidationError("verify-only contract must be the exact task leaf")
+            contract = load_contract(contract_path)
+            report, raw = governance.strict_load_json_bytes(
+                report_path, "Blender validation report", 4 * 1024 * 1024
+            )
+            if raw != canonical_json_bytes(report):
+                raise BlenderValidationError("Blender validation report is not canonical JSON")
+            expected = verify_validation_report(
+                cleaned, contract, report, task_id=task_dir.name
+            )
+            print(
+                "MESHY BLENDER VALIDATION VERIFY PASS sha256={0} byte_size={1} triangle_count={2}".format(
+                    expected["sha256"], expected["byte_size"], expected["triangle_count"]
+                )
+            )
+            return 0
         contract, cleaned, report_path = _resolve_task_inputs(args.project_root, args.contract, args.task_dir, args.glb, args.report)
         report = validate_cleaned_glb(cleaned, contract, task_id=cleaned.parent.name)
         report["blender_reimport_passed"] = True

@@ -77,7 +77,15 @@ RUNTIME_DOCUMENT_FIELDS = frozenset(
     )
 )
 CAPTURE_FIELDS = frozenset(
-    ("seed", "lighting", "camera_transform", "output_sha256", "pass", "reason")
+    (
+        "seed",
+        "lighting",
+        "camera_transform",
+        "staged_visibility",
+        "output_sha256",
+        "pass",
+        "reason",
+    )
 )
 FIXED_OUTPUT_NAMES = tuple(
     "seed-{0}-{1}.png".format(seed, lighting)
@@ -533,6 +541,29 @@ def _parse_finite_vector(value: str, label: str) -> list[float]:
     return numbers
 
 
+def _validate_staged_visibility(value: object) -> Dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"pass", "opaque_pixels", "luma_range"}:
+        raise ReviewError("staged visibility evidence is not canonical")
+    opaque_pixels = value.get("opaque_pixels")
+    luma_range = value.get("luma_range")
+    if (
+        value.get("pass") is not True
+        or type(opaque_pixels) is not int
+        or opaque_pixels < 2
+        or opaque_pixels > CAPTURE_SIZE[0] * CAPTURE_SIZE[1]
+        or isinstance(luma_range, bool)
+        or not isinstance(luma_range, (int, float))
+        or not math.isfinite(float(luma_range))
+        or float(luma_range) < 0.004
+    ):
+        raise ReviewError("staged visibility evidence is below the strict pixel gate")
+    return {
+        "pass": True,
+        "opaque_pixels": opaque_pixels,
+        "luma_range": float(luma_range),
+    }
+
+
 def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any]:
     """Parse the exact marker and retain the camera values emitted by Godot."""
 
@@ -546,7 +577,11 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
     pattern = re.compile(
         r"^" + re.escape(expected)
         + r"camera_position=(?P<position>[^ ]+) camera_target=(?P<target>[^ ]+) "
-        + r"camera_size=(?P<size>[^ ]+)(?: output=(?P<output>.+))?$"
+        + r"camera_size=(?P<size>[^ ]+) "
+        + r"staged_visibility=(?P<visibility>pass|fail) "
+        + r"staged_opaque_pixels=(?P<pixels>[0-9]+) "
+        + r"staged_luma_range=(?P<luma>[^ ]+)"
+        + r"(?: output=(?P<output>.+))?$"
     )
     match = pattern.fullmatch(line)
     if match is None:
@@ -557,11 +592,24 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
         raise ReviewError("camera size is not numeric") from exc
     if not math.isfinite(size) or size <= 0.0:
         raise ReviewError("camera size must be finite and positive")
+    try:
+        opaque_pixels = int(match.group("pixels"))
+        luma_range = float(match.group("luma"))
+    except ValueError as exc:
+        raise ReviewError("staged visibility evidence is not numeric") from exc
+    staged_visibility = _validate_staged_visibility(
+        {
+            "pass": match.group("visibility") == "pass",
+            "opaque_pixels": opaque_pixels,
+            "luma_range": luma_range,
+        }
+    )
     return {
         "projection": "orthogonal",
         "position": _parse_finite_vector(match.group("position"), "position"),
         "target": _parse_finite_vector(match.group("target"), "target"),
         "size": size,
+        "staged_visibility": staged_visibility,
     }
 
 
@@ -592,9 +640,7 @@ def _prime_overlay_imports(overlay_root: Path) -> None:
     raise ReviewError("overlay import emitted a diagnostic: {0}".format(_cap_text(last_output)))
 
 
-def check_capture_output(
-    stdout: str, stderr: str, seed: Optional[int] = None, lighting: Optional[str] = None
-) -> bool:
+def check_capture_output(stdout: str, stderr: str, seed: int, lighting: str) -> bool:
     """Accept only a canonical marker with no diagnostics or unbounded output."""
 
     try:
@@ -606,13 +652,11 @@ def check_capture_output(
     combined = "\n".join((stdout_text, stderr_text))
     if any(marker in combined for marker in DIAGNOSTIC_MARKERS):
         return False
-    marker = CAPTURE_MARKER
-    if seed is not None and lighting is not None:
-        marker = "{0} seed={1} lighting={2} ".format(CAPTURE_MARKER, seed, lighting)
-        try:
-            parse_capture_marker(stdout_text, seed, lighting)
-        except ReviewError:
-            return False
+    marker = "{0} seed={1} lighting={2} ".format(CAPTURE_MARKER, seed, lighting)
+    try:
+        parse_capture_marker(stdout_text, seed, lighting)
+    except ReviewError:
+        return False
     return marker in stdout_text
 
 
@@ -749,6 +793,7 @@ def run_capture(
             )
         )
     camera_transform = parse_capture_marker(stdout, seed, lighting)
+    staged_visibility = camera_transform.pop("staged_visibility")
     _validate_png(output)
     if not _png_is_visible(output):
         raise ReviewError("Godot capture is blank or near-uniform")
@@ -756,6 +801,7 @@ def run_capture(
         "seed": seed,
         "lighting": lighting,
         "camera_transform": camera_transform,
+        "staged_visibility": staged_visibility,
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
         "pass": True,
         "reason": "pass",
@@ -803,6 +849,7 @@ def build_runtime_review_document(
         if type(seed) is not int or not isinstance(lighting, str):
             raise ReviewError("runtime capture identity is invalid")
         capture_name(seed, lighting)
+        _validate_staged_visibility(item.get("staged_visibility"))
         key = (seed, lighting)
         if key in by_key:
             raise ReviewError("duplicate runtime capture")
@@ -962,46 +1009,6 @@ def _publish_fixed_captures(
     return destination
 
 
-def publish_captures(
-    captures: Mapping[Any, Path], output_dir: Path, report: Mapping[str, Any]
-) -> Path:
-    """Compatibility publisher for callers without a governed asset root.
-
-    ``run`` uses ``_publish_fixed_captures`` exclusively.  This helper keeps
-    the older direct unit API while still writing each leaf through governance
-    atomics and never copying to a caller-selected leaf.
-    """
-
-    normalised = _normalise_capture_mapping(captures)
-    expected = {(seed, lighting) for seed in SEEDS for lighting in LIGHTING_MODES}
-    if set(normalised) != expected:
-        raise ReviewError("runtime review requires all six captures before publication")
-    if report.get("pass") is not True:
-        raise ReviewError("runtime review report is not PASS")
-    destination = _absolute(output_dir)
-    if destination.exists() and (destination.is_symlink() or not destination.is_dir()):
-        raise ReviewError("preview directory is not a regular directory")
-    destination.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(destination, 0o700)
-    root = destination.parent
-    payloads = {}
-    for key, source in normalised.items():
-        _validate_png(source)
-        payloads[capture_name(*key)] = source.read_bytes()
-    for name, payload in payloads.items():
-        governance.atomic_write_bytes(
-            destination / name, payload, project_root=root, allowed_root=destination, mode=0o600
-        )
-    governance.atomic_write_json(
-        destination / "runtime-review.json",
-        dict(report),
-        project_root=root,
-        allowed_root=destination,
-        mode=0o600,
-    )
-    return destination
-
-
 def snapshot_runtime_surfaces(project_root: Path) -> tuple[Any, ...]:
     """Use the shared immutable protected-surface authority."""
 
@@ -1056,11 +1063,10 @@ def _load_runtime_inputs(
             raise ReviewError("caller contract does not match task-local contract")
         if contract_path is not None and generation.get("contract_sha256") != caller.sha256:
             raise ReviewError("generation contract hash is not bound to caller contract")
-        # The task-local artifact is canonical JSON, while the generation
-        # record's contract_sha256 intentionally preserves the caller's source
-        # bytes.  With no caller on a re-verification, the generation hash is
-        # the only valid contract identity available to the evidence chain.
-        bound_contract_hash = str(generation.get("contract_sha256"))
+        if contract_path is None:
+            if generation.get("contract_sha256") != task_contract_model.sha256:
+                raise ReviewError("generation contract hash is not bound to the task-local contract")
+        bound_contract_hash = task_contract_model.sha256
         cleaned = candidate_review._governed_artifact(root, resolved_task, "cleaned.glb")
         r4_path = candidate_review._governed_artifact(root, resolved_task, "blender-validation.json")
         cleaned_info = cleaned.lstat()
@@ -1072,20 +1078,18 @@ def _load_runtime_inputs(
         )
         if r4_raw != canonical_json_bytes(r4):
             raise ReviewError("Blender validation report is not canonical JSON")
-        from tools.meshy_blender_validate import _validate_report_record
+        from tools import meshy_blender_validate as blender_validate
 
-        _validate_report_record(r4)
-        if (
-            r4.get("task_id") != resolved_task.name
-            or r4.get("asset_id") != task_contract_model.asset_id
-            or r4.get("contract_sha256") != bound_contract_hash
-            or r4.get("sha256") != cleaned_hash
-            or r4.get("byte_size") != cleaned_info.st_size
-            or r4.get("status") != "PASS"
-            or r4.get("uvs_present") is not True
-            or r4.get("blender_reimport_passed") is not True
-        ):
-            raise ReviewError("R4 Blender evidence does not match the current task")
+        try:
+            blender_validate.verify_validation_report(
+                cleaned,
+                task_contract_path,
+                r4,
+                task_id=resolved_task.name,
+                reimport=blender_validate._reimport_with_blender_process,
+            )
+        except (OSError, TypeError, ValueError, RuntimeError) as exc:
+            raise ReviewError("R4 Blender evidence does not match the current task: " + str(exc)) from exc
         inputs = ValidatedTask(
             asset_id=task_contract_model.asset_id,
             task_id=resolved_task.name,
@@ -1182,6 +1186,7 @@ def _validate_runtime_document(
         size = transform.get("size")
         if isinstance(size, bool) or not isinstance(size, (int, float)) or not math.isfinite(float(size)) or float(size) <= 0.0:
             raise ReviewError("runtime camera size is invalid")
+        _validate_staged_visibility(item.get("staged_visibility"))
     if set(by_key) != set(expected):
         raise ReviewError("runtime review capture identity is invalid")
     if [(item["seed"], item["lighting"]) for item in captures] != expected:
