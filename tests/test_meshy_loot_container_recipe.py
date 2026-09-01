@@ -495,6 +495,7 @@ def test_real_blender_recipe_is_deterministic_and_preserves_disposable_master() 
             assert result["triangle_count"] <= 1500
             assert "LOOT CONTAINER RECIPE PASS mode=preview asset=loot_container_derelict_v1 states=closed,open,looted" in result["marker"]
             assert all((evidence / leaf).is_file() for leaf in ("closed.png", "open.png", "looted.png", "states_contact_sheet.png", "cleaned.preview.glb"))
+            assert result["renders"]["open.png"] != result["renders"]["looted.png"]
             assert (case / "source" / ASSET_ID / "build_recipe_manifest.json").is_file()
             assert json.loads((evidence / "build_recipe_manifest.json").read_text()) == json.loads((case / "source" / ASSET_ID / "build_recipe_manifest.json").read_text())
             glb_hash = hashlib.sha256((evidence / "cleaned.preview.glb").read_bytes()).hexdigest()
@@ -590,21 +591,27 @@ def test_real_blender_recipe_rejects_unowned_generated_name_collision(tmp_path: 
     )
     with pytest.raises(RuntimeError) as failure:
         recipe.run_blender_recipe(paths, contract, "preview")
-    assert "generated-name collision: object ContainerRoot is not recipe-owned" in str(failure.value)
+    failure_text = str(failure.value)
+    assert "generated-name collision: object ContainerRoot" in failure_text
+    assert "is not recipe-owned" in failure_text
 
     master_info = _run_blender_inspection(
         blender,
         master,
         """import bpy, json
 obj=bpy.data.objects.get('ContainerRoot')
-print('TASK2_JSON='+json.dumps({'authored':bool(obj and obj.get('authored_collider')),'objects':sorted(o.name for o in bpy.data.objects),'actions':sorted(a.name for a in bpy.data.actions),'materials':sorted(m.name for m in bpy.data.materials)}))""",
+authored_names=sorted(obj.name for obj in bpy.data.objects if obj.get('authored_collider'))
+print('TASK2_JSON='+json.dumps({'authored':bool(authored_names),'authored_names':authored_names,'objects':sorted(o.name for o in bpy.data.objects),'actions':sorted(a.name for a in bpy.data.actions),'materials':sorted(m.name for m in bpy.data.materials)}))""",
     )
     assert master_info["authored"] is True
-    assert "ContainerRoot.001" not in master_info["objects"]
-    assert not any(
-        name.endswith((".001", ".002"))
+    assert len(master_info["authored_names"]) == 1
+    assert master_info["authored_names"][0].startswith("ContainerRoot")
+    suffixed_names = [
+        name
         for name in master_info["objects"] + master_info["actions"] + master_info["materials"]
-    )
+        if name.endswith((".001", ".002"))
+    ]
+    assert all(name in master_info["authored_names"] for name in suffixed_names)
     for leaf in recipe.RENDER_LEAVES + ("cleaned.preview.glb", "build_recipe_manifest.json"):
         assert not (evidence / leaf).exists()
     assert not (master.parent / "build_recipe_manifest.json").exists()

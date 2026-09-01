@@ -602,7 +602,7 @@ def _build_handle(bpy: Any, collection: Any, alloy: Any) -> Any:
 def _build_accents(bpy: Any, collection: Any, accent: Any) -> tuple[Any, Any, Any]:
     left = _add_box(bpy, "LatchLeft", (-0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
     right = _add_box(bpy, "LatchRight", (0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
-    loot = _add_box(bpy, "LootVisual", (0.0, 0.0, 0.12), (0.28, 0.18, 0.08), collection, accent, 0.004)
+    loot = _add_box(bpy, "LootVisual", (0.0, 0.08, 0.30), (0.36, 0.20, 0.12), collection, accent, 0.004)
     loot["wrapper_visibility"] = "open_unlooted_only"
     return left, right, loot
 
