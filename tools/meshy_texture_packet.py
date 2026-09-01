@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
@@ -594,6 +595,27 @@ def write_texture_request(
     )
     destination = resolved_task / TEXTURE_REQUEST_NAME
     try:
+        if os.path.lexists(destination):
+            existing_destination = governance.governed_task_path(
+                root, destination, "Meshy texture request output", allow_missing=False
+            )
+            existing_request, raw = governance.strict_load_json_bytes(
+                existing_destination,
+                "Meshy texture request output",
+                _CANONICAL_JSON_MAX_BYTES,
+            )
+            canonical_existing = canonical_json_bytes(existing_request)
+            if raw != canonical_existing:
+                raise ValueError("Meshy texture request output is not canonical JSON")
+            if raw != canonical_json_bytes(request):
+                raise ValueError("Meshy texture request output differs from the requested content")
+            info = os.lstat(existing_destination)
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+                raise ValueError("Meshy texture request output must be a regular non-symlink file")
+            if stat.S_IMODE(info.st_mode) != 0o600:
+                raise ValueError("Meshy texture request output must have mode 0600")
+            return request
+
         governance.governed_task_path(
             root, destination, "Meshy texture request output", allow_missing=True
         )

@@ -366,6 +366,70 @@ def test_texture_packet_writes_only_fixed_leaf_atomically_and_preserves_surfaces
     assert not list(task_dir.glob(".*texture_request.json.*.tmp"))
 
 
+def test_texture_packet_rejects_malformed_existing_request_without_mutation(governed_task) -> None:
+    project_root, task_dir, contract = governed_task
+    destination = task_dir / TEXTURE_REQUEST_NAME
+    original = b"not json\\n"
+    destination.write_bytes(original)
+
+    with pytest.raises(TexturePacketError, match="invalid|JSON|request|publication"):
+        write_texture_request(**_request_args(project_root, task_dir, contract))
+
+    assert destination.read_bytes() == original
+
+
+def test_texture_packet_rejects_noncanonical_or_different_existing_request_without_mutation(governed_task) -> None:
+    project_root, task_dir, contract = governed_task
+    destination = task_dir / TEXTURE_REQUEST_NAME
+    request = _request(project_root, task_dir, contract)
+    noncanonical = json.dumps(request, ensure_ascii=False, sort_keys=True).encode("utf-8") + b"\\n"
+    canonical_different = dict(request)
+    canonical_different["reviewer"] = "different-reviewer"
+    cases = (noncanonical, canonical_json_bytes(canonical_different))
+
+    for original in cases:
+        destination.write_bytes(original)
+        with pytest.raises(TexturePacketError, match="canonical|different|content|request|publication"):
+            write_texture_request(**_request_args(project_root, task_dir, contract))
+        assert destination.read_bytes() == original
+        destination.unlink()
+
+
+def test_texture_packet_accepts_identical_canonical_request_idempotently(governed_task) -> None:
+    project_root, task_dir, contract = governed_task
+    destination = task_dir / TEXTURE_REQUEST_NAME
+    request = _request(project_root, task_dir, contract)
+    payload = canonical_json_bytes(request)
+    destination.write_bytes(payload)
+    destination.chmod(0o600)
+    before = os.lstat(destination)
+
+    assert write_texture_request(**_request_args(project_root, task_dir, contract)) == request
+
+    after = os.lstat(destination)
+    assert destination.read_bytes() == payload
+    assert after.st_ino == before.st_ino
+    assert after.st_mtime_ns == before.st_mtime_ns
+
+
+def test_texture_packet_rejects_identical_request_with_wrong_mode_without_mutation(governed_task) -> None:
+    project_root, task_dir, contract = governed_task
+    destination = task_dir / TEXTURE_REQUEST_NAME
+    payload = canonical_json_bytes(_request(project_root, task_dir, contract))
+    destination.write_bytes(payload)
+    destination.chmod(0o640)
+    before = os.lstat(destination)
+
+    with pytest.raises(TexturePacketError, match="mode|permission|600|request|publication"):
+        write_texture_request(**_request_args(project_root, task_dir, contract))
+
+    after = os.lstat(destination)
+    assert destination.read_bytes() == payload
+    assert stat.S_IMODE(after.st_mode) == 0o640
+    assert after.st_ino == before.st_ino
+    assert after.st_mtime_ns == before.st_mtime_ns
+
+
 def test_texture_packet_rejects_output_symlink_and_non_regular_without_touching_outside(governed_task) -> None:
     project_root, task_dir, contract = governed_task
     sentinel = project_root.parent / "outside-sentinel"
