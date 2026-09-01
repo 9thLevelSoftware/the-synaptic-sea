@@ -4,14 +4,15 @@
 
 No completion claim without fresh validation evidence.
 
-## Meshy-to-Blender candidate asset pipeline (ADR-0057) — PENDING
+## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
 Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
 Requirements: `REQ-AIAP-001` through `REQ-AIAP-010`.
 
-Task 1 records the governance and exact eventual commands below. Every command in this
-section is **PENDING** until its corresponding implementation task lands; none is a Task 1
-pass claim. No Meshy API call, paid generation, asset generation, or promotion is run by Task 1.
+The toolchain is implemented and host/toolchain verified at commit
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. This section records current commands and evidence
+boundaries. No real provider task, candidate artifact, external Blender master, or six-case
+candidate runtime capture is claimed here; those are post-PR live-pilot evidence.
 
 The authority chain is:
 
@@ -28,11 +29,11 @@ the editable master, topology, UV, exact meter scale, pivot, `+Z` forward, state
 rig, and export. Godot wrappers/runtime data own collision, navigation, sockets, integrity,
 VFX/animation integration, and gameplay bindings.
 
-### Contract and focused Python tests — PENDING Tasks 2–7, 9–11
+### Contract, plan, and focused Python tests — IMPLEMENTED
 
 ```bash
-python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json
-python3 -m pytest -q \
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 -m pytest -q \
   tests/test_meshy_asset_contract.py \
   tests/test_meshy_stage.py \
   tests/test_meshy_candidate_review.py \
@@ -44,115 +45,139 @@ python3 -m pytest -q \
   tests/test_prop_visual_metadata.py
 ```
 
-### Blender normalized-GLB validator — PENDING Task 8
+At the implementation snapshot, this focused suite completed **340 passed in 185.67s**. The
+contract validator and all nine host CLI help surfaces also passed with `/usr/bin/python3`.
+The read-only plan makes no provider call and records `references_resolved=false` until real
+rights-cleared reference files are supplied for the pilot:
 
 ```bash
-BLENDER="${BLENDER:-/opt/homebrew/bin/blender}"
-TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
-TASK_DIR="assets/_staging/meshy/loot_container_derelict_v1/${TASK_ID}"
-"$BLENDER" --background --factory-startup --python tools/meshy_blender_validate.py -- \
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py plan \
   --project-root . \
-  --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
-  --task-dir "$TASK_DIR" \
-  --glb "$TASK_DIR/cleaned.glb"
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json
 ```
 
-Expected eventual marker (not currently claimed):
+### Current host-Python lifecycle
 
-```text
-MESHY BLENDER VALIDATION PASS asset=loot_container_derelict_v1 triangles=<n> materials=<n>
+Run from the repository root. `--approved-credits` is required for paid commands and must equal
+the plan's `maximum_credits` request-envelope/integrity value; standing subscription authorization
+means spend and cap bookkeeping are not a human blocker. The lifecycle is plan → generate →
+resume/verify → candidate review → Blender master and validator → optional texture packet after
+selection/UV → runtime review → binder → proposal only:
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py generate \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --approved-credits <maximum_credits> --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py resume \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --approved-credits <maximum_credits> \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py verify \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --pricing-file data/asset_generation/meshy_pricing_v1.json
 ```
 
-### Locked-isometric runtime review — IMPLEMENTED Task 11
+Each governed batch retains exactly the contract `candidate_count`. The loot-container pilot is
+one batch with four candidate records, with one paid creation POST attempt per record. A timeout,
+transport failure, `429`, `5xx`, or other ambiguous creation result is reconciled from the
+immutable journal and is never automatically retried. One selected Blender master derives all
+alternate states; single-attempt safety never reduces candidate cardinality.
+
+After explicit candidate selection and the Blender UV pass:
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py select \
+  --project-root . --task-dir "<task_dir>" --reviewer "<reviewer>" \
+  --check silhouette_readable --check proportions_match_contract \
+  --check functional_volume_present --check movable_parts_separable \
+  --check cleanup_bounded --check camera_readability
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_blender_master.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --reviewer "<reviewer>"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_blender_validate.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --glb "<task_dir>/cleaned.glb" \
+  --report "<task_dir>/blender-validation.json"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_texture_packet.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --material-family "<family>" --resolution 1024 \
+  --reviewer "<reviewer>" --approved-credits 10
+```
+
+The Blender commands are host-Python launchers; do not invoke them as `blender --python`.
+Blender focused evidence at the snapshot is 2 passed tests for valid re-import/publication and
+non-affine rejection. No external pilot master or cleaned GLB is present yet.
+
+### Locked-isometric runtime review and proposal boundary
 
 ```bash
 TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
 TASK_DIR="assets/_staging/meshy/stalker_v1/${TASK_ID}"
-python3 tools/meshy_runtime_review.py \
-  --project-root . \
-  --contract data/asset_generation/contracts/stalker_v1.json \
-  --task-dir "$TASK_DIR" \
-  --preview-dir artifacts/validation-previews/meshy/stalker_v1
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_runtime_review.py \
+  --project-root . --contract data/asset_generation/contracts/stalker_v1.json \
+  --task-dir "$TASK_DIR" --preview-dir artifacts/validation-previews/meshy/stalker_v1
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py bind \
+  --project-root . --task-dir "$TASK_DIR"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_promotion_packet.py prop \
+  --project-root . --task-dir "$TASK_DIR" \
+  --target-path res://assets/imported/props/dressing/stalker_v1.sidecar.json
 ```
 
-The runner requires the direct private task layout, a canonical task-local contract, a SUCCEEDED generation record,
-and `cleaned.glb` plus the exact canonical R4 `blender-validation.json` report (including UV and Blender
-re-import evidence). It copies the production project into a disposable external overlay and mounts the
-candidate only at `res://assets/_review/meshy/<asset_id>/cleaned.glb`; live runtime surfaces are not write targets.
-The overlay is import-primed before six bounded subprocess captures: seeds `42` and `777` under
-`normal`, `emergency`, and `dark` lighting. Every capture must emit one exact camera marker without an
-unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostic, pass the conservative visible-variance gate,
-and produce a complete 1600x900 PNG. The six fixed captures are validated privately, then published through
-the shared governance atomics, with `runtime-review.json` published last. Existing evidence is immutable and
-reusable only when every fixed byte, hash, and mode matches exactly.
-
-Published output:
+The runner uses the real `breach_field` environment and locked-isometric camera for exactly six
+cases: seeds `42` and `777` × `normal`, `emergency`, and `dark` lighting. It publishes captures
+only after complete PNGs, clean diagnostics, task/artifact identity, selected/SUCCEEDED evidence,
+and the Blender re-import report pass. The exact producer marker requires task identity:
 
 ```text
-artifacts/validation-previews/meshy/<asset_id>/
-  seed-42-normal.png
-  seed-42-emergency.png
-  seed-42-dark.png
-  seed-777-normal.png
-  seed-777-emergency.png
-  seed-777-dark.png
-  runtime-review.json
+MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
 ```
 
-`runtime-review.json` records the task identity, contract/R4/cleaned-GLB hashes, ordered seed/lighting matrix,
-actual finite locked-isometric camera transforms emitted by Godot, per-capture output hashes, and all-pass status;
-it contains no subjective aesthetic score or host path. After publication, the only allowed advancement is the
-in-memory evidence binder:
+There is no Meshy task directory, raw/cleaned GLB, generation/review record, external master, or
+six runtime captures in this phase; the real candidate lifecycle is pending the post-PR live
+pilot. Runtime review, the binder, and the proposal command never write live catalogs, generated
+indexes, wrappers, or imported assets. The promotion packet is a proposal only and application
+requires a separate reviewed task.
+
+### Existing Godot regression smokes — current commands
 
 ```bash
-python3 tools/meshy_candidate_review.py bind \
-  --project-root . \
-  --task-dir "$TASK_DIR"
-```
-
-The binder derives evidence only from the governed task, canonical R4 report, fixed captures, and runtime report,
-then publishes the final `promotion_ready` review once. Re-running it is read-only idempotent verification; forged
-intermediate or promotion states fail full evidence verification. Runtime review is proposal/review evidence only:
-it never copies the asset into live runtime catalogs or wrappers.
-
-Expected marker (when a real staged task is supplied):
-
-```text
-MESHY RUNTIME REVIEW PASS asset=stalker_v1 seeds=42,777 lighting=normal,emergency,dark captures=6
-```
-
-### Existing Godot regression smokes — PENDING integration of Task 11
-
-These existing production-environment smokes remain regression evidence. Task 1 does not claim
-new or current passes for them:
-
-```bash
+ROOT="${ROOT:-.}"
 GODOT="${GODOT:-/opt/homebrew/bin/godot}"
-"$GODOT" --headless --path . --script res://scripts/validation/threat_visual_catalog_smoke.gd
-"$GODOT" --headless --path . --script res://scripts/validation/structural_live_loader_smoke.gd
-"$GODOT" --headless --path . --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 ```
 
-Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines block runtime acceptance unless the
-existing validation plan explicitly classifies that exact output. A pass marker or zero exit
-code does not override an unclassified diagnostic. Generation and review must not write to
-`assets/imported`, `data/combat/threat_visual_catalog.json`,
-`data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is a separate
-reviewed task.
+These existing production-environment smokes remain regression evidence. Fresh results for the
+parent's isolated Godot lane are not supplied by this documentation phase, and this section does
+not claim `builder_playable_runtime_fields_smoke.gd` is green. Unexpected `ERROR:`, `WARNING:`,
+or `SCRIPT ERROR:` lines block runtime acceptance unless the exact output is classified in this
+plan; a pass marker or zero exit code does not override an unclassified diagnostic. Generation
+and review must not write to `assets/imported`, `data/combat/threat_visual_catalog.json`,
+`data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is separate.
 
 ## Godot binary
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2`
+`/opt/homebrew/bin/godot` (Godot 4.7.1)
 
 ## Project root
 
-`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
+`ROOT="${ROOT:-.}"`
 
 ## Focused route-control validation
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected markers:
@@ -1139,10 +1164,11 @@ bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
 must block the change):
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
-for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
+  "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
 done
 ```
 
@@ -1155,7 +1181,7 @@ section (and update the allowlist) before re-running.
 Use after gameplay-system milestones where the user asked to avoid proof churn:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
+ROOT="${ROOT:-.}"
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 ```
@@ -1178,7 +1204,9 @@ Gate 1 accepts two evidence paths:
 Automated Gate 1 command:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.

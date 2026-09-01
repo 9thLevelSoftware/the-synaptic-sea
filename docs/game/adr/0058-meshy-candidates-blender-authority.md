@@ -1,10 +1,11 @@
-# ADR-0057: Meshy Candidates, Blender Canonical Masters, and Godot Runtime Authority
+# ADR-0058: Meshy Candidates, Blender Canonical Masters, and Godot Runtime Authority
 
 ## Status
 
-Accepted for Task 1 governance; implementation of the later tools and runtime-review harness is
-pending. No Meshy API call, paid action, asset generation, or promotion is part of this ADR's
-implementation task.
+Accepted. The toolchain implementation is present and host-verified at merge commit
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. Real provider tasks, candidate artifacts, and the
+six-case runtime evidence remain intentionally reserved for the post-PR live pilot; no provider
+call or promotion is part of this documentation refresh.
 
 ## Date
 
@@ -72,22 +73,35 @@ integrity and damage consequences, VFX/animation integration, and gameplay bindi
 child may change only after the wrapper contract remains intact. Runtime state is not duplicated
 in a candidate sidecar, staged GLB, or generated visual index.
 
-### Cost, provenance, and path gates
+### Standing subscription, request integrity, and path gates
 
-No Meshy API call may occur without all five of these gates:
+The project has standing subscription authorization for post-PR testing. Spend, cap, and account
+bookkeeping do not block that testing, but authorization never waives the integrity gates. No
+Meshy API call may occur without all of these conditions:
 
 1. a validated repository asset contract;
-2. validated reference rights and consistent separate input images;
-3. a live provider balance check;
-4. an explicit maximum credit ceiling that bounds the requested batch; and
-5. an immutable request record containing the exact request and relevant hashes before
-   submission.
+2. validated rights and consistent separate input images;
+3. a read-only plan whose `maximum_credits` is copied into the required
+   `--approved-credits` request-envelope/integrity field; and
+4. an immutable request record containing the exact request and relevant hashes before submission.
 
-The request and generation records must not contain API keys, authorization headers, signed
-URLs, or other secrets. Generation output is staged atomically and records provider/model/task
+The `--approved-credits` value must equal the plan's `maximum_credits`; it is not renewed human
+spend approval. A materially changed request must be replanned. Within one governed batch, every
+planned candidate record allows exactly one paid creation POST attempt. A timeout, transport
+failure, `429`, `5xx`, or other ambiguous outcome is reconciled from the immutable journal and is
+never automatically retried. Task and artifact identity, selected/SUCCEEDED evidence, Blender
+re-import, runtime review, provenance, and protected-path gates remain mandatory.
+
+The request and generation records must not contain API keys, authorization headers, signed URLs,
+or other secrets. Generation output is staged atomically and records provider/model/task
 identifiers, contract and reference hashes, output hashes/sizes, license state, and consumed
 credits. Later review decisions are separate records and do not rewrite immutable generation
 facts.
+
+Each generation creates one governed batch with exactly the contract's `candidate_count` planned
+candidate records. `loot_container_derelict_v1` therefore uses one batch of four candidate records;
+each record has one creation POST attempt. One selected Blender master derives its closed, open,
+and looted states. Single-attempt safety never reduces candidate cardinality.
 
 The generator, downloader, Blender staging flow, and runtime-review harness must never write to:
 
@@ -107,6 +121,74 @@ seeds `42` and `777` in `breach_field`, under `normal`, `emergency`, and `dark` 
 standalone neutral model viewer is not final runtime evidence. Unexpected `ERROR:`, `WARNING:`,
 or `SCRIPT ERROR:` lines block runtime acceptance unless the existing validation plan
 explicitly classifies the exact output.
+
+### Current command surfaces and order
+
+Commands are host-Python launchers and run from the repository root. The supported lifecycle is:
+
+1. Read-only plan, then provider submission only after the plan, rights, and request record are
+   valid:
+
+   ```bash
+   /usr/bin/python3 tools/meshy_stage.py plan --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json \
+     --pricing-file data/asset_generation/meshy_pricing_v1.json
+   /usr/bin/python3 tools/meshy_stage.py generate --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json \
+     --approved-credits <maximum_credits> --pricing-file data/asset_generation/meshy_pricing_v1.json \
+     --reference-root <reference_root> --reference front=<front_file> \
+     --reference side=<side_file> --reference back=<back_file> \
+     --reference three_quarter=<three_quarter_file> --output-license paid-private
+   ```
+
+2. Recovery and offline verification use the existing journal; neither creates a second task:
+
+   ```bash
+   /usr/bin/python3 tools/meshy_stage.py resume --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json \
+     --batch-journal <batch_journal> --approved-credits <maximum_credits> \
+     --pricing-file data/asset_generation/meshy_pricing_v1.json \
+     --reference-root <reference_root> --reference front=<front_file> \
+     --reference side=<side_file> --reference back=<back_file> \
+     --reference three_quarter=<three_quarter_file> --output-license paid-private
+   /usr/bin/python3 tools/meshy_stage.py verify --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json \
+     --batch-journal <batch_journal> --pricing-file data/asset_generation/meshy_pricing_v1.json
+   ```
+
+3. Select or reject a candidate, then run the host-Python Blender master and independent
+   re-import validator. Optional texture packet generation is after selection and the Blender UV
+   pass, never before geometry approval:
+
+   ```bash
+   /usr/bin/python3 tools/meshy_candidate_review.py select --project-root . --task-dir "<task_dir>" \
+     --reviewer "<reviewer>" --check silhouette_readable --check proportions_match_contract \
+     --check functional_volume_present --check movable_parts_separable --check cleanup_bounded \
+     --check camera_readability
+   /usr/bin/python3 tools/meshy_blender_master.py --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+     --reviewer "<reviewer>"
+   /usr/bin/python3 tools/meshy_blender_validate.py --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+     --glb <task_dir>/cleaned.glb --report <task_dir>/blender-validation.json
+   /usr/bin/python3 tools/meshy_texture_packet.py --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+     --material-family <family> --resolution 1024 --reviewer "<reviewer>" --approved-credits 10
+   ```
+
+4. Run the real runtime review, bind its evidence, and emit a proposal only. The binder and
+   proposal never promote or write protected runtime surfaces:
+
+   ```bash
+   /usr/bin/python3 tools/meshy_runtime_review.py --project-root . \
+     --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+     --preview-dir "artifacts/validation-previews/meshy/<asset_id>"
+   /usr/bin/python3 tools/meshy_candidate_review.py bind --project-root . --task-dir "<task_dir>"
+   /usr/bin/python3 tools/meshy_promotion_packet.py prop --project-root . --task-dir "<task_dir>" \
+     --target-path res://assets/imported/props/dressing/<asset_id>.sidecar.json
+   ```
+
+The promotion packet is a review proposal only; applying it is a separate reviewed task.
 
 ### Pilot scope
 
@@ -136,7 +218,7 @@ ADR-0052 remains authoritative for the existing prop metadata and visual-binding
   version, and bounds) while preserving authored bindings, placement, provenance, and
   extensions. Refresh must preserve AI provenance and authored fields.
 
-Thus ADR-0057 governs how a candidate reaches the existing visual-record boundary; it does not
+Thus ADR-0058 governs how a candidate reaches the existing visual-record boundary; it does not
 redefine the prop sidecar/index contract or move gameplay state into it.
 
 ## Consequences
@@ -160,8 +242,8 @@ redefine the prop sidecar/index contract or move gameplay state into it.
 - External `.blend` masters require a backup/checkpoint gate before promotion.
 - The six-case runtime review and clean diagnostic requirement make visual promotion slower but
   prevent context and log regressions.
-- The first implementation tasks must land before the commands in the validation plan can be
-  claimed as passing.
+- Real provider tasks, raw/cleaned GLBs, external Blender masters, generation records, and six
+  runtime captures are not present until the post-PR live pilot.
 
 ## Validation
 
@@ -170,12 +252,14 @@ ADR:
 
 - Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
 - Requirements: `REQ-AIAP-001` through `REQ-AIAP-010` in `docs/game/05_requirements.md`.
-- Pending command registry: `docs/game/06_validation_plan.md`.
+- Current command registry and evidence boundary: `docs/game/06_validation_plan.md`.
 
-The eventual gates include the contract validator, focused Python tests, the Blender
-normalized-GLB validator, the locked-isometric runtime-review harness, and the existing Godot
-smokes. They are explicitly pending until the corresponding implementation tasks land; Task 1
-reports no runtime or provider pass.
+The implemented gates include the contract validator, focused Python tests, the host-Python
+Blender master and normalized-GLB validator, the locked-isometric runtime-review harness, and
+the existing Godot smokes. At commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`, the focused
+Meshy suite passed 340 tests in 185.67 seconds and the Blender focused tests passed 2 tests.
+There is no real Meshy task directory, raw/cleaned GLB, generation/review record, external master,
+or six-capture runtime report yet; those are truthful post-PR live-pilot evidence limitations.
 
 ## Alternatives considered
 
@@ -191,5 +275,6 @@ reports no runtime or provider pass.
 5. **Let generation write the live catalog, generated index, or wrappers.** Rejected: it makes
    review and rollback ambiguous; proposal output and separate promotion keep the boundary
    explicit.
-6. **Call a paid endpoint whenever an API key is available.** Rejected: contract, rights,
-   live balance, explicit maximum credit ceiling, and immutable request evidence are mandatory.
+6. **Call a paid endpoint whenever an API key is available.** Rejected: standing subscription
+   authorization does not waive contract, rights, `--approved-credits` request integrity,
+   immutable evidence, single-POST-attempt, reconciliation, or review gates.

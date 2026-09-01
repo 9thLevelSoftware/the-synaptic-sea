@@ -1,1 +1,32 @@
-{"asset_id":"hull_tendril_kit_v1","candidate_count":3,"endpoint":"/openapi/v1/image-to-3d","estimated_cost":30,"estimated_cost_per_candidate":10,"maximum_credits":30,"prompt_packet_sha256":"2de2efde170e87cdcb64e6dfef45712e325ec7c7363c20020b31cc7bd1ead6f4","request":{"ai_model":"meshy-t2","model_type":"smart-topology","should_texture":false,"target_formats":["glb"],"target_polycount":6000}}
+{
+  "asset_id": "hull_tendril_kit_v1",
+  "candidate_count": 3,
+  "contract_sha256": "d5139bbbffaa0a5e2f6628efd9f62f91060fcfa9d2b2ac58d430e0d8116533f0",
+  "cost_per_candidate": 5,
+  "endpoint": "/openapi/v1/image-to-3d",
+  "maximum_credits": 15,
+  "pricing_checked_at": "2026-08-31",
+  "pricing_expires_at": "2026-09-30",
+  "pricing_id": "meshy_api_2026_08_31",
+  "pricing_sha256": "b2c729a587fd2e69bc1ea93a90379fd1d6ad2b6eb589736c03b8501fe2369413",
+  "pricing_source_url": "https://docs.meshy.ai/api/pricing.md",
+  "prompt_packet_sha256": "bcadbd99902646bf931daf95f33e4cef13eba5f6d8ec4f142354e98b136e0c59",
+  "prompt_profile_id": "synaptic_sea_derelict_v1",
+  "prompt_profile_sha256": "b8abb9cf4c9bfb4f1cceb254a30b255da4553e70daae5489cb330739b4aa4254",
+  "references_resolved": false,
+  "request": {
+    "ai_model": "meshy-t2",
+    "model_type": "smart-topology",
+    "should_texture": false,
+    "target_formats": [
+      "glb"
+    ],
+    "target_polycount": 6000
+  },
+  "required_views": [
+    "front",
+    "side",
+    "back",
+    "three_quarter"
+  ]
+}

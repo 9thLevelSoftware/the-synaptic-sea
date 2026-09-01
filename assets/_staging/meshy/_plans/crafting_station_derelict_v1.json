@@ -1,1 +1,32 @@
-{"asset_id":"crafting_station_derelict_v1","candidate_count":4,"endpoint":"/openapi/v1/image-to-3d","estimated_cost":40,"estimated_cost_per_candidate":10,"maximum_credits":40,"prompt_packet_sha256":"0825f3d8618ddc8180297dcb973196179336002c17be3e2c4020e67b4e0104ca","request":{"ai_model":"meshy-t2","model_type":"smart-topology","should_texture":false,"target_formats":["glb"],"target_polycount":6000}}
+{
+  "asset_id": "crafting_station_derelict_v1",
+  "candidate_count": 4,
+  "contract_sha256": "6d859276ccc48d6350728c79617433f6f4da0cf9fdf0de35233c05be6f9a0ea8",
+  "cost_per_candidate": 5,
+  "endpoint": "/openapi/v1/image-to-3d",
+  "maximum_credits": 20,
+  "pricing_checked_at": "2026-08-31",
+  "pricing_expires_at": "2026-09-30",
+  "pricing_id": "meshy_api_2026_08_31",
+  "pricing_sha256": "b2c729a587fd2e69bc1ea93a90379fd1d6ad2b6eb589736c03b8501fe2369413",
+  "pricing_source_url": "https://docs.meshy.ai/api/pricing.md",
+  "prompt_packet_sha256": "53cc60619e4b2b326b3598e4459ecd6cee858ba2e5e77b8d14d0f5e12605a510",
+  "prompt_profile_id": "synaptic_sea_derelict_v1",
+  "prompt_profile_sha256": "b8abb9cf4c9bfb4f1cceb254a30b255da4553e70daae5489cb330739b4aa4254",
+  "references_resolved": false,
+  "request": {
+    "ai_model": "meshy-t2",
+    "model_type": "smart-topology",
+    "should_texture": false,
+    "target_formats": [
+      "glb"
+    ],
+    "target_polycount": 6000
+  },
+  "required_views": [
+    "front",
+    "side",
+    "back",
+    "three_quarter"
+  ]
+}

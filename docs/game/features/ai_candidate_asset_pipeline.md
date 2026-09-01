@@ -2,10 +2,11 @@
 
 ## Status
 
-Approved as Task 1 governance. Implementation of the contract, staging adapter, Blender
-validator, runtime-review harness, and skill pressure tests is pending the later tasks in the
-Meshy-to-Blender implementation plan. Task 1 changes documentation only; it does not create,
-import, generate, promote, or modify any asset or runtime file.
+Implemented and host-verified at toolchain snapshot commit
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. This document records the current CLI and runtime
+contracts. Real provider tasks, downloaded candidates, external Blender masters, and six-case
+candidate runtime captures remain intentionally reserved for the post-PR live pilot; this
+documentation refresh performs no provider call or promotion.
 
 ## Scope
 
@@ -22,8 +23,8 @@ Meshy is a candidate generator only. It cannot author structural floors, walls, 
 sockets, collision, or damage topology. A raw candidate never becomes a runtime asset by
 being downloaded, selected, textured, or opened by a Godot bridge.
 
-Task 1 establishes the documentation and ownership boundary. Later implementation tasks may
-add tools and tests, but they must preserve this scope and the protected-path rules below.
+The implemented tools and tests preserve this scope and the protected-path rules below. A real
+candidate lifecycle is a separate post-PR pilot and cannot be inferred from host-only evidence.
 
 ## Authority and ownership
 
@@ -93,16 +94,18 @@ explicit diff and complete provenance.
 
 ## Contract-first and provider gates
 
-Before any Meshy API call, all of the following must be present and valid:
+The project has standing subscription authorization for post-PR testing. Spend, cap, and account
+bookkeeping do not block that testing, but authorization never waives request integrity or any
+evidence gate. Before any Meshy API call, all of the following must be present and valid:
 
 1. The repository asset contract validates without unknown fields, invalid dimensions, or an
    unsupported category/state/generation policy.
 2. Required reference images are separate files, consistent with one another, rights-cleared,
    hash-recorded, and free of collage substitution.
-3. A live Meshy balance has been checked.
-4. An explicit maximum credit ceiling has been approved for the requested batch, and the
-   provider estimate is within both the balance and that ceiling.
-5. An immutable request record is created before submission. It records the exact validated
+3. A read-only plan is current, and its `maximum_credits` is passed as the required
+   `--approved-credits` request-envelope/integrity field. This value is not renewed human spend
+   approval; materially changed requests are replanned.
+4. An immutable request record is created before submission. It records the exact validated
    request and hashes but never stores API keys, authorization headers, or signed download
    URLs.
 
@@ -114,9 +117,17 @@ Later contract/schema work must also preserve two shape constraints for the pilo
   deliverables with explicit `deliverables`/`kit_parts` arrays, including module and state
   coverage needed by Blender and Godot review.
 
-No API call is permitted without a validated contract, validated reference rights, a live
-balance, an explicit maximum credit ceiling, and an immutable request record. A dry-run plan
-is read-only and makes no API call.
+No API call is permitted without a validated contract, validated reference rights, the required
+`--approved-credits` integrity field, and an immutable request record. A dry-run plan is read-only
+and makes no provider call; its current `references_resolved=false` result truthfully records that
+rights-cleared reference files are absent until the live pilot.
+
+Each `generate` operation creates one governed batch containing exactly the contract's
+`candidate_count` planned candidate task records. `loot_container_derelict_v1` therefore uses one
+batch with four candidate records. Each planned candidate record allows exactly one paid creation
+POST attempt. A timeout, transport failure, `429`, `5xx`, or other ambiguous creation outcome is
+reconciled from the immutable journal and is never automatically retried. One selected Blender
+master derives all alternate states; single-attempt safety never reduces candidate cardinality.
 
 Candidates are staged in isolation and must be selected before Blender cleanup. Geometry is
 judged before optional texturing. Alternate states are derived from one Blender master; the
@@ -172,7 +183,7 @@ surface, but it must not mutate the live catalogs, generated index, wrapper scen
 data. Any proposed sidecar/index/catalog change is emitted as a reviewable promotion packet;
 it is not applied by the generator.
 
-## Promotion proposal packets (Task 10)
+## Promotion proposal packets
 
 Promotion is a proposal-producing boundary, not a promotion command. Run
 `tools/meshy_promotion_packet.py` only against a completed task directory below
@@ -242,8 +253,8 @@ visual GLB into collision, navigation, socket, or integrity data.
 
 ## Acceptance criteria
 
-Task 1 is accepted when the repository documentation makes all of the following testable and
-unambiguous:
+This feature is accepted when the repository documentation makes all of the following testable
+and unambiguous:
 
 - The authority chain is contract-first, candidate-only, Blender-canonical, staged-validation-
   gated, runtime-reviewed in a temporary overlay, and promotion-separated.
@@ -254,97 +265,96 @@ unambiguous:
 - Godot wrappers/runtime data explicitly own collision, navigation, sockets, integrity,
   VFX/animation integration, and gameplay bindings.
 - The five pilot IDs are present exactly as listed above.
-- No provider call can proceed without the contract, reference rights, live balance, explicit
-  maximum credit ceiling, and immutable request record gates.
+- No provider call can proceed without the contract, reference rights, the plan's
+  `--approved-credits` request-integrity field, and immutable request-record gates. Standing
+  subscription authorization removes spend bookkeeping as a human blocker; it does not remove
+  any integrity, review, or protected-path gate.
 - No generator path can write to any protected runtime surface.
 - Runtime review is pinned to seeds `42` and `777` in `breach_field` under `normal`,
   `emergency`, and `dark` lighting.
 - Promotion is documented as a separate reviewed task, never automatic.
-- Requirements `REQ-AIAP-001` through `REQ-AIAP-010` each have a later executable gate or
-  explicitly labeled pending validation command.
+- Requirements `REQ-AIAP-001` through `REQ-AIAP-010` each have an executable gate in the current
+  toolchain or a clearly identified post-PR live-pilot evidence limitation.
 - The later skill pressure tests must demonstrate the same refusals and routing rules, not
   merely repeat prose.
 - Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines block runtime acceptance unless
   the existing validation plan explicitly classifies that exact output. A passing marker or
   zero exit code alone does not override an unclassified diagnostic.
 
-## Validation placeholders (pending later implementation tasks)
+## Current validation and command surfaces
 
-The commands below are the eventual gates. They are intentionally **PENDING** in Task 1;
-they must not be reported as currently passing until their implementation tasks land and
-fresh output is captured.
-
-### Contract and focused Python tests — PENDING Tasks 2–7, 9–11
+The current host-Python lifecycle is plan → generate → resume/verify → candidate review →
+Blender master and validator → optional texture packet after selection/UV → runtime review →
+evidence binder → proposal only. Run commands from the repository root:
 
 ```bash
-python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json
-python3 -m pytest -q \
-  tests/test_meshy_asset_contract.py \
-  tests/test_meshy_stage.py \
-  tests/test_meshy_candidate_review.py \
-  tests/test_meshy_blender_tools.py \
-  tests/test_meshy_texture_packet.py \
-  tests/test_meshy_promotion_packet.py \
-  tests/test_meshy_runtime_review.py \
-  tests/test_validate_prop_visual_bindings.py \
-  tests/test_prop_visual_metadata.py
+/usr/bin/python3 tools/meshy_stage.py plan --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json
+/usr/bin/python3 tools/meshy_stage.py generate --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --approved-credits <maximum_credits> --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+/usr/bin/python3 tools/meshy_stage.py resume --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --approved-credits <maximum_credits> \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+/usr/bin/python3 tools/meshy_stage.py verify --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --pricing-file data/asset_generation/meshy_pricing_v1.json
 ```
 
-### Blender normalized-GLB validator — PENDING Task 8
+After a candidate is selected and its Blender UV pass is complete, the remaining host launchers
+are:
 
 ```bash
-BLENDER="${BLENDER:-/opt/homebrew/bin/blender}"
-"$BLENDER" --background --factory-startup --python tools/meshy_blender_validate.py -- \
-  --project-root . \
-  --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
-  --task-dir assets/_staging/meshy/loot_container_derelict_v1/<task-id> \
-  --glb assets/_staging/meshy/loot_container_derelict_v1/<task-id>/cleaned.glb
+/usr/bin/python3 tools/meshy_candidate_review.py select --project-root . --task-dir "<task_dir>" \
+  --reviewer "<reviewer>" --check silhouette_readable --check proportions_match_contract \
+  --check functional_volume_present --check movable_parts_separable --check cleanup_bounded \
+  --check camera_readability
+/usr/bin/python3 tools/meshy_blender_master.py --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+  --reviewer "<reviewer>"
+/usr/bin/python3 tools/meshy_blender_validate.py --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+  --glb <task_dir>/cleaned.glb --report <task_dir>/blender-validation.json
+/usr/bin/python3 tools/meshy_texture_packet.py --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+  --material-family <family> --resolution 1024 --reviewer "<reviewer>" --approved-credits 10
+/usr/bin/python3 tools/meshy_runtime_review.py --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
+  --preview-dir "artifacts/validation-previews/meshy/<asset_id>"
+/usr/bin/python3 tools/meshy_candidate_review.py bind --project-root . --task-dir "<task_dir>"
+/usr/bin/python3 tools/meshy_promotion_packet.py prop --project-root . --task-dir "<task_dir>" \
+  --target-path res://assets/imported/props/dressing/<asset_id>.sidecar.json
 ```
 
-Expected eventual marker (not a Task 1 result):
+The host toolchain evidence is current at commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`:
+the focused Meshy suite completed 340 tests in 185.67 seconds, and the real Blender focused
+tests passed 2 tests for valid re-import/publication and non-affine rejection. The real candidate
+lifecycle is not claimed here: no Meshy task directory, raw/cleaned GLB, generation/review
+record, external Blender master, or six runtime captures exists until the post-PR live pilot.
+
+The runtime marker requires task identity:
 
 ```text
-MESHY BLENDER VALIDATION PASS asset=loot_container_derelict_v1 triangles=<n> materials=<n>
+MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
 ```
 
-### Locked-isometric runtime review — PENDING Task 11
-
-```bash
-python3 tools/meshy_runtime_review.py \
-  --project-root . \
-  --contract data/asset_generation/contracts/stalker_v1.json \
-  --task-dir assets/_staging/meshy/stalker_v1/<task-id> \
-  --preview-dir artifacts/validation-previews/meshy/stalker_v1
-```
-
-The eventual harness must run exactly six real-environment cases: seeds `42` and `777`, each
-under `normal`, `emergency`, and `dark` lighting, in `breach_field` with the production
-locked-isometric camera. It must publish captures only after all six cases pass and after
-checking for unexpected diagnostics. Expected eventual marker (not a Task 1 result):
-
-```text
-MESHY RUNTIME REVIEW PASS asset=stalker_v1 seeds=42,777 lighting=normal,emergency,dark captures=6
-```
-
-### Existing Godot regression smokes — PENDING integration of Task 11
-
-These are existing production-environment smokes and remain regression evidence; Task 1 does
-not claim them as newly passing:
-
-```bash
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
-"$GODOT" --headless --path . --script res://scripts/validation/threat_visual_catalog_smoke.gd
-"$GODOT" --headless --path . --script res://scripts/validation/structural_live_loader_smoke.gd
-"$GODOT" --headless --path . --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
-```
-
-The full existing regression bundle remains governed by `docs/game/06_validation_plan.md`.
-Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output from these or the future review
-harness blocks acceptance unless that exact output is already classified there.
+Existing Godot regression smokes remain regression evidence and must use the current validation
+plan. Unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks acceptance unless that
+exact output is classified there. A pass marker or zero exit code does not override an
+unclassified diagnostic.
 
 ## Non-goals
 
-- Meshy generation, API calls, paid credit spend, or reference upload during Task 1.
+- Meshy generation, API calls, paid credit spend, or reference upload during this documentation
+  refresh.
 - Treating raw Meshy output as a runtime source or production Godot import route.
 - Meshy cannot author structural floors, walls, doors, ramps, sockets, collision, or damage
   topology.
@@ -362,17 +372,17 @@ harness blocks acceptance unless that exact output is already classified there.
 |---|---|
 | Attractive candidate bypasses the contract | Validate category, dimensions, states, axes, budgets, and provenance before selection or cleanup. |
 | Inconsistent or unlicensed references | Require separate, consistent images, explicit rights, and input hashes before any provider call. |
-| Unbounded paid spend | Check live balance and enforce an explicit maximum credit ceiling before immutable submission. |
+| Duplicate or ambiguous paid submission | Bind the plan's `maximum_credits` to required `--approved-credits` request integrity, allow one creation POST per planned candidate record, and reconcile ambiguity without automatic retry. |
 | Candidate or provider writes into runtime | Use isolated staging, path containment, protected-surface snapshots, and proposal-only promotion output. |
 | Blender cleanup drifts from gameplay | Keep collision, navigation, sockets, integrity, VFX/animation integration, and bindings in Godot wrappers/runtime data. |
 | Refresh erases provenance | Reconcile through ADR-0052's explicit refresh-preservation rule for authored fields and extensions. |
 | Review passes in the wrong visual context | Run seeds `42` and `777` in `breach_field` under all three lighting modes with the production locked-isometric camera. |
 | Diagnostics are mistaken for harmless noise | Treat every unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` as a blocker unless the validation plan classifies it. |
-| Skill advice diverges from repository enforcement | Task 12 pressure-tests the umbrella skill against the same contract, cost, staging, ownership, and promotion gates. |
+| Skill advice diverges from repository enforcement | Pressure-test the umbrella skill against the same contract, request-integrity, staging, ownership, and promotion gates. |
 
 ## Related records
 
-- ADR: `docs/game/adr/0057-meshy-candidates-blender-authority.md`
+- ADR: `docs/game/adr/0058-meshy-candidates-blender-authority.md`
 - Existing prop metadata authority: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`
 - Existing prop feature contract: `docs/game/features/asset_metadata_pipeline.md`
 - Requirements: `REQ-AIAP-001` through `REQ-AIAP-010` in `docs/game/05_requirements.md`
