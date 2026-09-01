@@ -613,6 +613,7 @@ print('TASK2_JSON='+json.dumps({'authored':bool(obj and obj.get('authored_collid
 def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(tmp_path: Path) -> None:
     blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
     assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_blender_master
     from tools import meshy_loot_container_recipe as recipe
 
     contract = load_contract(CONTRACT_PATH)
@@ -639,6 +640,31 @@ def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(t
     )
 
     first = recipe.run_blender_recipe(paths, contract, "preview")
+    seed_expression = """import bpy
+owner='loot_container_derelict_v1'
+def mark(datablock):
+    datablock['meshy_recipe_owner']=owner
+    return datablock
+mesh=mark(bpy.data.meshes.new('StaleOwnedMesh.001'))
+obj=mark(bpy.data.objects.new('ContainerRoot.001', mesh))
+bpy.data.collections['WORKING'].objects.link(obj)
+camera_data=mark(bpy.data.cameras.new('RecipeCamera.001'))
+camera=mark(bpy.data.objects.new('RecipeCamera.001', camera_data))
+bpy.context.scene.collection.objects.link(camera)
+light_data=mark(bpy.data.lights.new('RecipeStudioLight.001', type='AREA'))
+light=mark(bpy.data.objects.new('RecipeStudioLight.001', light_data))
+bpy.context.scene.collection.objects.link(light)
+mark(bpy.data.actions.new('lid_open.001'))
+mark(bpy.data.materials.new('painted_ship_alloy.001'))
+mark(bpy.data.meshes.new('LootRecipeOrphanMesh'))
+bpy.ops.wm.save_as_mainfile(filepath=r'''%s''')""" % str(master)
+    seeded = meshy_blender_master._run_bounded_process(
+        [str(blender), "--background", str(master), "--python-expr", seed_expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    assert seeded.returncode == 0, seeded.stderr
+
     second = recipe.run_blender_recipe(paths, contract, "preview")
     for result in (first, second):
         assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
@@ -660,12 +686,16 @@ datablocks={
     'cameras':[camera for camera in bpy.data.cameras],
     'lights':[light for light in bpy.data.lights],
 }
+seeded_names={'ContainerRoot.001','RecipeCamera.001','RecipeStudioLight.001','lid_open.001','painted_ship_alloy.001','StaleOwnedMesh.001','LootRecipeOrphanMesh'}
 owned_suffixes=sorted(datablock.name for datablocks in datablocks.values() for datablock in datablocks if datablock.get('meshy_recipe_owner') == 'loot_container_derelict_v1' and datablock.name.endswith(('.001','.002')))
-print('TASK2_JSON='+json.dumps({'export_objects':[name for name in required if bpy.data.objects.get(name)],'recipe_objects':[name for name in recipe_objects if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions),'recipe_materials':[name for name in ['painted_ship_alloy','warning_accent'] if bpy.data.materials.get(name)],'working_scaffold':bool(bpy.data.objects.get('mesh_node_WORKING')),'owned_suffixes':owned_suffixes}))""",
+seeded_owner_datablocks=sorted(kind+':'+datablock.name for kind, datablocks in datablocks.items() for datablock in datablocks if datablock.get('meshy_recipe_owner') == 'loot_container_derelict_v1' and datablock.name in seeded_names)
+print('TASK2_JSON='+json.dumps({'export_objects':[name for name in required if bpy.data.objects.get(name)],'recipe_objects':[name for name in recipe_objects if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions),'recipe_materials':[name for name in ['painted_ship_alloy','warning_accent'] if bpy.data.materials.get(name)],'working_scaffold':bool(bpy.data.objects.get('mesh_node_WORKING')),'owned_suffixes':owned_suffixes,'seeded_owner_datablocks':seeded_owner_datablocks,'seeded_orphan_mesh':bool(bpy.data.meshes.get('LootRecipeOrphanMesh'))}))""",
     )
     assert master_info["export_objects"] == list(recipe.EXPORT_OBJECT_NAMES)
     assert master_info["recipe_objects"] == list(recipe.EXPORT_OBJECT_NAMES) + ["RecipeCamera", "RecipeStudioLight"]
     assert master_info["actions"] == ["lid_open"]
     assert master_info["recipe_materials"] == ["painted_ship_alloy", "warning_accent"]
     assert master_info["working_scaffold"] is False
+    assert master_info["seeded_orphan_mesh"] is False
+    assert master_info["seeded_owner_datablocks"] == []
     assert master_info["owned_suffixes"] == []

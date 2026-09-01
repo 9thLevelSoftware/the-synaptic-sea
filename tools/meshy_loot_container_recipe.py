@@ -20,7 +20,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Mapping, Union
+from typing import Any, Collection, Mapping, Union
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -450,6 +450,13 @@ def _mark_recipe_owned(datablock: Any) -> Any:
     return datablock
 
 
+def _matches_generated_name(name: str, canonical_names: Collection[str]) -> bool:
+    if name in canonical_names:
+        return True
+    base, separator, suffix = name.rpartition(".")
+    return separator == "." and len(suffix) >= 3 and suffix.isdigit() and base in canonical_names
+
+
 def _preflight_generated_name_collisions(bpy: Any) -> None:
     generated = (
         ("object", bpy.data.objects, set(EXPORT_OBJECT_NAMES) | set(_BOX_PART_NAMES) | {"RecipeCamera", "RecipeStudioLight"}),
@@ -462,38 +469,43 @@ def _preflight_generated_name_collisions(bpy: Any) -> None:
         "{0} {1} is not recipe-owned".format(kind, datablock.name)
         for kind, datablocks, names in generated
         for datablock in datablocks
-        if datablock.name in names and not _recipe_owned(datablock)
+        if _matches_generated_name(datablock.name, names) and not _recipe_owned(datablock)
     ]
     if collisions:
         raise RuntimeError("generated-name collision: " + "; ".join(sorted(collisions)))
 
 
 def _remove_owned_objects(bpy: Any) -> None:
-    names = set(EXPORT_OBJECT_NAMES) | set(_BOX_PART_NAMES) | {
-        "RecipeCamera",
-        "RecipeStudioLight",
-    }
+    scaffold_data: list[tuple[str, Any]] = []
     for obj in list(bpy.data.objects):
-        object_name = obj.name
-        is_scaffold = object_name == "mesh_node_WORKING"
-        if not is_scaffold and (object_name not in names or not _recipe_owned(obj)):
+        is_scaffold = obj.name == "mesh_node_WORKING"
+        if not is_scaffold and not _recipe_owned(obj):
             continue
         obj_type = obj.type
         data = obj.data if obj_type in {"MESH", "CAMERA", "LIGHT"} else None
+        if is_scaffold and data is not None:
+            scaffold_data.append((obj_type, data))
         bpy.data.objects.remove(obj, do_unlink=True)
-        if data is not None and data.users == 0:
-            if is_scaffold or _recipe_owned(data):
-                if obj_type == "MESH":
-                    bpy.data.meshes.remove(data)
-                elif obj_type == "CAMERA":
-                    bpy.data.cameras.remove(data)
-                elif obj_type == "LIGHT":
-                    bpy.data.lights.remove(data)
+
+    for obj_type, data in scaffold_data:
+        if data.users != 0:
+            continue
+        if obj_type == "MESH":
+            bpy.data.meshes.remove(data)
+        elif obj_type == "CAMERA":
+            bpy.data.cameras.remove(data)
+        elif obj_type == "LIGHT":
+            bpy.data.lights.remove(data)
+
+    for datablocks in (bpy.data.meshes, bpy.data.cameras, bpy.data.lights):
+        for datablock in list(datablocks):
+            if _recipe_owned(datablock) and datablock.users == 0:
+                datablocks.remove(datablock)
     for action in list(bpy.data.actions):
-        if action.name == "lid_open" and _recipe_owned(action):
+        if _recipe_owned(action):
             bpy.data.actions.remove(action)
     for material in list(bpy.data.materials):
-        if material.name in _MANIFEST_MATERIALS and material.users == 0 and _recipe_owned(material):
+        if _recipe_owned(material):
             bpy.data.materials.remove(material)
 
 
