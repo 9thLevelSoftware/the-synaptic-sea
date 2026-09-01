@@ -120,8 +120,10 @@ Later contract/schema work must also preserve two shape constraints for the pilo
 
 The candidate plan's `maximum_credits` applies to `meshy_stage.py generate` and `resume`. The
 optional texture packet is proposal-only, uses a separate current 10-credit integrity estimate via
-`TEXTURE_APPROVED_CREDITS`, and does not create a provider task. It still requires selected
-candidate, Blender, and UV evidence and does not weaken task/artifact integrity.
+`TEXTURE_APPROVED_CREDITS`, and does not create a provider task. The texture packet's
+`--approved-credits` value must be greater than or equal to the current fixed 10-credit estimate,
+so `TEXTURE_APPROVED_CREDITS` must be `10` or greater. It still requires selected candidate,
+Blender, and UV evidence and does not weaken task/artifact integrity.
 
 No API call is permitted without a validated contract, validated reference rights, the required
 `--approved-credits` integrity field, and an immutable request record. A dry-run plan is read-only

@@ -94,8 +94,10 @@ and artifact identity, selected/SUCCEEDED evidence, Blender re-import, runtime r
 and protected-path gates remain mandatory.
 
 The optional texture packet is proposal-only, uses a separate current 10-credit integrity estimate
-via `TEXTURE_APPROVED_CREDITS`, and does not create a provider task. It still requires selected
-candidate, Blender, and UV evidence and does not weaken task/artifact integrity.
+via `TEXTURE_APPROVED_CREDITS`, and does not create a provider task. The texture packet's
+`--approved-credits` value must be greater than or equal to the current fixed 10-credit estimate,
+so `TEXTURE_APPROVED_CREDITS` must be `10` or greater. It still requires selected candidate,
+Blender, and UV evidence and does not weaken task/artifact integrity.
 
 The request and generation records must not contain API keys, authorization headers, signed URLs,
 or other secrets. Generation output is staged atomically and records provider/model/task

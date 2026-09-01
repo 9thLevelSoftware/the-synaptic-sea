@@ -64,8 +64,10 @@ Run from the repository root. The candidate plan's `maximum_credits` applies to
 plan value as a request-envelope/integrity check. This candidate-plan equality does not apply to
 the optional texture packet. Standing subscription authorization means spend and cap bookkeeping
 are not a human blocker. The optional texture packet is proposal-only, uses a separate current
-10-credit integrity estimate, and does not create a provider task. It still requires selected
-candidate, Blender, and UV evidence and does not weaken task/artifact integrity. The lifecycle is
+10-credit integrity estimate, and does not create a provider task. The texture packet's `--approved-credits`
+value must be greater than or equal to the current fixed 10-credit estimate, so
+`TEXTURE_APPROVED_CREDITS` must be `10` or greater. It still requires selected candidate, Blender,
+and UV evidence and does not weaken task/artifact integrity. The lifecycle is
 plan → generate → resume/verify → candidate review → Blender master and validator → optional
 texture packet after selection/UV → runtime review → binder → proposal only:
 
