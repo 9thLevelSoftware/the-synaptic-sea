@@ -1003,6 +1003,7 @@ def _atomic_write_payload(
     project_root: Union[str, os.PathLike],
     allowed_root: Union[str, os.PathLike],
     mode: int = 0o600,
+    replace: bool = True,
 ) -> None:
     """Publish bytes only through a pinned allowed directory FD."""
 
@@ -1027,6 +1028,8 @@ def _atomic_write_payload(
         raise ValueError("Meshy output must have a file name")
 
     identities = _snapshot_identities(target, "Meshy output")
+    if not replace and identities.get(target.parts) is not None:
+        raise ValueError("Meshy output target already exists")
     hook = _ATOMIC_VALIDATION_HOOK
     if hook is not None:
         hook(target)
@@ -1048,12 +1051,20 @@ def _atomic_write_payload(
         finally:
             os.close(temporary_fd)
             temporary_fd = None
-        os.replace(
-            temporary_name,
-            target.name,
-            src_dir_fd=directory_fd,
-            dst_dir_fd=directory_fd,
-        )
+        if replace:
+            os.replace(
+                temporary_name,
+                target.name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+        else:
+            _rename_noreplace(
+                directory_fd,
+                temporary_name,
+                target.name,
+                "Meshy output target",
+            )
         temporary_name = None
         os.fsync(directory_fd)
     except BaseException as exc:
@@ -1130,7 +1141,13 @@ def _fsync_directory_tree(directory_fd: int) -> None:
             raise OSError("Meshy task source contains a non-regular entry")
 
 
-def _rename_directory_noreplace(parent_fd: int, source_name: str, final_name: str) -> None:
+def _rename_noreplace(
+    parent_fd: int,
+    source_name: str,
+    final_name: str,
+    label: str,
+    unavailable_message: str = "Meshy publication requires an exclusive rename primitive",
+) -> None:
     """Use the platform's directory-relative exclusive rename primitive."""
 
     libc = ctypes.CDLL(None, use_errno=True)
@@ -1149,7 +1166,7 @@ def _rename_directory_noreplace(parent_fd: int, source_name: str, final_name: st
             return
         error_number = ctypes.get_errno()
         if error_number == errno.EEXIST:
-            raise ValueError("Meshy final task directory appeared during publication")
+            raise ValueError(f"{label} appeared during publication")
         raise OSError(error_number, os.strerror(error_number))
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is not None:
@@ -1166,11 +1183,23 @@ def _rename_directory_noreplace(parent_fd: int, source_name: str, final_name: st
             return
         error_number = ctypes.get_errno()
         if error_number == errno.EEXIST:
-            raise ValueError("Meshy final task directory appeared during publication")
+            raise ValueError(f"{label} appeared during publication")
         raise OSError(error_number, os.strerror(error_number))
     # No portable exclusive primitive is safe to emulate with os.rename:
     # that call replaces an existing destination.  Fail closed instead.
-    raise OSError("Meshy publication requires an exclusive directory rename primitive")
+    raise OSError(unavailable_message)
+
+
+def _rename_directory_noreplace(parent_fd: int, source_name: str, final_name: str) -> None:
+    """Use the platform's directory-relative exclusive rename primitive."""
+
+    _rename_noreplace(
+        parent_fd,
+        source_name,
+        final_name,
+        "Meshy final task directory",
+        "Meshy publication requires an exclusive directory rename primitive",
+    )
 
 
 def atomic_publish_directory(
@@ -1289,6 +1318,25 @@ def atomic_write_bytes(
     """Publish exact bytes through the same pinned-FD path as JSON."""
 
     _atomic_write_payload(path, payload, project_root, allowed_root, mode=mode)
+
+
+def atomic_create_bytes(
+    path: Union[str, os.PathLike],
+    payload: bytes,
+    project_root: Union[str, os.PathLike],
+    allowed_root: Union[str, os.PathLike],
+    mode: int = 0o600,
+) -> None:
+    """Atomically create exact bytes without replacing an existing leaf."""
+
+    _atomic_write_payload(
+        path,
+        payload,
+        project_root,
+        allowed_root,
+        mode=mode,
+        replace=False,
+    )
 
 
 def atomic_write_json(
@@ -1417,6 +1465,7 @@ __all__ = [
     "ProtectedSurfaceRecord",
     "PublicationUncertainError",
     "atomic_publish_directory",
+    "atomic_create_bytes",
     "atomic_write_bytes",
     "atomic_write_json",
     "credit_lock",

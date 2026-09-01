@@ -1914,7 +1914,7 @@ def test_r9_archive_before_outputs_crash_is_retryable(
     tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
-    original = stage_module._write_artifact_bytes
+    original = stage_module._create_artifact_bytes
     armed = {"value": True}
 
     def crash(preflight: Any, directory: Path, name: str, payload: bytes) -> None:
@@ -1923,7 +1923,7 @@ def test_r9_archive_before_outputs_crash_is_retryable(
             raise RuntimeError("injected after archive")
         original(preflight, directory, name, payload)
 
-    monkeypatch.setattr(stage_module, "_write_artifact_bytes", crash)
+    monkeypatch.setattr(stage_module, "_create_artifact_bytes", crash)
     with pytest.raises(RuntimeError, match="injected after archive"):
         stage_module.continue_batch(
             valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
@@ -1936,7 +1936,7 @@ def test_r9_archive_before_outputs_crash_is_retryable(
     assert not (task_dir / "thumbnail.png").exists()
     assert json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))["status"] == "FAILED"
 
-    monkeypatch.setattr(stage_module, "_write_artifact_bytes", original)
+    monkeypatch.setattr(stage_module, "_create_artifact_bytes", original)
     retry_client = FakeMeshyClient()
     retry_client._task_counter = 100
     retry = stage_module.continue_batch(
@@ -1964,6 +1964,64 @@ def test_r9_one_preexisting_matching_output_is_reused(
     assert result["pass"] is True
     assert (task_dir / "raw.glb").read_bytes() == raw
     assert (task_dir / "thumbnail.png").is_file()
+
+
+def test_r9_recovery_rejects_raw_leaf_appearing_before_exclusive_publish(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    generation_before = (task_dir / "generation.json").read_bytes()
+    journal_before = journal_path.read_bytes()
+    attacker = b"attacker-owned-raw"
+    real_create = stage_module.governance.atomic_create_bytes
+
+    def create_after_raw_appearance(path: Path, payload: bytes, *args: Any, **kwargs: Any) -> None:
+        if Path(path).name == "raw.glb":
+            Path(path).write_bytes(attacker)
+            os.chmod(path, 0o600)
+        return real_create(path, payload, *args, **kwargs)
+
+    monkeypatch.setattr(stage_module.governance, "atomic_create_bytes", create_after_raw_appearance)
+    with pytest.raises(ValueError, match="appeared|exists|recovery output|output"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+        )
+
+    assert (task_dir / "raw.glb").read_bytes() == attacker
+    assert (task_dir / "raw.glb").stat().st_mode & 0o777 == 0o600
+    assert (task_dir / "generation.json").read_bytes() == generation_before
+    assert journal_path.read_bytes() == journal_before
+    assert not (task_dir / "thumbnail.png").exists()
+
+
+def test_r9_recovery_rejects_failed_archive_appearing_before_exclusive_publish(
+    tmp_path: Path, valid_contract: AssetContract, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generated, journal_path, task_dir, generation_kwargs = _historical_failed_batch(tmp_path, valid_contract)
+    generation_before = (task_dir / "generation.json").read_bytes()
+    journal_before = journal_path.read_bytes()
+    attacker = b"attacker-owned-archive"
+    real_create = stage_module.governance.atomic_create_bytes
+
+    def create_after_archive_appearance(path: Path, payload: bytes, *args: Any, **kwargs: Any) -> None:
+        if Path(path).name == "generation.failed.json":
+            Path(path).write_bytes(attacker)
+            os.chmod(path, 0o600)
+        return real_create(path, payload, *args, **kwargs)
+
+    monkeypatch.setattr(stage_module.governance, "atomic_create_bytes", create_after_archive_appearance)
+    with pytest.raises(ValueError, match="appeared|exists|generation.failed"):
+        stage_module.continue_batch(
+            valid_contract, tmp_path, FakeMeshyClient(), journal_path, 100, **generation_kwargs
+        )
+
+    archive = task_dir / "generation.failed.json"
+    assert archive.read_bytes() == attacker
+    assert archive.stat().st_mode & 0o777 == 0o600
+    assert (task_dir / "generation.json").read_bytes() == generation_before
+    assert journal_path.read_bytes() == journal_before
+    assert not (task_dir / "raw.glb").exists()
+    assert not (task_dir / "thumbnail.png").exists()
 
 
 def test_r9_suffix_published_before_journal_update_is_reconciled(

@@ -382,6 +382,68 @@ def test_atomic_write_bytes_publishes_exact_bytes_with_private_mode(tmp_path: Pa
     assert not list(target.parent.glob(".*.tmp"))
 
 
+def test_atomic_create_bytes_rejects_existing_leaf_without_replacing_it(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    target = root / STAGING / "tasks" / "payload.bin"
+    target.parent.mkdir()
+    target.write_bytes(b"existing")
+
+    with pytest.raises(ValueError, match="appeared|exists"):
+        governance.atomic_create_bytes(
+            target,
+            b"replacement",
+            project_root=root,
+            allowed_root=root / STAGING,
+        )
+
+    assert target.read_bytes() == b"existing"
+    assert not list(target.parent.glob(".*.tmp"))
+
+
+def test_atomic_create_bytes_rejects_leaf_appearing_after_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_project(tmp_path)
+    target = root / STAGING / "tasks" / "payload.bin"
+    target.parent.mkdir()
+    real_create = governance._create_sibling_temp
+
+    def create_then_appear(parent_fd: int, target_name: str, mode: int):
+        descriptor, temporary_name = real_create(parent_fd, target_name, mode)
+        target.write_bytes(b"attacker-owned")
+        os.chmod(target, 0o600)
+        return descriptor, temporary_name
+
+    monkeypatch.setattr(governance, "_create_sibling_temp", create_then_appear)
+    with pytest.raises(ValueError, match="appeared|exists"):
+        governance.atomic_create_bytes(
+            target,
+            b"replacement",
+            project_root=root,
+            allowed_root=root / STAGING,
+        )
+
+    assert target.read_bytes() == b"attacker-owned"
+    assert not list(target.parent.glob(".*.tmp"))
+
+
+def test_atomic_create_bytes_publishes_exact_bytes_with_private_mode(tmp_path: Path) -> None:
+    root = make_project(tmp_path)
+    target = root / STAGING / "tasks" / "payload.bin"
+    payload = b"exclusive\x00exact"
+
+    governance.atomic_create_bytes(
+        target,
+        payload,
+        project_root=root,
+        allowed_root=root / STAGING,
+    )
+
+    assert target.read_bytes() == payload
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert not list(target.parent.glob(".*.tmp"))
+
+
 def test_atomic_publish_directory_renames_complete_private_tree(tmp_path: Path) -> None:
     root = make_project(tmp_path)
     parent = root / STAGING / "asset"

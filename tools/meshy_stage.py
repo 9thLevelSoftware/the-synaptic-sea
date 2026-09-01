@@ -1042,6 +1042,15 @@ def _write_artifact_bytes(preflight: _Preflight, task_dir: Path, name: str, payl
     )
 
 
+def _create_artifact_bytes(preflight: _Preflight, task_dir: Path, name: str, payload: bytes) -> None:
+    governance.atomic_create_bytes(
+        _artifact_path(preflight, task_dir, name),
+        payload,
+        project_root=preflight.root,
+        allowed_root=preflight.asset_root,
+    )
+
+
 def _validate_glb(payload: bytes) -> None:
     """Validate the complete GLB 2.0 container, not merely its magic bytes."""
 
@@ -2811,7 +2820,7 @@ def _publish_recovery_outputs(
         # Re-check a leaf that appeared after the initial all-leaves read;
         # never replace an existing artifact during recovery.
         if _validate_recovery_outputs(preflight, task_dir, {name: outputs[name]}):
-            _write_artifact_bytes(preflight, task_dir, name, outputs[name])
+            _create_artifact_bytes(preflight, task_dir, name, outputs[name])
 
 
 
@@ -2976,7 +2985,7 @@ def _recover_failed_task(
     missing = _validate_recovery_outputs(preflight, task_dir, outputs)
     archive = _validate_failed_archive(preflight, task_dir, failed_document, failed_bytes)
     if not os.path.lexists(str(archive)):
-        governance.atomic_write_bytes(
+        governance.atomic_create_bytes(
             archive,
             failed_bytes,
             project_root=preflight.root,
