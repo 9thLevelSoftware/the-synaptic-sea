@@ -10,16 +10,23 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import math
 import os
 import re
+import shutil
 import stat
-from dataclasses import dataclass
+import sys
+import tempfile
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Union
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from tools import meshy_governance as governance
-from tools.meshy_asset_contract import AssetContract, load_contract
+from tools.meshy_asset_contract import AssetContract, canonical_json_bytes, load_contract
 
 ASSET_ID = "loot_container_derelict_v1"
 SELECTED_TASK_ID = "01a05dcb-fc3b-7418-b105-2170af354088"
@@ -70,6 +77,17 @@ _MANIFEST_STATES = {"closed": 1, "open": 30, "looted": 60}
 _MANIFEST_HINGE = {"axis": "X", "open_degrees": 105.0}
 _MANIFEST_DIMENSIONS = (0.9, 0.55, 0.65)
 _MANIFEST_MATERIALS = ("painted_ship_alloy", "warning_accent")
+EXPORT_OBJECT_NAMES = (
+    "ContainerRoot",
+    "ContainerBody",
+    "HingePivot",
+    "ContainerLid",
+    "FrontHandle",
+    "LatchLeft",
+    "LatchRight",
+    "LootVisual",
+)
+RENDER_LEAVES = ("closed.png", "open.png", "looted.png", "states_contact_sheet.png")
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 _ALLOWED_MODES = frozenset(("preview", "publish-cleaned"))
 _MAX_GLB_BYTES = 512 * 1024 * 1024
@@ -275,7 +293,9 @@ def _check_hash(value: object, label: str, errors: list[str]) -> None:
         errors.append(f"{label} must be a lowercase 64-character SHA-256 hash")
 
 
-def validate_manifest_document(document: Mapping[str, Any]) -> list[str]:
+def validate_manifest_document(
+    document: Mapping[str, Any], expected_master_path: PathLike | None = None
+) -> list[str]:
     """Return deterministic diagnostics for the strict master manifest contract."""
 
     if not isinstance(document, Mapping):
@@ -303,7 +323,9 @@ def validate_manifest_document(document: Mapping[str, Any]) -> list[str]:
     _check_hash(document.get("contract_sha256"), "contract_sha256", errors)
     _check_hash(document.get("raw_sha256"), "raw_sha256", errors)
 
-    expected_master = str(_derive_master_path())
+    expected_master = str(
+        _derive_master_path() if expected_master_path is None else _lexical_path(expected_master_path)
+    )
     if document.get("master_path") != expected_master:
         errors.append("master_path must be the canonical external Blender master")
 
@@ -361,6 +383,601 @@ def validate_manifest_document(document: Mapping[str, Any]) -> list[str]:
     elif any(not isinstance(key, str) or not key for key in renders):
         errors.append("renders mapping keys must be non-empty strings")
     return sorted(set(errors))
+
+
+def validate_functional_evidence(evidence: Mapping[str, Any]) -> list[str]:
+    """Validate the small runtime inventory used to bind the one-state recipe."""
+
+    errors: list[str] = []
+    actions = evidence.get("action_names") if isinstance(evidence, Mapping) else None
+    if actions != ["lid_open"]:
+        errors.append("action_names must contain exactly one lid_open action")
+    objects = evidence.get("state_mesh_names") if isinstance(evidence, Mapping) else None
+    if objects != list(EXPORT_OBJECT_NAMES):
+        errors.append("state meshes must equal the functional export hierarchy without duplicates")
+    if isinstance(objects, list) and len(objects) != len(set(objects)):
+        errors.append("state meshes must not contain duplicates")
+    return sorted(set(errors))
+
+
+def _require_finished(result: Any, label: str) -> None:
+    try:
+        values = set(result)
+    except TypeError:
+        values = {str(result)}
+    if "FINISHED" not in values or "CANCELLED" in values or "ERROR" in values:
+        raise RuntimeError("Blender operator did not finish: {0} result={1!r}".format(label, values))
+
+
+def _ensure_collection(bpy: Any, scene: Any, name: str) -> Any:
+    collection = bpy.data.collections.get(name)
+    if collection is None:
+        collection = bpy.data.collections.new(name)
+    if scene.collection.children.get(name) is None:
+        scene.collection.children.link(collection)
+    return collection
+
+
+def _link_only(obj: Any, collection: Any) -> None:
+    for owner in list(obj.users_collection):
+        owner.objects.unlink(obj)
+    collection.objects.link(obj)
+
+
+def _remove_owned_objects(bpy: Any) -> None:
+    names = set(EXPORT_OBJECT_NAMES) | {
+        "mesh_node_WORKING",
+        "RecipeCamera",
+        "RecipeStudioLight",
+    }
+    for obj in list(bpy.data.objects):
+        if obj.name not in names:
+            continue
+        data = obj.data if obj.type == "MESH" else None
+        bpy.data.objects.remove(obj, do_unlink=True)
+        if data is not None and data.users == 0:
+            bpy.data.meshes.remove(data)
+    for action in list(bpy.data.actions):
+        if action.name == "lid_open":
+            bpy.data.actions.remove(action)
+    for material in list(bpy.data.materials):
+        if material.name in _MANIFEST_MATERIALS and material.users == 0:
+            bpy.data.materials.remove(material)
+
+
+def _make_material(bpy: Any, name: str, color: tuple[float, float, float, float], metallic: float, roughness: float) -> Any:
+    material = bpy.data.materials.get(name)
+    if material is None:
+        material = bpy.data.materials.new(name)
+    material.diffuse_color = color
+    material.use_nodes = True
+    node = material.node_tree.nodes.get("Principled BSDF")
+    if node is None:
+        raise RuntimeError("material has no Principled BSDF: " + name)
+    node.inputs["Base Color"].default_value = color
+    node.inputs["Metallic"].default_value = metallic
+    node.inputs["Roughness"].default_value = roughness
+    return material
+
+
+def _deselect_all(bpy: Any) -> None:
+    for obj in tuple(bpy.context.selected_objects):
+        obj.select_set(False)
+
+
+def _add_box(bpy: Any, name: str, center: tuple[float, float, float], size: tuple[float, float, float], collection: Any, material: Any, bevel: float = 0.0) -> Any:
+    _deselect_all(bpy)
+    _require_finished(bpy.ops.mesh.primitive_cube_add(size=1.0, location=center), "add box " + name)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = size
+    _require_finished(bpy.ops.object.transform_apply(location=False, rotation=False, scale=True), "apply box dimensions " + name)
+    _link_only(obj, collection)
+    obj.data.materials.append(material)
+    if bevel > 0.0:
+        modifier = obj.modifiers.new(name="PurposefulEdgeBevel", type="BEVEL")
+        modifier.width = min(float(bevel), 0.008)
+        modifier.segments = 1
+        modifier.limit_method = "ANGLE"
+        bpy.context.view_layer.objects.active = obj
+        _require_finished(bpy.ops.object.modifier_apply(modifier=modifier.name), "apply bevel " + name)
+    return obj
+
+
+def _join_as(bpy: Any, name: str, objects: list[Any]) -> Any:
+    if not objects:
+        raise RuntimeError("cannot join an empty object list")
+    _deselect_all(bpy)
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    _require_finished(bpy.ops.object.join(), "join " + name)
+    objects[0].name = name
+    return objects[0]
+
+
+def _build_body(bpy: Any, collection: Any, alloy: Any) -> Any:
+    parts = [
+        _add_box(bpy, "BodyFloor", (0.0, 0.0, 0.035), (0.90, 0.55, 0.07), collection, alloy, 0.006),
+        _add_box(bpy, "BodyFront", (0.0, -0.2625, 0.25), (0.90, 0.025, 0.36), collection, alloy, 0.006),
+        _add_box(bpy, "BodyRear", (0.0, 0.2625, 0.25), (0.90, 0.025, 0.36), collection, alloy, 0.006),
+        _add_box(bpy, "BodyLeft", (-0.4375, 0.0, 0.25), (0.025, 0.50, 0.36), collection, alloy, 0.006),
+        _add_box(bpy, "BodyRight", (0.4375, 0.0, 0.25), (0.025, 0.50, 0.36), collection, alloy, 0.006),
+    ]
+    return _join_as(bpy, "ContainerBody", parts)
+
+
+def _build_lid(bpy: Any, collection: Any, hinge: Any, alloy: Any) -> Any:
+    parts = [
+        _add_box(bpy, "LidTop", (0.0, 0.0, 0.60), (0.90, 0.55, 0.10), collection, alloy, 0.006),
+        _add_box(bpy, "LidFront", (0.0, -0.2625, 0.49), (0.90, 0.025, 0.12), collection, alloy, 0.006),
+        _add_box(bpy, "LidRear", (0.0, 0.2625, 0.49), (0.90, 0.025, 0.12), collection, alloy, 0.006),
+        _add_box(bpy, "LidLeft", (-0.4375, 0.0, 0.49), (0.025, 0.50, 0.12), collection, alloy, 0.006),
+        _add_box(bpy, "LidRight", (0.4375, 0.0, 0.49), (0.025, 0.50, 0.12), collection, alloy, 0.006),
+    ]
+    lid = _join_as(bpy, "ContainerLid", parts)
+    lid.parent = hinge
+    lid.matrix_parent_inverse = hinge.matrix_world.inverted()
+    return lid
+
+
+def _build_handle(bpy: Any, collection: Any, alloy: Any) -> Any:
+    parts = [
+        _add_box(bpy, "HandleLeft", (-0.19, -0.266, 0.29), (0.035, 0.018, 0.13), collection, alloy, 0.004),
+        _add_box(bpy, "HandleRight", (0.19, -0.266, 0.29), (0.035, 0.018, 0.13), collection, alloy, 0.004),
+        _add_box(bpy, "HandleGrip", (0.0, -0.266, 0.235), (0.38, 0.018, 0.035), collection, alloy, 0.004),
+    ]
+    return _join_as(bpy, "FrontHandle", parts)
+
+
+def _build_accents(bpy: Any, collection: Any, accent: Any) -> tuple[Any, Any, Any]:
+    left = _add_box(bpy, "LatchLeft", (-0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
+    right = _add_box(bpy, "LatchRight", (0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
+    loot = _add_box(bpy, "LootVisual", (0.0, 0.0, 0.12), (0.28, 0.18, 0.08), collection, accent, 0.004)
+    loot["wrapper_visibility"] = "open_unlooted_only"
+    return left, right, loot
+
+
+def _unwrap_object(bpy: Any, obj: Any) -> None:
+    _deselect_all(bpy)
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    _require_finished(bpy.ops.object.mode_set(mode="EDIT"), "enter edit mode for UV unwrap")
+    _require_finished(bpy.ops.mesh.select_all(action="SELECT"), "select mesh for UV unwrap")
+    _require_finished(bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.02), "smart project UVs")
+    _require_finished(bpy.ops.uv.pack_islands(margin=0.02), "pack UVs")
+    _require_finished(bpy.ops.object.mode_set(mode="OBJECT"), "leave edit mode for UV unwrap")
+    obj.select_set(False)
+
+
+def _build_animation(bpy: Any, hinge: Any, loot: Any, scene: Any) -> Any:
+    action = bpy.data.actions.new("lid_open")
+    hinge.rotation_mode = "XYZ"
+    hinge.animation_data_create()
+    hinge.animation_data.action = action
+    hinge.rotation_euler = (0.0, 0.0, 0.0)
+    if not hinge.keyframe_insert(data_path="rotation_euler", index=0, frame=1):
+        raise RuntimeError("could not keyframe closed hinge")
+    hinge.rotation_euler.x = math.radians(-105.0)
+    if not hinge.keyframe_insert(data_path="rotation_euler", index=0, frame=30):
+        raise RuntimeError("could not keyframe open hinge")
+    if not hinge.keyframe_insert(data_path="rotation_euler", index=0, frame=60):
+        raise RuntimeError("could not keyframe looted hinge")
+
+    # Blender 5.2 creates a second shared Action slot on the same Action when
+    # the second owner is keyed; this keeps visibility and hinge channels in
+    # exactly one lid_open Action.
+    loot.animation_data_create()
+    loot.animation_data.action = action
+    loot.hide_render = True
+    if not loot.keyframe_insert(data_path="hide_render", frame=1):
+        raise RuntimeError("could not keyframe hidden loot")
+    loot.hide_render = False
+    if not loot.keyframe_insert(data_path="hide_render", frame=30):
+        raise RuntimeError("could not keyframe visible loot")
+    loot.hide_render = True
+    if not loot.keyframe_insert(data_path="hide_render", frame=60):
+        raise RuntimeError("could not keyframe hidden looted loot")
+    scene.frame_set(1)
+    return action
+
+
+def _configure_preview_scene(bpy: Any, scene: Any, root: Any) -> None:
+    for obj in list(bpy.data.objects):
+        if obj.name in ("RecipeCamera", "RecipeStudioLight"):
+            bpy.data.objects.remove(obj, do_unlink=True)
+    camera_data = bpy.data.cameras.new("RecipeCamera")
+    camera = bpy.data.objects.new("RecipeCamera", camera_data)
+    scene.collection.objects.link(camera)
+    camera.location = (1.35, -1.35, 1.05)
+    target = (0.0, 0.0, 0.28)
+    direction = __import__("mathutils").Vector(target) - camera.location
+    camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+    camera_data.type = "ORTHO"
+    camera_data.ortho_scale = 1.22
+    scene.camera = camera
+
+    light_data = bpy.data.lights.new("RecipeStudioLight", type="AREA")
+    light = bpy.data.objects.new("RecipeStudioLight", light_data)
+    scene.collection.objects.link(light)
+    light.location = (1.5, -2.0, 3.0)
+    light_data.energy = 600.0
+    light_data.size = 4.0
+
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.render.resolution_x = 640
+    scene.render.resolution_y = 640
+    scene.render.resolution_percentage = 100
+    scene.render.film_transparent = False
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGBA"
+    scene.render.image_settings.color_depth = "8"
+    shading = scene.display.shading
+    shading.light = "STUDIO"
+    shading.studio_light = "paint.sl"
+    shading.color_type = "MATERIAL"
+    shading.show_shadows = True
+    shading.show_cavity = True
+    shading.cavity_type = "WORLD"
+    shading.curvature_ridge_factor = 1.5
+    shading.curvature_valley_factor = 1.0
+    shading.show_specular_highlight = True
+    if hasattr(shading, "background_type"):
+        shading.background_type = "WORLD"
+    scene.world.color = (0.035, 0.045, 0.055)
+    scene.view_settings.view_transform = "Standard"
+    try:
+        scene.view_settings.look = "Medium High Contrast"
+    except TypeError:
+        scene.view_settings.look = "None"
+    scene.view_settings.exposure = 0.0
+    scene.view_settings.gamma = 1.0
+    scene.frame_start = 1
+    scene.frame_end = 60
+    scene.frame_set(1)
+
+
+def _export_glb(bpy: Any, scene: Any, export_objects: list[Any], path: Path) -> None:
+    _deselect_all(bpy)
+    for obj in export_objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = export_objects[0]
+    scene.frame_set(1)
+    requested = {
+        "filepath": str(path),
+        "export_format": "GLB",
+        "use_selection": True,
+        "export_apply": True,
+        "export_extras": True,
+        "export_materials": "EXPORT",
+        "export_texcoords": True,
+        "export_animations": True,
+        "export_cameras": False,
+        "export_lights": False,
+        "export_current_frame": False,
+        "export_frame_range": True,
+    }
+    supported = {item.identifier for item in bpy.ops.export_scene.gltf.get_rna_type().properties}
+    kwargs = {key: value for key, value in requested.items() if key in supported}
+    for required in ("filepath", "export_format", "use_selection", "export_apply", "export_extras", "export_materials", "export_texcoords", "export_animations"):
+        if required not in kwargs:
+            raise RuntimeError("Blender GLB exporter lacks required option: " + required)
+    _require_finished(bpy.ops.export_scene.gltf(**kwargs), "selection-only GLB export")
+    if not path.is_file() or path.stat().st_size <= 20 or path.read_bytes()[:4] != b"glTF":
+        raise RuntimeError("Blender GLB export is stale, empty, or not GLB")
+
+
+def _render_states(bpy: Any, scene: Any, run_dir: Path) -> None:
+    for frame, leaf in ((1, "closed.png"), (30, "open.png"), (60, "looted.png")):
+        scene.frame_set(frame)
+        target = run_dir / leaf
+        scene.render.filepath = str(target)
+        _require_finished(bpy.ops.render.render(write_still=True), "render " + leaf)
+        if not target.is_file() or target.stat().st_size <= 0 or target.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+            raise RuntimeError("render output is stale or invalid: " + leaf)
+    scene.frame_set(1)
+
+
+def _mesh_triangles(obj: Any) -> int:
+    obj.data.calc_loop_triangles()
+    return len(obj.data.loop_triangles)
+
+
+def _bounds_for_meshes(mesh_objects: list[Any]) -> tuple[list[float], list[float]]:
+    points: list[tuple[float, float, float]] = []
+    for obj in mesh_objects:
+        for corner in obj.bound_box:
+            point = obj.matrix_world @ __import__("mathutils").Vector(corner)
+            points.append((float(point.x), float(point.y), float(point.z)))
+    if not points:
+        raise RuntimeError("re-imported GLB has no mesh geometry")
+    return [min(point[index] for point in points) for index in range(3)], [max(point[index] for point in points) for index in range(3)]
+
+
+def _fresh_glb_evidence(bpy: Any, glb_path: Path, raw_preserved: bool) -> dict[str, Any]:
+    _require_finished(bpy.ops.wm.read_factory_settings(use_empty=True), "fresh Blender scene for GLB re-import")
+    _require_finished(bpy.ops.import_scene.gltf(filepath=str(glb_path)), "fresh GLB re-import")
+    scene = bpy.context.scene
+    scene.frame_set(1)
+    objects = list(bpy.data.objects)
+    mesh_objects = [obj for obj in objects if obj.type == "MESH"]
+    minimum, maximum = _bounds_for_meshes(mesh_objects)
+    dimensions = [maximum[index] - minimum[index] for index in range(3)]
+    materials = sorted({material.name for obj in mesh_objects for material in obj.data.materials})
+    uvs_present = bool(mesh_objects) and all(bool(obj.data.uv_layers) for obj in mesh_objects)
+    triangles = sum(_mesh_triangles(obj) for obj in mesh_objects)
+    action_names = sorted(action.name for action in bpy.data.actions)
+    inventory = [name for name in EXPORT_OBJECT_NAMES if bpy.data.objects.get(name) is not None]
+    root = bpy.data.objects.get("ContainerRoot")
+    if root is None:
+        raise RuntimeError("fresh GLB re-import has no ContainerRoot")
+    return {
+        "action_names": action_names,
+        "state_mesh_names": inventory,
+        "object_inventory": inventory,
+        "triangle_count": triangles,
+        "materials": materials,
+        "uvs_present": uvs_present,
+        "dimensions_m": dimensions,
+        "root_location": [float(value) for value in root.location],
+        "raw_preserved": bool(raw_preserved),
+    }
+
+
+def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run_dir: Path) -> dict[str, Any]:
+    import bpy  # type: ignore
+
+    scene = bpy.context.scene
+    _remove_owned_objects(bpy)
+    export_collection = _ensure_collection(bpy, scene, "EXPORT")
+    source_raw = _ensure_collection(bpy, scene, "SOURCE_RAW")
+    _ensure_collection(bpy, scene, "WORKING")
+    _ensure_collection(bpy, scene, "SOCKETS_MARKERS")
+    raw_preserved = bool(bpy.data.objects.get("mesh_node") and source_raw.objects.get("mesh_node"))
+    marker_names = {obj.name for obj in bpy.data.objects if obj.name in {"ORIGIN_MARKER", "FORWARD_Z_MARKER", "OriginMarker", "ScaleMarker"}}
+    raw_preserved = raw_preserved and bool(marker_names)
+
+    alloy = _make_material(bpy, "painted_ship_alloy", (0.23, 0.29, 0.34, 1.0), 0.65, 0.48)
+    accent = _make_material(bpy, "warning_accent", (0.65, 0.18, 0.06, 1.0), 0.4, 0.42)
+    root = bpy.data.objects.new("ContainerRoot", None)
+    root.location = (0.0, 0.0, 0.0)
+    export_collection.objects.link(root)
+    root["required_states"] = "closed,open,looted"
+    root["default_state"] = "closed"
+    root["hinge_axis"] = "X"
+    root["hinge_open_degrees"] = 105.0
+    root["state_frames"] = "closed:1,open:30,looted:60"
+    root["collision_owner"] = "godot_wrapper"
+    root["source_provider"] = "meshy"
+    root["source_task_id"] = SELECTED_TASK_ID
+
+    hinge = bpy.data.objects.new("HingePivot", None)
+    hinge.location = (0.0, 0.245, 0.43)
+    hinge.parent = root
+    export_collection.objects.link(hinge)
+    body = _build_body(bpy, export_collection, alloy)
+    body.parent = root
+    lid = _build_lid(bpy, export_collection, hinge, alloy)
+    handle = _build_handle(bpy, export_collection, alloy)
+    left, right, loot = _build_accents(bpy, export_collection, accent)
+    for obj in (handle, left, right, loot):
+        obj.parent = root
+    meshes = [body, lid, handle, left, right, loot]
+    for mesh in meshes:
+        _unwrap_object(bpy, mesh)
+    action = _build_animation(bpy, hinge, loot, scene)
+    action_name = action.name
+    _configure_preview_scene(bpy, scene, root)
+    export_objects = [root, body, hinge, lid, handle, left, right, loot]
+    if tuple(obj.name for obj in export_objects) != EXPORT_OBJECT_NAMES:
+        raise RuntimeError("functional export hierarchy order drifted")
+    _render_states(bpy, scene, run_dir)
+    glb_path = run_dir / "cleaned.preview.glb"
+    _export_glb(bpy, scene, export_objects, glb_path)
+    scene.frame_set(1)
+    updated_master = run_dir / "updated_master.blend"
+    _require_finished(bpy.ops.wm.save_as_mainfile(filepath=str(updated_master)), "save updated Blender master")
+    if not updated_master.is_file() or updated_master.stat().st_size <= 0:
+        raise RuntimeError("updated Blender master was not saved")
+    source_material_names = sorted((alloy.name, accent.name))
+    source_master_inventory = sorted(obj.name for obj in bpy.data.objects)
+    evidence = _fresh_glb_evidence(bpy, glb_path, raw_preserved)
+    evidence["source_action_names"] = [action_name]
+    evidence["source_materials"] = source_material_names
+    evidence["master_object_inventory"] = source_master_inventory
+    evidence_path = run_dir / "runtime_evidence.json"
+    evidence_path.write_bytes(canonical_json_bytes(evidence))
+    if not evidence_path.is_file():
+        raise RuntimeError("runtime evidence was not written")
+    print("BLENDER LOOT RECIPE RUNTIME PASS")
+    return evidence
+
+
+def _hash_decoded_rgba(path: Path) -> str:
+    from PIL import Image
+
+    with Image.open(path) as image:
+        return hashlib.sha256(image.convert("RGBA").tobytes()).hexdigest()
+
+
+def _build_contact_sheet(run_dir: Path) -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    images = []
+    for leaf in ("closed.png", "open.png", "looted.png"):
+        with Image.open(run_dir / leaf) as image:
+            images.append(image.convert("RGBA"))
+    label_height = 40
+    sheet = Image.new("RGBA", (640 * 3, 640 + label_height), (22, 28, 34, 255))
+    draw = ImageDraw.Draw(sheet)
+    font = ImageFont.load_default()
+    for index, (label, image) in enumerate(zip(("CLOSED", "OPEN", "LOOTED"), images)):
+        x = index * 640
+        sheet.paste(image, (x, label_height))
+        draw.text((x + 12, 12), label, fill=(240, 240, 240, 255), font=font)
+    sheet.save(run_dir / "states_contact_sheet.png", format="PNG", optimize=False, compress_level=6)
+
+
+def _publish_leaf(path: Path, payload: bytes, label: str) -> None:
+    parent = path.parent
+    parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _reject_symlink_components(path, label)
+    try:
+        governance.atomic_write_bytes(path, payload, project_root=parent, allowed_root=parent, mode=0o600)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise ValueError(label + " publication failed") from exc
+    _regular_file(path, label)
+
+
+def _source_manifest_path(paths: RecipePaths) -> Path:
+    return paths.master_path.parent / "build_recipe_manifest.json"
+
+
+def _validate_runtime_evidence(evidence: Mapping[str, Any]) -> None:
+    errors = validate_functional_evidence(evidence)
+    if evidence.get("object_inventory") != list(EXPORT_OBJECT_NAMES):
+        errors.append("GLB object inventory is not the exact functional hierarchy")
+    if evidence.get("triangle_count", 0) > 1500:
+        errors.append("runtime triangle design target exceeded")
+    if evidence.get("materials") != list(_MANIFEST_MATERIALS):
+        errors.append("runtime material inventory is not the exact two-material set")
+    if evidence.get("uvs_present") is not True:
+        errors.append("runtime GLB UV evidence is missing")
+    dimensions = evidence.get("dimensions_m")
+    if not isinstance(dimensions, list) or len(dimensions) != 3 or any(abs(float(value) - expected) > 1e-5 for value, expected in zip(dimensions, _MANIFEST_DIMENSIONS)):
+        errors.append("runtime default closed dimensions are not exact")
+    if evidence.get("root_location") != [0.0, 0.0, 0.0]:
+        errors.append("runtime root pivot is not bottom-center origin")
+    if evidence.get("raw_preserved") is not True:
+        errors.append("SOURCE_RAW or markers were not preserved")
+    if errors:
+        raise ValueError("; ".join(sorted(set(errors))))
+
+
+def _validate_recipe_inputs(paths: RecipePaths, contract: AssetContract) -> str:
+    if not isinstance(paths, RecipePaths):
+        raise TypeError("paths must be a RecipePaths instance")
+    if not isinstance(contract, AssetContract) or contract.asset_id != ASSET_ID:
+        raise ValueError("contract must be the loot-container AssetContract")
+    _regular_file(paths.master_path, "Blender master")
+    raw_path = paths.task_dir / "raw.glb"
+    _regular_file(raw_path, "task-local raw.glb")
+    raw_hash = governance.file_sha256(raw_path, max_bytes=_MAX_GLB_BYTES)
+    if not paths.evidence_dir.exists() or not paths.evidence_dir.is_dir() or paths.evidence_dir.is_symlink():
+        raise ValueError("evidence directory must be an existing regular directory")
+    _reject_symlink_components(paths.evidence_dir, "evidence directory")
+    return raw_hash
+
+
+def run_blender_recipe(paths: RecipePaths, contract: AssetContract, mode: str) -> dict[str, Any]:
+    """Run the bounded Blender authoring process and publish deterministic evidence."""
+
+    if mode not in _ALLOWED_MODES:
+        raise ValueError("mode must be preview or publish-cleaned")
+    raw_hash = _validate_recipe_inputs(paths, contract)
+    from tools.meshy_blender_master import _run_bounded_process
+
+    with tempfile.TemporaryDirectory(prefix=".meshy-loot-recipe-", dir=str(paths.evidence_dir)) as temporary:
+        run_dir = Path(temporary)
+        input_master = run_dir / "input_master.blend"
+        shutil.copy2(paths.master_path, input_master)
+        contract_path = run_dir / "contract.json"
+        contract_path.write_bytes(contract.snapshot_bytes())
+        runtime_paths = replace(paths, master_path=input_master)
+        command = build_blender_command(runtime_paths, contract_path, mode) + ["--run-dir", str(run_dir)]
+        completed = _run_bounded_process(command, cwd=paths.project_root, timeout=120.0)
+        stdout = completed.stdout.decode("utf-8", "replace") if isinstance(completed.stdout, bytes) else str(completed.stdout or "")
+        stderr = completed.stderr.decode("utf-8", "replace") if isinstance(completed.stderr, bytes) else str(completed.stderr or "")
+        if completed.returncode != 0:
+            raise RuntimeError("Blender recipe failed: " + (stderr[-4000:] or stdout[-4000:]))
+        runtime_evidence_path = run_dir / "runtime_evidence.json"
+        if not runtime_evidence_path.is_file():
+            raise RuntimeError("Blender recipe did not produce runtime evidence: " + (stderr[-4000:] or stdout[-4000:]))
+        evidence = json.loads(runtime_evidence_path.read_text(encoding="utf-8"))
+        if not isinstance(evidence, dict):
+            raise ValueError("runtime evidence must be an object")
+        _validate_runtime_evidence(evidence)
+        _build_contact_sheet(run_dir)
+        for leaf in RENDER_LEAVES:
+            _regular_file(run_dir / leaf, "private " + leaf)
+        glb_path = run_dir / "cleaned.preview.glb"
+        _regular_file(glb_path, "private scratch GLB")
+        if glb_path.read_bytes()[:4] != b"glTF":
+            raise ValueError("private scratch GLB is not GLB")
+        master_copy = run_dir / "updated_master.blend"
+        _regular_file(master_copy, "private updated Blender master")
+
+        render_hashes = {leaf: _hash_decoded_rgba(run_dir / leaf) for leaf in RENDER_LEAVES}
+        manifest = {
+            "schema_version": "1.0.0",
+            "document_kind": "loot_container_master_recipe",
+            "asset_id": ASSET_ID,
+            "task_id": SELECTED_TASK_ID,
+            "contract_sha256": contract.sha256,
+            "raw_sha256": raw_hash,
+            "master_path": str(paths.master_path),
+            "objects": list(EXPORT_OBJECT_NAMES),
+            "states": dict(_MANIFEST_STATES),
+            "hinge": dict(_MANIFEST_HINGE),
+            "dimensions_m": [float(value) for value in evidence["dimensions_m"]],
+            "triangle_count": int(evidence["triangle_count"]),
+            "materials": list(evidence["materials"]),
+            "uvs_present": bool(evidence["uvs_present"]),
+            "source_raw_preserved": bool(evidence["raw_preserved"]),
+            "runtime_promoted": False,
+            "renders": render_hashes,
+        }
+        errors = validate_manifest_document(manifest, expected_master_path=paths.master_path)
+        if errors:
+            raise ValueError("manifest validation failed: " + "; ".join(errors))
+        master_payload = master_copy.read_bytes()
+        _publish_leaf(paths.master_path, master_payload, "updated Blender master")
+        for leaf in RENDER_LEAVES:
+            _publish_leaf(paths.evidence_dir / leaf, (run_dir / leaf).read_bytes(), leaf)
+        _publish_leaf(paths.scratch_glb, glb_path.read_bytes(), "scratch GLB")
+        manifest_payload = canonical_json_bytes(manifest)
+        source_manifest = _source_manifest_path(paths)
+        _publish_leaf(source_manifest, manifest_payload, "source recipe manifest")
+        _publish_leaf(paths.manifest_path, manifest_payload, "evidence recipe manifest")
+        print("LOOT CONTAINER RECIPE PASS mode={0} asset={1} states=closed,open,looted".format(mode, ASSET_ID))
+        result = dict(manifest)
+        result["runtime_evidence"] = evidence
+        result["stdout"] = stdout
+        result["stderr"] = stderr
+        result["marker"] = "LOOT CONTAINER RECIPE PASS mode={0} asset={1} states=closed,open,looted".format(mode, ASSET_ID)
+        return result
+
+
+def _is_blender_runtime() -> bool:
+    return Path(sys.executable).name.lower().startswith("blender") or "--background" in sys.argv
+
+
+def _runtime_argv() -> list[str] | None:
+    if "--" not in sys.argv:
+        return None
+    return list(sys.argv[sys.argv.index("--") + 1 :])
+
+
+def _run_runtime_main() -> int:
+    parser = _build_parser()
+    parser.add_argument("--run-dir", type=Path, default=None)
+    args = parser.parse_args(_runtime_argv())
+    if args.run_dir is None:
+        raise ValueError("Blender runtime requires private --run-dir")
+    contract = load_contract(args.contract)
+    run_dir = _resolve_path(args.run_dir)
+    run_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    master_path = _resolve_path(__import__("bpy").data.filepath)
+    paths = RecipePaths(
+        project_root=_resolve_path(args.project_root),
+        task_dir=_resolve_path(args.task_dir),
+        master_path=master_path,
+        evidence_dir=_resolve_path(args.evidence_dir),
+        scratch_glb=run_dir / "cleaned.preview.glb",
+        manifest_path=run_dir / "build_recipe_manifest.json",
+    )
+    _run_blender_recipe_runtime(paths, contract, run_dir)
+    return 0
 
 
 def build_blender_command(paths: RecipePaths, contract_path: Path, mode: str) -> list[str]:
@@ -463,20 +1080,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
     try:
+        if argv is None and _is_blender_runtime():
+            return _run_runtime_main()
+        args = _build_parser().parse_args(argv)
         contract, paths = resolve_recipe_paths(
             args.project_root, args.contract, args.task_dir, args.evidence_dir
         )
-        if args.mode == "preview":
-            print("MESHY LOOT CONTAINER RECIPE PREVIEW", contract.asset_id)
-            return 0
-        print(
-            "publish-cleaned is recognized but live GLB publication is deferred in Task 1",
-            file=os.sys.stderr,
-        )
-        return 2
-    except (OSError, TypeError, ValueError) as exc:
+        run_blender_recipe(paths, contract, args.mode)
+        return 0
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
         print(f"meshy_loot_container_recipe: {exc}", file=os.sys.stderr)
         return 1
 
@@ -490,8 +1103,10 @@ __all__ = [
     "BLENDER",
     "CANONICAL_MASTER_LEAF",
     "CANONICAL_MASTER_PATH",
+    "EXPORT_OBJECT_NAMES",
     "PROTECTED_REPO_PATHS",
     "PublishedArtifact",
+    "RENDER_LEAVES",
     "RecipePaths",
     "SELECTED_TASK_ID",
     "TRUSTED_EVIDENCE_ROOT",

@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -391,3 +393,151 @@ def test_cli_recognizes_modes_without_importing_bpy() -> None:
     assert "preview" in result.stdout
     assert "publish-cleaned" in result.stdout
     assert "bpy" not in sys.modules
+
+
+def test_recipe_declares_functional_hierarchy_and_no_decimator() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    source = (ROOT / "tools/meshy_loot_container_recipe.py").read_text(encoding="utf-8")
+    for name in (
+        "ContainerBody",
+        "HingePivot",
+        "ContainerLid",
+        "FrontHandle",
+        "LatchLeft",
+        "LatchRight",
+        "LootVisual",
+    ):
+        assert name in source
+    assert "DECIMATE" not in source
+    assert not any("collision" in name.lower() for name in recipe.EXPORT_OBJECT_NAMES)
+
+
+def test_lid_open_evidence_rejects_duplicate_state_meshes_and_wrong_action() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    valid = {
+        "action_names": ["lid_open"],
+        "state_mesh_names": list(recipe.EXPORT_OBJECT_NAMES),
+    }
+    assert recipe.validate_functional_evidence(valid) == []
+
+    duplicate = dict(valid)
+    duplicate["action_names"] = ["lid_open", "lid_open"]
+    assert recipe.validate_functional_evidence(duplicate)
+
+    state_copy = dict(valid)
+    state_copy["state_mesh_names"] = list(recipe.EXPORT_OBJECT_NAMES) + ["ContainerBody_closed"]
+    assert recipe.validate_functional_evidence(state_copy)
+
+
+def test_validate_manifest_accepts_expected_master_path_for_disposable_copy(tmp_path: Path) -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    disposable_master = tmp_path / "loot_container_derelict_v1_master.blend"
+    document = _valid_manifest(disposable_master)
+    assert recipe.validate_manifest_document(document, expected_master_path=disposable_master) == []
+
+
+def _run_blender_inspection(blender: Path, blend_path: Path, expression: str) -> dict[str, Any]:
+    from tools.meshy_blender_master import _run_bounded_process
+
+    result = _run_bounded_process(
+        [str(blender), "--background", "--factory-startup", str(blend_path), "--python-expr", expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    output = result.stdout.decode("utf-8", "replace") if isinstance(result.stdout, bytes) else str(result.stdout)
+    assert result.returncode == 0, result.stderr
+    records = [json.loads(line.split("=", 1)[1]) for line in output.splitlines() if line.startswith("TASK2_JSON=")]
+    assert len(records) == 1, output
+    return records[0]
+
+
+def test_real_blender_recipe_is_deterministic_and_preserves_disposable_master() -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+    runs: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="meshy-task2-", dir="/private/var/tmp") as temporary:
+        root = Path(temporary)
+        for index in (1, 2):
+            case = root / ("case-" + str(index))
+            master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+            task = case / "task"
+            evidence = case / "evidence"
+            master.parent.mkdir(parents=True)
+            task.mkdir(parents=True)
+            evidence.mkdir(parents=True)
+            shutil.copy2(canonical_master, master)
+            shutil.copy2(canonical_raw, task / "raw.glb")
+            paths = recipe.RecipePaths(
+                project_root=ROOT,
+                task_dir=task,
+                master_path=master,
+                evidence_dir=evidence,
+                scratch_glb=evidence / "cleaned.preview.glb",
+                manifest_path=evidence / "build_recipe_manifest.json",
+            )
+            result = recipe.run_blender_recipe(paths, contract, "preview")
+            assert result["asset_id"] == ASSET_ID
+            assert result["states"] == {"closed": 1, "open": 30, "looted": 60}
+            assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+            assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+            assert result["triangle_count"] <= 1500
+            assert "LOOT CONTAINER RECIPE PASS mode=preview asset=loot_container_derelict_v1 states=closed,open,looted" in result["marker"]
+            assert all((evidence / leaf).is_file() for leaf in ("closed.png", "open.png", "looted.png", "states_contact_sheet.png", "cleaned.preview.glb"))
+            assert (case / "source" / ASSET_ID / "build_recipe_manifest.json").is_file()
+            assert json.loads((evidence / "build_recipe_manifest.json").read_text()) == json.loads((case / "source" / ASSET_ID / "build_recipe_manifest.json").read_text())
+            glb_hash = hashlib.sha256((evidence / "cleaned.preview.glb").read_bytes()).hexdigest()
+            runs.append({"manifest": result, "glb_hash": glb_hash, "master": master, "evidence": evidence})
+
+        first_manifest = dict(runs[0]["manifest"])
+        second_manifest = dict(runs[1]["manifest"])
+        first_manifest.pop("runtime_evidence", None)
+        first_manifest.pop("stdout", None)
+        first_manifest.pop("stderr", None)
+        first_manifest.pop("marker", None)
+        second_manifest.pop("runtime_evidence", None)
+        second_manifest.pop("stdout", None)
+        second_manifest.pop("stderr", None)
+        second_manifest.pop("marker", None)
+        first_manifest["master_path"] = "MASTER"
+        second_manifest["master_path"] = "MASTER"
+        assert first_manifest == second_manifest
+        assert runs[0]["glb_hash"] == runs[1]["glb_hash"]
+        assert runs[0]["manifest"]["renders"] == runs[1]["manifest"]["renders"]
+
+        master_expression = """import bpy, json, math
+scene=bpy.context.scene
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+frames=[]
+for frame in (1,30,60):
+    scene.frame_set(frame)
+    frames.append([round(math.degrees(bpy.data.objects['HingePivot'].rotation_euler.x),6), bool(bpy.data.objects['LootVisual'].hide_render)])
+print('TASK2_JSON='+json.dumps({'objects':[name for name in required if bpy.data.objects.get(name)],'raw':bool(bpy.data.objects.get('mesh_node') and bpy.data.objects['mesh_node'].users_collection[0].name=='SOURCE_RAW'),'markers':sorted(o.name for o in bpy.data.objects if o.name in ['ORIGIN_MARKER','FORWARD_Z_MARKER']),'actions':sorted(a.name for a in bpy.data.actions),'frames':frames,'root':list(bpy.data.objects['ContainerRoot'].location),'parents':{name:(bpy.data.objects[name].parent.name if bpy.data.objects[name].parent else None) for name in required}}))"""
+        master_info = _run_blender_inspection(blender, runs[0]["master"], master_expression)
+        assert master_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert master_info["raw"] is True
+        assert master_info["markers"] == ["FORWARD_Z_MARKER", "ORIGIN_MARKER"]
+        assert master_info["actions"] == ["lid_open"]
+        assert master_info["frames"] == [[0.0, True], [-105.0, False], [-105.0, True]]
+        assert master_info["root"] == [0.0, 0.0, 0.0]
+        assert master_info["parents"]["ContainerLid"] == "HingePivot"
+        assert master_info["parents"]["HingePivot"] == "ContainerRoot"
+
+        glb_expression = """import bpy, json
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=r'''%s''')
+print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual'] if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions)}))""" % str(runs[0]["evidence"] / "cleaned.preview.glb")
+        glb_info = _run_blender_inspection(blender, runs[0]["master"], glb_expression)
+        assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert glb_info["actions"] == ["lid_open"]
