@@ -8,6 +8,7 @@ import struct
 import subprocess
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -432,22 +433,43 @@ def test_validate_rejects_glb_and_report_aliases_outside_exact_task_leaves(tmp_p
         _resolve_task_inputs(project_root, CONTRACT_PATH, task_dir, None, tmp_path / "alias.json")
 
 
-def test_validate_report_writer_uses_mode_0600_and_preserves_outside_sentinel(tmp_path: Path) -> None:
+def test_validate_report_writer_uses_mode_0600_and_preserves_outside_sentinel(tmp_path: Path, monkeypatch) -> None:
     project_root, task_dir, contract = _bound_fixture_task(tmp_path)
     report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     report["blender_reimport_passed"] = True
-    authority = validate_module._BlenderReimportEvidence(
-        validate_module._REIMPORT_AUTHORITY,
+    calls = []
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        calls.append((glb_path, expected_triangles))
+        return SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport)
+    sentinel = tmp_path / "outside-sentinel"
+    sentinel.write_bytes(b"untouched")
+    write_validation_report(project_root, task_dir, report)
+    assert calls == [(task_dir / "cleaned.glb", report["triangle_count"])]
+    assert (task_dir / "blender-validation.json").stat().st_mode & 0o777 == 0o600
+    assert sentinel.read_bytes() == b"untouched"
+    assert json.loads((task_dir / "blender-validation.json").read_text()) == report
+
+
+def test_validate_report_writer_rejects_host_constructed_runtime_authority(tmp_path: Path) -> None:
+    project_root, task_dir, contract = _bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    forged_authority = validate_module._BlenderReimportEvidence(
         report["sha256"],
         report["byte_size"],
         report["triangle_count"],
     )
-    sentinel = tmp_path / "outside-sentinel"
-    sentinel.write_bytes(b"untouched")
-    write_validation_report(project_root, task_dir, report, authority)
-    assert (task_dir / "blender-validation.json").stat().st_mode & 0o777 == 0o600
-    assert sentinel.read_bytes() == b"untouched"
-    assert json.loads((task_dir / "blender-validation.json").read_text()) == report
+
+    with pytest.raises(TypeError):
+        write_validation_report(project_root, task_dir, report, forged_authority)
+    assert not (task_dir / "blender-validation.json").exists()
 
 
 def test_validate_report_writer_rejects_fixed_leaf_symlink_without_touching_target(tmp_path: Path) -> None:
@@ -515,37 +537,51 @@ def test_real_blender_rejects_non_affine_matrix_with_failure_marker(tmp_path: Pa
     assert not (task_dir / "blender-validation.json").exists()
 
 
-def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_path: Path) -> None:
+def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_path: Path, monkeypatch) -> None:
     project_root, task_dir, contract = _bound_fixture_task(tmp_path)
     report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     report["blender_reimport_passed"] = True
     report["triangle_count"] = 99
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport)
     with pytest.raises(ValueError, match="semantic|re-import|evidence|match"):
         write_validation_report(project_root, task_dir, report)
 
+    monkeypatch.undo()
     honest = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     honest["blender_reimport_passed"] = True
-    with pytest.raises(ValueError, match="authority|re-import|evidence"):
+    with pytest.raises(BlenderValidationError, match="runtime|re-import"):
         write_validation_report(project_root, task_dir, honest)
 
 
-def test_report_writer_rejects_forged_bounds_materials_and_uv_evidence(tmp_path: Path) -> None:
+
+def test_report_writer_rejects_forged_bounds_materials_and_uv_evidence(tmp_path: Path, monkeypatch) -> None:
     project_root, task_dir, contract = _bound_fixture_task(tmp_path)
     report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     report["blender_reimport_passed"] = True
     expected = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
-    authority = validate_module._BlenderReimportEvidence(
-        validate_module._REIMPORT_AUTHORITY,
-        expected["sha256"],
-        expected["byte_size"],
-        expected["triangle_count"],
-    )
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=expected["sha256"],
+            byte_size=expected["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport)
     report["bounds"]["max"][0] = 999.0
     report["bounds"]["dimensions"][0] = 999.0
     report["material_names"] = ["ForgedMaterial"]
     report["uv_evidence"][0]["accessor"] = 999
     with pytest.raises(ValueError, match="semantic|re-import|evidence|match|bounds"):
-        write_validation_report(project_root, task_dir, report, authority)
+        write_validation_report(project_root, task_dir, report)
 
 
 def _run_python_process(script: str) -> list[str]:

@@ -63,13 +63,11 @@ class AccessorData:
 
 @dataclass(frozen=True)
 class _BlenderReimportEvidence:
-    authority: object
     sha256: str
     byte_size: int
     triangle_count: int
 
 
-_REIMPORT_AUTHORITY = object()
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _ASSET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
@@ -946,14 +944,12 @@ def _resolve_task_inputs(project_root: PathLike, contract_path: PathLike, task_d
     return contract, cleaned, report
 
 
-def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None, reimport_evidence: Optional[_BlenderReimportEvidence] = None) -> None:
+def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None) -> None:
     """Publish one fully validated PASS at the fixed task-local report leaf."""
 
     if report is None:
         raise BlenderValidationError("write_validation_report requires project root, task directory, and report")
     _validate_report_record(report)
-    if not isinstance(reimport_evidence, _BlenderReimportEvidence) or reimport_evidence.authority is not _REIMPORT_AUTHORITY:
-        raise BlenderValidationError("report publication requires runtime Blender re-import authority")
     try:
         from tools import meshy_candidate_review as candidate_review
         review_path, review, generation, root, _asset_root = candidate_review._load_task_record(project_root, task_dir)
@@ -983,6 +979,7 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
     if stat.S_ISLNK(cleaned_info.st_mode) or not stat.S_ISREG(cleaned_info.st_mode) or report.get("byte_size") != cleaned_info.st_size or report.get("sha256") != cleaned_hash:
         raise BlenderValidationError("validation report does not match cleaned.glb")
     expected = validate_cleaned_glb(cleaned, task_contract, task_id=resolved_task.name)
+    reimport_evidence = _reimport_with_blender(cleaned, int(expected["triangle_count"]))
     expected["blender_reimport_passed"] = True
     if (
         reimport_evidence.sha256 != expected["sha256"]
@@ -1006,36 +1003,41 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
 def _reimport_with_blender(glb_path: Path, expected_triangles: int) -> _BlenderReimportEvidence:
     """Re-import the exact GLB in Blender and compare actual mesh triangles."""
 
-    import bpy  # type: ignore
+    try:
+        import bpy  # type: ignore
+    except Exception as exc:
+        raise BlenderValidationError("Blender runtime is unavailable for re-import") from exc
 
-    for obj in list(bpy.data.objects):
-        bpy.data.objects.remove(obj, do_unlink=True)
-    result = bpy.ops.import_scene.gltf(filepath=str(glb_path))
     try:
-        result_values = set(result)
-    except TypeError:
-        result_values = {str(result)}
-    if "FINISHED" not in result_values or "CANCELLED" in result_values:
-        raise BlenderValidationError("Blender could not re-import cleaned.glb")
-    mesh_objects = [obj for obj in bpy.data.objects if obj.type == "MESH"]
-    if not mesh_objects:
-        raise BlenderValidationError("Blender re-import produced no mesh objects")
-    imported_triangles = 0
-    for obj in mesh_objects:
-        scale = obj.scale
-        if any(float(value) <= 0.0 or not math.isfinite(float(value)) for value in scale):
-            raise BlenderValidationError("Blender re-import contains non-positive transforms")
-        imported_triangles += sum(max(len(polygon.vertices) - 2, 0) for polygon in obj.data.polygons)
-    if imported_triangles != expected_triangles:
-        raise BlenderValidationError("Blender re-import triangle count differs from GLB count: " + str(imported_triangles) + " != " + str(expected_triangles))
-    try:
+        for obj in list(bpy.data.objects):
+            bpy.data.objects.remove(obj, do_unlink=True)
+        result = bpy.ops.import_scene.gltf(filepath=str(glb_path))
+        try:
+            result_values = set(result)
+        except TypeError:
+            result_values = {str(result)}
+        if "FINISHED" not in result_values or "CANCELLED" in result_values:
+            raise BlenderValidationError("Blender could not re-import cleaned.glb")
+        mesh_objects = [obj for obj in bpy.data.objects if obj.type == "MESH"]
+        if not mesh_objects:
+            raise BlenderValidationError("Blender re-import produced no mesh objects")
+        imported_triangles = 0
+        for obj in mesh_objects:
+            scale = obj.scale
+            if any(float(value) <= 0.0 or not math.isfinite(float(value)) for value in scale):
+                raise BlenderValidationError("Blender re-import contains non-positive transforms")
+            imported_triangles += sum(max(len(polygon.vertices) - 2, 0) for polygon in obj.data.polygons)
+        if imported_triangles != expected_triangles:
+            raise BlenderValidationError("Blender re-import triangle count differs from GLB count: " + str(imported_triangles) + " != " + str(expected_triangles))
         info = os.lstat(glb_path)
         digest = governance.file_sha256(glb_path, max_bytes=_MAX_GLB_BYTES)
-    except (OSError, ValueError) as exc:
-        raise BlenderValidationError("cleaned.glb evidence is unavailable after Blender re-import") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
-        raise BlenderValidationError("cleaned.glb must remain a regular file after Blender re-import")
-    return _BlenderReimportEvidence(_REIMPORT_AUTHORITY, digest, info.st_size, imported_triangles)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise BlenderValidationError("cleaned.glb must remain a regular file after Blender re-import")
+        return _BlenderReimportEvidence(digest, info.st_size, imported_triangles)
+    except BlenderValidationError:
+        raise
+    except Exception as exc:
+        raise BlenderValidationError("Blender re-import failed: " + str(exc)) from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1073,16 +1075,12 @@ build_validation_report = validate_cleaned_glb
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    runtime = _is_blender_runtime() if argv is None else False
     try:
         args = parse_args(argv)
         contract, cleaned, report_path = _resolve_task_inputs(args.project_root, args.contract, args.task_dir, args.glb, args.report)
         report = validate_cleaned_glb(cleaned, contract, task_id=cleaned.parent.name)
-        if not runtime:
-            raise BlenderValidationError("real Blender re-import is required before PASS publication")
-        reimport_evidence = _reimport_with_blender(cleaned, int(report["triangle_count"]))
         report["blender_reimport_passed"] = True
-        write_validation_report(args.project_root, cleaned.parent, report, reimport_evidence)
+        write_validation_report(args.project_root, cleaned.parent, report)
         print("MESHY BLENDER VALIDATION PASS asset={0} triangles={1} materials={2}".format(report["asset_id"], report["triangle_count"], len(report["material_names"])))
         return 0
     except (BlenderValidationError, OSError, ValueError) as exc:
