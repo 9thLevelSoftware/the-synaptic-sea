@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import shutil
 import subprocess
@@ -16,15 +17,104 @@ from tools import generate_prop_sidecars, validate_prop_visual_bindings
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROPS_ROOT = Path("assets/imported/props")
 
+GOVERNED_PROP_FILES = (
+    "assets/imported/props/components/air_recycler_unit.glb",
+    "assets/imported/props/components/air_recycler_unit.sidecar.json",
+    "assets/imported/props/components/conduit_run.glb",
+    "assets/imported/props/components/conduit_run.sidecar.json",
+    "assets/imported/props/components/console_generic.glb",
+    "assets/imported/props/components/console_generic.sidecar.json",
+    "assets/imported/props/components/hull_plating.glb",
+    "assets/imported/props/components/hull_plating.sidecar.json",
+    "assets/imported/props/components/locker_wall.glb",
+    "assets/imported/props/components/locker_wall.sidecar.json",
+    "assets/imported/props/components/machinery_block.glb",
+    "assets/imported/props/components/machinery_block.sidecar.json",
+    "assets/imported/props/components/nav_console.glb",
+    "assets/imported/props/components/nav_console.sidecar.json",
+    "assets/imported/props/components/pump_assembly.glb",
+    "assets/imported/props/components/pump_assembly.sidecar.json",
+    "assets/imported/props/components/reactor_console.glb",
+    "assets/imported/props/components/reactor_console.sidecar.json",
+    "assets/imported/props/components/sensor_rack.glb",
+    "assets/imported/props/components/sensor_rack.sidecar.json",
+    "assets/imported/props/components/thruster_control.glb",
+    "assets/imported/props/components/thruster_control.sidecar.json",
+    "assets/imported/props/dressing/cable_tray.glb",
+    "assets/imported/props/dressing/cable_tray.sidecar.json",
+    "assets/imported/props/dressing/cargo_pallet.glb",
+    "assets/imported/props/dressing/cargo_pallet.sidecar.json",
+    "assets/imported/props/dressing/emergency_wall.glb",
+    "assets/imported/props/dressing/emergency_wall.sidecar.json",
+    "assets/imported/props/dressing/focused_work_lamp.glb",
+    "assets/imported/props/dressing/focused_work_lamp.sidecar.json",
+    "assets/imported/props/dressing/generic_crate.glb",
+    "assets/imported/props/dressing/generic_crate.sidecar.json",
+    "assets/imported/props/dressing/generic_locker.glb",
+    "assets/imported/props/dressing/generic_locker.sidecar.json",
+    "assets/imported/props/dressing/maintenance_bench.glb",
+    "assets/imported/props/dressing/maintenance_bench.sidecar.json",
+    "assets/imported/props/dressing/medical_cabinet.glb",
+    "assets/imported/props/dressing/medical_cabinet.sidecar.json",
+    "assets/imported/props/dressing/practical_overhead.glb",
+    "assets/imported/props/dressing/practical_overhead.sidecar.json",
+    "assets/imported/props/dressing/salvage_cart.glb",
+    "assets/imported/props/dressing/salvage_cart.sidecar.json",
+    "assets/imported/props/dressing/service_rack.glb",
+    "assets/imported/props/dressing/service_rack.sidecar.json",
+    "assets/imported/props/objectives/medbay_terminal.glb",
+    "assets/imported/props/objectives/medbay_terminal.sidecar.json",
+    "assets/imported/props/objectives/reactor_control_panel.glb",
+    "assets/imported/props/objectives/reactor_control_panel.sidecar.json",
+    "assets/imported/props/objectives/repair_junction.glb",
+    "assets/imported/props/objectives/repair_junction.sidecar.json",
+    "assets/imported/props/objectives/supply_cache.glb",
+    "assets/imported/props/objectives/supply_cache.sidecar.json",
+)
+MAX_CURATED_PROP_BYTES = 2_000_000
+CURATED_PROP_FILES = GOVERNED_PROP_FILES
+CURATED_TOOL_FILES = (
+    "tools/generate_prop_sidecars.py",
+    "tools/prop_visual_metadata.py",
+    "tools/validate_prop_visual_bindings.py",
+)
+COMPONENT_CATALOG_FILE = "data/components/component_catalog.json"
+GAMEPLAY_SLICE_FILE = "data/procgen/fixture/gameplay_slice.json"
+AUTHORITATIVE_COMPONENT_IDS = (
+    "air_recycler_unit",
+    "conduit_run",
+    "console_generic",
+    "hull_plating",
+    "locker_wall",
+    "machinery_block",
+    "nav_console",
+    "pump_assembly",
+    "reactor_console",
+    "sensor_rack",
+    "thruster_control",
+)
+OBJECTIVE_PLACEMENT_IDS = (
+    "medbay_terminal",
+    "reactor_control_panel",
+    "maintenance_breaker_panel",
+    "cargo_supply_cache",
+    "supply_cache",
+)
 
-def _copy_path(source_root: Path, destination_root: Path, relative: str) -> None:
+
+def _copy_file(source_root: Path, destination_root: Path, relative: str) -> None:
     source = source_root / relative
+    if not source.is_file():
+        raise AssertionError(f"fixture source must be a regular file: {relative}")
     destination = destination_root / relative
-    if source.is_dir():
-        shutil.copytree(source, destination)
-    else:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+
+def _write_fixture_json(root: Path, relative: str, value: object) -> None:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(path, value)
 
 
 @contextlib.contextmanager
@@ -32,15 +122,18 @@ def copied_project() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(prefix="prop-binding-test-") as temporary:
         root = Path(temporary) / "project"
         root.mkdir()
-        for relative in (
-            "assets/imported/props",
-            "data/components/component_catalog.json",
-            "data/procgen",
-            "data/placement/schemas",
-            "data/props",
-            "tools",
-        ):
-            _copy_path(PROJECT_ROOT, root, relative)
+        for relative in (*CURATED_PROP_FILES, *CURATED_TOOL_FILES, COMPONENT_CATALOG_FILE):
+            _copy_file(PROJECT_ROOT, root, relative)
+        _copy_file(PROJECT_ROOT, root, "data/props/visual_bindings.generated.json")
+        _write_fixture_json(
+            root,
+            GAMEPLAY_SLICE_FILE,
+            {
+                "schema_version": "1.1.0",
+                "document_kind": "ship_gameplay_slice",
+                "objectives": [{"placement_id": placement_id} for placement_id in OBJECTIVE_PLACEMENT_IDS],
+            },
+        )
         yield root
 
 
@@ -166,6 +259,25 @@ def run_generator(project_root: Path, *arguments: str) -> subprocess.CompletedPr
 
 
 class ValidatePropVisualBindingsTests(unittest.TestCase):
+    def test_fixture_plan_is_explicitly_curated_and_bounded(self) -> None:
+        helper_source = inspect.getsource(copied_project)
+        self.assertNotIn("_copy_path(", helper_source)
+        self.assertNotIn("copytree(", helper_source)
+        self.assertNotIn("assets/imported/props", helper_source)
+
+        manifest = globals().get("CURATED_PROP_FILES")
+        if manifest is None:
+            self.fail("copied_project must declare CURATED_PROP_FILES")
+        self.assertEqual(tuple(manifest), GOVERNED_PROP_FILES)
+        self.assertEqual(len(manifest), 52)
+        self.assertEqual(len(set(manifest)), 52)
+        self.assertTrue(all("/ithappy/" not in f"/{relative}" for relative in manifest))
+        self.assertTrue(all(not relative.endswith(".glb.import") for relative in manifest))
+        missing = [relative for relative in manifest if not (PROJECT_ROOT / relative).is_file()]
+        self.assertEqual(missing, [])
+        total_bytes = sum((PROJECT_ROOT / relative).stat().st_size for relative in manifest)
+        self.assertLessEqual(total_bytes, MAX_CURATED_PROP_BYTES)
+
     def test_validator_rejects_missing_sidecar(self) -> None:
         with copied_project_without("assets/imported/props/components/reactor_console.sidecar.json") as project_root:
             self.assertIn("missing sidecar", run_validator(project_root))
