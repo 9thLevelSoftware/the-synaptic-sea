@@ -730,6 +730,199 @@ def test_validate_report_uv_evidence_requires_positive_counts(contract) -> None:
         validate_module._validate_report_record(report)
 
 
+def test_validate_rejects_scene_child_also_listed_as_secondary_scene_root(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["children"] = [1]
+    document["nodes"].append({"mesh": 0, "name": "TriangleChild"})
+    document["scenes"].append({"nodes": [1]})
+    path = tmp_path / "child-also-root.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="root|scene"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_allows_true_root_in_multiple_scenes(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["scenes"].append({"nodes": [0]})
+    path = tmp_path / "root-in-multiple-scenes.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    report = validate_cleaned_glb(path, contract)
+    assert report["triangle_count"] == 1
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda d: d.update(extensions={"KHR_materials_variants": {}}),
+        lambda d: d.update(extensions={"KHR_materials_variants": {"variants": []}}),
+        lambda d: d.update(extensions={"KHR_materials_variants": {"variants": [{}]}}),
+        lambda d: d.update(extensions={"KHR_materials_variants": {"variants": [{"name": "   "}]}}),
+    ],
+)
+def test_validate_rejects_missing_or_malformed_khr_variant_inventory(contract, tmp_path: Path, mutate) -> None:
+    document, binary = _fixture_document_and_binary()
+    mutate(document)
+    path = tmp_path / "invalid-khr-variant-inventory.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="variant"):
+        validate_cleaned_glb(path, contract)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda d: d["meshes"][0]["primitives"][0].update(
+            extensions={"KHR_materials_variants": {"mappings": [{"material": 0, "variants": [0]}]}}
+        ),
+        lambda d: d.update(
+            materials=[{"name": "Paint"}],
+            extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+        ) or d["meshes"][0]["primitives"][0].update(
+            extensions={"KHR_materials_variants": {}}
+        ),
+        lambda d: d.update(
+            materials=[{"name": "Paint"}],
+            extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+        ) or d["meshes"][0]["primitives"][0].update(
+            extensions={"KHR_materials_variants": {"mappings": []}}
+        ),
+        lambda d: d.update(
+            materials=[{"name": "Paint"}],
+            extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+        ) or d["meshes"][0]["primitives"][0].update(
+            extensions={"KHR_materials_variants": {"mappings": [{"material": 0, "variants": 0}]}}
+        ),
+    ],
+)
+def test_validate_rejects_missing_or_malformed_khr_primitive_mappings(contract, tmp_path: Path, mutate) -> None:
+    document, binary = _fixture_document_and_binary()
+    mutate(document)
+    path = tmp_path / "invalid-khr-mappings.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="mapping|variant|root"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_rejects_khr_mapping_material_out_of_range(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document.update(
+        materials=[{"name": "Paint"}],
+        extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+    )
+    document["meshes"][0]["primitives"][0]["extensions"] = {
+        "KHR_materials_variants": {"mappings": [{"material": 99, "variants": [0]}]}
+    }
+    path = tmp_path / "khr-material-out-of-range.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="material"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_rejects_khr_mapping_variant_out_of_range(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document.update(
+        materials=[{"name": "Paint"}],
+        extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+    )
+    document["meshes"][0]["primitives"][0]["extensions"] = {
+        "KHR_materials_variants": {"mappings": [{"material": 0, "variants": [99]}]}
+    }
+    path = tmp_path / "khr-variant-out-of-range.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="variant"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_rejects_duplicate_khr_variant_assignment(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document.update(
+        materials=[{"name": "Paint"}],
+        extensions={
+            "KHR_materials_variants": {
+                "variants": [{"name": "Gloss"}, {"name": "Matte"}]
+            }
+        },
+    )
+    document["meshes"][0]["primitives"][0]["extensions"] = {
+        "KHR_materials_variants": {
+            "mappings": [
+                {"material": 0, "variants": [0]},
+                {"material": 0, "variants": [1, 0]},
+            ]
+        }
+    }
+    path = tmp_path / "khr-duplicate-variant.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    with pytest.raises(ValueError, match="variant"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_accepts_valid_khr_mapping_and_unknown_extension_fields(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document.update(
+        materials=[{"name": "Paint"}],
+        extensions={
+            "KHR_materials_variants": {
+                "variants": [{"name": "Gloss"}],
+                "unknown_root_field": {"retained": True},
+            }
+        },
+    )
+    document["meshes"][0]["primitives"][0]["extensions"] = {
+        "KHR_materials_variants": {
+            "mappings": [{"material": 0, "variants": [0], "unknown_mapping_field": 7}],
+            "unknown_primitive_field": "ignored",
+        }
+    }
+    path = tmp_path / "valid-khr-mapping.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    report = validate_cleaned_glb(path, contract)
+    assert report["material_names"] == ["Paint"]
+    assert report["triangle_count"] == 1
+
+
+def test_real_blender_rejects_scene_root_and_khr_variant_reference_inputs(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", os.environ.get("BLENDER_PATH", "/Applications/Blender.app/Contents/MacOS/Blender")))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    cases = []
+
+    scene_root = tmp_path / "scene"
+    scene_root.mkdir()
+    project_root, task_dir, _contract = _bound_fixture_task(scene_root)
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["children"] = [1]
+    document["nodes"].append({"mesh": 0, "name": "TriangleChild"})
+    document["scenes"].append({"nodes": [1]})
+    (task_dir / "cleaned.glb").write_bytes(_pack_glb(document, binary))
+    cases.append((project_root, task_dir))
+
+    variants_root = tmp_path / "variants"
+    variants_root.mkdir()
+    project_root, task_dir, _contract = _bound_fixture_task(variants_root)
+    document, binary = _fixture_document_and_binary()
+    document.update(
+        materials=[{"name": "Paint"}],
+        extensions={"KHR_materials_variants": {"variants": [{"name": "Gloss"}]}},
+    )
+    document["meshes"][0]["primitives"][0]["extensions"] = {
+        "KHR_materials_variants": {"mappings": [{"material": 99, "variants": [0]}]}
+    }
+    (task_dir / "cleaned.glb").write_bytes(_pack_glb(document, binary))
+    cases.append((project_root, task_dir))
+
+    for case_root, case_task in cases:
+        command = [
+            str(blender), "--background", "--factory-startup", "--python",
+            str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"), "--",
+            "--project-root", str(case_root), "--contract", str(CONTRACT_PATH),
+            "--task-dir", str(case_task),
+        ]
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+        assert result.returncode != 0, result.stdout + result.stderr
+        assert "MESHY BLENDER VALIDATION PASS" not in result.stdout
+        assert not (case_task / "blender-validation.json").exists()
+
+
 def test_validate_rejects_non_affine_glb_matrix(contract, tmp_path: Path) -> None:
     document, binary = _fixture_document_and_binary()
     document["nodes"][0]["matrix"] = [

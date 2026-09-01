@@ -437,6 +437,22 @@ def _validate_material_texture_infos(value: Any, texture_count: int, label: str)
             _validate_material_texture_infos(child, texture_count, label + "[" + str(index) + "]")
 
 
+def _validate_khr_materials_variants_root(document: Dict[str, Any]) -> Optional[int]:
+    extensions = document.get("extensions", {})
+    if not isinstance(extensions, dict) or "KHR_materials_variants" not in extensions:
+        return None
+    extension = extensions["KHR_materials_variants"]
+    if not isinstance(extension, dict):
+        raise BlenderValidationError("KHR_materials_variants root extension must be an object")
+    variants = extension.get("variants")
+    if not isinstance(variants, list) or not variants:
+        raise BlenderValidationError("KHR_materials_variants variants must be a non-empty array")
+    for index, variant in enumerate(variants):
+        if not isinstance(variant, dict) or not isinstance(variant.get("name"), str) or not variant["name"].strip():
+            raise BlenderValidationError("KHR_materials_variants variant " + str(index) + " must have a non-empty name")
+    return len(variants)
+
+
 def _validate_material_texture_graph(document: Dict[str, Any]) -> None:
     materials = document.get("materials", [])
     textures = document.get("textures", [])
@@ -509,6 +525,18 @@ def _scene_reachable_nodes(document: Dict[str, Any]) -> set:
         raise BlenderValidationError("default scene is invalid")
     reachable = set()
     default_reachable = set()
+    child_indices = set()
+    for parent_index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            raise BlenderValidationError("node " + str(parent_index) + " must be an object")
+        children = node.get("children", [])
+        if not isinstance(children, list):
+            raise BlenderValidationError("node children must be an array")
+        for child in children:
+            child_index = _integer(child, "node child index")
+            if child_index >= len(nodes):
+                raise BlenderValidationError("node child index is invalid")
+            child_indices.add(child_index)
 
     def mark(index: Any, target: set) -> None:
         node_index = _integer(index, "scene node index")
@@ -530,9 +558,14 @@ def _scene_reachable_nodes(document: Dict[str, Any]) -> set:
         if not isinstance(roots, list):
             raise BlenderValidationError("scene nodes must be an array")
         for root in roots:
-            mark(root, reachable)
+            root_index = _integer(root, "scene node index")
+            if root_index >= len(nodes):
+                raise BlenderValidationError("scene node index is invalid")
+            if root_index in child_indices:
+                raise BlenderValidationError("scene root is listed as a child node")
+            mark(root_index, reachable)
             if index == scene_index:
-                mark(root, default_reachable)
+                mark(root_index, default_reachable)
     if reachable != set(range(len(nodes))):
         raise BlenderValidationError("GLB contains nodes outside declared scenes")
     return default_reachable
@@ -630,7 +663,7 @@ def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4]
         raise BlenderValidationError("contract pivot policy is invalid")
 
 
-def _mesh_primitives(document: Dict[str, Any], binary: bytes, material_names: List[str]) -> Tuple[List[PrimitiveData], List[Vector3], int, List[Dict[str, Any]]]:
+def _mesh_primitives(document: Dict[str, Any], binary: bytes, material_names: List[str], khr_variant_count: Optional[int] = None) -> Tuple[List[PrimitiveData], List[Vector3], int, List[Dict[str, Any]]]:
     meshes = document.get("meshes")
     if not isinstance(meshes, list) or not meshes:
         raise BlenderValidationError("GLB mesh inventory is empty")
@@ -647,6 +680,33 @@ def _mesh_primitives(document: Dict[str, Any], binary: bytes, material_names: Li
         for primitive_index, primitive in enumerate(raw_primitives):
             if not isinstance(primitive, dict) or primitive.get("mode", 4) != 4:
                 raise BlenderValidationError("mesh primitive must use TRIANGLES mode")
+            primitive_extensions = primitive.get("extensions", {})
+            if isinstance(primitive_extensions, dict) and "KHR_materials_variants" in primitive_extensions:
+                if khr_variant_count is None:
+                    raise BlenderValidationError("KHR_materials_variants primitive extension requires root inventory")
+                extension = primitive_extensions["KHR_materials_variants"]
+                if not isinstance(extension, dict):
+                    raise BlenderValidationError("KHR_materials_variants primitive extension must be an object")
+                mappings = extension.get("mappings")
+                if not isinstance(mappings, list) or not mappings:
+                    raise BlenderValidationError("KHR_materials_variants mappings must be a non-empty array")
+                used_variants = set()
+                for mapping_index, mapping in enumerate(mappings):
+                    if not isinstance(mapping, dict):
+                        raise BlenderValidationError("KHR_materials_variants mapping " + str(mapping_index) + " must be an object")
+                    material_index = _integer(mapping.get("material"), "KHR_materials_variants mapping material index")
+                    if material_index >= len(material_names):
+                        raise BlenderValidationError("KHR_materials_variants mapping material index is out of range")
+                    variants = mapping.get("variants")
+                    if not isinstance(variants, list) or not variants:
+                        raise BlenderValidationError("KHR_materials_variants mapping variants must be a non-empty array")
+                    for variant in variants:
+                        variant_index = _integer(variant, "KHR_materials_variants mapping variant index")
+                        if variant_index >= khr_variant_count:
+                            raise BlenderValidationError("KHR_materials_variants mapping variant index is out of range")
+                        if variant_index in used_variants:
+                            raise BlenderValidationError("KHR_materials_variants variant is assigned more than once")
+                        used_variants.add(variant_index)
             attributes = primitive.get("attributes")
             if not isinstance(attributes, dict) or not isinstance(attributes.get("POSITION"), int) or isinstance(attributes.get("POSITION"), bool):
                 raise BlenderValidationError("mesh primitive has no POSITION attribute")
@@ -763,8 +823,9 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     document = parsed.document
     buffers, views, _accessors = _validate_document_layout(document, parsed.binary)
     material_names = _material_names(document)
+    khr_variant_count = _validate_khr_materials_variants_root(document)
     _validate_material_texture_graph(document)
-    primitives, _all_positions, _mesh_triangle_count, all_uv_evidence = _mesh_primitives(document, parsed.binary, material_names)
+    primitives, _all_positions, _mesh_triangle_count, all_uv_evidence = _mesh_primitives(document, parsed.binary, material_names, khr_variant_count)
     worlds = _node_world_matrices(document)
     nodes = document.get("nodes")
     assert isinstance(nodes, list)
