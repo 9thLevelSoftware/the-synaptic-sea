@@ -102,9 +102,10 @@ evidence gate. Before any Meshy API call, all of the following must be present a
    unsupported category/state/generation policy.
 2. Required reference images are separate files, consistent with one another, rights-cleared,
    hash-recorded, and free of collage substitution.
-3. A read-only plan is current, and its `maximum_credits` is passed as the required
-   `--approved-credits` request-envelope/integrity field. This value is not renewed human spend
-   approval; materially changed requests are replanned.
+3. For candidate generation, a read-only plan is current, and its `maximum_credits` is passed as
+   the required `--approved-credits` request-envelope/integrity field to `meshy_stage.py generate`
+   and `resume`. This value is not renewed human spend approval; materially changed requests are
+   replanned.
 4. An immutable request record is created before submission. It records the exact validated
    request and hashes but never stores API keys, authorization headers, or signed download
    URLs.
@@ -116,6 +117,11 @@ Later contract/schema work must also preserve two shape constraints for the pilo
 - `hull_tendril_kit_v1` and `biomatter_swarm_kit_v1` contracts enumerate their required
   deliverables with explicit `deliverables`/`kit_parts` arrays, including module and state
   coverage needed by Blender and Godot review.
+
+The candidate plan's `maximum_credits` applies to `meshy_stage.py generate` and `resume`. The
+optional texture packet is proposal-only, uses a separate current 10-credit integrity estimate via
+`TEXTURE_APPROVED_CREDITS`, and does not create a provider task. It still requires selected
+candidate, Blender, and UV evidence and does not weaken task/artifact integrity.
 
 No API call is permitted without a validated contract, validated reference rights, the required
 `--approved-credits` integrity field, and an immutable request record. A dry-run plan is read-only
@@ -160,7 +166,8 @@ and the corresponding validation records.
 The editable master is external/heavy source and is not a runtime staging substitute:
 
 ```text
-/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/
+MESHY_MASTER_ROOT="${MESHY_MASTER_ROOT:?set external Meshy master root}"
+$MESHY_MASTER_ROOT/<asset_id>/
   <asset_id>_master.blend
   textures/
   exports/
@@ -323,9 +330,11 @@ are:
 /usr/bin/python3 tools/meshy_blender_validate.py --project-root . \
   --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
   --glb <task_dir>/cleaned.glb --report <task_dir>/blender-validation.json
+TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
 /usr/bin/python3 tools/meshy_texture_packet.py --project-root . \
   --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
-  --material-family <family> --resolution 1024 --reviewer "<reviewer>" --approved-credits 10
+  --material-family <family> --resolution 1024 --reviewer "<reviewer>" \
+  --approved-credits "$TEXTURE_APPROVED_CREDITS"
 /usr/bin/python3 tools/meshy_runtime_review.py --project-root . \
   --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
   --preview-dir "artifacts/validation-previews/meshy/<asset_id>"

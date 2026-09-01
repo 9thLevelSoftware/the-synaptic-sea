@@ -59,11 +59,15 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py pla
 
 ### Current host-Python lifecycle
 
-Run from the repository root. `--approved-credits` is required for paid commands and must equal
-the plan's `maximum_credits` request-envelope/integrity value; standing subscription authorization
-means spend and cap bookkeeping are not a human blocker. The lifecycle is plan → generate →
-resume/verify → candidate review → Blender master and validator → optional texture packet after
-selection/UV → runtime review → binder → proposal only:
+Run from the repository root. The candidate plan's `maximum_credits` applies to
+`meshy_stage.py generate` and `resume`: their required `--approved-credits` value must equal that
+plan value as a request-envelope/integrity check. This candidate-plan equality does not apply to
+the optional texture packet. Standing subscription authorization means spend and cap bookkeeping
+are not a human blocker. The optional texture packet is proposal-only, uses a separate current
+10-credit integrity estimate, and does not create a provider task. It still requires selected
+candidate, Blender, and UV evidence and does not weaken task/artifact integrity. The lifecycle is
+plan → generate → resume/verify → candidate review → Blender master and validator → optional
+texture packet after selection/UV → runtime review → binder → proposal only:
 
 ```bash
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py generate \
@@ -105,10 +109,11 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_blender_vali
   --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
   --task-dir "<task_dir>" --glb "<task_dir>/cleaned.glb" \
   --report "<task_dir>/blender-validation.json"
+TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_texture_packet.py \
   --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
   --task-dir "<task_dir>" --material-family "<family>" --resolution 1024 \
-  --reviewer "<reviewer>" --approved-credits 10
+  --reviewer "<reviewer>" --approved-credits "$TEXTURE_APPROVED_CREDITS"
 ```
 
 The Blender commands are host-Python launchers; do not invoke them as `blender --python`.
@@ -149,7 +154,7 @@ requires a separate reviewed task.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
@@ -165,7 +170,7 @@ and review must not write to `assets/imported`, `data/combat/threat_visual_catal
 
 ## Godot binary
 
-`/opt/homebrew/bin/godot` (Godot 4.7.1)
+`$GODOT` (the caller-supplied Godot 4.7.1 executable)
 
 ## Project root
 
@@ -175,7 +180,7 @@ and review must not write to `assets/imported`, `data/combat/threat_visual_catal
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
@@ -193,7 +198,7 @@ Registered in the regression bundle after GREEN.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
 ```
 
@@ -207,7 +212,7 @@ Feature: `docs/game/features/enclosed_slot_fill.md`.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 ```
 
@@ -223,7 +228,7 @@ Registered in the regression bundle after GREEN.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 ```
 
@@ -237,7 +242,7 @@ Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golde
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 ```
 
@@ -253,7 +258,7 @@ Feature: `docs/game/features/derelict_builder_runtime_preview.md`. The preview i
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 MANIFEST="${DERELICT_BUILDER_MANIFEST:?set DERELICT_BUILDER_MANIFEST to a validated derelict_builder_bundle manifest}"
 "$GODOT" --headless --path "$ROOT" res://scenes/procgen/derelict_builder_preview.tscn -- --manifest "$MANIFEST"
 ```
@@ -288,7 +293,7 @@ These require clean `BUILDER AUTHORED PORTALS PASS`, `BUILDER PLACED PROPS PASS`
 ```bash
 set -euo pipefail
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
@@ -1165,7 +1170,7 @@ must block the change):
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
   "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
@@ -1205,7 +1210,7 @@ Automated Gate 1 command:
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 

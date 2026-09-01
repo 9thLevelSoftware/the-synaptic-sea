@@ -81,16 +81,21 @@ Meshy API call may occur without all of these conditions:
 
 1. a validated repository asset contract;
 2. validated rights and consistent separate input images;
-3. a read-only plan whose `maximum_credits` is copied into the required
-   `--approved-credits` request-envelope/integrity field; and
+3. for candidate generation, a read-only plan whose `maximum_credits` is copied into the required
+   `--approved-credits` request-envelope/integrity field for `meshy_stage.py generate` and `resume`;
 4. an immutable request record containing the exact request and relevant hashes before submission.
 
-The `--approved-credits` value must equal the plan's `maximum_credits`; it is not renewed human
-spend approval. A materially changed request must be replanned. Within one governed batch, every
-planned candidate record allows exactly one paid creation POST attempt. A timeout, transport
-failure, `429`, `5xx`, or other ambiguous outcome is reconciled from the immutable journal and is
-never automatically retried. Task and artifact identity, selected/SUCCEEDED evidence, Blender
-re-import, runtime review, provenance, and protected-path gates remain mandatory.
+For `meshy_stage.py generate` and `resume`, the `--approved-credits` value must equal the
+candidate plan's `maximum_credits`; it is not renewed human spend approval. A materially changed
+request must be replanned. Within one governed batch, every planned candidate record allows exactly
+one paid creation POST attempt. A timeout, transport failure, `429`, `5xx`, or other ambiguous
+creation outcome is reconciled from the immutable journal and is never automatically retried. Task
+and artifact identity, selected/SUCCEEDED evidence, Blender re-import, runtime review, provenance,
+and protected-path gates remain mandatory.
+
+The optional texture packet is proposal-only, uses a separate current 10-credit integrity estimate
+via `TEXTURE_APPROVED_CREDITS`, and does not create a provider task. It still requires selected
+candidate, Blender, and UV evidence and does not weaken task/artifact integrity.
 
 The request and generation records must not contain API keys, authorization headers, signed URLs,
 or other secrets. Generation output is staged atomically and records provider/model/task
@@ -171,9 +176,11 @@ Commands are host-Python launchers and run from the repository root. The support
    /usr/bin/python3 tools/meshy_blender_validate.py --project-root . \
      --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
      --glb <task_dir>/cleaned.glb --report <task_dir>/blender-validation.json
+   TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
    /usr/bin/python3 tools/meshy_texture_packet.py --project-root . \
      --contract data/asset_generation/contracts/<asset_id>.json --task-dir "<task_dir>" \
-     --material-family <family> --resolution 1024 --reviewer "<reviewer>" --approved-credits 10
+     --material-family <family> --resolution 1024 --reviewer "<reviewer>" \
+     --approved-credits "$TEXTURE_APPROVED_CREDITS"
    ```
 
 4. Run the real runtime review, bind its evidence, and emit a proposal only. The binder and
