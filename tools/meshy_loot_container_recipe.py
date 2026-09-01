@@ -101,6 +101,10 @@ _BOX_PART_NAMES = (
     "HandleLeft",
     "HandleRight",
     "HandleGrip",
+    "LatchLeftStem",
+    "LatchLeftCatch",
+    "LatchRightStem",
+    "LatchRightCatch",
 )
 _RECIPE_OWNER_KEY = "meshy_recipe_owner"
 _RECIPE_OWNER_VALUE = ASSET_ID
@@ -568,7 +572,7 @@ def _join_as(bpy: Any, name: str, objects: list[Any]) -> Any:
 def _build_body(bpy: Any, collection: Any, alloy: Any) -> Any:
     parts = [
         _add_box(bpy, "BodyFloor", (0.0, 0.0, 0.035), (0.90, 0.55, 0.07), collection, alloy, 0.006),
-        _add_box(bpy, "BodyFront", (0.0, -0.2625, 0.25), (0.90, 0.025, 0.36), collection, alloy, 0.006),
+        _add_box(bpy, "BodyFront", (0.0, -0.260, 0.25), (0.90, 0.020, 0.36), collection, alloy, 0.006),
         _add_box(bpy, "BodyRear", (0.0, 0.2625, 0.25), (0.90, 0.025, 0.36), collection, alloy, 0.006),
         _add_box(bpy, "BodyLeft", (-0.4375, 0.0, 0.25), (0.025, 0.50, 0.36), collection, alloy, 0.006),
         _add_box(bpy, "BodyRight", (0.4375, 0.0, 0.25), (0.025, 0.50, 0.36), collection, alloy, 0.006),
@@ -590,18 +594,32 @@ def _build_lid(bpy: Any, collection: Any, hinge: Any, alloy: Any) -> Any:
     return lid
 
 
-def _build_handle(bpy: Any, collection: Any, alloy: Any) -> Any:
+def _build_handle(bpy: Any, collection: Any, accent: Any) -> Any:
     parts = [
-        _add_box(bpy, "HandleLeft", (-0.19, -0.266, 0.29), (0.035, 0.018, 0.13), collection, alloy, 0.004),
-        _add_box(bpy, "HandleRight", (0.19, -0.266, 0.29), (0.035, 0.018, 0.13), collection, alloy, 0.004),
-        _add_box(bpy, "HandleGrip", (0.0, -0.266, 0.235), (0.38, 0.018, 0.035), collection, alloy, 0.004),
+        _add_box(bpy, "HandleLeft", (-0.19, -0.2705, 0.33), (0.035, 0.009, 0.12), collection, accent, 0.004),
+        _add_box(bpy, "HandleRight", (0.19, -0.2705, 0.33), (0.035, 0.009, 0.12), collection, accent, 0.004),
+        _add_box(bpy, "HandleGrip", (0.0, -0.2705, 0.27), (0.38, 0.009, 0.035), collection, accent, 0.004),
     ]
     return _join_as(bpy, "FrontHandle", parts)
 
 
 def _build_accents(bpy: Any, collection: Any, accent: Any) -> tuple[Any, Any, Any]:
-    left = _add_box(bpy, "LatchLeft", (-0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
-    right = _add_box(bpy, "LatchRight", (0.23, -0.272, 0.43), (0.07, 0.006, 0.14), collection, accent, 0.003)
+    left = _join_as(
+        bpy,
+        "LatchLeft",
+        [
+            _add_box(bpy, "LatchLeftStem", (-0.23, -0.270, 0.46), (0.022, 0.010, 0.08), collection, accent, 0.003),
+            _add_box(bpy, "LatchLeftCatch", (-0.23, -0.270, 0.415), (0.07, 0.010, 0.030), collection, accent, 0.003),
+        ],
+    )
+    right = _join_as(
+        bpy,
+        "LatchRight",
+        [
+            _add_box(bpy, "LatchRightStem", (0.23, -0.270, 0.46), (0.022, 0.010, 0.08), collection, accent, 0.003),
+            _add_box(bpy, "LatchRightCatch", (0.23, -0.270, 0.415), (0.07, 0.010, 0.030), collection, accent, 0.003),
+        ],
+    )
     loot = _add_box(bpy, "LootVisual", (0.0, 0.08, 0.30), (0.36, 0.20, 0.12), collection, accent, 0.004)
     loot["wrapper_visibility"] = "open_unlooted_only"
     return left, right, loot
@@ -832,10 +850,13 @@ def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run
     body = _build_body(bpy, export_collection, alloy)
     body.parent = root
     lid = _build_lid(bpy, export_collection, hinge, alloy)
-    handle = _build_handle(bpy, export_collection, alloy)
+    handle = _build_handle(bpy, export_collection, accent)
     left, right, loot = _build_accents(bpy, export_collection, accent)
-    for obj in (handle, left, right, loot):
-        obj.parent = root
+    handle.parent = root
+    loot.parent = root
+    for latch in (left, right):
+        latch.parent = hinge
+        latch.matrix_parent_inverse = hinge.matrix_world.inverted()
     meshes = [body, lid, handle, left, right, loot]
     for mesh in meshes:
         _unwrap_object(bpy, mesh)

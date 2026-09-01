@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import shutil
 import stat
@@ -542,6 +543,161 @@ print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','Co
         glb_info = _run_blender_inspection(blender, runs[0]["master"], glb_expression)
         assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
         assert glb_info["actions"] == ["lid_open"]
+
+
+def test_real_blender_front_hardware_geometry_and_hinge_follow() -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+
+    with tempfile.TemporaryDirectory(prefix="meshy-front-hardware-", dir="/private/var/tmp") as temporary:
+        root = Path(temporary)
+        master = root / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+        task = root / "task"
+        evidence = root / "evidence"
+        master.parent.mkdir(parents=True)
+        task.mkdir()
+        evidence.mkdir()
+        shutil.copy2(canonical_master, master)
+        shutil.copy2(canonical_raw, task / "raw.glb")
+        paths = recipe.RecipePaths(
+            project_root=ROOT,
+            task_dir=task,
+            master_path=master,
+            evidence_dir=evidence,
+            scratch_glb=evidence / "cleaned.preview.glb",
+            manifest_path=evidence / "build_recipe_manifest.json",
+        )
+
+        result = recipe.run_blender_recipe(paths, contract, "preview")
+        assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert result["triangle_count"] <= 1500
+        assert result["states"] == {"closed": 1, "open": 30, "looted": 60}
+        assert result["renders"]["open.png"] != result["renders"]["looted.png"]
+
+        geometry_expression = """import bpy, json, math
+from mathutils import Vector
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+def bounds(obj):
+    points=[obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    minimum=[min(float(point[index]) for point in points) for index in range(3)]
+    maximum=[max(float(point[index]) for point in points) for index in range(3)]
+    return [minimum, maximum]
+def center(box):
+    return [(box[0][index]+box[1][index])/2.0 for index in range(3)]
+def islands(obj):
+    adjacent=[set() for _ in obj.data.vertices]
+    for edge in obj.data.edges:
+        left,right=edge.vertices
+        adjacent[left].add(right)
+        adjacent[right].add(left)
+    seen=set()
+    count=0
+    for index in range(len(adjacent)):
+        if index in seen:
+            continue
+        count+=1
+        stack=[index]
+        seen.add(index)
+        while stack:
+            current=stack.pop()
+            for neighbor in adjacent[current]:
+                if neighbor not in seen:
+                    seen.add(neighbor)
+                    stack.append(neighbor)
+    return count
+
+def triangles(obj):
+    obj.data.calc_loop_triangles()
+    return len(obj.data.loop_triangles)
+scene=bpy.context.scene
+body_front=bpy.data.objects['ContainerBody']
+handle=bpy.data.objects['FrontHandle']
+left=bpy.data.objects['LatchLeft']
+right=bpy.data.objects['LatchRight']
+body_points=[body_front.matrix_world @ Vector(vertex.co) for vertex in body_front.data.vertices]
+body_front_points=[point for point in body_points if point.z > 0.1 and point.y < -0.26]
+body_box=[[min(float(point[index]) for point in body_front_points) for index in range(3)],[max(float(point[index]) for point in body_front_points) for index in range(3)]]
+handle_box=bounds(handle)
+overlap=max(0.0, min(handle_box[1][1], body_box[1][1])-max(handle_box[0][1], body_box[0][1]))
+frames={}
+for frame in (1,30,60):
+    scene.frame_set(frame)
+    bpy.context.view_layer.update()
+    frames[str(frame)]={'hinge_degrees':round(math.degrees(bpy.data.objects['HingePivot'].rotation_euler.x),6),'loot_hidden':bool(bpy.data.objects['LootVisual'].hide_render),'left_bounds':bounds(left),'right_bounds':bounds(right),'left_center':center(bounds(left)),'right_center':center(bounds(right))}
+print('TASK2_JSON='+json.dumps({'inventory':[name for name in required if bpy.data.objects.get(name)],'materials':sorted({material.name for obj in bpy.data.objects if obj.type=='MESH' for material in obj.data.materials}),'triangles':sum(triangles(bpy.data.objects[name]) for name in required if bpy.data.objects[name].type=='MESH'),'handle_materials':sorted(material.name for material in handle.data.materials),'handle_islands':islands(handle),'handle_bounds':handle_box,'body_front_bounds':body_box,'handle_body_y_overlap':overlap,'latch_left_materials':sorted(material.name for material in left.data.materials),'latch_right_materials':sorted(material.name for material in right.data.materials),'latch_left_islands':islands(left),'latch_right_islands':islands(right),'parents':{'LatchLeft':left.parent.name if left.parent else None,'LatchRight':right.parent.name if right.parent else None,'ContainerLid':bpy.data.objects['ContainerLid'].parent.name if bpy.data.objects['ContainerLid'].parent else None},'frames':frames,'actions':sorted(action.name for action in bpy.data.actions)}))"""
+        info = _run_blender_inspection(blender, master, geometry_expression)
+        assert info["inventory"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert info["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert info["triangles"] <= 1500
+        assert info["handle_materials"] == ["warning_accent"]
+        assert info["handle_islands"] == 3
+        for bounds in (info["handle_bounds"], info["body_front_bounds"]):
+            assert all(math.isfinite(value) for side in bounds for value in side)
+            assert all(bounds[1][index] > bounds[0][index] for index in range(3))
+        assert info["body_front_bounds"][0][1] - info["handle_bounds"][0][1] > 0.002
+        assert info["handle_bounds"][0][1] >= -0.275 - 1e-6
+        assert info["handle_body_y_overlap"] > 0.001
+        assert info["latch_left_materials"] == ["warning_accent"]
+        assert info["latch_right_materials"] == ["warning_accent"]
+        assert info["latch_left_islands"] == 2
+        assert info["latch_right_islands"] == 2
+        assert info["parents"]["LatchLeft"] == "HingePivot"
+        assert info["parents"]["LatchRight"] == "HingePivot"
+        assert info["parents"]["ContainerLid"] == "HingePivot"
+        closed_left = info["frames"]["1"]["left_center"]
+        closed_right = info["frames"]["1"]["right_center"]
+        closed_left_box = info["frames"]["1"]["left_bounds"]
+        closed_right_box = info["frames"]["1"]["right_bounds"]
+        assert abs(closed_left[0] + closed_right[0]) < 1e-6
+        assert abs(closed_left[1] - closed_right[1]) < 1e-6
+        assert abs(closed_left[2] - closed_right[2]) < 1e-6
+        assert all(
+            abs((closed_left_box[1][index] - closed_left_box[0][index]) - (closed_right_box[1][index] - closed_right_box[0][index])) < 1e-6
+            for index in range(3)
+        )
+        assert info["frames"]["1"]["left_bounds"][0][1] >= -0.275 - 1e-6
+        assert info["frames"]["1"]["right_bounds"][0][1] >= -0.275 - 1e-6
+        for latch_bounds in (info["frames"]["1"]["left_bounds"], info["frames"]["1"]["right_bounds"]):
+            assert info["body_front_bounds"][0][1] - latch_bounds[0][1] > 0.002
+            assert -0.45 - 1e-6 <= latch_bounds[0][0] <= latch_bounds[1][0] <= 0.45 + 1e-6
+            assert -0.275 - 1e-6 <= latch_bounds[0][1] <= latch_bounds[1][1] <= 0.275 + 1e-6
+            assert -1e-6 <= latch_bounds[0][2] <= latch_bounds[1][2] <= 0.65 + 1e-6
+        open_left = info["frames"]["30"]["left_center"]
+        open_right = info["frames"]["30"]["right_center"]
+        assert sum((open_left[index]-closed_left[index])**2 for index in range(3)) ** 0.5 > 0.1
+        assert sum((open_right[index]-closed_right[index])**2 for index in range(3)) ** 0.5 > 0.1
+        assert open_left[2] > info["body_front_bounds"][1][2] + 0.1
+        assert open_right[2] > info["body_front_bounds"][1][2] + 0.1
+        assert info["frames"]["1"]["hinge_degrees"] == 0.0
+        assert info["frames"]["30"]["hinge_degrees"] == -105.0
+        assert info["frames"]["60"]["hinge_degrees"] == -105.0
+        assert info["frames"]["1"]["loot_hidden"] is True
+        assert info["frames"]["30"]["loot_hidden"] is False
+        assert info["frames"]["60"]["loot_hidden"] is True
+
+        glb_expression = """import bpy, json
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=r'''%s''')
+mesh_objects=[obj for obj in bpy.data.objects if obj.type=='MESH']
+triangles=0
+for obj in mesh_objects:
+    obj.data.calc_loop_triangles()
+    triangles+=len(obj.data.loop_triangles)
+print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual'] if bpy.data.objects.get(name)],'materials':sorted({material.name for obj in mesh_objects for material in obj.data.materials}),'triangles':triangles}))""" % str(evidence / "cleaned.preview.glb")
+        glb_info = _run_blender_inspection(blender, master, glb_expression)
+        assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert glb_info["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert glb_info["triangles"] <= 1500
 
 
 def test_real_blender_recipe_rejects_unowned_generated_name_collision(tmp_path: Path) -> None:
