@@ -17,6 +17,7 @@ import math
 import os
 import re
 import shutil
+import stat
 import struct
 import sys
 import tempfile
@@ -1156,8 +1157,16 @@ def _poll_until_succeeded(client: Any, preflight: _Preflight, task_id: str, on_c
             raise _TaskFailure(_safe_error(exc), last_consumed)
         if not isinstance(response, dict):
             raise _TaskFailure("Meshy task response must be an object", last_consumed)
-        if response.get("task_id") != task_id:
+        response_task_id = response.get("task_id")
+        response_provider_id = response.get("id")
+        if "id" in response and response_provider_id != task_id:
             raise _TaskFailure("Meshy task response identity mismatch", last_consumed)
+        if "task_id" in response and response_task_id != task_id:
+            raise _TaskFailure("Meshy task response identity mismatch", last_consumed)
+        if "id" not in response and "task_id" not in response:
+            raise _TaskFailure("Meshy task response identity is missing", last_consumed)
+        response = dict(response)
+        response["task_id"] = task_id
         consumed = response.get("consumed_credits")
         if consumed is not None:
             if not isinstance(consumed, int) or isinstance(consumed, bool) or consumed < 0:
@@ -2528,6 +2537,516 @@ def resume_batch(
         }
 
 
+
+class _RecoveryManual(RuntimeError):
+    """A bound provider task is terminal and needs operator intervention."""
+
+
+def _pinned_generation_bytes(
+    path: Path, identities: Mapping[Tuple[str, ...], Tuple[int, int]]
+) -> bytes:
+    parent_fd: Optional[int] = None
+    descriptor: Optional[int] = None
+    try:
+        parent_fd = governance._open_pinned_parent(path, dict(identities), governance._pinned_directory_flags())
+        descriptor = os.open(path.name, governance._read_leaf_flags(), dir_fd=parent_fd)
+        opened = os.fstat(descriptor)
+        governance._check_fd_identity(descriptor, identities.get(path.parts), "Meshy generation record")
+        if not stat.S_ISREG(opened.st_mode):
+            raise ValueError("Meshy generation record must be a regular file")
+        return governance._read_descriptor(
+            descriptor, "Meshy generation record", 4 * 1024 * 1024, opened
+        )
+    except FileNotFoundError as exc:
+        raise ValueError("Meshy generation record changed during compare-and-swap") from exc
+    except OSError as exc:
+        raise ValueError("Meshy generation record identity changed during compare-and-swap") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _cas_replace_generation(
+    preflight: _Preflight,
+    path: Path,
+    identities: Mapping[Tuple[str, ...], Tuple[int, int]],
+    failed_bytes: bytes,
+    success_bytes: bytes,
+) -> None:
+    """Replace generation.json only while its pinned failed bytes still match."""
+
+    parent_fd: Optional[int] = None
+    temporary_fd: Optional[int] = None
+    temporary_name: Optional[str] = None
+    try:
+        parent_fd = governance._open_pinned_parent(
+            path, dict(identities), governance._pinned_directory_flags()
+        )
+        if _pinned_generation_bytes(path, identities) != failed_bytes:
+            raise ValueError("Meshy generation compare-and-swap source changed")
+        temporary_fd, temporary_name = governance._create_sibling_temp(
+            parent_fd, path.name, 0o600
+        )
+        governance._write_all(temporary_fd, success_bytes)
+        os.fsync(temporary_fd)
+        os.close(temporary_fd)
+        temporary_fd = None
+        if _pinned_generation_bytes(path, identities) != failed_bytes:
+            raise ValueError("Meshy generation compare-and-swap source changed")
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        temporary_name = None
+        os.fsync(parent_fd)
+    finally:
+        if temporary_fd is not None:
+            os.close(temporary_fd)
+        if temporary_name is not None and parent_fd is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _validate_failed_archive(
+    preflight: _Preflight,
+    task_dir: Path,
+    failed_document: Dict[str, Any],
+    failed_bytes: bytes,
+) -> Path:
+    archive = task_dir / "generation.failed.json"
+    governance.governed_task_path(
+        preflight.root,
+        archive,
+        "Meshy generation.failed.json",
+        allow_missing=True,
+    )
+    if not os.path.lexists(str(archive)):
+        return archive
+    try:
+        info = os.lstat(archive)
+    except OSError as exc:
+        raise ValueError("Meshy generation.failed.json could not be inspected") from exc
+    if stat.S_ISLNK(info.st_mode):
+        raise ValueError("Meshy generation.failed.json must not be a symlink")
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("Meshy generation.failed.json must be a regular file")
+    if stat.S_IMODE(info.st_mode) != 0o600:
+        raise ValueError("Meshy generation.failed.json has the wrong mode")
+    try:
+        archived, archived_bytes = governance.strict_load_json_bytes(
+            archive, "Meshy generation.failed.json", 4 * 1024 * 1024
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError("Meshy generation.failed.json is malformed") from exc
+    if archived_bytes != failed_bytes or archived != failed_document:
+        raise ValueError("Meshy generation.failed.json does not preserve the failed record")
+    errors = validate_generation_record(archived)
+    if errors:
+        raise ValueError("Meshy generation.failed.json is invalid")
+    return archive
+
+
+def _load_failed_recovery_source(
+    preflight: _Preflight,
+    journal_path: Path,
+    journal: Dict[str, Any],
+    task_index: int,
+    task_id: str,
+) -> Tuple[Path, Dict[str, Any], bytes, Dict[Tuple[str, ...], Tuple[int, int]]]:
+    task_dir = preflight.asset_root / task_id
+    generation_path = _artifact_path(preflight, task_dir, "generation.json")
+    try:
+        document, raw = governance.strict_load_json_bytes(
+            generation_path, "Meshy generation record", 4 * 1024 * 1024
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError("Meshy failed generation evidence is unavailable") from exc
+    errors = validate_generation_record(document)
+    if errors or raw != canonical_json_bytes(document):
+        raise ValueError("Meshy failed generation evidence is not canonical")
+    if (
+        document.get("status") != "FAILED"
+        or document.get("asset_id") != preflight.contract.asset_id
+        or document.get("batch_id") != journal["batch_id"]
+        or document.get("task_index") != task_index
+        or document.get("task_id") != task_id
+    ):
+        raise ValueError("Meshy failed generation evidence identity does not match journal")
+    _verify_generation_adjacent_artifacts(generation_path, document, journal_path)
+    identities = governance._snapshot_identities(
+        generation_path, "Meshy failed generation record"
+    )
+    if identities.get(generation_path.parts) is None:
+        raise ValueError("Meshy failed generation record identity is missing")
+    return generation_path, document, raw, identities
+
+
+def _continue_result(
+    contract: AssetContract,
+    journal: Dict[str, Any],
+    recovered: List[str],
+    continued: List[str],
+    unresolved: List[Dict[str, Any]],
+    unresolved_submission: List[Dict[str, Any]],
+    errors: List[str],
+) -> Dict[str, Any]:
+    passed = journal["state"] == "COMPLETED" and not unresolved and not errors and all(
+        task.get("state") == "SUCCEEDED" for task in journal["tasks"]
+    )
+    return {
+        "asset_id": contract.asset_id,
+        "batch_id": journal["batch_id"],
+        "state": journal["state"],
+        "pass": passed,
+        "recovered": recovered,
+        "continued": continued,
+        "created": list(continued),
+        "unresolved": unresolved,
+        "unresolved_submission": unresolved_submission,
+        "errors": sorted(set(errors)),
+        "consumed_credits": journal["cumulative_consumed_credits"],
+    }
+
+
+def _recover_failed_task(
+    client: Any,
+    preflight: _Preflight,
+    journal_path: Path,
+    journal: Dict[str, Any],
+    task_index: int,
+    task: Mapping[str, Any],
+) -> Dict[str, Any]:
+    task_id = task.get("task_id")
+    if not isinstance(task_id, str):
+        raise ValueError("Meshy recovery task has no trusted task id")
+    generation_path, failed_document, failed_bytes, identities = _load_failed_recovery_source(
+        preflight, journal_path, journal, task_index, task_id
+    )
+    task_dir = generation_path.parent
+    _validate_failed_archive(preflight, task_dir, failed_document, failed_bytes)
+    old_consumed = task.get("consumed_credits")
+    prior_cumulative = journal["cumulative_consumed_credits"]
+    if _valid_nonnegative_int(old_consumed):
+        prior_cumulative -= old_consumed
+    if prior_cumulative < 0:
+        raise ValueError("Meshy recovery journal cumulative credits are invalid")
+
+    def note_consumed(value: int) -> None:
+        if value > preflight.cost_per_candidate or prior_cumulative + value > preflight.approved_credits:
+            raise _TaskFailure(
+                "Meshy actual credit consumption exceeded the approved bound",
+                value,
+                budget_violation=True,
+            )
+
+    try:
+        response = _poll_until_succeeded(client, preflight, task_id, note_consumed)
+    except _TaskFailure as exc:
+        if re.fullmatch(r"Meshy task ended with status [A-Z]+", str(exc)):
+            raise _RecoveryManual(_safe_error(exc)) from exc
+        raise
+    consumed = response.get("consumed_credits")
+    if not _valid_nonnegative_int(consumed):
+        raise _TaskFailure("Meshy success response did not contain consumed_credits")
+    model_urls = response.get("model_urls")
+    glb_url = model_urls.get("glb") if isinstance(model_urls, dict) else None
+    thumbnail_url = response.get("thumbnail_url")
+    if not isinstance(glb_url, str) or not isinstance(thumbnail_url, str):
+        raise _TaskFailure("Meshy success response did not contain required output URLs", consumed)
+    try:
+        MeshyClient._validate_download_url(glb_url)
+        MeshyClient._validate_download_url(thumbnail_url)
+    except RuntimeError as exc:
+        raise _TaskFailure(_safe_error(exc), consumed) from exc
+    if _pinned_generation_bytes(generation_path, identities) != failed_bytes:
+        raise ValueError("Meshy generation compare-and-swap source changed")
+    for name in ("raw.glb", "thumbnail.png"):
+        output_path = _artifact_path(preflight, task_dir, name)
+        if os.path.lexists(str(output_path)):
+            raise ValueError("Meshy recovery output already exists: " + name)
+    archive = _validate_failed_archive(preflight, task_dir, failed_document, failed_bytes)
+    if not os.path.lexists(str(archive)):
+        governance.atomic_write_bytes(
+            archive,
+            failed_bytes,
+            project_root=preflight.root,
+            allowed_root=preflight.asset_root,
+            mode=0o600,
+        )
+    _validate_failed_archive(preflight, task_dir, failed_document, failed_bytes)
+    if _pinned_generation_bytes(generation_path, identities) != failed_bytes:
+        raise ValueError("Meshy generation compare-and-swap source changed")
+
+    glb = _download_with_limit(client, glb_url, _GLB_MAX_BYTES, preflight)
+    thumbnail = _download_with_limit(client, thumbnail_url, _THUMBNAIL_MAX_BYTES, preflight)
+    try:
+        _validate_glb(glb)
+    except ValueError as exc:
+        raise _TaskFailure(_safe_error(exc), consumed) from exc
+    if len(thumbnail) <= len(_PNG_SIGNATURE) or not thumbnail.startswith(_PNG_SIGNATURE):
+        raise _TaskFailure("thumbnail.png has an invalid PNG signature", consumed)
+    if len(glb) + len(thumbnail) > _DOWNLOAD_TOTAL_MAX_BYTES:
+        raise _TaskFailure("Meshy downloads exceed aggregate size", consumed)
+    _write_artifact_bytes(preflight, task_dir, "raw.glb", glb)
+    _write_artifact_bytes(preflight, task_dir, "thumbnail.png", thumbnail)
+    recovered = dict(failed_document)
+    recovered.update(
+        status="SUCCEEDED",
+        completed_at=_utc_timestamp(),
+        consumed_credits=consumed,
+        outputs={
+            "raw.glb": {"sha256": hashlib.sha256(glb).hexdigest(), "byte_size": len(glb)},
+            "thumbnail.png": {
+                "sha256": hashlib.sha256(thumbnail).hexdigest(),
+                "byte_size": len(thumbnail),
+            },
+        },
+        error=None,
+        budget_violation=False,
+    )
+    errors = validate_generation_record(recovered)
+    if errors:
+        raise ValueError("invalid recovered Meshy generation record: " + "; ".join(errors))
+    _cas_replace_generation(
+        preflight,
+        generation_path,
+        identities,
+        failed_bytes,
+        canonical_json_bytes(recovered),
+    )
+    return recovered
+
+
+def continue_batch(
+    contract: AssetContract,
+    project_root: Path,
+    client: Any,
+    batch_journal: Union[str, os.PathLike],
+    approved_credits: int,
+    *,
+    pricing_file: Optional[Path],
+    reference_root: Path,
+    reference_specs: object,
+    output_license: str,
+    today: object = None,
+    date: object = None,
+    clock: Optional[Callable[[], float]] = None,
+    deadline: object = _DEFAULT_DEADLINE_SECONDS,
+) -> Dict[str, Any]:
+    """Recover one bound failure, then create only its pending journal suffix."""
+
+    required = ("get_balance", "poll_task", "download_bytes", "create_task")
+    if client is None or not all(hasattr(client, name) for name in required):
+        raise ValueError("a Meshy continue client must expose balance, polling, download, and create operations")
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    account_lock_id = getattr(client, "account_lock_id", None)
+    if not isinstance(account_lock_id, str):
+        raise ValueError("Meshy client must expose an account lock id")
+    root, _stage, _asset_root, journal_path, journal = _load_resume_journal(
+        project_root, contract, batch_journal
+    )
+    approval = journal["approval"]
+    preflight = _preflight(
+        contract,
+        root,
+        client,
+        approved_credits,
+        pricing_file=pricing_file,
+        reference_root=reference_root,
+        reference_specs=reference_specs,
+        output_license=output_license,
+        today=today,
+        date=date,
+        clock=clock,
+        deadline=deadline,
+    )
+    if not _approval_matches_preflight(preflight, journal):
+        raise ValueError("Meshy batch journal approval does not match the recomputed request")
+    if not _approval_creation_matches_evidence(preflight, journal):
+        raise ValueError("Meshy batch journal creation time does not match staged evidence")
+    if approval.get("approved_credits") != approved_credits:
+        raise ValueError("Meshy approved credit ceiling does not match the original journal")
+
+    with governance.credit_lock(account_lock_id, preflight.operation_deadline, preflight.clock):
+        _refresh_before_provider(preflight)
+        reloaded = load_batch_journal(journal_path)
+        if reloaded != journal:
+            raise ValueError("Meshy batch journal changed during continue preflight")
+        if not _approval_matches_preflight(preflight, reloaded):
+            raise ValueError("Meshy batch journal approval changed during continue preflight")
+        if not _approval_creation_matches_evidence(preflight, reloaded):
+            raise ValueError("Meshy batch journal creation time changed during continue preflight")
+        journal = reloaded
+        tasks = [_copy_mapping(task) for task in journal["tasks"]]
+        first = next((index for index, task in enumerate(tasks) if task["state"] != "SUCCEEDED"), None)
+        if first is None:
+            for index, task in enumerate(tasks):
+                task_id = task.get("task_id")
+                if not isinstance(task_id, str):
+                    raise ValueError("Meshy succeeded continuation task has no task id")
+                load_generation_record(
+                    preflight.asset_root / task_id / "generation.json",
+                    journal_path=journal_path,
+                )
+            return _continue_result(contract, journal, [], [], [], [], [])
+        for index in range(first):
+            task_id = tasks[index].get("task_id")
+            if tasks[index]["state"] != "SUCCEEDED" or not isinstance(task_id, str):
+                raise ValueError("Meshy continuation prefix is not a trusted succeeded sequence")
+            load_generation_record(
+                preflight.asset_root / task_id / "generation.json",
+                journal_path=journal_path,
+            )
+        for index in range(first, len(tasks)):
+            task = tasks[index]
+            if index == first and task["state"] == "SUBMITTING":
+                unresolved = [_unresolved_item(index, task, "unresolved_submission" if task.get("task_id") is None else "submission_state_unresolved")]
+                return _continue_result(
+                    contract,
+                    journal,
+                    [],
+                    [],
+                    unresolved,
+                    unresolved if task.get("task_id") is None else [],
+                    [],
+                )
+            if index == first and task["state"] == "FAILED":
+                if not isinstance(task.get("task_id"), str):
+                    raise ValueError("Meshy failed continuation task has no trusted task id")
+                continue
+            if task["state"] != "PENDING" or task.get("task_id") is not None:
+                raise ValueError("Meshy continuation suffix is not contiguous pending work")
+
+        recovered: List[str] = []
+        continued: List[str] = []
+        unresolved: List[Dict[str, Any]] = []
+        unresolved_submission: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        cumulative = journal["cumulative_consumed_credits"]
+        if tasks[first]["state"] == "FAILED":
+            try:
+                recovered_record = _recover_failed_task(
+                    client, preflight, journal_path, journal, first, tasks[first]
+                )
+            except _RecoveryManual as exc:
+                item = _unresolved_item(first, tasks[first], "terminal_manual")
+                return _continue_result(contract, journal, [], [], [item], [], [_safe_error(exc)])
+            except _TaskFailure as exc:
+                raise RuntimeError(_safe_error(exc)) from exc
+            old_consumed = tasks[first].get("consumed_credits")
+            if _valid_nonnegative_int(old_consumed):
+                cumulative -= old_consumed
+            new_consumed = recovered_record.get("consumed_credits")
+            if _valid_nonnegative_int(new_consumed):
+                cumulative += new_consumed
+            tasks[first] = _task_entry(first, tasks[first]["task_id"], "SUCCEEDED", new_consumed, None)
+            recovered.append(tasks[first]["task_id"])
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+            tasks = [_copy_mapping(task) for task in journal["tasks"]]
+            cumulative = journal["cumulative_consumed_credits"]
+            first += 1
+
+        balance_checked = False
+        for index in range(first, len(tasks)):
+            task = tasks[index]
+            if task["state"] != "PENDING" or task.get("task_id") is not None:
+                raise ValueError("Meshy continuation suffix changed before submission")
+            _check_deadline(preflight)
+            _refresh_before_provider(preflight)
+            if not balance_checked:
+                try:
+                    balance = _call_with_deadline(client.get_balance, preflight)
+                except Exception as exc:
+                    raise RuntimeError(_safe_error(exc)) from exc
+                if not _valid_nonnegative_int(balance):
+                    raise ValueError("Meshy balance response did not contain credits")
+                balance_checked = True
+            tasks[index] = _task_entry(index, None, "SUBMITTING", None, None)
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+            try:
+                created_task_id = _call_with_deadline(
+                    client.create_task, preflight, preflight.endpoint, preflight.transient.payload
+                )
+                created_task_id = _safe_task_id(created_task_id)
+            except Exception as exc:
+                unresolved_item = _unresolved_item(index, tasks[index], "unresolved_submission")
+                unresolved.append(unresolved_item)
+                unresolved_submission.append(unresolved_item)
+                errors.append(_safe_error(exc))
+                return _continue_result(
+                    contract, journal, recovered, continued, unresolved, unresolved_submission, errors
+                )
+            existing_ids = {
+                item.get("task_id") for item in tasks if isinstance(item.get("task_id"), str)
+            }
+            task_dir = preflight.asset_root / created_task_id
+            if created_task_id in existing_ids or os.path.lexists(str(task_dir)):
+                tasks[index] = _task_entry(
+                    index,
+                    None,
+                    "COLLISION",
+                    None,
+                    "Meshy task id collision",
+                    collision_task_id=created_task_id,
+                )
+                _resume_journal_update(preflight, journal, tasks, cumulative)
+                journal = load_batch_journal(journal_path)
+                item = _unresolved_item(index, tasks[index], "collision")
+                return _continue_result(contract, journal, recovered, continued, [item], [], ["Meshy task id collision"])
+            tasks[index] = _task_entry(index, created_task_id, "PENDING", None, None)
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+            try:
+                record = _stage_task(
+                    client,
+                    preflight,
+                    journal["batch_id"],
+                    index,
+                    created_task_id,
+                    journal["approval"]["created_at"],
+                    cumulative,
+                )
+            except BaseException as exc:
+                consumed = exc.consumed if isinstance(exc, _TaskFailure) else None
+                if _valid_nonnegative_int(consumed):
+                    cumulative += consumed
+                if isinstance(exc, _TaskCollision):
+                    tasks[index] = _task_entry(index, None, "COLLISION", None, _safe_error(exc), collision_task_id=exc.collision_task_id)
+                    reason = "collision"
+                elif isinstance(exc, _TaskFailure) and exc.budget_violation:
+                    tasks[index] = _task_entry(index, created_task_id, "OVERRUN", consumed, _safe_error(exc), budget_violation=True)
+                    reason = "budget_overrun"
+                elif isinstance(exc, _TaskFailure) and exc.publication_uncertain:
+                    tasks[index] = _task_entry(index, created_task_id, "UNCERTAIN", consumed, _safe_error(exc))
+                    reason = "publication_uncertain"
+                else:
+                    tasks[index] = _task_entry(index, created_task_id, "FAILED", consumed, _safe_error(exc))
+                    reason = "failed"
+                item = _unresolved_item(index, tasks[index], reason)
+                _resume_journal_update(preflight, journal, tasks, cumulative)
+                journal = load_batch_journal(journal_path)
+                return _continue_result(contract, journal, recovered, continued, [item], [], [_safe_error(exc)])
+            consumed = record.get("consumed_credits")
+            if not _valid_nonnegative_int(consumed):
+                raise ValueError("Meshy continued generation did not contain consumed credits")
+            cumulative += consumed
+            tasks[index] = _task_entry(index, created_task_id, "SUCCEEDED", consumed, None)
+            continued.append(created_task_id)
+            _resume_journal_update(preflight, journal, tasks, cumulative)
+            journal = load_batch_journal(journal_path)
+            tasks = [_copy_mapping(task) for task in journal["tasks"]]
+        return _continue_result(contract, journal, recovered, continued, unresolved, unresolved_submission, errors)
 def _visible_task_directories(
     root: Path,
     asset_root: Path,
@@ -2882,6 +3401,20 @@ def _build_parser() -> argparse.ArgumentParser:
     resume.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
     resume.add_argument("--output-license", choices=_ALLOWED_LICENSES, required=True)
     resume.add_argument("--deadline-seconds", type=float, default=_DEFAULT_DEADLINE_SECONDS)
+    continuation = subparsers.add_parser(
+        "continue",
+        help="recover one bound Meshy failure and continue its pending suffix",
+        description="Recover a bound failed Meshy task by safe GETs, then create only its contiguous pending journal suffix.",
+    )
+    continuation.add_argument("--project-root", type=Path, required=True)
+    continuation.add_argument("--contract", type=Path, required=True)
+    continuation.add_argument("--batch-journal", type=Path, required=True)
+    continuation.add_argument("--approved-credits", type=int, required=True)
+    continuation.add_argument("--pricing-file", type=Path, default=None, required=False)
+    continuation.add_argument("--reference-root", type=Path, required=True)
+    continuation.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
+    continuation.add_argument("--output-license", choices=_ALLOWED_LICENSES, required=True)
+    continuation.add_argument("--deadline-seconds", type=float, default=_DEFAULT_DEADLINE_SECONDS)
     verify = subparsers.add_parser(
         "verify",
         help="verify a Meshy batch offline with no API client",
@@ -2908,6 +3441,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
             result = resume_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
+        elif args.command == "continue":
+            if args.approved_credits <= 0:
+                raise ValueError("approved credit ceiling must be positive")
+            result = continue_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
         else:
             result = verify_batch(args.project_root, contract, args.batch_journal, pricing_file=args.pricing_file)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
@@ -2919,6 +3456,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("MESHY RESUME PASS batch={0}".format(result["batch_id"]))
             return 0
         print("MESHY RESUME UNRESOLVED batch={0}".format(result["batch_id"]))
+        return 1
+    if args.command == "continue":
+        if result.get("pass"):
+            print("MESHY CONTINUE PASS batch={0}".format(result["batch_id"]))
+            return 0
+        print("MESHY CONTINUE UNRESOLVED batch={0}".format(result["batch_id"]))
         return 1
     if args.command == "verify":
         if result.get("pass"):
@@ -2935,5 +3478,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "resume_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
 ]
