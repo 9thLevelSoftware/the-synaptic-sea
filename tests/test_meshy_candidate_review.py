@@ -15,6 +15,7 @@ from tools.meshy_stage import generate_batch
 from tools.meshy_candidate_review import (
     CHECK_FIELDS,
     ReviewError,
+    bind_promotion_evidence,
     reject_candidate,
     select_candidate,
     transition_review,
@@ -548,3 +549,27 @@ def test_r3_lexical_escape_is_rejected_before_resolution(tmp_path: Path) -> None
 
     with pytest.raises(ReviewError, match="lexical"):
         verify_review(project_root, task_dir / ".." / task_dir.name)
+
+
+def test_r6_binder_is_the_only_path_to_promotion_ready(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+
+    with pytest.raises(ReviewError, match="evidence|governed|cleaned"):
+        bind_promotion_evidence(project_root, task_dir)
+
+
+def test_r6_verify_rejects_forged_promotion_ready_without_runtime_evidence(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _real_staged_task(tmp_path)
+    forged = _read_review(task_dir)
+    forged.update(
+        {
+            "state": "promotion_ready",
+            "decision": "promotion_ready",
+            "checks": _true_checks(),
+            "rejection_reasons": [],
+        }
+    )
+    (task_dir / "review.json").write_bytes(canonical_json_bytes(forged))
+
+    with pytest.raises(ReviewError, match="evidence|cleaned|runtime"):
+        verify_review(project_root, task_dir)

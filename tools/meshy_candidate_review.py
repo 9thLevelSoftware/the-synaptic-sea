@@ -237,7 +237,7 @@ def _validate_check_mapping(checks: object, *, require_all_true: bool) -> Dict[s
 def transition_review(
     record: Dict[str, Any], target_state: str, checks: Optional[Mapping[str, bool]] = None
 ) -> Dict[str, Any]:
-    """Apply one transition; evidence-bearing post-selection transitions are not wired yet."""
+    """Apply one ordinary transition; post-selected transitions require the binder."""
 
     if isinstance(target_state, str) and target_state in _POST_SELECTED_STATES:
         raise ReviewError(
@@ -474,8 +474,78 @@ def verify_review(
             raise ReviewError("selected review requires SUCCEEDED generation evidence")
         return record
     if state in _POST_SELECTED_STATES:
-        raise ReviewError("evidence-not-yet-verified for post-selected review state")
+        # Post-selection state is never trusted as evidence.  Re-derive the
+        # complete chain from the fixed task-local contract, R4 report, six
+        # fixed captures, and report hash map before accepting it.
+        try:
+            from tools import meshy_runtime_review as runtime_review
+
+            runtime_review.verify_evidence_chain(project_root, task_dir)
+        except ReviewError:
+            raise
+        except (OSError, TypeError, ValueError, RuntimeError) as exc:
+            raise ReviewError("runtime evidence could not be derived: {0}".format(exc)) from exc
+        if state != "promotion_ready":
+            raise ReviewError("intermediate post-selected review state is not publishable")
+        return record
     raise ReviewError("review state cannot be operationally verified")
+
+
+def bind_promotion_evidence(
+    project_root: Union[os.PathLike, str], task_dir: Union[os.PathLike, str]
+) -> Dict[str, Any]:
+    """Derive runtime evidence and publish the sole promotion-ready state.
+
+    The caller supplies neither a target state nor evidence.  The binder reads
+    the governed task and lets the runtime verifier derive every accepted fact
+    from the task-local contract, generation record, R4 report, and fixed
+    preview leaves.  Intermediate states exist only in memory and one final
+    canonical review write is performed.
+    """
+
+    review_path, record, generation, root, asset_root = _load_task_record(project_root, task_dir)
+    state = record["state"]
+    if state == "promotion_ready":
+        # Idempotency is read-only: verification must still be complete, but a
+        # valid existing record is never rewritten or timestamped again.
+        return verify_review(project_root, task_dir)
+    if state != "selected":
+        raise ReviewError("promotion evidence requires a selected review")
+    if generation.get("status") != "SUCCEEDED":
+        raise ReviewError("promotion evidence requires SUCCEEDED generation evidence")
+
+    try:
+        from tools import meshy_runtime_review as runtime_review
+
+        runtime_review.verify_evidence_chain(project_root, task_dir)
+    except ReviewError:
+        raise
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise ReviewError("runtime evidence could not be derived: {0}".format(exc)) from exc
+
+    bound = _copy_record(record)
+    # Keep these transitions private.  No caller can request an intermediate
+    # state and no intermediate record is ever persisted.
+    for target_state in ("blender_cleanup_pass", "runtime_review_pass", "promotion_ready"):
+        if target_state not in TRANSITIONS[bound["state"]]:
+            raise ReviewError("invalid evidence-bound transition: {0} -> {1}".format(bound["state"], target_state))
+        bound["state"] = target_state
+        bound["decision"] = _STATE_DECISIONS[target_state]
+        bound["rejection_reasons"] = []
+        errors = validate_review(bound)
+        if errors:
+            raise ReviewError("invalid evidence-bound review: {0}".format("; ".join(errors)))
+    try:
+        governance.atomic_write_json(
+            review_path,
+            bound,
+            project_root=root,
+            allowed_root=asset_root,
+            mode=0o600,
+        )
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        raise ReviewError("promotion review publication failed: {0}".format(exc)) from exc
+    return _reload_published(project_root, task_dir, bound)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -497,6 +567,10 @@ def _build_parser() -> argparse.ArgumentParser:
     verify = subparsers.add_parser("verify", help="verify a candidate review record")
     verify.add_argument("--project-root", type=Path, required=True)
     verify.add_argument("--task-dir", type=Path, required=True)
+
+    bind = subparsers.add_parser("bind", help="bind derived runtime evidence to promotion_ready")
+    bind.add_argument("--project-root", type=Path, required=True)
+    bind.add_argument("--task-dir", type=Path, required=True)
     return parser
 
 
@@ -546,6 +620,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     record["task_id"], record["state"]
                 )
             )
+        elif args.command == "bind":
+            record = bind_promotion_evidence(args.project_root, args.task_dir)
+            print(
+                "MESHY CANDIDATE REVIEW PASS task_id={0} state={1}".format(
+                    record["task_id"], record["state"]
+                )
+            )
         else:  # pragma: no cover - argparse owns the command choices
             return 2
     except (OSError, TypeError, ValueError) as exc:
@@ -564,6 +645,7 @@ __all__ = [
     "REVIEW_STATES",
     "ReviewError",
     "TRANSITIONS",
+    "bind_promotion_evidence",
     "main",
     "reject_candidate",
     "select_candidate",

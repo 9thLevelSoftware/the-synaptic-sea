@@ -13,6 +13,7 @@ import pytest
 
 from tools import meshy_runtime_review as review
 from tools.meshy_asset_contract import canonical_json_bytes, load_contract
+from tools.meshy_blender_validate import validate_cleaned_glb
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,11 @@ def _task_dir(tmp_path: Path, *, report: object = None, glb: bool = True) -> Pat
     if glb:
         shutil.copy2(FIXTURE_GLB, task / "cleaned.glb")
     if report is not None:
+        if report == {"status": "PASS"} and glb:
+            contract = load_contract(FIXTURE_CONTRACT)
+            canonical_report = validate_cleaned_glb(task / "cleaned.glb", contract, task_id=task.name)
+            canonical_report["blender_reimport_passed"] = True
+            report = canonical_report
         (task / "blender-validation.json").write_bytes(canonical_json_bytes(report))
     return task
 
@@ -96,7 +102,7 @@ def test_review_constructs_godot_command(tmp_path: Path) -> None:
         for lighting in LIGHTING:
             assert review.build_godot_command(overlay, seed, lighting, output) == [
                 str(review.GODOT),
-                "--headless",
+                *review._godot_render_args(),
                 "--path",
                 str(overlay),
                 "--script",
@@ -196,3 +202,52 @@ def test_cli_requires_all_args(tmp_path: Path) -> None:
         review.build_parser().parse_args([])
     with pytest.raises(SystemExit):
         review.parse_args(["--project-root", str(tmp_path)])
+
+
+def test_runtime_command_binds_asset_and_category_as_user_args(tmp_path: Path) -> None:
+    command = review.build_godot_command(
+        tmp_path / "overlay",
+        42,
+        "normal",
+        tmp_path / "capture.png",
+        asset_id="fixture_triangle",
+        category="gameplay_prop",
+    )
+
+    assert command[command.index("--asset-id") + 1] == "fixture_triangle"
+    assert command[command.index("--category") + 1] == "gameplay_prop"
+    assert "shell=True" not in command
+
+
+def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
+    marker = (
+        "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
+        "camera_position=12.5,8.25,-4.0 camera_target=1.0,2.0,3.0 "
+        "camera_size=7.5 output=/private/tmp/capture.png"
+    )
+
+    parsed = review.parse_capture_marker(marker, 42, "normal")
+
+    assert parsed == {
+        "projection": "orthogonal",
+        "position": [12.5, 8.25, -4.0],
+        "target": [1.0, 2.0, 3.0],
+        "size": 7.5,
+    }
+
+
+def test_preview_directory_must_be_fixed_to_asset_leaf(tmp_path: Path) -> None:
+    task = _task_dir(tmp_path, report={"status": "PASS"})
+    with pytest.raises(SystemExit):
+        review.parse_args(
+            [
+                "--project-root",
+                str(tmp_path),
+                "--contract",
+                str(FIXTURE_CONTRACT),
+                "--task-dir",
+                str(task),
+                "--preview-dir",
+                str(tmp_path / "artifacts/validation-previews/meshy/other"),
+            ]
+        )

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Headless, locked-isometric capture for one temporary Meshy review overlay.
-## The host runner supplies --seed, --lighting, and --output. The staged GLB
-## is always loaded from res://assets/_review/meshy/<asset_id>/cleaned.glb.
+## The host runner supplies every identity and output argument explicitly. The
+## staged GLB is always loaded from res://assets/_review/meshy/<asset_id>/cleaned.glb.
 
 const HARNESS_SCENE: String = "res://scenes/validation/meshy_asset_review_harness.tscn"
 const ShipBlueprintScript: GDScript = preload("res://scripts/procgen/ship_blueprint.gd")
@@ -28,6 +28,9 @@ var output_path: String = ""
 var asset_id: String = ""
 var asset_category: String = ""
 var generated_derelict: Node3D
+var staged_visual_root: Node3D
+var staged_camera_target: Vector3 = Vector3.ZERO
+var staged_camera_size: float = 0.0
 
 
 func _initialize() -> void:
@@ -51,7 +54,7 @@ func _initialize() -> void:
 	review_environment = harness.get_node_or_null("ReviewEnvironment") as WorldEnvironment
 	generated_root = harness.get_node_or_null("GeneratedDerelictRoot") as Node3D
 	if review_camera == null or key_light == null or fill_light == null or review_environment == null or generated_root == null:
-		_fail("review harness scene is missing required nodes")
+		_fail("review harness is missing required nodes")
 		return
 
 	var parsed: Dictionary = _parse_user_args(OS.get_cmdline_user_args())
@@ -60,11 +63,14 @@ func _initialize() -> void:
 		return
 	seed_value = int(parsed["seed"])
 	lighting_mode = str(parsed["lighting"])
+	asset_id = str(parsed["asset_id"])
+	asset_category = str(parsed["category"])
 	output_path = _resolve_output_path(str(parsed["output"]))
-	asset_id = OS.get_environment("MESHY_REVIEW_ASSET_ID").strip_edges()
-	asset_category = OS.get_environment("MESHY_REVIEW_ASSET_CATEGORY").strip_edges()
-	if asset_id.is_empty():
-		_fail("MESHY_REVIEW_ASSET_ID is required")
+	if asset_id.is_empty() or asset_id.find("/") >= 0 or asset_id.find("\\") >= 0 or asset_id.find("..") >= 0:
+		_fail("asset-id must be a single safe identifier")
+		return
+	if asset_category.is_empty() or asset_category.find("/") >= 0 or asset_category.find("\\") >= 0 or asset_category.find("..") >= 0:
+		_fail("category must be a single value")
 		return
 	if not SEEDS.has(seed_value):
 		_fail("seed must be 42 or 777")
@@ -83,17 +89,18 @@ func _initialize() -> void:
 		return
 	if not _mount_staged_asset():
 		return
-	_fit_locked_isometric_camera()
+	if not _fit_locked_isometric_camera():
+		return
 	call_deferred("_capture_after_frames")
 
 
 func _parse_user_args(args: PackedStringArray) -> Dictionary:
-	var result: Dictionary = {"seed": 42, "lighting": "normal", "output": ""}
+	var result: Dictionary = {"seed": 42, "lighting": "normal", "asset_id": "", "category": "", "output": ""}
 	var seen: Dictionary = {}
 	var index: int = 0
 	while index < args.size():
 		var token: String = str(args[index])
-		if token != "--seed" and token != "--lighting" and token != "--output":
+		if token != "--seed" and token != "--lighting" and token != "--asset-id" and token != "--category" and token != "--output":
 			return {"error": "unknown argument %s" % token}
 		if seen.has(token):
 			return {"error": "duplicate argument %s" % token}
@@ -109,11 +116,15 @@ func _parse_user_args(args: PackedStringArray) -> Dictionary:
 			result["seed"] = int(value)
 		elif token == "--lighting":
 			result["lighting"] = value
+		elif token == "--asset-id":
+			result["asset_id"] = value
+		elif token == "--category":
+			result["category"] = value
 		else:
 			result["output"] = value
 		index += 2
-	if not seen.has("--seed") or not seen.has("--lighting") or not seen.has("--output"):
-		return {"error": "--seed, --lighting, and --output are required"}
+	if not seen.has("--seed") or not seen.has("--lighting") or not seen.has("--asset-id") or not seen.has("--category") or not seen.has("--output"):
+		return {"error": "--asset-id, --category, --seed, --lighting, and --output are required"}
 	return result
 
 
@@ -220,6 +231,7 @@ func _mount_staged_asset() -> bool:
 	generated_root.add_child(mount)
 	visual.position = Vector3.ZERO
 	mount.add_child(visual)
+	staged_visual_root = visual
 	return true
 
 
@@ -275,13 +287,81 @@ func _read_position(raw: Variant) -> Vector3:
 	return Vector3.INF
 
 
-func _fit_locked_isometric_camera() -> void:
-	var target: Vector3 = generated_derelict.position if generated_derelict != null else Vector3.ZERO
+func _expand_visual_bounds(node: Node, bounds: Array, parent_transform: Transform3D) -> void:
+	var world_transform: Transform3D = parent_transform
+	if node is Node3D:
+		world_transform = parent_transform * (node as Node3D).transform
+	if node is MeshInstance3D:
+		var mesh_instance: MeshInstance3D = node as MeshInstance3D
+		var local_bounds: AABB = mesh_instance.get_aabb()
+		var corners: Array[Vector3] = [
+			local_bounds.position,
+			local_bounds.position + Vector3(local_bounds.size.x, 0.0, 0.0),
+			local_bounds.position + Vector3(0.0, local_bounds.size.y, 0.0),
+			local_bounds.position + Vector3(0.0, 0.0, local_bounds.size.z),
+			local_bounds.position + Vector3(local_bounds.size.x, local_bounds.size.y, 0.0),
+			local_bounds.position + Vector3(local_bounds.size.x, 0.0, local_bounds.size.z),
+			local_bounds.position + Vector3(0.0, local_bounds.size.y, local_bounds.size.z),
+			local_bounds.end,
+		]
+		for corner in corners:
+			var world_point: Vector3 = world_transform * corner
+			if not bounds[0]:
+				bounds[1] = AABB(world_point, Vector3.ZERO)
+				bounds[0] = true
+			else:
+				bounds[1] = (bounds[1] as AABB).expand(world_point)
+	for child in node.get_children():
+		_expand_visual_bounds(child as Node, bounds, world_transform)
+
+
+func _fit_locked_isometric_camera() -> bool:
+	if staged_visual_root == null:
+		_fail("staged visual root is missing")
+		return false
+	var bounds: Array = [false, AABB()]
+	_expand_visual_bounds(staged_visual_root, bounds, Transform3D.IDENTITY)
+	if not bounds[0]:
+		_fail("staged visual has no mesh geometry")
+		return false
+	var visual_bounds: AABB = bounds[1]
+	if visual_bounds.size.length() <= 0.0001:
+		_fail("staged visual bounds are empty")
+		return false
+	staged_camera_target = visual_bounds.position + visual_bounds.size * 0.5
+	var horizontal_extent: float = max(visual_bounds.size.x, visual_bounds.size.z)
+	var vertical_extent: float = visual_bounds.size.y
+	staged_camera_size = max(max(horizontal_extent * 0.90, vertical_extent * 1.35), 1.5)
+	var locked_direction: Vector3 = Vector3(16.0, 14.0, 16.0).normalized()
+	var camera_distance: float = max(visual_bounds.size.length() * 2.5, 32.0)
+	var camera_position: Vector3 = staged_camera_target + locked_direction * camera_distance
 	review_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	review_camera.size = 18.0
-	var camera_position := target + Vector3(16.0, 14.0, 16.0)
-	review_camera.look_at_from_position(camera_position, target, Vector3.UP)
+	review_camera.size = staged_camera_size
+	review_camera.look_at_from_position(camera_position, staged_camera_target, Vector3.UP)
 	review_camera.current = true
+	return true
+
+
+func _has_visible_variance(image: Image) -> bool:
+	var minimum: float = 1.0
+	var maximum: float = 0.0
+	var opaque_count: int = 0
+	var sample_count: int = 0
+	for y in range(0, IMAGE_SIZE.y, max(1, IMAGE_SIZE.y / 18)):
+		for x in range(0, IMAGE_SIZE.x, max(1, IMAGE_SIZE.x / 32)):
+			var pixel: Color = image.get_pixel(x, y)
+			var alpha: float = pixel.a
+			if alpha >= 0.05:
+				opaque_count += 1
+			var luminance: float = 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b
+			minimum = min(minimum, luminance)
+			maximum = max(maximum, luminance)
+			sample_count += 1
+	return opaque_count >= max(2, sample_count / 8) and maximum - minimum >= 0.004
+
+
+func _format_vector(value: Vector3) -> String:
+	return "%.9f,%.9f,%.9f" % [value.x, value.y, value.z]
 
 
 func _capture_after_frames() -> void:
@@ -290,6 +370,9 @@ func _capture_after_frames() -> void:
 	var image: Image = capture_viewport.get_texture().get_image()
 	if image == null or image.get_size() != IMAGE_SIZE:
 		_fail("viewport capture was not 1600x900")
+		return
+	if not _has_visible_variance(image):
+		_fail("viewport capture was blank or near-uniform")
 		return
 	var output_parent: String = output_path.get_base_dir()
 	var directory_error: Error = DirAccess.make_dir_recursive_absolute(output_parent)
@@ -300,7 +383,7 @@ func _capture_after_frames() -> void:
 	if save_error != OK:
 		_fail("PNG capture failed error=%d" % save_error)
 		return
-	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_transform=locked-isometric output=%s" % [seed_value, lighting_mode, output_path])
+	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_position=%s camera_target=%s camera_size=%.9f output=%s" % [seed_value, lighting_mode, _format_vector(review_camera.global_position), _format_vector(staged_camera_target), staged_camera_size, output_path])
 	quit(0)
 
 

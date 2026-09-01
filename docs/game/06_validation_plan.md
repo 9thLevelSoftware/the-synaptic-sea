@@ -75,13 +75,16 @@ python3 tools/meshy_runtime_review.py \
   --preview-dir artifacts/validation-previews/meshy/stalker_v1
 ```
 
-The runner requires `cleaned.glb` plus a `blender-validation.json` report with a `PASS` status. It
-copies the production project into a disposable external overlay and mounts the candidate only at
-`res://assets/_review/meshy/<asset_id>/cleaned.glb`; live runtime surfaces are not write targets.
+The runner requires the direct private task layout, a canonical task-local contract, a SUCCEEDED generation record,
+and `cleaned.glb` plus the exact canonical R4 `blender-validation.json` report (including UV and Blender
+re-import evidence). It copies the production project into a disposable external overlay and mounts the
+candidate only at `res://assets/_review/meshy/<asset_id>/cleaned.glb`; live runtime surfaces are not write targets.
 The overlay is import-primed before six bounded subprocess captures: seeds `42` and `777` under
-`normal`, `emergency`, and `dark` lighting. Every capture must emit the pass marker without an
-unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostic and produce a complete 1600x900
-PNG. The six captures and canonical report publish atomically only after all captures pass.
+`normal`, `emergency`, and `dark` lighting. Every capture must emit one exact camera marker without an
+unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostic, pass the conservative visible-variance gate,
+and produce a complete 1600x900 PNG. The six fixed captures are validated privately, then published through
+the shared governance atomics, with `runtime-review.json` published last. Existing evidence is immutable and
+reusable only when every fixed byte, hash, and mode matches exactly.
 
 Published output:
 
@@ -96,8 +99,21 @@ artifacts/validation-previews/meshy/<asset_id>/
   runtime-review.json
 ```
 
-`runtime-review.json` records contract and cleaned-GLB hashes, the reviewed seed/lighting matrix,
-locked-isometric camera transform, per-capture output hashes, and pass status.
+`runtime-review.json` records the task identity, contract/R4/cleaned-GLB hashes, ordered seed/lighting matrix,
+actual finite locked-isometric camera transforms emitted by Godot, per-capture output hashes, and all-pass status;
+it contains no subjective aesthetic score or host path. After publication, the only allowed advancement is the
+in-memory evidence binder:
+
+```bash
+python3 tools/meshy_candidate_review.py bind \
+  --project-root . \
+  --task-dir "$TASK_DIR"
+```
+
+The binder derives evidence only from the governed task, canonical R4 report, fixed captures, and runtime report,
+then publishes the final `promotion_ready` review once. Re-running it is read-only idempotent verification; forged
+intermediate or promotion states fail full evidence verification. Runtime review is proposal/review evidence only:
+it never copies the asset into live runtime catalogs or wrappers.
 
 Expected marker (when a real staged task is supplied):
 
