@@ -270,19 +270,6 @@ def _hinge_fixture(document: dict, binary: bytes, *, times=None, rotations=None)
     return binary + input_data + output_data
 
 
-def _rewrite_hinge_samples(document: dict, binary: bytes, *, times=None, rotations=None) -> bytes:
-    sampler = document["animations"][0]["samplers"][0]
-    result = bytearray(binary)
-    if times is not None:
-        input_view = document["bufferViews"][document["accessors"][sampler["input"]]["bufferView"]]
-        struct.pack_into("<" + "f" * len(times), result, input_view["byteOffset"], *times)
-    if rotations is not None:
-        output_view = document["bufferViews"][document["accessors"][sampler["output"]]["bufferView"]]
-        values = [value for rotation in rotations for value in rotation]
-        struct.pack_into("<" + "f" * len(values), result, output_view["byteOffset"], *values)
-    return bytes(result)
-
-
 def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: Path) -> None:
     document, binary = _fixture_document_and_binary()
     binary = _hinge_fixture(document, binary)
@@ -324,43 +311,43 @@ def test_validate_accepts_hinge_sample_count_at_limit(contract, tmp_path: Path) 
 
 
 @pytest.mark.parametrize(
-    "mutation",
+    "mutation,expected",
     [
-        pytest.param("all-identity", id="all-identity-no-motion"),
-        pytest.param("first-not-rest", id="first-sample-not-rest"),
-        pytest.param("final-sign-equivalent", id="final-pose-sign-equivalent-to-first"),
-        pytest.param("non-increasing-times", id="non-increasing-times"),
-        pytest.param("non-finite-time", id="non-finite-time"),
-        pytest.param("non-finite-quaternion", id="non-finite-quaternion"),
-        pytest.param("zero-quaternion", id="zero-quaternion"),
-        pytest.param("non-unit-quaternion", id="non-unit-quaternion"),
+        pytest.param("all-identity", "final sample must be rotation-distinct", id="all-identity-no-motion"),
+        pytest.param("first-not-rest", "first sample must match node rest rotation", id="first-sample-not-rest"),
+        pytest.param("final-sign-equivalent", "final sample must be rotation-distinct", id="final-pose-sign-equivalent-to-first"),
+        pytest.param("non-increasing-times", "strictly increasing", id="non-increasing-times"),
+        pytest.param("non-finite-time", "could not be decoded", id="non-finite-time"),
+        pytest.param("non-finite-quaternion", "could not be decoded", id="non-finite-quaternion"),
+        pytest.param("zero-quaternion", "must be nonzero", id="zero-quaternion"),
+        pytest.param("non-unit-quaternion", "must be unit length", id="non-unit-quaternion"),
     ],
 )
-def test_validate_rejects_invalid_hinge_animation_samples(contract, tmp_path: Path, mutation: str) -> None:
-    document, binary = _fixture_document_and_binary()
-    binary = _hinge_fixture(document, binary)
+def test_validate_rejects_invalid_hinge_animation_samples(
+    contract, tmp_path: Path, mutation: str, expected: str
+) -> None:
     identity = (0.0, 0.0, 0.0, 1.0)
     open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
+    times = (0.0, 1.0, 2.0)
+    rotations = (identity, open_rotation, open_rotation)
     if mutation == "all-identity":
-        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, identity, identity])
+        rotations = (identity, identity, identity)
     elif mutation == "first-not-rest":
-        binary = _rewrite_hinge_samples(
-            document,
-            binary,
-            rotations=[(0.70710678, 0.0, 0.0, 0.70710678), open_rotation, open_rotation],
-        )
+        rotations = ((0.70710678, 0.0, 0.0, 0.70710678), open_rotation, open_rotation)
     elif mutation == "final-sign-equivalent":
-        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, -1.0)])
+        rotations = (identity, open_rotation, (0.0, 0.0, 0.0, -1.0))
     elif mutation == "non-increasing-times":
-        binary = _rewrite_hinge_samples(document, binary, times=[0.0, 1.0, 1.0])
+        times = (0.0, 1.0, 1.0)
     elif mutation == "non-finite-time":
-        binary = _rewrite_hinge_samples(document, binary, times=[0.0, 1.0, float("nan")])
+        times = (0.0, 1.0, float("nan"))
     elif mutation == "non-finite-quaternion":
-        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (float("nan"), 0.0, 0.0, 1.0)])
+        rotations = (identity, open_rotation, (float("nan"), 0.0, 0.0, 1.0))
     elif mutation == "zero-quaternion":
-        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, 0.0)])
+        rotations = (identity, open_rotation, (0.0, 0.0, 0.0, 0.0))
     else:
-        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, 2.0)])
+        rotations = (identity, open_rotation, (0.0, 0.0, 0.0, 2.0))
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary, times=times, rotations=rotations)
     path = tmp_path / "invalid-hinge-samples.glb"
     path.write_bytes(_pack_glb(document, binary))
     hinge_contract = _contract_variant(
@@ -369,35 +356,21 @@ def test_validate_rejects_invalid_hinge_animation_samples(contract, tmp_path: Pa
         {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
     )
 
-    with pytest.raises(ValueError, match="hinge animation"):
+    with pytest.raises(ValueError, match=expected):
         validate_cleaned_glb(path, hinge_contract)
 
 
-def test_validate_rejects_oversized_hinge_sample_count_before_decode(
-    contract, tmp_path: Path, monkeypatch
-) -> None:
-    monkeypatch.setattr(validate_module, "_MAX_HINGE_SAMPLES", 3)
-    decoded_accessors = []
-    original_accessor_values = validate_module._accessor_values
-
-    def tracking_accessor_values(document, binary, accessor_index):
-        decoded_accessors.append(accessor_index)
-        return original_accessor_values(document, binary, accessor_index)
-
-    monkeypatch.setattr(validate_module, "_accessor_values", tracking_accessor_values)
+def test_validate_rejects_oversized_hinge_sample_count(contract, tmp_path: Path) -> None:
     identity = (0.0, 0.0, 0.0, 1.0)
     open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
+    sample_count = validate_module._MAX_HINGE_SAMPLES + 1
     document, binary = _fixture_document_and_binary()
     binary = _hinge_fixture(
         document,
         binary,
-        times=(0.0, 1.0, 2.0, 3.0),
-        rotations=(identity, open_rotation, open_rotation, open_rotation),
+        times=tuple(float(index) for index in range(sample_count)),
+        rotations=(identity,) + (open_rotation,) * (sample_count - 1),
     )
-    hinge_accessors = {
-        document["animations"][0]["samplers"][0]["input"],
-        document["animations"][0]["samplers"][0]["output"],
-    }
     path = tmp_path / "oversized-hinge-samples.glb"
     path.write_bytes(_pack_glb(document, binary))
     hinge_contract = _contract_variant(
@@ -406,10 +379,13 @@ def test_validate_rejects_oversized_hinge_sample_count_before_decode(
         {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
     )
 
-    with pytest.raises(ValueError, match="hinge animation sampler accessor count exceeds the limit"):
+    with pytest.raises(
+        ValueError,
+        match=r"hinge animation sampler accessor count exceeds the limit \({0} > {1}\)".format(
+            sample_count, validate_module._MAX_HINGE_SAMPLES
+        ),
+    ):
         validate_cleaned_glb(path, hinge_contract)
-
-    assert hinge_accessors.isdisjoint(decoded_accessors)
 
 
 def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:

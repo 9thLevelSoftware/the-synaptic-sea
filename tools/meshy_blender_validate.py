@@ -35,6 +35,7 @@ _MAX_GLB_BYTES = 512 * 1024 * 1024
 _MAX_JSON_BYTES = 16 * 1024 * 1024
 _MAX_JSON_DEPTH = 64
 _MAX_PROCESS_OUTPUT = 1024 * 1024
+# Bound untrusted hinge-sampler decode; lid_open does not need dense baked keys.
 _MAX_HINGE_SAMPLES = 1024
 _CANONICAL_FIELDS = (
     "schema_version", "document_kind", "status", "task_id", "asset_id",
@@ -289,7 +290,11 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
         if output_count != input_count:
             raise BlenderValidationError("hinge animation sampler input and output accessor counts must match")
         if input_count > _MAX_HINGE_SAMPLES:
-            raise BlenderValidationError("hinge animation sampler accessor count exceeds the limit")
+            raise BlenderValidationError(
+                "hinge animation sampler accessor count exceeds the limit ({0} > {1})".format(
+                    input_count, _MAX_HINGE_SAMPLES
+                )
+            )
         if sampler.get("interpolation") != "LINEAR":
             raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
         try:
@@ -300,22 +305,18 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
         if len(input_samples.values) != input_count or len(output_samples.values) != output_count:
             raise BlenderValidationError("hinge animation samples could not be decoded")
         times = [float(sample[0]) for sample in input_samples.values]
-        if any(not math.isfinite(time) for time in times):
-            raise BlenderValidationError("hinge animation input times must be finite")
         if any(later <= earlier for earlier, later in zip(times, times[1:])):
             raise BlenderValidationError("hinge animation input times must be strictly increasing")
 
         quaternions: List[Tuple[float, float, float, float]] = []
         for sample in output_samples.values:
-            if len(sample) != 4 or any(not math.isfinite(float(value)) for value in sample):
-                raise BlenderValidationError("hinge animation quaternion samples must be finite")
-            length = math.sqrt(sum(float(value) * float(value) for value in sample))
-            if not math.isfinite(length) or length <= 1e-12:
+            values = tuple(float(value) for value in sample)
+            length = math.sqrt(sum(value * value for value in values))
+            if length <= 1e-12:
                 raise BlenderValidationError("hinge animation quaternion samples must be nonzero")
             if abs(length - 1.0) > 1e-4:
                 raise BlenderValidationError("hinge animation quaternion samples must be unit length")
-            qx, qy, qz, qw = (float(sample[index]) for index in range(4))
-            quaternions.append((qx / length, qy / length, qz / length, qw / length))
+            quaternions.append(values)
 
         rest_rotation = _finite_vector(
             node.get("rotation", [0.0, 0.0, 0.0, 1.0]),
