@@ -70,6 +70,7 @@ class _BlenderReimportEvidence:
 
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _ASSET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,111 @@ def _integer(value: Any, label: str, minimum: int = 0) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
         raise BlenderValidationError(label + " must be an integer >= " + str(minimum))
     return value
+
+
+_SUPPORTED_ANIMATION_KINDS = frozenset(
+    {
+        "hinge",
+        "optional_humanoid_biped_rig_after_selection",
+        "blender_segmented_chain_rig",
+        "godot_multimesh_particles_behavior",
+        "static_gameplay_prop",
+        "static_mesh",
+        "structural_architecture",
+        "environment",
+        "static",  # legacy fixture contract retained for validator compatibility
+    }
+)
+
+
+def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict[str, Any]) -> None:
+    animations = document.get("animations", [])
+    skins = document.get("skins", [])
+    if not isinstance(animations, list) or not isinstance(skins, list):
+        raise BlenderValidationError("animation and skin inventories must be arrays")
+
+    animation_document = contract_document.get("animation")
+    if not isinstance(animation_document, dict):
+        raise BlenderValidationError("contract animation policy must be an object")
+    kind = animation_document.get("kind")
+    if not isinstance(kind, str) or kind not in _SUPPORTED_ANIMATION_KINDS:
+        raise BlenderValidationError("contract animation kind is unsupported")
+
+    rigging_allowed = animation_document.get("meshy_rigging_allowed")
+    rigging_target = animation_document.get("rigging_target")
+    if kind == "hinge":
+        if rigging_allowed is not False or rigging_target != "non_humanoid":
+            raise BlenderValidationError("hinge animation contract flags are invalid")
+        if skins:
+            raise BlenderValidationError("hinge animation contract forbids skins")
+        if len(animations) != 1:
+            raise BlenderValidationError("hinge animation inventory must contain exactly one animation")
+        animation = animations[0]
+        if not isinstance(animation, dict) or animation.get("name") != "lid_open":
+            raise BlenderValidationError("hinge animation must be named lid_open")
+        channels = animation.get("channels")
+        samplers = animation.get("samplers")
+        if not isinstance(channels, list) or not channels or not isinstance(samplers, list) or not samplers:
+            raise BlenderValidationError("hinge animation channels and samplers must be non-empty arrays")
+        if len(channels) != 1 or len(samplers) != 1:
+            raise BlenderValidationError("hinge animation must contain exactly one channel and sampler")
+
+        channel = channels[0]
+        if not isinstance(channel, dict):
+            raise BlenderValidationError("hinge animation channel must be an object")
+        sampler_index = _integer(channel.get("sampler"), "hinge animation sampler index")
+        if sampler_index >= len(samplers):
+            raise BlenderValidationError("hinge animation sampler index is out of range")
+        target = channel.get("target")
+        if not isinstance(target, dict):
+            raise BlenderValidationError("hinge animation channel target must be an object")
+        node_index = _integer(target.get("node"), "hinge animation target node index")
+        nodes = document.get("nodes")
+        if not isinstance(nodes, list) or node_index >= len(nodes):
+            raise BlenderValidationError("hinge animation target node index is out of range")
+        node = nodes[node_index]
+        if not isinstance(node, dict) or node.get("name") != "HingePivot":
+            raise BlenderValidationError("hinge animation target node must be HingePivot")
+        if target.get("path") != "rotation":
+            raise BlenderValidationError("hinge animation target path must be rotation")
+
+        sampler = samplers[sampler_index]
+        if not isinstance(sampler, dict):
+            raise BlenderValidationError("hinge animation sampler must be an object")
+        accessors = document.get("accessors")
+        if not isinstance(accessors, list):
+            raise BlenderValidationError("hinge animation accessors must be an array")
+        accessor_indices = {}
+        for field in ("input", "output"):
+            accessor_index = _integer(sampler.get(field), "hinge animation sampler " + field + " accessor")
+            if accessor_index >= len(accessors):
+                raise BlenderValidationError("hinge animation sampler accessor index is out of range")
+            accessor_indices[field] = accessor_index
+        input_accessor = accessors[accessor_indices["input"]]
+        output_accessor = accessors[accessor_indices["output"]]
+        if not isinstance(input_accessor, dict) or not isinstance(output_accessor, dict):
+            raise BlenderValidationError("hinge animation sampler accessors must be objects")
+        if input_accessor.get("type") != "SCALAR" or input_accessor.get("componentType") != 5126:
+            raise BlenderValidationError("hinge animation sampler input must be a float SCALAR accessor")
+        input_count = _integer(input_accessor.get("count"), "hinge animation sampler input accessor count", 3)
+        if output_accessor.get("type") != "VEC4" or output_accessor.get("componentType") != 5126:
+            raise BlenderValidationError("hinge animation sampler output must be a float VEC4 accessor")
+        output_count = _integer(output_accessor.get("count"), "hinge animation sampler output accessor count")
+        if output_count != input_count:
+            raise BlenderValidationError("hinge animation sampler input and output accessor counts must match")
+        if sampler.get("interpolation") != "LINEAR":
+            raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
+        return
+
+    if kind == "optional_humanoid_biped_rig_after_selection":
+        if rigging_allowed is not True or rigging_target != "humanoid_biped":
+            raise BlenderValidationError("humanoid animation contract flags are invalid")
+        return
+
+    if rigging_allowed is not False or rigging_target != ("none" if kind == "static" else "non_humanoid"):
+        raise BlenderValidationError("non-humanoid animation contract flags are invalid")
+    if animations or skins:
+        raise BlenderValidationError("animation or rig data is forbidden by the contract")
 
 
 def _number(value: Any, label: str) -> float:
@@ -874,14 +980,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     declared_length = _integer(buffers[0].get("byteLength"), "buffer byteLength")
     _validate_images(document, views, declared_length)
     _validate_node_policies(document, worlds, bounds_min, bounds_max, contract_document, default_reachable)
-    animations = document.get("animations", [])
-    skins = document.get("skins", [])
-    if not isinstance(animations, list) or not isinstance(skins, list):
-        raise BlenderValidationError("animation and skin inventories must be arrays")
-    animation_document = contract_document.get("animation")
-    rigging_allowed = isinstance(animation_document, dict) and animation_document.get("meshy_rigging_allowed") is True
-    if (animations or skins) and (not rigging_allowed or animation_document.get("rigging_target") != "humanoid_biped"):  # type: ignore
-        raise BlenderValidationError("animation or rig data is forbidden by the contract")
+    _validate_animation_policy(document, contract_document)
     return {
         "schema_version": "1.0.0",
         "document_kind": "meshy_blender_validation",
@@ -967,11 +1066,19 @@ def verify_validation_report(
     report: Dict[str, Any],
     *,
     task_id: Optional[str] = None,
+    expected_contract_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Recompute and re-import one fixed R4 report without publishing it."""
 
+    if expected_contract_sha256 is not None and (
+        not isinstance(expected_contract_sha256, str)
+        or _HASH_RE.fullmatch(expected_contract_sha256) is None
+    ):
+        raise BlenderValidationError("expected contract hash must be lowercase 64-hex")
     _validate_report_record(report)
     expected = validate_cleaned_glb(cleaned_glb, contract, task_id=task_id)
+    if expected_contract_sha256 is not None:
+        expected["contract_sha256"] = expected_contract_sha256
     expected["blender_reimport_passed"] = True
     try:
         reimport_evidence = _reimport_with_blender(
@@ -1036,6 +1143,51 @@ def _resolve_task_inputs(project_root: PathLike, contract_path: PathLike, task_d
     return contract, cleaned, report
 
 
+def _resolve_verify_inputs(
+    project_root: PathLike,
+    contract_path: PathLike,
+    task_dir: PathLike,
+    glb_alias: PathLike,
+    report_alias: PathLike,
+) -> Tuple[AssetContract, str, Path, Path]:
+    """Resolve governed source/artifact bindings for fixed report verification."""
+
+    _caller_contract, cleaned, report = _resolve_task_inputs(
+        project_root, contract_path, task_dir, glb_alias, report_alias
+    )
+    try:
+        from tools import meshy_candidate_review as candidate_review
+
+        review_path, review, generation, root, _asset_root = candidate_review._load_task_record(
+            project_root, task_dir
+        )
+        if review.get("state") != "selected" or generation.get("status") != "SUCCEEDED":
+            raise BlenderValidationError(
+                "verify-only requires a selected review and SUCCEEDED generation"
+            )
+        resolved_task = Path(review_path).parent
+        task_contract_path = candidate_review._governed_artifact(
+            root, resolved_task, "contract.json"
+        )
+        task_contract_document, task_contract_raw = governance.strict_load_json_bytes(
+            task_contract_path, "task contract", 4 * 1024 * 1024
+        )
+        if task_contract_raw != canonical_json_bytes(task_contract_document):
+            raise BlenderValidationError("task contract is not canonical JSON")
+        task_contract = load_contract(task_contract_path)
+        if (
+            task_contract.asset_id != resolved_task.parent.name
+            or generation.get("contract_artifact_sha256")
+            != hashlib.sha256(task_contract_raw).hexdigest()
+        ):
+            raise BlenderValidationError("task contract artifact is not bound")
+        return task_contract, str(generation["contract_sha256"]), cleaned, report
+    except BlenderValidationError:
+        raise
+    except Exception as exc:
+        raise BlenderValidationError("verify-only task evidence is not fully governed: " + str(exc)) from exc
+
+
 def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None) -> None:
     """Publish one fully validated PASS at the fixed task-local report leaf."""
 
@@ -1063,7 +1215,13 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
     if report.get("contract_sha256") != generation.get("contract_sha256"):
         raise BlenderValidationError("validation report contract hash is not bound")
     cleaned = resolved_task / "cleaned.glb"
-    verify_validation_report(cleaned, task_contract, report, task_id=resolved_task.name)
+    verify_validation_report(
+        cleaned,
+        task_contract,
+        report,
+        task_id=resolved_task.name,
+        expected_contract_sha256=generation["contract_sha256"],
+    )
     try:
         governance.atomic_write_json(target, report, project_root=root, allowed_root=resolved_task, mode=0o600)
         persisted, raw = governance.strict_load_json_bytes(target, "Blender validation report", 4 * 1024 * 1024)
@@ -1125,7 +1283,6 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
 
     task_dir = Path(glb_path).parent
     contract_path = task_dir / "contract.json"
-    report_path = task_dir / "blender-validation.json"
     command = [
         BLENDER_PATH,
         "--background",
@@ -1141,9 +1298,9 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
         str(task_dir),
         "--glb",
         str(glb_path),
-        "--report",
-        str(report_path),
-        "--verify-only",
+        "--reimport-only",
+        "--expected-triangles",
+        str(expected_triangles),
     ]
     try:
         result = _run_bounded_process(command, cwd=task_dir, timeout=120.0)
@@ -1156,9 +1313,10 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
     if result.returncode != 0:
         raise BlenderValidationError("Blender re-import process failed: " + (stderr or stdout)[-4096:])
     matches = list(re.finditer(
-        r"MESHY BLENDER VALIDATION VERIFY PASS sha256=(?P<sha256>[0-9a-f]{64}) "
-        r"byte_size=(?P<byte_size>[0-9]+) triangle_count=(?P<triangle_count>[0-9]+)",
+        r"^MESHY BLENDER REIMPORT PASS sha256=(?P<sha256>[0-9a-f]{64}) "
+        r"byte_size=(?P<byte_size>[0-9]+) triangle_count=(?P<triangle_count>[0-9]+)$",
         stdout,
+        re.MULTILINE,
     ))
     if len(matches) != 1:
         raise BlenderValidationError("Blender re-import process did not emit canonical authority")
@@ -1171,6 +1329,48 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
     return evidence
 
 
+def _positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("expected a positive integer")
+    return parsed
+
+
+def _reimport_only_inputs(args: argparse.Namespace) -> Tuple[Path, int]:
+    if not _is_blender_runtime():
+        raise BlenderValidationError("reimport-only requires Blender runtime")
+    try:
+        import bpy  # type: ignore  # noqa: F401
+    except Exception as exc:
+        raise BlenderValidationError("reimport-only requires Blender runtime") from exc
+    if args.glb is None:
+        raise BlenderValidationError("reimport-only requires --glb")
+    if args.expected_triangles is None:
+        raise BlenderValidationError("reimport-only requires --expected-triangles")
+    if not isinstance(args.expected_triangles, int) or isinstance(args.expected_triangles, bool) or args.expected_triangles <= 0:
+        raise BlenderValidationError("reimport-only requires positive --expected-triangles")
+    if args.report is not None:
+        raise BlenderValidationError("reimport-only does not accept --report")
+    task_dir = Path(args.task_dir).expanduser().resolve()
+    cleaned = Path(args.glb).expanduser().resolve()
+    contract_path = Path(args.contract).expanduser().resolve()
+    if cleaned != task_dir / "cleaned.glb":
+        raise BlenderValidationError("reimport-only GLB must be the exact task cleaned.glb leaf")
+    if contract_path != task_dir / "contract.json":
+        raise BlenderValidationError("reimport-only contract must be the exact task contract.json leaf")
+    for path, label in ((cleaned, "cleaned.glb"), (contract_path, "contract.json")):
+        try:
+            info = os.lstat(path)
+        except OSError as exc:
+            raise BlenderValidationError("reimport-only " + label + " is missing") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise BlenderValidationError("reimport-only " + label + " must be a regular file")
+    return cleaned, args.expected_triangles
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, required=True)
@@ -1178,7 +1378,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task-dir", type=Path, required=True)
     parser.add_argument("--glb", type=Path, required=False)
     parser.add_argument("--report", type=Path, required=False)
-    parser.add_argument("--verify-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--verify-only", action="store_true")
+    mode.add_argument("--reimport-only", action="store_true")
+    parser.add_argument("--expected-triangles", type=_positive_integer, required=False)
     return parser
 
 
@@ -1212,22 +1415,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.verify_only:
             if args.glb is None or args.report is None:
                 raise BlenderValidationError("verify-only requires --glb and --report")
-            task_dir = Path(args.task_dir).expanduser().resolve()
-            cleaned = Path(args.glb).expanduser().resolve()
-            report_path = Path(args.report).expanduser().resolve()
-            if cleaned != task_dir / "cleaned.glb" or report_path != task_dir / "blender-validation.json":
-                raise BlenderValidationError("verify-only paths must be exact task leaves")
-            contract_path = Path(args.contract).expanduser().resolve()
-            if contract_path != task_dir / "contract.json":
-                raise BlenderValidationError("verify-only contract must be the exact task leaf")
-            contract = load_contract(contract_path)
+            task_contract, source_contract_hash, cleaned, report_path = _resolve_verify_inputs(
+                args.project_root,
+                args.contract,
+                args.task_dir,
+                args.glb,
+                args.report,
+            )
             report, raw = governance.strict_load_json_bytes(
                 report_path, "Blender validation report", 4 * 1024 * 1024
             )
             if raw != canonical_json_bytes(report):
                 raise BlenderValidationError("Blender validation report is not canonical JSON")
+            _validate_report_record(report)
+            if report.get("contract_sha256") != source_contract_hash:
+                raise BlenderValidationError("validation report contract hash is not bound")
             expected = verify_validation_report(
-                cleaned, contract, report, task_id=task_dir.name
+                cleaned,
+                task_contract,
+                report,
+                task_id=cleaned.parent.name,
+                expected_contract_sha256=source_contract_hash,
             )
             print(
                 "MESHY BLENDER VALIDATION VERIFY PASS sha256={0} byte_size={1} triangle_count={2}".format(
@@ -1235,6 +1443,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 )
             )
             return 0
+        if args.reimport_only:
+            cleaned, expected_triangles = _reimport_only_inputs(args)
+            evidence = _reimport_with_blender(cleaned, expected_triangles)
+            print(
+                "MESHY BLENDER REIMPORT PASS sha256={0} byte_size={1} triangle_count={2}".format(
+                    evidence.sha256, evidence.byte_size, evidence.triangle_count
+                )
+            )
+            return 0
+        if args.expected_triangles is not None:
+            raise BlenderValidationError("--expected-triangles requires --reimport-only")
         contract, cleaned, report_path = _resolve_task_inputs(args.project_root, args.contract, args.task_dir, args.glb, args.report)
         report = validate_cleaned_glb(cleaned, contract, task_id=cleaned.parent.name)
         report["blender_reimport_passed"] = True

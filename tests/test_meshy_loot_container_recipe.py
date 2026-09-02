@@ -1,0 +1,1282 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from tools.meshy_asset_contract import load_contract
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT_PATH = ROOT / "data/asset_generation/contracts/loot_container_derelict_v1.json"
+TASK_ID = "01a05dcb-fc3b-7418-b105-2170af354088"
+ASSET_ID = "loot_container_derelict_v1"
+
+
+def _task_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
+    project_root = tmp_path / "project"
+    task_dir = project_root / f"assets/_staging/meshy/{ASSET_ID}/{TASK_ID}"
+    evidence_dir = tmp_path / "external-evidence" / ASSET_ID
+    task_dir.mkdir(parents=True)
+    evidence_dir.mkdir(parents=True)
+    return project_root, task_dir, evidence_dir
+
+
+def test_host_import_does_not_import_bpy() -> None:
+    sys.modules.pop("bpy", None)
+    from tools import meshy_loot_container_recipe as recipe
+
+    assert "bpy" not in sys.modules
+    assert recipe.ASSET_ID == ASSET_ID
+    assert recipe.SELECTED_TASK_ID == TASK_ID
+    assert recipe.BLENDER == "/opt/homebrew/bin/blender"
+
+
+def test_paths_are_exact_and_keep_evidence_external(tmp_path: Path, monkeypatch) -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    master_root = tmp_path / "trusted-master"
+    trusted_evidence_root = tmp_path / "trusted-evidence"
+    trusted_evidence_root.mkdir()
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    evidence_dir.mkdir()
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master_root)
+    monkeypatch.setattr(recipe, "TRUSTED_EVIDENCE_ROOT", trusted_evidence_root)
+
+    paths = recipe.derive_recipe_paths(project_root, task_dir, evidence_dir)
+
+    assert paths.project_root == project_root.resolve()
+    assert paths.task_dir == task_dir.resolve()
+    assert paths.master_path == master_root / ASSET_ID / f"{ASSET_ID}_master.blend"
+    assert paths.evidence_dir == evidence_dir.resolve()
+    assert paths.scratch_glb == evidence_dir / "cleaned.preview.glb"
+    assert paths.manifest_path == evidence_dir / "build_recipe_manifest.json"
+    assert paths.evidence_dir.is_relative_to(trusted_evidence_root)
+    assert not paths.evidence_dir.is_relative_to(project_root.resolve())
+
+
+def test_derive_recipe_paths_rejects_symlinked_asset_directory(tmp_path: Path, monkeypatch) -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    master_root = tmp_path / "trusted-master"
+    outside = tmp_path / "outside-master"
+    outside.mkdir()
+    (outside / f"{ASSET_ID}_master.blend").write_bytes(b"outside master")
+    master_root.mkdir()
+    (master_root / ASSET_ID).symlink_to(outside, target_is_directory=True)
+    trusted_evidence_root = tmp_path / "trusted-evidence"
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    evidence_dir.mkdir(parents=True)
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master_root)
+    monkeypatch.setattr(recipe, "TRUSTED_EVIDENCE_ROOT", trusted_evidence_root)
+
+    with pytest.raises(ValueError, match="symlink"):
+        recipe.derive_recipe_paths(project_root, task_dir, evidence_dir)
+
+
+def test_derive_recipe_paths_rejects_symlinked_canonical_master_leaf(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    master_root = tmp_path / "trusted-master"
+    asset_root = master_root / ASSET_ID
+    asset_root.mkdir(parents=True)
+    outside = tmp_path / "outside-master.blend"
+    outside.write_bytes(b"outside master")
+    (asset_root / f"{ASSET_ID}_master.blend").symlink_to(outside)
+    trusted_evidence_root = tmp_path / "trusted-evidence"
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    evidence_dir.mkdir(parents=True)
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master_root)
+    monkeypatch.setattr(recipe, "TRUSTED_EVIDENCE_ROOT", trusted_evidence_root)
+
+    with pytest.raises(ValueError, match="symlink"):
+        recipe.derive_recipe_paths(project_root, task_dir, evidence_dir)
+
+
+def _valid_manifest(master_path: Path) -> dict[str, Any]:
+    digest = "a" * 64
+    return {
+        "schema_version": "1.0.0",
+        "document_kind": "loot_container_master_recipe",
+        "asset_id": ASSET_ID,
+        "task_id": TASK_ID,
+        "contract_sha256": digest,
+        "raw_sha256": "b" * 64,
+        "master_path": str(master_path),
+        "objects": [
+            "ContainerRoot",
+            "ContainerBody",
+            "HingePivot",
+            "ContainerLid",
+            "FrontHandle",
+            "LatchLeft",
+            "LatchRight",
+            "LootVisual",
+        ],
+        "states": {"closed": 1, "open": 30, "looted": 60},
+        "hinge": {"axis": "X", "open_degrees": 105.0},
+        "dimensions_m": [0.9, 0.55, 0.65],
+        "triangle_count": 3000,
+        "materials": ["painted_ship_alloy", "warning_accent"],
+        "uvs_present": True,
+        "source_raw_preserved": True,
+        "runtime_promoted": False,
+        "renders": {"closed": "closed.png", "open": "open.png", "looted": "looted.png"},
+    }
+
+
+def test_manifest_document_accepts_exact_contract() -> None:
+    from tools.meshy_loot_container_recipe import validate_manifest_document
+
+    assert validate_manifest_document(_valid_manifest(Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend"))) == []
+
+
+def test_manifest_document_rejects_missing_and_extra_top_level_fields() -> None:
+    from tools.meshy_loot_container_recipe import validate_manifest_document
+
+    document = _valid_manifest(Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend"))
+    document.pop("renders")
+    document["unexpected"] = True
+
+    errors = validate_manifest_document(document)
+
+    assert any("missing top-level field: renders" in error for error in errors)
+    assert any("unknown top-level field: unexpected" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda document: document.update(asset_id="other_asset"),
+        lambda document: document.update(task_id="other-task"),
+        lambda document: document.update(contract_sha256="A" * 64),
+        lambda document: document.update(raw_sha256="not-a-hash"),
+        lambda document: document.update(master_path="/repo/assets/imported/loot.glb"),
+        lambda document: document.update(objects=["ContainerRoot"]),
+        lambda document: document.update(states={"closed": 1, "open": 31, "looted": 60}),
+        lambda document: document.update(hinge={"axis": "Y", "open_degrees": 105.0}),
+        lambda document: document.update(dimensions_m=[0.92, 0.55, 0.65]),
+        lambda document: document.update(triangle_count=3001),
+        lambda document: document.update(materials=["warning_accent", "painted_ship_alloy"]),
+        lambda document: document.update(uvs_present=False),
+        lambda document: document.update(source_raw_preserved=False),
+        lambda document: document.update(runtime_promoted=True),
+        lambda document: document.update(renders=[]),
+    ],
+)
+def test_manifest_document_rejects_policy_violations(mutate) -> None:
+    from tools.meshy_loot_container_recipe import validate_manifest_document
+
+    document = _valid_manifest(Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend"))
+    mutate(document)
+
+    assert validate_manifest_document(document)
+
+
+def test_manifest_materials_accept_one_permitted_name_in_canonical_order() -> None:
+    from tools.meshy_loot_container_recipe import validate_manifest_document
+
+    one = _valid_manifest(Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend"))
+    one["materials"] = ["painted_ship_alloy"]
+    assert validate_manifest_document(one) == []
+
+    empty = _valid_manifest(Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend"))
+    empty["materials"] = []
+    assert validate_manifest_document(empty)
+
+
+def test_manifest_document_accepts_empty_renders_for_task_one() -> None:
+    from tools.meshy_loot_container_recipe import validate_manifest_document
+
+    document = _valid_manifest(Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/"
+        "loot_container_derelict_v1/loot_container_derelict_v1_master.blend"
+    ))
+    document["renders"] = {}
+
+    assert validate_manifest_document(document) == []
+
+
+def _governed_inputs(tmp_path: Path, monkeypatch):
+    from tools import meshy_candidate_review as candidate_review
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    master_root = tmp_path / "masters"
+    trusted_evidence_root = tmp_path / "evidence"
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    master_path = master_root / ASSET_ID / f"{ASSET_ID}_master.blend"
+    master_path.parent.mkdir(parents=True)
+    trusted_evidence_root.mkdir()
+    evidence_dir.mkdir()
+    master_path.write_bytes(b"canonical master")
+    os.chmod(master_path, 0o600)
+    raw = b"raw glb bytes"
+    raw_path = task_dir / "raw.glb"
+    raw_path.write_bytes(raw)
+    os.chmod(raw_path, 0o600)
+    contract = load_contract(CONTRACT_PATH)
+    contract_path = project_root / "contract.json"
+    contract_path.write_bytes(CONTRACT_PATH.read_bytes())
+    review = {"asset_id": ASSET_ID, "task_id": TASK_ID, "state": "selected"}
+    generation = {
+        "asset_id": ASSET_ID,
+        "task_id": TASK_ID,
+        "status": "SUCCEEDED",
+        "contract_sha256": contract.sha256,
+        "outputs": {
+            "raw.glb": {"sha256": hashlib.sha256(raw).hexdigest(), "byte_size": len(raw)}
+        },
+    }
+    review_path = task_dir / "review.json"
+    review_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master_root)
+    monkeypatch.setattr(recipe, "TRUSTED_EVIDENCE_ROOT", trusted_evidence_root)
+    monkeypatch.setattr(
+        candidate_review,
+        "_load_task_record",
+        lambda *_args: (review_path, review, generation, project_root, project_root / f"assets/_staging/meshy/{ASSET_ID}"),
+    )
+    return recipe, project_root, task_dir, evidence_dir, master_path, contract
+
+
+def test_resolve_recipe_paths_rechecks_master_candidate_after_derivation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    recipe, project_root, task_dir, evidence_dir, master_path, _contract = _governed_inputs(
+        tmp_path, monkeypatch
+    )
+    asset_root = master_path.parent
+    outside = tmp_path / "outside-master"
+
+    original_derive = recipe.derive_recipe_paths
+
+    def derive_then_rebind(*args):
+        paths = original_derive(*args)
+        asset_root.rename(outside)
+        asset_root.symlink_to(outside, target_is_directory=True)
+        return paths
+
+    monkeypatch.setattr(recipe, "derive_recipe_paths", derive_then_rebind)
+
+    with pytest.raises(ValueError, match="symlink"):
+        recipe.resolve_recipe_paths(
+            project_root, project_root / "contract.json", task_dir, evidence_dir
+        )
+
+
+def test_validate_recipe_inputs_rechecks_master_before_copy_after_asset_rebind(
+    tmp_path: Path, monkeypatch
+) -> None:
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", paths.master_path.parent.parent)
+    assert recipe._derive_master_path() == paths.master_path
+
+    asset_root = paths.master_path.parent
+    outside = tmp_path / "outside-master"
+    asset_root.rename(outside)
+    asset_root.symlink_to(outside, target_is_directory=True)
+    copy_calls = []
+
+    def copy2(*args, **kwargs):
+        copy_calls.append((args, kwargs))
+        raise AssertionError("master copy must not be reached")
+
+    monkeypatch.setattr(recipe.shutil, "copy2", copy2)
+
+    with pytest.raises(ValueError, match="symlink"):
+        recipe.run_blender_recipe(paths, contract, "preview")
+    assert copy_calls == []
+
+
+def test_resolve_recipe_paths_reuses_governed_selected_task_and_hash(tmp_path: Path, monkeypatch) -> None:
+    recipe, project_root, task_dir, evidence_dir, master_path, contract = _governed_inputs(
+        tmp_path, monkeypatch
+    )
+
+    loaded, paths = recipe.resolve_recipe_paths(
+        project_root, project_root / "contract.json", task_dir, evidence_dir
+    )
+
+    assert loaded.sha256 == contract.sha256
+    assert paths.task_dir == task_dir.resolve()
+    assert paths.master_path == master_path
+    assert paths.scratch_glb == evidence_dir / "cleaned.preview.glb"
+
+
+def test_resolve_recipe_paths_rejects_unselected_or_failed_task(tmp_path: Path, monkeypatch) -> None:
+    recipe, project_root, task_dir, evidence_dir, _master_path, _contract = _governed_inputs(
+        tmp_path, monkeypatch
+    )
+    from tools import meshy_candidate_review as candidate_review
+
+    review_path, review, generation, root, asset_root = candidate_review._load_task_record(
+        project_root, task_dir
+    )
+    review["state"] = "pending"
+    with pytest.raises(ValueError, match="selected"):
+        recipe.resolve_recipe_paths(project_root, project_root / "contract.json", task_dir, evidence_dir)
+
+    review["state"] = "selected"
+    generation["status"] = "FAILED"
+    with pytest.raises(ValueError, match="SUCCEEDED"):
+        recipe.resolve_recipe_paths(project_root, project_root / "contract.json", task_dir, evidence_dir)
+
+    assert review_path.parent == task_dir
+    assert root == project_root
+    assert asset_root == project_root / f"assets/_staging/meshy/{ASSET_ID}"
+
+
+def test_publish_cleaned_is_idempotent_and_returns_hash(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import publish_cleaned
+
+    allowed_root = tmp_path / "evidence"
+    allowed_root.mkdir(mode=0o700)
+    source = tmp_path / "source.glb"
+    destination = allowed_root / "cleaned.glb"
+    payload = b"cleaned glb"
+    source.write_bytes(payload)
+
+    first = publish_cleaned(source, destination, allowed_root)
+    second = publish_cleaned(source, destination, allowed_root)
+
+    expected = hashlib.sha256(payload).hexdigest()
+    assert first == second
+    assert first.path == destination
+    assert first.sha256 == expected
+    assert first.byte_size == len(payload)
+    assert destination.read_bytes() == payload
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+
+
+def test_publish_cleaned_rejects_mismatch_without_touching_destination(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import publish_cleaned
+
+    allowed_root = tmp_path / "evidence"
+    allowed_root.mkdir(mode=0o700)
+    source = tmp_path / "source.glb"
+    destination = allowed_root / "cleaned.glb"
+    source.write_bytes(b"new bytes")
+    destination.write_bytes(b"old bytes")
+
+    with pytest.raises(ValueError, match="does not match|mismatch|already exists"):
+        publish_cleaned(source, destination, allowed_root)
+    assert destination.read_bytes() == b"old bytes"
+
+
+def test_publish_cleaned_rejects_destination_escape_and_symlink(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import publish_cleaned
+
+    allowed_root = tmp_path / "evidence"
+    allowed_root.mkdir(mode=0o700)
+    source = tmp_path / "source.glb"
+    source.write_bytes(b"source")
+    outside = tmp_path / "outside.glb"
+    outside.write_bytes(b"untouched")
+
+    with pytest.raises(ValueError, match="allowed|outside"):
+        publish_cleaned(source, tmp_path / "escape.glb", allowed_root)
+
+    linked = allowed_root / "cleaned.glb"
+    linked.symlink_to(outside)
+    with pytest.raises(ValueError, match="symlink"):
+        publish_cleaned(source, linked, allowed_root)
+    assert outside.read_bytes() == b"untouched"
+
+
+def test_publish_cleaned_rejects_symlinked_allowed_root(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import publish_cleaned
+
+    canonical_tmp_path = tmp_path.resolve()
+    real_allowed_root = canonical_tmp_path / "real-evidence"
+    real_allowed_root.mkdir(mode=0o700)
+    symlinked_allowed_root = canonical_tmp_path / "alias-evidence"
+    symlinked_allowed_root.symlink_to(real_allowed_root, target_is_directory=True)
+    source = canonical_tmp_path / "source.glb"
+    source.write_bytes(b"source")
+
+    with pytest.raises(ValueError, match="allowed root.*symlink|symlink"):
+        publish_cleaned(source, real_allowed_root / "cleaned.glb", symlinked_allowed_root)
+
+
+def test_build_blender_command_has_exact_argv(tmp_path: Path) -> None:
+    from tools.meshy_loot_container_recipe import build_blender_command, derive_recipe_paths
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    trusted_evidence_root = tmp_path / "evidence"
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    evidence_dir.mkdir(parents=True)
+    import tools.meshy_loot_container_recipe as recipe
+
+    original = recipe.TRUSTED_EVIDENCE_ROOT
+    recipe.TRUSTED_EVIDENCE_ROOT = trusted_evidence_root
+    try:
+        paths = derive_recipe_paths(project_root, task_dir, evidence_dir)
+        contract_path = project_root / "contract.json"
+        command = build_blender_command(paths, contract_path, "preview")
+    finally:
+        recipe.TRUSTED_EVIDENCE_ROOT = original
+
+    assert command == [
+        "/opt/homebrew/bin/blender",
+        "--background",
+        str(paths.master_path),
+        "--python",
+        str(paths.project_root / "tools/meshy_loot_container_recipe.py"),
+        "--",
+        "--project-root",
+        str(paths.project_root),
+        "--contract",
+        str(contract_path),
+        "--task-dir",
+        str(paths.task_dir),
+        "--evidence-dir",
+        str(paths.evidence_dir),
+        "--mode",
+        "preview",
+    ]
+
+
+@pytest.mark.parametrize("mode", ["", "author", "export", "publish"])
+def test_build_blender_command_rejects_unknown_mode(tmp_path: Path, mode: str) -> None:
+    from tools.meshy_loot_container_recipe import build_blender_command, derive_recipe_paths
+    import tools.meshy_loot_container_recipe as recipe
+
+    project_root, task_dir, _ = _task_layout(tmp_path)
+    trusted_evidence_root = tmp_path / "evidence"
+    evidence_dir = trusted_evidence_root / ASSET_ID
+    evidence_dir.mkdir(parents=True)
+    original = recipe.TRUSTED_EVIDENCE_ROOT
+    recipe.TRUSTED_EVIDENCE_ROOT = trusted_evidence_root
+    try:
+        paths = derive_recipe_paths(project_root, task_dir, evidence_dir)
+    finally:
+        recipe.TRUSTED_EVIDENCE_ROOT = original
+
+    with pytest.raises(ValueError, match="mode"):
+        build_blender_command(paths, project_root / "contract.json", mode)
+
+
+def test_cli_recognizes_modes_without_importing_bpy() -> None:
+    sys.modules.pop("bpy", None)
+    script = ROOT / "tools/meshy_loot_container_recipe.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "preview" in result.stdout
+    assert "publish-cleaned" in result.stdout
+    assert "bpy" not in sys.modules
+
+
+def test_recipe_declares_functional_hierarchy_and_no_decimator() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    source = (ROOT / "tools/meshy_loot_container_recipe.py").read_text(encoding="utf-8")
+    for name in (
+        "ContainerBody",
+        "HingePivot",
+        "ContainerLid",
+        "FrontHandle",
+        "LatchLeft",
+        "LatchRight",
+        "LootVisual",
+    ):
+        assert name in source
+    assert "DECIMATE" not in source
+    assert not any("collision" in name.lower() for name in recipe.EXPORT_OBJECT_NAMES)
+
+
+def test_lid_open_evidence_rejects_duplicate_state_meshes_and_wrong_action() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    valid = {
+        "action_names": ["lid_open"],
+        "state_mesh_names": list(recipe.EXPORT_OBJECT_NAMES),
+    }
+    assert recipe.validate_functional_evidence(valid) == []
+
+    duplicate = dict(valid)
+    duplicate["action_names"] = ["lid_open", "lid_open"]
+    assert recipe.validate_functional_evidence(duplicate)
+
+    state_copy = dict(valid)
+    state_copy["state_mesh_names"] = list(recipe.EXPORT_OBJECT_NAMES) + ["ContainerBody_closed"]
+    assert recipe.validate_functional_evidence(state_copy)
+
+
+def test_validate_manifest_accepts_expected_master_path_for_disposable_copy(tmp_path: Path) -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    disposable_master = tmp_path / "loot_container_derelict_v1_master.blend"
+    document = _valid_manifest(disposable_master)
+    assert recipe.validate_manifest_document(document, expected_master_path=disposable_master) == []
+
+
+def _run_blender_inspection(blender: Path, blend_path: Path, expression: str) -> dict[str, Any]:
+    from tools.meshy_blender_master import _run_bounded_process
+
+    result = _run_bounded_process(
+        [str(blender), "--background", "--factory-startup", str(blend_path), "--python-expr", expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    output = result.stdout.decode("utf-8", "replace") if isinstance(result.stdout, bytes) else str(result.stdout)
+    assert result.returncode == 0, result.stderr
+    records = [json.loads(line.split("=", 1)[1]) for line in output.splitlines() if line.startswith("TASK2_JSON=")]
+    assert len(records) == 1, output
+    return records[0]
+
+
+def test_real_blender_recipe_is_deterministic_and_preserves_disposable_master(
+    monkeypatch,
+) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+    runs: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="meshy-task2-", dir="/private/var/tmp") as temporary:
+        root = Path(temporary)
+        for index in (1, 2):
+            case = root / ("case-" + str(index))
+            master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+            task = case / "task"
+            evidence = case / "evidence"
+            master.parent.mkdir(parents=True)
+            task.mkdir(parents=True)
+            evidence.mkdir(parents=True)
+            shutil.copy2(canonical_master, master)
+            shutil.copy2(canonical_raw, task / "raw.glb")
+            paths = recipe.RecipePaths(
+                project_root=ROOT,
+                task_dir=task,
+                master_path=master,
+                evidence_dir=evidence,
+                scratch_glb=evidence / "cleaned.preview.glb",
+                manifest_path=evidence / "build_recipe_manifest.json",
+            )
+            monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master.parent.parent)
+            result = recipe.run_blender_recipe(paths, contract, "preview")
+            assert result["asset_id"] == ASSET_ID
+            assert result["states"] == {"closed": 1, "open": 30, "looted": 60}
+            assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+            assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+            assert result["triangle_count"] <= 1500
+            assert "LOOT CONTAINER RECIPE PASS mode=preview asset=loot_container_derelict_v1 states=closed,open,looted" in result["marker"]
+            assert all((evidence / leaf).is_file() for leaf in ("closed.png", "open.png", "looted.png", "states_contact_sheet.png", "cleaned.preview.glb"))
+            assert result["renders"]["open.png"] != result["renders"]["looted.png"]
+            assert (case / "source" / ASSET_ID / "build_recipe_manifest.json").is_file()
+            assert json.loads((evidence / "build_recipe_manifest.json").read_text()) == json.loads((case / "source" / ASSET_ID / "build_recipe_manifest.json").read_text())
+            glb_hash = hashlib.sha256((evidence / "cleaned.preview.glb").read_bytes()).hexdigest()
+            runs.append({"manifest": result, "glb_hash": glb_hash, "master": master, "evidence": evidence})
+
+        first_manifest = dict(runs[0]["manifest"])
+        second_manifest = dict(runs[1]["manifest"])
+        first_manifest.pop("runtime_evidence", None)
+        first_manifest.pop("stdout", None)
+        first_manifest.pop("stderr", None)
+        first_manifest.pop("marker", None)
+        second_manifest.pop("runtime_evidence", None)
+        second_manifest.pop("stdout", None)
+        second_manifest.pop("stderr", None)
+        second_manifest.pop("marker", None)
+        first_manifest["master_path"] = "MASTER"
+        second_manifest["master_path"] = "MASTER"
+        assert first_manifest == second_manifest
+        assert runs[0]["glb_hash"] == runs[1]["glb_hash"]
+        assert runs[0]["manifest"]["renders"] == runs[1]["manifest"]["renders"]
+
+        master_expression = """import bpy, json, math
+scene=bpy.context.scene
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+frames=[]
+for frame in (1,30,60):
+    scene.frame_set(frame)
+    frames.append([round(math.degrees(bpy.data.objects['HingePivot'].rotation_euler.x),6), bool(bpy.data.objects['LootVisual'].hide_render)])
+print('TASK2_JSON='+json.dumps({'objects':[name for name in required if bpy.data.objects.get(name)],'raw':bool(bpy.data.objects.get('mesh_node') and bpy.data.objects['mesh_node'].users_collection[0].name=='SOURCE_RAW'),'markers':sorted(o.name for o in bpy.data.objects if o.name in ['ORIGIN_MARKER','FORWARD_Z_MARKER']),'actions':sorted(a.name for a in bpy.data.actions),'frames':frames,'root':list(bpy.data.objects['ContainerRoot'].location),'parents':{name:(bpy.data.objects[name].parent.name if bpy.data.objects[name].parent else None) for name in required}}))"""
+        master_info = _run_blender_inspection(blender, runs[0]["master"], master_expression)
+        assert master_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert master_info["raw"] is True
+        assert master_info["markers"] == ["FORWARD_Z_MARKER", "ORIGIN_MARKER"]
+        assert master_info["actions"] == ["lid_open"]
+        assert master_info["frames"] == [[0.0, True], [-105.0, False], [-105.0, True]]
+        assert master_info["root"] == [0.0, 0.0, 0.0]
+        assert master_info["parents"]["ContainerLid"] == "HingePivot"
+        assert master_info["parents"]["HingePivot"] == "ContainerRoot"
+
+        glb_expression = """import bpy, json
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=r'''%s''')
+print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual'] if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions)}))""" % str(runs[0]["evidence"] / "cleaned.preview.glb")
+        glb_info = _run_blender_inspection(blender, runs[0]["master"], glb_expression)
+        assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert glb_info["actions"] == ["lid_open"]
+
+
+def test_real_blender_front_hardware_geometry_and_hinge_follow(monkeypatch) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+
+    with tempfile.TemporaryDirectory(prefix="meshy-front-hardware-", dir="/private/var/tmp") as temporary:
+        root = Path(temporary)
+        master = root / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+        task = root / "task"
+        evidence = root / "evidence"
+        master.parent.mkdir(parents=True)
+        task.mkdir()
+        evidence.mkdir()
+        shutil.copy2(canonical_master, master)
+        shutil.copy2(canonical_raw, task / "raw.glb")
+        paths = recipe.RecipePaths(
+            project_root=ROOT,
+            task_dir=task,
+            master_path=master,
+            evidence_dir=evidence,
+            scratch_glb=evidence / "cleaned.preview.glb",
+            manifest_path=evidence / "build_recipe_manifest.json",
+        )
+        monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master.parent.parent)
+
+        result = recipe.run_blender_recipe(paths, contract, "preview")
+        assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert result["triangle_count"] <= 1500
+        assert result["states"] == {"closed": 1, "open": 30, "looted": 60}
+        assert result["renders"]["open.png"] != result["renders"]["looted.png"]
+
+        geometry_expression = """import bpy, json, math
+from mathutils import Vector
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+def bounds(obj):
+    points=[obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    minimum=[min(float(point[index]) for point in points) for index in range(3)]
+    maximum=[max(float(point[index]) for point in points) for index in range(3)]
+    return [minimum, maximum]
+def center(box):
+    return [(box[0][index]+box[1][index])/2.0 for index in range(3)]
+def islands(obj):
+    adjacent=[set() for _ in obj.data.vertices]
+    for edge in obj.data.edges:
+        left,right=edge.vertices
+        adjacent[left].add(right)
+        adjacent[right].add(left)
+    seen=set()
+    count=0
+    for index in range(len(adjacent)):
+        if index in seen:
+            continue
+        count+=1
+        stack=[index]
+        seen.add(index)
+        while stack:
+            current=stack.pop()
+            for neighbor in adjacent[current]:
+                if neighbor not in seen:
+                    seen.add(neighbor)
+                    stack.append(neighbor)
+    return count
+
+def triangles(obj):
+    obj.data.calc_loop_triangles()
+    return len(obj.data.loop_triangles)
+scene=bpy.context.scene
+body_front=bpy.data.objects['ContainerBody']
+handle=bpy.data.objects['FrontHandle']
+left=bpy.data.objects['LatchLeft']
+right=bpy.data.objects['LatchRight']
+body_points=[body_front.matrix_world @ Vector(vertex.co) for vertex in body_front.data.vertices]
+body_front_points=[point for point in body_points if point.z > 0.1 and point.y < -0.26]
+body_box=[[min(float(point[index]) for point in body_front_points) for index in range(3)],[max(float(point[index]) for point in body_front_points) for index in range(3)]]
+handle_box=bounds(handle)
+overlap=max(0.0, min(handle_box[1][1], body_box[1][1])-max(handle_box[0][1], body_box[0][1]))
+frames={}
+for frame in (1,30,60):
+    scene.frame_set(frame)
+    bpy.context.view_layer.update()
+    frames[str(frame)]={'hinge_degrees':round(math.degrees(bpy.data.objects['HingePivot'].rotation_euler.x),6),'loot_hidden':bool(bpy.data.objects['LootVisual'].hide_render),'left_bounds':bounds(left),'right_bounds':bounds(right),'left_center':center(bounds(left)),'right_center':center(bounds(right))}
+print('TASK2_JSON='+json.dumps({'inventory':[name for name in required if bpy.data.objects.get(name)],'materials':sorted({material.name for obj in bpy.data.objects if obj.type=='MESH' for material in obj.data.materials}),'triangles':sum(triangles(bpy.data.objects[name]) for name in required if bpy.data.objects[name].type=='MESH'),'handle_materials':sorted(material.name for material in handle.data.materials),'handle_islands':islands(handle),'handle_bounds':handle_box,'body_front_bounds':body_box,'handle_body_y_overlap':overlap,'latch_left_materials':sorted(material.name for material in left.data.materials),'latch_right_materials':sorted(material.name for material in right.data.materials),'latch_left_islands':islands(left),'latch_right_islands':islands(right),'parents':{'LatchLeft':left.parent.name if left.parent else None,'LatchRight':right.parent.name if right.parent else None,'ContainerLid':bpy.data.objects['ContainerLid'].parent.name if bpy.data.objects['ContainerLid'].parent else None},'frames':frames,'actions':sorted(action.name for action in bpy.data.actions)}))"""
+        info = _run_blender_inspection(blender, master, geometry_expression)
+        assert info["inventory"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert info["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert info["triangles"] <= 1500
+        assert info["handle_materials"] == ["warning_accent"]
+        assert info["handle_islands"] == 3
+        for bounds in (info["handle_bounds"], info["body_front_bounds"]):
+            assert all(math.isfinite(value) for side in bounds for value in side)
+            assert all(bounds[1][index] > bounds[0][index] for index in range(3))
+        assert info["body_front_bounds"][0][1] - info["handle_bounds"][0][1] > 0.002
+        assert info["handle_bounds"][0][1] >= -0.275 - 1e-6
+        assert info["handle_body_y_overlap"] > 0.001
+        assert info["latch_left_materials"] == ["warning_accent"]
+        assert info["latch_right_materials"] == ["warning_accent"]
+        assert info["latch_left_islands"] == 2
+        assert info["latch_right_islands"] == 2
+        assert info["parents"]["LatchLeft"] == "HingePivot"
+        assert info["parents"]["LatchRight"] == "HingePivot"
+        assert info["parents"]["ContainerLid"] == "HingePivot"
+        closed_left = info["frames"]["1"]["left_center"]
+        closed_right = info["frames"]["1"]["right_center"]
+        closed_left_box = info["frames"]["1"]["left_bounds"]
+        closed_right_box = info["frames"]["1"]["right_bounds"]
+        assert abs(closed_left[0] + closed_right[0]) < 1e-6
+        assert abs(closed_left[1] - closed_right[1]) < 1e-6
+        assert abs(closed_left[2] - closed_right[2]) < 1e-6
+        assert all(
+            abs((closed_left_box[1][index] - closed_left_box[0][index]) - (closed_right_box[1][index] - closed_right_box[0][index])) < 1e-6
+            for index in range(3)
+        )
+        assert info["frames"]["1"]["left_bounds"][0][1] >= -0.275 - 1e-6
+        assert info["frames"]["1"]["right_bounds"][0][1] >= -0.275 - 1e-6
+        for latch_bounds in (info["frames"]["1"]["left_bounds"], info["frames"]["1"]["right_bounds"]):
+            assert info["body_front_bounds"][0][1] - latch_bounds[0][1] > 0.002
+            assert -0.45 - 1e-6 <= latch_bounds[0][0] <= latch_bounds[1][0] <= 0.45 + 1e-6
+            assert -0.275 - 1e-6 <= latch_bounds[0][1] <= latch_bounds[1][1] <= 0.275 + 1e-6
+            assert -1e-6 <= latch_bounds[0][2] <= latch_bounds[1][2] <= 0.65 + 1e-6
+        open_left = info["frames"]["30"]["left_center"]
+        open_right = info["frames"]["30"]["right_center"]
+        assert sum((open_left[index]-closed_left[index])**2 for index in range(3)) ** 0.5 > 0.1
+        assert sum((open_right[index]-closed_right[index])**2 for index in range(3)) ** 0.5 > 0.1
+        assert open_left[2] > info["body_front_bounds"][1][2] + 0.1
+        assert open_right[2] > info["body_front_bounds"][1][2] + 0.1
+        assert info["frames"]["1"]["hinge_degrees"] == 0.0
+        assert info["frames"]["30"]["hinge_degrees"] == -105.0
+        assert info["frames"]["60"]["hinge_degrees"] == -105.0
+        assert info["frames"]["1"]["loot_hidden"] is True
+        assert info["frames"]["30"]["loot_hidden"] is False
+        assert info["frames"]["60"]["loot_hidden"] is True
+
+        glb_expression = """import bpy, json
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=r'''%s''')
+mesh_objects=[obj for obj in bpy.data.objects if obj.type=='MESH']
+triangles=0
+for obj in mesh_objects:
+    obj.data.calc_loop_triangles()
+    triangles+=len(obj.data.loop_triangles)
+print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual'] if bpy.data.objects.get(name)],'materials':sorted({material.name for obj in mesh_objects for material in obj.data.materials}),'triangles':triangles}))""" % str(evidence / "cleaned.preview.glb")
+        glb_info = _run_blender_inspection(blender, master, glb_expression)
+        assert glb_info["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert glb_info["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert glb_info["triangles"] <= 1500
+
+
+def test_real_blender_recipe_rejects_unowned_generated_name_collision(
+    tmp_path: Path, monkeypatch
+) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_blender_master
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    case = tmp_path / "collision-case"
+    master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = case / "task"
+    evidence = case / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+
+    seed_expression = (
+        "import bpy; "
+        "mesh=bpy.data.meshes.new('AuthoredColliderMesh'); "
+        "obj=bpy.data.objects.new('ContainerRoot', mesh); "
+        "bpy.data.collections['WORKING'].objects.link(obj); "
+        "obj['authored_collider']=True; "
+        "bpy.ops.wm.save_as_mainfile(filepath=r'''%s''')"
+    ) % str(master)
+    seeded = meshy_blender_master._run_bounded_process(
+        [str(blender), "--background", str(master), "--python-expr", seed_expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    assert seeded.returncode == 0, seeded.stderr
+
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master.parent.parent)
+    with pytest.raises(RuntimeError) as failure:
+        recipe.run_blender_recipe(paths, contract, "preview")
+    failure_text = str(failure.value)
+    assert "generated-name collision: object ContainerRoot" in failure_text
+    assert "is not recipe-owned" in failure_text
+
+    master_info = _run_blender_inspection(
+        blender,
+        master,
+        """import bpy, json
+obj=bpy.data.objects.get('ContainerRoot')
+authored_names=sorted(obj.name for obj in bpy.data.objects if obj.get('authored_collider'))
+print('TASK2_JSON='+json.dumps({'authored':bool(authored_names),'authored_names':authored_names,'objects':sorted(o.name for o in bpy.data.objects),'actions':sorted(a.name for a in bpy.data.actions),'materials':sorted(m.name for m in bpy.data.materials)}))""",
+    )
+    assert master_info["authored"] is True
+    assert len(master_info["authored_names"]) == 1
+    assert master_info["authored_names"][0].startswith("ContainerRoot")
+    suffixed_names = [
+        name
+        for name in master_info["objects"] + master_info["actions"] + master_info["materials"]
+        if name.endswith((".001", ".002"))
+    ]
+    assert all(name in master_info["authored_names"] for name in suffixed_names)
+    for leaf in recipe.RENDER_LEAVES + ("cleaned.preview.glb", "build_recipe_manifest.json"):
+        assert not (evidence / leaf).exists()
+    assert not (master.parent / "build_recipe_manifest.json").exists()
+
+
+def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(
+    tmp_path: Path, monkeypatch
+) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_blender_master
+    from tools import meshy_loot_container_recipe as recipe
+
+    contract = load_contract(CONTRACT_PATH)
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
+    master = tmp_path / "generated" / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = tmp_path / "generated" / "task"
+    evidence = tmp_path / "generated" / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master.parent.parent)
+
+    first = recipe.run_blender_recipe(paths, contract, "preview")
+    seed_expression = """import bpy
+owner='loot_container_derelict_v1'
+def mark(datablock):
+    datablock['meshy_recipe_owner']=owner
+    return datablock
+mesh=mark(bpy.data.meshes.new('StaleOwnedMesh.001'))
+obj=mark(bpy.data.objects.new('ContainerRoot.001', mesh))
+bpy.data.collections['WORKING'].objects.link(obj)
+camera_data=mark(bpy.data.cameras.new('RecipeCamera.001'))
+camera=mark(bpy.data.objects.new('RecipeCamera.001', camera_data))
+bpy.context.scene.collection.objects.link(camera)
+light_data=mark(bpy.data.lights.new('RecipeStudioLight.001', type='AREA'))
+light=mark(bpy.data.objects.new('RecipeStudioLight.001', light_data))
+bpy.context.scene.collection.objects.link(light)
+mark(bpy.data.actions.new('lid_open.001'))
+mark(bpy.data.materials.new('painted_ship_alloy.001'))
+mark(bpy.data.meshes.new('LootRecipeOrphanMesh'))
+bpy.ops.wm.save_as_mainfile(filepath=r'''%s''')""" % str(master)
+    seeded = meshy_blender_master._run_bounded_process(
+        [str(blender), "--background", str(master), "--python-expr", seed_expression],
+        cwd=ROOT,
+        timeout=120.0,
+    )
+    assert seeded.returncode == 0, seeded.stderr
+
+    second = recipe.run_blender_recipe(paths, contract, "preview")
+    for result in (first, second):
+        assert result["objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+        assert result["materials"] == ["painted_ship_alloy", "warning_accent"]
+        assert result["runtime_evidence"]["source_action_names"] == ["lid_open"]
+        assert result["runtime_evidence"]["source_materials"] == ["painted_ship_alloy", "warning_accent"]
+
+    master_info = _run_blender_inspection(
+        blender,
+        master,
+        """import bpy, json
+required=['ContainerRoot','ContainerBody','HingePivot','ContainerLid','FrontHandle','LatchLeft','LatchRight','LootVisual']
+recipe_objects=required+['RecipeCamera','RecipeStudioLight']
+datablocks={
+    'objects':[obj for obj in bpy.data.objects],
+    'actions':[action for action in bpy.data.actions],
+    'materials':[material for material in bpy.data.materials],
+    'meshes':[mesh for mesh in bpy.data.meshes],
+    'cameras':[camera for camera in bpy.data.cameras],
+    'lights':[light for light in bpy.data.lights],
+}
+seeded_names={'ContainerRoot.001','RecipeCamera.001','RecipeStudioLight.001','lid_open.001','painted_ship_alloy.001','StaleOwnedMesh.001','LootRecipeOrphanMesh'}
+owned_suffixes=sorted(datablock.name for datablocks in datablocks.values() for datablock in datablocks if datablock.get('meshy_recipe_owner') == 'loot_container_derelict_v1' and datablock.name.endswith(('.001','.002')))
+seeded_owner_datablocks=sorted(kind+':'+datablock.name for kind, datablocks in datablocks.items() for datablock in datablocks if datablock.get('meshy_recipe_owner') == 'loot_container_derelict_v1' and datablock.name in seeded_names)
+print('TASK2_JSON='+json.dumps({'export_objects':[name for name in required if bpy.data.objects.get(name)],'recipe_objects':[name for name in recipe_objects if bpy.data.objects.get(name)],'actions':sorted(a.name for a in bpy.data.actions),'recipe_materials':[name for name in ['painted_ship_alloy','warning_accent'] if bpy.data.materials.get(name)],'working_scaffold':bool(bpy.data.objects.get('mesh_node_WORKING')),'owned_suffixes':owned_suffixes,'seeded_owner_datablocks':seeded_owner_datablocks,'seeded_orphan_mesh':bool(bpy.data.meshes.get('LootRecipeOrphanMesh'))}))""",
+    )
+    assert master_info["export_objects"] == list(recipe.EXPORT_OBJECT_NAMES)
+    assert master_info["recipe_objects"] == list(recipe.EXPORT_OBJECT_NAMES) + ["RecipeCamera", "RecipeStudioLight"]
+    assert master_info["actions"] == ["lid_open"]
+    assert master_info["recipe_materials"] == ["painted_ship_alloy", "warning_accent"]
+    assert master_info["working_scaffold"] is False
+    assert master_info["seeded_orphan_mesh"] is False
+    assert master_info["seeded_owner_datablocks"] == []
+    assert master_info["owned_suffixes"] == []
+
+
+def _fake_recipe_runner(payload: bytes):
+    from PIL import Image
+
+    evidence = {
+        "action_names": ["lid_open"],
+        "state_mesh_names": [
+            "ContainerRoot",
+            "ContainerBody",
+            "HingePivot",
+            "ContainerLid",
+            "FrontHandle",
+            "LatchLeft",
+            "LatchRight",
+            "LootVisual",
+        ],
+        "object_inventory": [
+            "ContainerRoot",
+            "ContainerBody",
+            "HingePivot",
+            "ContainerLid",
+            "FrontHandle",
+            "LatchLeft",
+            "LatchRight",
+            "LootVisual",
+        ],
+        "triangle_count": 1,
+        "materials": ["painted_ship_alloy", "warning_accent"],
+        "uvs_present": True,
+        "dimensions_m": [0.9, 0.55, 0.65],
+        "root_location": [0.0, 0.0, 0.0],
+        "raw_preserved": True,
+    }
+
+    def run(command, cwd, timeout):
+        run_dir = Path(command[command.index("--run-dir") + 1])
+        (run_dir / "updated_master.blend").write_bytes(b"updated master")
+        (run_dir / "cleaned.preview.glb").write_bytes(payload)
+        colors = {
+            "closed.png": (20, 30, 40, 255),
+            "open.png": (30, 40, 50, 255),
+            "looted.png": (40, 50, 60, 255),
+        }
+        for leaf, color in colors.items():
+            Image.new("RGBA", (1, 1), color).save(run_dir / leaf, format="PNG")
+        (run_dir / "runtime_evidence.json").write_bytes(
+            json.dumps(evidence, sort_keys=True).encode("utf-8")
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
+
+    return run
+
+
+def _recipe_case(tmp_path: Path, monkeypatch):
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root = tmp_path / "project"
+    task_dir = project_root / "assets/_staging/meshy" / ASSET_ID / TASK_ID
+    master_path = tmp_path / "master" / ASSET_ID / (ASSET_ID + "_master.blend")
+    evidence_dir = tmp_path / "evidence"
+    task_dir.mkdir(parents=True)
+    master_path.parent.mkdir(parents=True)
+    evidence_dir.mkdir()
+    master_path.write_bytes(b"canonical master")
+    (task_dir / "raw.glb").write_bytes(b"raw glb")
+    contract = load_contract(CONTRACT_PATH)
+    paths = recipe.RecipePaths(
+        project_root=project_root,
+        task_dir=task_dir,
+        master_path=master_path,
+        evidence_dir=evidence_dir,
+        scratch_glb=evidence_dir / "cleaned.preview.glb",
+        manifest_path=evidence_dir / "build_recipe_manifest.json",
+    )
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master_path.parent.parent)
+    return recipe, contract, paths
+
+
+def _publication_snapshot(recipe, paths):
+    leaves = [
+        paths.master_path,
+        *(paths.evidence_dir / leaf for leaf in recipe.RENDER_LEAVES),
+        paths.scratch_glb,
+        recipe._source_manifest_path(paths),
+        paths.manifest_path,
+        paths.task_dir / "cleaned.glb",
+    ]
+    snapshot = {}
+    for path in leaves:
+        if not os.path.lexists(path):
+            snapshot[path] = None
+            continue
+        payload = path.read_bytes()
+        info = path.stat()
+        snapshot[path] = (payload, hashlib.sha256(payload).hexdigest(), info.st_ino, info.st_mtime_ns)
+    return snapshot
+
+
+def test_approved_comparison_checks_manifest_render_hashes_and_glb_bytes() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    approved = _valid_manifest(Path("/tmp/loot_container_derelict_v1_master.blend"))
+    approved["renders"] = {leaf: "a" * 64 for leaf in recipe.RENDER_LEAVES}
+    generated = json.loads(json.dumps(approved))
+    recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF approved")
+
+    generated["renders"]["open.png"] = "b" * 64
+    with pytest.raises(ValueError, match="render hashes"):
+        recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF approved")
+
+    generated = json.loads(json.dumps(approved))
+    with pytest.raises(ValueError, match="scratch GLB"):
+        recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF changed")
+
+
+def test_publish_cleaned_preflights_mismatch_before_canonical_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    destination = paths.task_dir / "cleaned.glb"
+    destination.write_bytes(b"mismatching cleaned glb")
+    before = _publication_snapshot(recipe, paths)
+
+    with pytest.raises(ValueError, match="existing cleaned GLB does not match source"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_publish_rejects_divergent_source_manifest_before_runner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+    from tools.meshy_asset_contract import canonical_json_bytes
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    source_manifest = recipe._source_manifest_path(paths)
+    divergent = json.loads(source_manifest.read_text(encoding="utf-8"))
+    divergent["triangle_count"] = 2
+    source_manifest.write_bytes(canonical_json_bytes(divergent))
+    before = _publication_snapshot(recipe, paths)
+    calls = []
+    runner = _fake_recipe_runner(b"glTF approved")
+
+    def spy(command, cwd, timeout):
+        calls.append((command, cwd, timeout))
+        return runner(command, cwd, timeout)
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", spy)
+    with pytest.raises(ValueError, match="source.*evidence|manifest"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert calls == []
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_publish_rejects_divergent_evidence_manifest_before_runner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+    from tools.meshy_asset_contract import canonical_json_bytes
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    divergent = json.loads(paths.manifest_path.read_text(encoding="utf-8"))
+    divergent["triangle_count"] = 2
+    paths.manifest_path.write_bytes(canonical_json_bytes(divergent))
+    before = _publication_snapshot(recipe, paths)
+    calls = []
+    runner = _fake_recipe_runner(b"glTF approved")
+
+    def spy(command, cwd, timeout):
+        calls.append((command, cwd, timeout))
+        return runner(command, cwd, timeout)
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", spy)
+    with pytest.raises(ValueError, match="source.*evidence|manifest"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert calls == []
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_identical_source_and_evidence_manifests_publish_and_task_leaf_is_idempotent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    source_manifest = recipe._source_manifest_path(paths)
+    assert source_manifest.read_bytes() == paths.manifest_path.read_bytes()
+
+    first = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    destination = paths.task_dir / "cleaned.glb"
+    first_stat = destination.stat()
+    second = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    second_stat = destination.stat()
+
+    assert first["marker"] == second["marker"]
+    assert destination.read_bytes() == b"glTF approved"
+    assert (second_stat.st_ino, second_stat.st_mtime_ns) == (first_stat.st_ino, first_stat.st_mtime_ns)
+
+
+def test_publish_cleaned_mismatch_fails_before_task_leaf_or_canonical_touch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    approved_manifest = paths.manifest_path.read_bytes()
+    approved_scratch = paths.scratch_glb.read_bytes()
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF changed"))
+    with pytest.raises(ValueError, match="approved baseline|scratch GLB"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert not (paths.task_dir / "cleaned.glb").exists()
+    assert paths.manifest_path.read_bytes() == approved_manifest
+    assert paths.scratch_glb.read_bytes() == approved_scratch
+
+
+def test_publish_cleaned_exact_match_publishes_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+
+    first = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    destination = paths.task_dir / "cleaned.glb"
+    first_stat = destination.stat()
+    assert first["marker"] == "LOOT CONTAINER RECIPE PASS mode=publish-cleaned task=" + TASK_ID
+    assert destination.read_bytes() == b"glTF approved"
+
+    second = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    second_stat = destination.stat()
+    assert second["marker"] == first["marker"]
+    assert destination.read_bytes() == b"glTF approved"
+    assert (second_stat.st_ino, second_stat.st_mtime_ns) == (first_stat.st_ino, first_stat.st_mtime_ns)
+
+
+def test_preview_does_not_require_approved_baseline_and_keeps_generic_marker(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path, monkeypatch)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF preview"))
+
+    result = recipe.run_blender_recipe(paths, contract, "preview")
+
+    assert result["marker"] == (
+        "LOOT CONTAINER RECIPE PASS mode=preview asset=loot_container_derelict_v1 "
+        "states=closed,open,looted"
+    )
+    assert not (paths.task_dir / "cleaned.glb").exists()
+
+
+def test_real_private_glb_uses_contract_dimension_order_for_pure_validator(
+    tmp_path: Path, monkeypatch
+) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+    from tools.meshy_blender_validate import BlenderValidationError, validate_cleaned_glb
+
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+    contract = load_contract(CONTRACT_PATH)
+    case = tmp_path / "closed-default"
+    master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = case / "task"
+    evidence = case / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+    monkeypatch.setattr(recipe, "TRUSTED_MASTER_ROOT", master.parent.parent)
+    result = recipe.run_blender_recipe(paths, contract, "preview")
+    assert result["runtime_evidence"]["dimensions_m"] == pytest.approx(
+        [0.9, 0.55, 0.65], abs=1e-5
+    )
+    assert result["renders"] == {
+        leaf: recipe._hash_decoded_rgba(evidence / leaf) for leaf in recipe.RENDER_LEAVES
+    }
+
+    try:
+        report = validate_cleaned_glb(paths.scratch_glb, contract, TASK_ID)
+    except BlenderValidationError as failure:
+        assert str(failure) == "animation or rig data is forbidden by the contract"
+    else:
+        assert report["status"] == "PASS"

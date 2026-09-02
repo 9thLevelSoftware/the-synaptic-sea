@@ -1089,7 +1089,11 @@ def _load_runtime_inputs(
 
         try:
             expected_r4 = blender_validate.verify_validation_report(
-                cleaned, task_contract_path, r4, task_id=resolved_task.name
+                cleaned,
+                task_contract_path,
+                r4,
+                task_id=resolved_task.name,
+                expected_contract_sha256=generation["contract_sha256"],
             )
         except (OSError, TypeError, ValueError, RuntimeError) as exc:
             raise ReviewError("R4 Blender evidence does not match the current task: " + str(exc)) from exc

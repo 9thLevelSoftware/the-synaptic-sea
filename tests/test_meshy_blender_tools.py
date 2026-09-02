@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.meshy_asset_contract import canonical_json_bytes, load_contract
+from tools.meshy_asset_contract import AssetContract, canonical_json_bytes, load_contract
 from tools.meshy_blender_master import (
     BLENDER_PATH,
     build_blender_command,
@@ -195,7 +195,319 @@ def _pack_glb(document: dict, binary: bytes = b"") -> bytes:
     return bytes(result)
 
 
-def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
+def _hinge_animation(
+    name: str = "lid_open",
+    node: int = 0,
+    path: str = "rotation",
+    input_accessor: int = 3,
+    output_accessor: int = 4,
+) -> dict:
+    return {
+        "name": name,
+        "channels": [{"sampler": 0, "target": {"node": node, "path": path}}],
+        "samplers": [{"input": input_accessor, "output": output_accessor, "interpolation": "LINEAR"}],
+    }
+
+
+def _contract_variant(tmp_path: Path, contract, animation: dict) -> AssetContract:
+    document = contract.document
+    document["animation"] = animation
+    path = tmp_path / "contract.json"
+    snapshot = (json.dumps(document, separators=(",", ":")) + "\n").encode("utf-8")
+    path.write_bytes(snapshot)
+    return load_contract(path)
+
+
+def _unchecked_contract_variant(tmp_path: Path, contract, animation: dict) -> AssetContract:
+    document = contract.document
+    document["animation"] = animation
+    path = tmp_path / "unchecked-contract.json"
+    snapshot = (json.dumps(document, separators=(",", ":")) + "\n").encode("utf-8")
+    path.write_bytes(snapshot)
+    return AssetContract(path, hashlib.sha256(snapshot).hexdigest(), snapshot)
+
+
+def _hinge_fixture(document: dict, binary: bytes) -> bytes:
+    document["nodes"][0]["name"] = "HingePivot"
+    input_data = struct.pack("<6f", 0.0, 1.0, 2.0, 0.0, 0.0, 0.0)
+    output_data = struct.pack(
+        "<12f",
+        0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0,
+    )
+    input_view = len(document["bufferViews"])
+    output_view = input_view + 1
+    input_accessor = len(document["accessors"])
+    output_accessor = input_accessor + 1
+    input_offset = len(binary)
+    output_offset = input_offset + len(input_data)
+    assert input_offset % 4 == 0
+    assert output_offset % 4 == 0
+    document["bufferViews"].extend(
+        [
+            {"buffer": 0, "byteOffset": input_offset, "byteLength": len(input_data)},
+            {"buffer": 0, "byteOffset": output_offset, "byteLength": len(output_data)},
+        ]
+    )
+    document["accessors"].extend(
+        [
+            {"bufferView": input_view, "componentType": 5126, "count": 3, "type": "SCALAR"},
+            {"bufferView": output_view, "componentType": 5126, "count": 3, "type": "VEC4"},
+        ]
+    )
+    document["buffers"][0]["byteLength"] = len(binary) + len(input_data) + len(output_data)
+    document["animations"] = [
+        _hinge_animation(input_accessor=input_accessor, output_accessor=output_accessor)
+    ]
+    document["skins"] = []
+    return binary + input_data + output_data
+
+
+def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    path = tmp_path / "hinge.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    report = validate_cleaned_glb(path, hinge_contract)
+
+    assert report["status"] == "PASS"
+
+
+def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    document["skins"] = [{}]
+    path = tmp_path / "hinge-skin.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="skin"):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize(
+    "animations",
+    [
+        pytest.param([], id="missing"),
+        pytest.param([_hinge_animation(name="not_lid_open")], id="wrong-name"),
+        pytest.param([_hinge_animation(), _hinge_animation()], id="duplicate"),
+    ],
+)
+def test_validate_rejects_hinge_animation_name_or_count(contract, tmp_path: Path, animations: list[dict]) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    document["animations"] = animations
+    path = tmp_path / "invalid-hinge-animation.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("mutation", ["wrong-node", "translation"])
+def test_validate_rejects_hinge_channel_target_or_path(contract, tmp_path: Path, mutation: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    if mutation == "wrong-node":
+        document["nodes"][0]["name"] = "OtherPivot"
+    else:
+        document["animations"][0]["channels"][0]["target"]["path"] = "translation"
+    path = tmp_path / "invalid-hinge-channel.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("inventory", ["animations", "skins"])
+def test_validate_rejects_hinge_non_array_inventories(contract, tmp_path: Path, inventory: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    document[inventory] = {}
+    path = tmp_path / "invalid-hinge-inventory.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda d, i, o: d["accessors"][i].update(type="VEC2"), id="input-type"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(componentType=5123), id="input-component-type"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(count=2), id="input-count-too-small"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(count=3.0), id="input-count-not-integer"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(type="VEC3"), id="output-type"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(componentType=5123), id="output-component-type"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(count=2), id="output-count-mismatch"),
+        pytest.param(lambda d, i, o: d["accessors"].__setitem__(i, []), id="malformed-input-accessor"),
+        pytest.param(lambda d, i, o: d["accessors"].__setitem__(o, {}), id="malformed-output-accessor"),
+    ],
+)
+def test_validate_rejects_hinge_accessor_semantics(contract, tmp_path: Path, mutate) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    sampler = document["animations"][0]["samplers"][0]
+    input_accessor = sampler["input"]
+    output_accessor = sampler["output"]
+    mutate(document, input_accessor, output_accessor)
+    path = tmp_path / "invalid-hinge-accessor.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="accessor|hinge animation"):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("meshy_rigging_allowed,rigging_target", [(True, "non_humanoid"), (False, "humanoid_biped")])
+def test_validate_rejects_hinge_wrong_contract_flags(
+    contract, tmp_path: Path, meshy_rigging_allowed: bool, rigging_target: str
+) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    path = tmp_path / "invalid-hinge-contract.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _unchecked_contract_variant(
+        tmp_path,
+        contract,
+        {
+            "kind": "hinge",
+            "meshy_rigging_allowed": meshy_rigging_allowed,
+            "rigging_target": rigging_target,
+        },
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("populated", [False, True], ids=["empty-inventories", "populated-inventories"])
+def test_validate_rejects_unknown_animation_kind(contract, tmp_path: Path, populated: bool) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = [_hinge_animation()] if populated else []
+    document["skins"] = []
+    if populated:
+        document["nodes"][0]["name"] = "HingePivot"
+    path = tmp_path / "unknown-kind.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    unknown_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "unknown_animation_kind", "meshy_rigging_allowed": True, "rigging_target": "humanoid_biped"},
+    )
+
+    with pytest.raises(ValueError, match="kind"):
+        validate_cleaned_glb(path, unknown_contract)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "static_gameplay_prop",
+        "static_mesh",
+        "structural_architecture",
+        "environment",
+        "blender_segmented_chain_rig",
+        "godot_multimesh_particles_behavior",
+    ],
+)
+def test_validate_accepts_supported_static_non_humanoid_empty_inventories(contract, tmp_path: Path, kind: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = []
+    document["skins"] = []
+    path = tmp_path / "static.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    static_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": kind, "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    report = validate_cleaned_glb(path, static_contract)
+
+    assert report["status"] == "PASS"
+
+
+@pytest.mark.parametrize("kind", ["static_mesh", "structural_architecture", "environment"])
+@pytest.mark.parametrize("inventory", ["animations", "skins"])
+def test_validate_rejects_populated_inventory_for_new_static_kinds(
+    contract, tmp_path: Path, kind: str, inventory: str
+) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = []
+    document["skins"] = []
+    document[inventory] = [{"name": "unexpected"}] if inventory == "animations" else [{}]
+    path = tmp_path / "populated-static.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    static_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": kind, "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="animation or rig data"):
+        validate_cleaned_glb(path, static_contract)
+
+
+def test_validate_retains_explicit_humanoid_rigging_allowance(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = [{"name": "MeshyRig"}]
+    document["skins"] = [{}]
+    path = tmp_path / "humanoid.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    humanoid_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {
+            "kind": "optional_humanoid_biped_rig_after_selection",
+            "meshy_rigging_allowed": True,
+            "rigging_target": "humanoid_biped",
+        },
+    )
+
+    report = validate_cleaned_glb(path, humanoid_contract)
+
+    assert report["status"] == "PASS"
+
+
+
+def _bound_fixture_task(
+    tmp_path: Path,
+    *,
+    category: str | None = None,
+    contract_path: Path = CONTRACT_PATH,
+):
     from tests.test_meshy_candidate_review import (
         _ReviewFakeMeshyClient,
         _true_checks,
@@ -208,9 +520,8 @@ def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
     project_root.mkdir()
     references = project_root / "references"
     references.mkdir()
-    contract_path = CONTRACT_PATH
     if category is not None:
-        document = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        document = json.loads(contract_path.read_text(encoding="utf-8"))
         if document.get("category") != category:
             document["category"] = category
             contract_path = tmp_path / "rewritten_contract.json"
@@ -235,6 +546,105 @@ def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
     select_candidate(project_root, task_dir, "operator", _true_checks())
     shutil.copy2(GLB_PATH, task_dir / "cleaned.glb")
     return project_root, task_dir, contract
+
+
+def _dual_hash_bound_fixture_task(tmp_path: Path):
+    document = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    source_path = tmp_path / "source-contract.json"
+    source_path.write_bytes(
+        json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
+    )
+    project_root, task_dir, source_contract = _bound_fixture_task(
+        tmp_path, contract_path=source_path
+    )
+    task_contract = load_contract(task_dir / "contract.json")
+    assert source_contract.snapshot_bytes() == task_contract.snapshot_bytes()
+    assert source_contract.sha256 != task_contract.sha256
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    assert generation["contract_sha256"] == source_contract.sha256
+    assert generation["contract_artifact_sha256"] == task_contract.sha256
+    return project_root, task_dir, source_contract, task_contract
+
+
+def test_dual_hash_report_writer_preserves_authenticated_source_hash(tmp_path: Path, monkeypatch) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport)
+    write_validation_report(project_root, task_dir, report)
+    assert json.loads((task_dir / "blender-validation.json").read_text()) == report
+    assert report["contract_sha256"] == source_contract.sha256
+
+
+def test_dual_hash_report_writer_rejects_forged_source_without_mutating_report(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    report_path.write_bytes(b"existing report")
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    report["contract_sha256"] = "f" * 64
+
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    with pytest.raises(BlenderValidationError, match="contract hash is not bound"):
+        write_validation_report(project_root, task_dir, report)
+    assert report_path.read_bytes() == b"existing report"
+
+
+def test_verify_validation_report_accepts_authenticated_source_hash(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _project_root, task_dir, source_contract, task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+
+    expected = validate_module.verify_validation_report(
+        task_dir / "cleaned.glb",
+        task_contract,
+        report,
+        task_id=task_dir.name,
+        expected_contract_sha256=source_contract.sha256,
+    )
+    assert expected["contract_sha256"] == source_contract.sha256
+
+
+def test_verify_validation_report_rejects_noncanonical_expected_source_hash(contract) -> None:
+    report = validate_cleaned_glb(GLB_PATH, contract, task_id="task-1")
+    report["blender_reimport_passed"] = True
+    with pytest.raises(BlenderValidationError, match="expected contract hash"):
+        validate_module.verify_validation_report(
+            GLB_PATH,
+            contract,
+            report,
+            task_id="task-1",
+            expected_contract_sha256="A" * 64,
+        )
 
 
 def test_parse_glb_rejects_duplicate_json_duplicate_bin_unknown_and_illegal_chunk_order() -> None:
@@ -566,8 +976,8 @@ def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_pat
     monkeypatch.undo()
     honest = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     honest["blender_reimport_passed"] = True
-    with pytest.raises(BlenderValidationError, match="runtime|re-import"):
-        write_validation_report(project_root, task_dir, honest)
+    write_validation_report(project_root, task_dir, honest)
+    assert json.loads((task_dir / "blender-validation.json").read_text()) == honest
 
 
 def test_verify_validation_report_has_no_caller_reimport_authority(contract) -> None:
@@ -986,3 +1396,212 @@ def test_validate_rejects_non_affine_glb_matrix(contract, tmp_path: Path) -> Non
     path.write_bytes(_pack_glb(document, binary))
     with pytest.raises(ValueError, match="affine|matrix"):
         validate_cleaned_glb(path, contract)
+
+
+def test_validate_reimport_only_parser_requires_positive_triangles(tmp_path: Path) -> None:
+    base = [
+        "--project-root", str(tmp_path), "--contract", str(tmp_path / "contract.json"),
+        "--task-dir", str(tmp_path), "--glb", str(tmp_path / "cleaned.glb"),
+    ]
+    args = build_validate_parser().parse_args(base + ["--reimport-only", "--expected-triangles", "1"])
+    assert args.reimport_only is True
+    assert args.expected_triangles == 1
+    with pytest.raises(SystemExit):
+        build_validate_parser().parse_args(base + ["--reimport-only", "--expected-triangles", "0"])
+    with pytest.raises(SystemExit):
+        build_validate_parser().parse_args(base + ["--verify-only", "--reimport-only", "--expected-triangles", "1"])
+
+
+def test_validate_reimport_process_uses_distinct_marker_and_no_report(tmp_path: Path, monkeypatch) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    glb_path = task_dir / "cleaned.glb"
+    command_calls = []
+    marker = "MESHY BLENDER REIMPORT PASS sha256={0} byte_size=12 triangle_count=1\n".format("a" * 64)
+
+    def fake_run(command, cwd, timeout):
+        command_calls.append((command, cwd, timeout))
+        return SimpleNamespace(returncode=0, stdout=marker, stderr="")
+
+    monkeypatch.setattr(master_module, "_run_bounded_process", fake_run)
+    evidence = validate_module._reimport_with_blender_process(glb_path, 1)
+
+    assert evidence == validate_module._BlenderReimportEvidence("a" * 64, 12, 1)
+    command, cwd, timeout = command_calls[0]
+    assert cwd == task_dir
+    assert timeout == 120.0
+    assert "--reimport-only" in command
+    assert command[command.index("--expected-triangles") + 1] == "1"
+    assert "--report" not in command
+
+
+def test_validate_reimport_only_rejects_host_python(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        "/usr/bin/python3", str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"),
+        "--project-root", str(project_root), "--contract", str(task_dir / "contract.json"),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--reimport-only", "--expected-triangles", "1",
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT)
+    result = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert "requires Blender runtime" in result.stderr
+    assert not report_path.exists()
+
+
+def test_real_blender_reimport_only_emits_evidence_without_report(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", BLENDER_PATH))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        str(blender), "--background", "--factory-startup", "--python",
+        str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"), "--",
+        "--project-root", str(project_root), "--contract", str(task_dir / "contract.json"),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--reimport-only", "--expected-triangles", "1",
+    ]
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("MESHY BLENDER REIMPORT PASS") == 1
+    assert not report_path.exists()
+
+
+def test_host_python_cli_publishes_report_after_blender_reimport(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", BLENDER_PATH))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    host_python = Path("/usr/bin/python3")
+    assert host_python.is_file() and os.access(host_python, os.X_OK)
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        str(host_python), str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"),
+        "--project-root", str(project_root), "--contract", str(source_contract_path),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--report", str(report_path),
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT)
+    result = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, (
+        "host validator failed: returncode={0} stderr={1!r} stdout={2!r} report_exists={3}".format(
+            result.returncode, result.stderr, result.stdout, report_path.exists()
+        )
+    )
+    assert report_path.is_file()
+    persisted = json.loads(report_path.read_text(encoding="utf-8"))
+    assert persisted["blender_reimport_passed"] is True
+    assert persisted["contract_sha256"] == source_contract.sha256
+
+
+def test_verify_only_accepts_governed_dual_hash_report(tmp_path: Path, monkeypatch) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(task_dir / "blender-validation.json"),
+            "--verify-only",
+        ]
+    )
+    assert result == 0
+
+
+def test_verify_only_rejects_forged_governed_binding_without_report_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+    report_path = task_dir / "blender-validation.json"
+    report_bytes = report_path.read_bytes()
+    generation_path = task_dir / "generation.json"
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["contract_artifact_sha256"] = "f" * 64
+    generation_path.write_bytes(canonical_json_bytes(generation))
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(report_path),
+            "--verify-only",
+        ]
+    )
+    assert result == 1
+    assert report_path.read_bytes() == report_bytes
+
+
+def test_verify_only_rejects_forged_source_hash_before_reimport(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+    report_path = task_dir / "blender-validation.json"
+    forged = json.loads(report_path.read_text(encoding="utf-8"))
+    forged["contract_sha256"] = "f" * 64
+    report_path.write_bytes(canonical_json_bytes(forged))
+    report_bytes = report_path.read_bytes()
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: pytest.fail("forged source hash must reject before re-import"),
+    )
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(report_path),
+            "--verify-only",
+        ]
+    )
+    assert result == 1
+    assert report_path.read_bytes() == report_bytes
