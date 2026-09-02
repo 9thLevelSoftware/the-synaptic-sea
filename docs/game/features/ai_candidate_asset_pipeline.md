@@ -343,6 +343,8 @@ TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
 /usr/bin/python3 tools/meshy_candidate_review.py bind --project-root . --task-dir "<task_dir>"
 /usr/bin/python3 tools/meshy_promotion_packet.py prop --project-root . --task-dir "<task_dir>" \
   --target-path res://assets/imported/props/dressing/<asset_id>.sidecar.json
+# threat_character / threat_kit contracts must use the threat packet instead:
+# /usr/bin/python3 tools/meshy_promotion_packet.py threat --project-root . --task-dir "<task_dir>"
 ```
 
 The host toolchain evidence is current at commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`:

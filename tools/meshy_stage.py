@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 import uuid
+import zlib
 from datetime import date as _date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, NamedTuple, Optional, Tuple, Union
@@ -33,6 +34,7 @@ if __package__ in (None, ""):
 
 from tools import meshy_governance as governance  # noqa: E402
 from tools.meshy_asset_contract import (  # noqa: E402
+    IDENTIFIER_RE,
     AssetContract,
     canonical_json_bytes,
     load_contract,
@@ -53,7 +55,12 @@ _BATCH_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_EXTENSIONS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 _PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
-_JPEG_SIGNATURE = bytes((255, 216, 255))
+_JPEG_SOI = bytes((255, 216))
+_JPEG_EOI = bytes((255, 217))
+# Dated snapshot ids only. The live approved record is
+# data/asset_generation/meshy_pricing_v1.json; do not pin a single calendar day
+# in code or a pricing bump is rejected as a false identity failure.
+_PRICING_ID_RE = re.compile(r"^meshy_api_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 _PRICING_MAX_BYTES = 1024 * 1024
 _REFERENCE_FILE_MAX_BYTES = 16 * 1024 * 1024
 _REFERENCE_TOTAL_MAX_BYTES = 48 * 1024 * 1024
@@ -495,7 +502,7 @@ def _validate_pricing_document(document: Mapping[str, Any]) -> None:
     expected = {"schema_version", "document_kind", "pricing_id", "checked_at", "expires_at", "source_url", "costs"}
     if set(document) != expected or document.get("schema_version") != "1.0.0" or document.get("document_kind") != "meshy_pricing":
         raise ValueError("pricing document fields are not exact")
-    if document.get("pricing_id") != "meshy_api_2026_08_31" or not isinstance(document.get("pricing_id"), str):
+    if not isinstance(document.get("pricing_id"), str) or _PRICING_ID_RE.fullmatch(document["pricing_id"]) is None:
         raise ValueError("pricing_id is not the approved pricing record")
     checked = _coerce_iso_date(document.get("checked_at"), "pricing checked_at")
     expires = _coerce_iso_date(document.get("expires_at"), "pricing expires_at")
@@ -584,8 +591,91 @@ def _validate_reference_filename(filename: str) -> str:
     return suffix
 
 
+def _png_is_structurally_valid(payload: bytes) -> bool:
+    if len(payload) < 33 or not payload.startswith(_PNG_SIGNATURE):
+        return False
+    offset = 8
+    index = 0
+    saw_ihdr = False
+    saw_iend = False
+    while offset + 12 <= len(payload):
+        length = int.from_bytes(payload[offset:offset + 4], "big")
+        kind = payload[offset + 4:offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(payload):
+            return False
+        expected_crc = int.from_bytes(payload[data_end:crc_end], "big")
+        actual_crc = zlib.crc32(kind + payload[data_start:data_end]) & 0xFFFFFFFF
+        if expected_crc != actual_crc:
+            return False
+        if index == 0:
+            if kind != b"IHDR" or length != 13:
+                return False
+            width = int.from_bytes(payload[data_start:data_start + 4], "big")
+            height = int.from_bytes(payload[data_start + 4:data_start + 8], "big")
+            bit_depth = payload[data_start + 8]
+            color_type = payload[data_start + 9]
+            if width == 0 or height == 0 or bit_depth not in (1, 2, 4, 8, 16) or color_type not in (0, 2, 3, 4, 6):
+                return False
+            saw_ihdr = True
+        elif kind == b"IHDR":
+            return False
+        if kind == b"IEND":
+            if length != 0 or crc_end != len(payload):
+                return False
+            saw_iend = True
+            break
+        offset = crc_end
+        index += 1
+    return saw_ihdr and saw_iend
+
+
+def _jpeg_is_structurally_valid(payload: bytes) -> bool:
+    if len(payload) < 6 or payload[:2] != _JPEG_SOI or payload[-2:] != _JPEG_EOI:
+        return False
+    offset = 2
+    saw_sof = False
+    saw_sos = False
+    while offset < len(payload):
+        if payload[offset] != 255:
+            return False
+        while offset < len(payload) and payload[offset] == 255:
+            offset += 1
+        if offset >= len(payload):
+            return False
+        marker = payload[offset]
+        offset += 1
+        if marker == 0xD9:
+            return saw_sof and saw_sos and offset == len(payload)
+        if marker == 0xD8:
+            return False
+        if marker in (0x01, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7):
+            continue
+        if offset + 2 > len(payload):
+            return False
+        length = int.from_bytes(payload[offset:offset + 2], "big")
+        if length < 2 or offset + length > len(payload):
+            return False
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            saw_sof = True
+        if marker == 0xDA:
+            saw_sos = True
+            offset += length
+            while offset < len(payload) - 1:
+                if payload[offset] == 255 and payload[offset + 1] != 0 and not (0xD0 <= payload[offset + 1] <= 0xD7):
+                    break
+                offset += 1
+            continue
+        offset += length
+    return False
+
+
 def _reference_magic_matches(suffix: str, payload: bytes) -> bool:
-    return payload.startswith(_PNG_SIGNATURE) if suffix == ".png" else payload.startswith(_JPEG_SIGNATURE) and payload.endswith(bytes((255, 217)))
+    if suffix == ".png":
+        return _png_is_structurally_valid(payload)
+    return suffix in (".jpg", ".jpeg") and _jpeg_is_structurally_valid(payload)
 
 
 def _provider_required_views(contract: AssetContract) -> List[str]:
@@ -729,7 +819,7 @@ def _safe_task_id(value: object) -> str:
 
 def _validate_staging_paths(project_root: Union[str, os.PathLike], asset_id: str) -> Tuple[Path, Path, Path]:
     root = governance.physical_project_root(project_root)
-    if not isinstance(asset_id, str) or _TASK_ID_RE.fullmatch(asset_id) is None:
+    if not isinstance(asset_id, str) or IDENTIFIER_RE.fullmatch(asset_id) is None:
         raise ValueError("contract asset_id is not a safe staging identifier")
     stage = root / STAGING_RELATIVE
     asset_root = stage / asset_id
@@ -1924,7 +2014,7 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
             errors.append(label + " error is invalid")
         if type(item.get("budget_violation")) is not bool:
             errors.append(label + " budget_violation is invalid")
-        if task_state == "PENDING" and (consumed is not None or error is not None and task_id is None):
+        if task_state == "PENDING" and (consumed is not None or error is not None):
             errors.append(label + " pending state is inconsistent")
         if task_state == "PENDING" and item.get("budget_violation") is not False:
             errors.append(label + " pending budget state is inconsistent")

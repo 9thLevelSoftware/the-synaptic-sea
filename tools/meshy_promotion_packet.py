@@ -24,7 +24,7 @@ if __package__ in (None, ""):
 
 from tools import meshy_candidate_review as candidate_review  # noqa: E402
 from tools import meshy_governance as governance  # noqa: E402
-from tools.meshy_asset_contract import canonical_json_bytes  # noqa: E402
+from tools.meshy_asset_contract import canonical_json_bytes, load_contract  # noqa: E402
 
 
 PROP_OVERLAY_NAME = "sidecar-overlay.json"
@@ -371,6 +371,34 @@ def _validate_threat_mesh_path(
     return expected
 
 
+def _load_task_category(root: Path, task_dir: Path) -> str:
+    try:
+        contract_path = candidate_review._governed_artifact(root, task_dir, "contract.json")
+        contract = load_contract(contract_path)
+    except (OSError, TypeError, ValueError, candidate_review.ReviewError) as exc:
+        raise PromotionPacketError("task-local contract is not valid") from exc
+    category = contract.document.get("category")
+    if not isinstance(category, str) or IDENTIFIER_RE.fullmatch(category) is None:
+        raise PromotionPacketError("task-local contract category is invalid")
+    return category
+
+
+def _require_packet_category(category: str, packet: str) -> None:
+    if packet == "prop":
+        if category == "gameplay_prop" or category.startswith("prop"):
+            return
+        raise PromotionPacketError(
+            "prop promotion is incompatible with contract category {0}".format(category)
+        )
+    if packet == "threat":
+        if category.startswith("threat"):
+            return
+        raise PromotionPacketError(
+            "threat promotion is incompatible with contract category {0}".format(category)
+        )
+    raise PromotionPacketError("unknown promotion packet type")
+
+
 def build_prop_promotion_proposal(
     project_root: PathLike,
     task_dir: PathLike,
@@ -384,6 +412,7 @@ def build_prop_promotion_proposal(
     root, resolved_task, asset_id, task_id, envelope, _generation = _verified_task(
         project_root, task_dir
     )
+    _require_packet_category(_load_task_category(root, resolved_task), "prop")
     target = _validate_prop_target(target_path or _default_prop_target(asset_id, prop_kind))
     document: Dict[str, Any] = {
         "asset_id": asset_id,
@@ -413,6 +442,7 @@ def build_threat_promotion_proposal(
     root, resolved_task, asset_id, task_id, envelope, _generation = _verified_task(
         project_root, task_dir
     )
+    _require_packet_category(_load_task_category(root, resolved_task), "threat")
     logical_mesh_path = _validate_threat_mesh_path(root, resolved_task, mesh_path)
     archetype_id = _archetype_for(asset_id, archetype)
     patch = {

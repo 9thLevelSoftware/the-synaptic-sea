@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import dataclasses
 import hashlib
 import inspect
@@ -12,6 +13,7 @@ import struct
 import subprocess
 import sys
 import threading
+import zlib
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -585,16 +587,48 @@ def test_cli_generate_accepts_pricing_and_reference_flags(tmp_path: Path) -> Non
     assert "unrecognized arguments" not in result.stderr
     assert not (tmp_path / STAGING_RELATIVE).exists()
 
+def _valid_png_bytes(tag: int = 0) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    raw = bytes((0, tag & 0xFF, (tag >> 8) & 0xFF, (tag >> 16) & 0xFF, 255))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _valid_jpeg_bytes(tag: int = 0) -> bytes:
+    body = bytes.fromhex(
+        "ffd8ffe000104a46494600010100000100010000"
+        "ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c"
+        "20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432"
+        "ffc0000b080001000101011100"
+        "ffc40014100100000000000000000000000000000000"
+        "ffda0008010100003f00fb"
+        "ffd9"
+    )
+    comment = struct.pack(">H", tag & 0xFFFF)
+    return b"\xff\xd8" + b"\xff\xfe" + struct.pack(">H", 4) + comment + body[2:]
+
+
 def _write_reference_set(root: Path, suffix: str = ".png") -> dict[str, str]:
-    payload = b"\x89PNG\r\n\x1a\nreference"
     names = {
         "front": "front" + suffix,
         "side": "side" + suffix,
         "back": "back" + suffix,
         "three_quarter": "three-quarter" + suffix,
     }
+    writer = _valid_jpeg_bytes if suffix.lower() in (".jpg", ".jpeg") else _valid_png_bytes
     for index, name in enumerate(names.values()):
-        (root / name).write_bytes(payload + bytes([index]))
+        (root / name).write_bytes(writer(index + 1))
     return names
 
 
@@ -614,7 +648,7 @@ def test_reference_inputs_reject_duplicate_basenames(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:
     names = {view: "same.png" for view in valid_contract.document["references"]["required_views"]}
-    (tmp_path / "same.png").write_bytes(b"\x89PNG\r\n\x1a\nreference")
+    (tmp_path / "same.png").write_bytes(_valid_png_bytes(1))
 
     with pytest.raises(ValueError, match="duplicate.*basename"):
         resolve_reference_inputs(valid_contract, tmp_path, names)
@@ -624,7 +658,7 @@ def test_reference_inputs_reject_duplicate_content_and_file_identity(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:
     names = _write_reference_set(tmp_path)
-    shared = b"\x89PNG\r\n\x1a\nidentical"
+    shared = _valid_png_bytes(99)
     (tmp_path / names["front"]).write_bytes(shared)
     (tmp_path / names["side"]).write_bytes(shared)
     with pytest.raises(ValueError, match="duplicate.*(content|sha|file)"):
@@ -677,6 +711,20 @@ def test_jpeg_requires_minimal_end_marker(
     for name in names.values():
         (tmp_path / name).write_bytes(b"\xff\xd8\xff\xe0not-terminated")
 
+    with pytest.raises(ValueError, match="signature"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+
+def test_reference_inputs_reject_truncated_or_wrapper_only_images(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    names = _write_reference_set(tmp_path)
+    (tmp_path / names["front"]).write_bytes(b"\x89PNG\r\n\x1a\n")
+    with pytest.raises(ValueError, match="signature"):
+        resolve_reference_inputs(valid_contract, tmp_path, names)
+
+    names = _write_reference_set(tmp_path, suffix=".jpg")
+    (tmp_path / names["front"]).write_bytes(bytes((255, 216, 255, 224)) + b"jpeg" + bytes((255, 217)))
     with pytest.raises(ValueError, match="signature"):
         resolve_reference_inputs(valid_contract, tmp_path, names)
 
@@ -841,14 +889,8 @@ def test_multi_image_request_preserves_contract_order_and_uses_official_cost(
 def test_reference_jpeg_magic_extension_and_symlink_fail_closed(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:
-    names = _write_reference_set(tmp_path)
-    for index, name in enumerate(names.values()):
-        (tmp_path / name).write_bytes(
-            bytes((255, 216, 255, 224)) + b"jpeg" + bytes([index]) + bytes((255, 217))
-        )
-    jpeg_names = {view: name[:-4] + ".jpg" for view, name in names.items()}
-    for old_name, new_name in zip(names.values(), jpeg_names.values()):
-        (tmp_path / old_name).rename(tmp_path / new_name)
+    names = _write_reference_set(tmp_path, suffix=".jpg")
+    jpeg_names = dict(names)
     resolved = resolve_reference_inputs(valid_contract, tmp_path, jpeg_names)
     assert all(item.media_type == "image/jpeg" for item in resolved.references)
 
@@ -878,6 +920,30 @@ def test_reference_file_and_aggregate_limits_are_enforced(
     monkeypatch.setattr(stage_module, "_REFERENCE_TOTAL_MAX_BYTES", 16)
     with pytest.raises(ValueError, match="aggregate|maximum"):
         resolve_reference_inputs(valid_contract, tmp_path, names)
+
+
+def test_staging_paths_use_contract_identifier_regex(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="safe staging identifier"):
+        stage_module._validate_staging_paths(tmp_path, "Foo.Bar")
+    with pytest.raises(ValueError, match="safe staging identifier"):
+        stage_module._validate_staging_paths(tmp_path, "Not_Valid.ID")
+    _root, _stage, asset_root = stage_module._validate_staging_paths(tmp_path, "fixture_triangle")
+    assert asset_root.name == "fixture_triangle"
+    assert asset_root.parent.name == "meshy"
+
+
+def test_pricing_id_accepts_dated_snapshot_and_rejects_undated(tmp_path: Path) -> None:
+    source = json.loads((ROOT / "data/asset_generation/meshy_pricing_v1.json").read_text(encoding="utf-8"))
+    source["pricing_id"] = "meshy_api_2026_09_02"
+    path = tmp_path / "priced.json"
+    path.write_bytes(canonical_json_bytes(source))
+    pricing = load_pricing(path, today="2026-09-01")
+    assert pricing.pricing_id == "meshy_api_2026_09_02"
+
+    source["pricing_id"] = "meshy_api"
+    path.write_bytes(canonical_json_bytes(source))
+    with pytest.raises(ValueError, match="pricing"):
+        load_pricing(path, today="2026-09-01")
 
 
 def test_pricing_document_has_exact_closed_fields_and_original_hash() -> None:
@@ -1060,8 +1126,12 @@ def test_r2b1_generation_loader_binds_all_adjacent_artifacts_and_journal(
     generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
     task_dir = next(
         path
-        for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir()
+        for path in sorted(
+            _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir(),
+            key=lambda item: item.name,
+        )
         if path.name != "_batches"
+        and json.loads((path / "generation.json").read_text(encoding="utf-8")).get("task_index") == 0
     )
     generation_path = task_dir / "generation.json"
     journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
@@ -1120,6 +1190,14 @@ def test_r2b1_journal_validator_rejects_forged_state_credit_and_collision_fields
     forged["tasks"][0]["state"] = "FAILED"
     forged["tasks"][0]["error"] = "collision"
     assert stage_module.validate_batch_journal(forged)
+
+    leftover = json.loads(json.dumps(journal))
+    leftover["tasks"][0]["state"] = "PENDING"
+    leftover["tasks"][0]["consumed_credits"] = None
+    leftover["tasks"][0]["error"] = "lingering"
+    leftover["tasks"][0]["budget_violation"] = False
+    errors = stage_module.validate_batch_journal(leftover)
+    assert any("pending state is inconsistent" in item for item in errors)
 
 
 @pytest.mark.parametrize(

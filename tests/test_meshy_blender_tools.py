@@ -7,13 +7,14 @@ import os
 import shutil
 import struct
 import subprocess
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from tools.meshy_asset_contract import AssetContract, load_contract
+from tools.meshy_asset_contract import AssetContract, canonical_json_bytes, load_contract
 from tools.meshy_blender_master import (
     BLENDER_PATH,
     build_blender_command,
@@ -407,7 +408,7 @@ def test_validate_retains_explicit_humanoid_rigging_allowance(contract, tmp_path
 
 
 
-def _bound_fixture_task(tmp_path: Path):
+def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
     from tests.test_meshy_candidate_review import (
         _ReviewFakeMeshyClient,
         _true_checks,
@@ -420,7 +421,14 @@ def _bound_fixture_task(tmp_path: Path):
     project_root.mkdir()
     references = project_root / "references"
     references.mkdir()
-    contract = load_contract(CONTRACT_PATH)
+    contract_path = CONTRACT_PATH
+    if category is not None:
+        document = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        if document.get("category") != category:
+            document["category"] = category
+            contract_path = tmp_path / "rewritten_contract.json"
+            contract_path.write_bytes(canonical_json_bytes(document))
+    contract = load_contract(contract_path)
     specs = _write_review_references(references)
     generate_batch(
         contract,
@@ -547,8 +555,8 @@ def test_validate_report_contains_typed_bound_fields_and_reimport_evidence(contr
     assert set(report) == set(validate_module._CANONICAL_FIELDS)
     assert report["uv_evidence"][0]["vertex_count"] == 3
     assert report["blender_reimport_passed"] is False
-    report["blender_reimport_passed"] = True
-    validate_module._validate_report_record(report)
+    with pytest.raises(validate_module.BlenderValidationError, match="re-import"):
+        validate_module._validate_report_record(report)
 
 
 def test_master_runner_uses_isolated_process_group_timeout_term_kill_and_reap(monkeypatch) -> None:
@@ -841,7 +849,7 @@ def test_report_writer_rejects_forged_bounds_materials_and_uv_evidence(tmp_path:
 
 
 def _run_python_process(script: str) -> list[str]:
-    return ["/usr/bin/python3", "-c", script]
+    return [sys.executable, "-c", script]
 
 
 def _kill_pid_if_alive(pid_file: Path) -> None:

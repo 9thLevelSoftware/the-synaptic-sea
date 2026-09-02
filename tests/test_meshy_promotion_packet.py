@@ -58,7 +58,9 @@ def _visible_png_bytes() -> bytes:
     )
 
 
-def _canonical_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tuple[Path, Path]:
+def _canonical_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, category: str = "gameplay_prop"
+) -> Tuple[Path, Path]:
     """Build selected -> promotion_ready evidence through real governed code."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     from tests.test_meshy_runtime_review import _bound_runtime_fixture
@@ -66,7 +68,7 @@ def _canonical_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tuple
     from tools import meshy_runtime_review as runtime_review
     from tools.meshy_candidate_review import bind_promotion_evidence
 
-    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path)
+    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path, category=category)
 
     def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
         return SimpleNamespace(
@@ -238,7 +240,7 @@ def test_positive_prop_is_derived_from_canonical_promotion_ready_evidence(
 def test_positive_threat_writes_two_fixed_leaves_with_patch_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch)
+    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch, category="threat_character")
     live_before = _make_live_surfaces(project_root)
 
     proposal = write_threat_promotion_proposal(
@@ -470,7 +472,7 @@ def test_existing_prop_leaf_is_immutable_evidence(
 def test_threat_preflights_both_leaves_before_first_write(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch)
+    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch, category="threat_character")
     proposal = _threat(project_root, task_dir)
     patch = task_dir / THREAT_PATCH_NAME
     provenance = task_dir / ASSET_PROVENANCE_NAME
@@ -495,7 +497,7 @@ def test_threat_preflights_both_leaves_before_first_write(
 def test_threat_exact_first_leaf_retry_resumes_without_replacement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch)
+    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch, category="threat_character")
     proposal = _threat(project_root, task_dir)
     provenance = task_dir / ASSET_PROVENANCE_NAME
     _write_canonical(provenance, proposal["asset_provenance"])
@@ -520,7 +522,7 @@ def test_threat_exact_first_leaf_retry_resumes_without_replacement(
 def test_threat_existing_first_leaf_mismatch_blocks_final_leaf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch)
+    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch, category="threat_character")
     provenance = task_dir / ASSET_PROVENANCE_NAME
     provenance.write_bytes(b"different")
     provenance.chmod(0o600)
@@ -537,22 +539,43 @@ def test_threat_existing_first_leaf_mismatch_blocks_final_leaf(
     assert provenance.read_bytes() == b"different"
 
 
+def test_packet_type_must_match_task_contract_category(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir = _canonical_fixture(tmp_path / "prop", monkeypatch)
+    with pytest.raises(PromotionPacketError, match="incompatible with contract category gameplay_prop"):
+        _threat(project_root, task_dir)
+
+    project_root, task_dir = _canonical_fixture(
+        tmp_path / "threat", monkeypatch, category="threat_character"
+    )
+    with pytest.raises(PromotionPacketError, match="incompatible with contract category threat_character"):
+        _prop(project_root, task_dir)
+
+
 def test_success_and_failure_leave_protected_runtime_surfaces_unchanged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    project_root, task_dir = _canonical_fixture(tmp_path, monkeypatch)
+    project_root, task_dir = _canonical_fixture(tmp_path / "prop", monkeypatch)
     expected = _make_live_surfaces(project_root)
     before = _live_snapshot(project_root)
     write_prop_promotion_proposal(project_root, task_dir, target_path=_proposal_target())
+    assert before == expected == _live_snapshot(project_root)
+
+    threat_root, threat_dir = _canonical_fixture(
+        tmp_path / "threat", monkeypatch, category="threat_character"
+    )
+    threat_expected = _make_live_surfaces(threat_root)
+    threat_before = _live_snapshot(threat_root)
     write_threat_promotion_proposal(
-        project_root,
-        task_dir,
+        threat_root,
+        threat_dir,
         mesh_path="res://assets/_staging/meshy/{0}/{1}/cleaned.glb".format(
-            task_dir.parent.name, task_dir.name
+            threat_dir.parent.name, threat_dir.name
         ),
         archetype="fixture_triangle",
     )
-    assert before == expected == _live_snapshot(project_root)
+    assert threat_before == threat_expected == _live_snapshot(threat_root)
 
     failed = task_dir / "cleaned.glb"
     original = failed.read_bytes()

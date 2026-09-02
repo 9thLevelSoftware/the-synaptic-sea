@@ -195,6 +195,8 @@ Commands are host-Python launchers and run from the repository root. The support
    /usr/bin/python3 tools/meshy_candidate_review.py bind --project-root . --task-dir "<task_dir>"
    /usr/bin/python3 tools/meshy_promotion_packet.py prop --project-root . --task-dir "<task_dir>" \
      --target-path res://assets/imported/props/dressing/<asset_id>.sidecar.json
+   # threat_character / threat_kit contracts use the threat packet, not prop:
+   # /usr/bin/python3 tools/meshy_promotion_packet.py threat --project-root . --task-dir "<task_dir>"
    ```
 
 The promotion packet is a review proposal only; applying it is a separate reviewed task.

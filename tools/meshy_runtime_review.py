@@ -524,14 +524,7 @@ def build_godot_command(
     """Construct the exact no-shell bounded capture command."""
 
     capture_name(seed, lighting)
-    command = [
-        str(GODOT),
-        *_godot_render_args(),
-        "--path",
-        str(_absolute(overlay_root)),
-        "--script",
-        CAPTURE_SCRIPT,
-        "--",
+    user_args = [
         "--seed",
         str(seed),
         "--lighting",
@@ -542,8 +535,17 @@ def build_godot_command(
     if asset_id is not None or category is not None:
         if not isinstance(asset_id, str) or not isinstance(category, str):
             raise ReviewError("asset_id and category must be supplied together")
-        command[10:10] = ["--asset-id", asset_id, "--category", category]
-    return command
+        user_args.extend(["--asset-id", asset_id, "--category", category])
+    return [
+        str(GODOT),
+        *_godot_render_args(),
+        "--path",
+        str(_absolute(overlay_root)),
+        "--script",
+        CAPTURE_SCRIPT,
+        "--",
+        *user_args,
+    ]
 
 
 def _parse_finite_vector(value: str, label: str) -> list[float]:
