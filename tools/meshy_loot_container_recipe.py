@@ -167,6 +167,23 @@ def _resolve_path(value: PathLike, base: Path | None = None) -> Path:
     return _lexical_path(value, base).resolve(strict=False)
 
 
+def _validate_master_candidate(
+    path: PathLike | None = None, *, require_file: bool = False
+) -> Path:
+    root = _lexical_path(TRUSTED_MASTER_ROOT)
+    candidate = root / ASSET_ID / CANONICAL_MASTER_LEAF
+    if path is not None and _lexical_path(path) != candidate:
+        raise ValueError("canonical master path is not the exact trusted master")
+    _reject_symlink_components(candidate, "trusted master root")
+    resolved_root = root.resolve(strict=False)
+    resolved_candidate = candidate.resolve(strict=False)
+    if not _contained(root, candidate) or not _contained(resolved_root, resolved_candidate):
+        raise ValueError("canonical master path escapes the trusted master root")
+    if require_file:
+        _regular_file(candidate, "canonical Blender master")
+    return resolved_candidate
+
+
 def _validate_task_dir(project_root: Path, task_dir: PathLike) -> Path:
     try:
         task = governance.governed_task_path(
@@ -201,12 +218,7 @@ def _validate_evidence_dir(project_root: Path, evidence_dir: PathLike) -> Path:
 
 
 def _derive_master_path() -> Path:
-    root = _lexical_path(TRUSTED_MASTER_ROOT)
-    _reject_symlink_components(root, "trusted master root")
-    candidate = root / ASSET_ID / CANONICAL_MASTER_LEAF
-    if not _contained(root, candidate):  # pragma: no cover - fixed constants
-        raise ValueError("canonical master path escapes the trusted master root")
-    return _resolve_path(candidate)
+    return _validate_master_candidate()
 
 
 def derive_recipe_paths(
@@ -303,9 +315,8 @@ def resolve_recipe_paths(
         raise ValueError("contract hash does not match generation evidence")
 
     paths = derive_recipe_paths(project, Path(review_path).parent, evidence_dir)
+    _validate_master_candidate(paths.master_path, require_file=True)
     _validate_raw_evidence(paths, generation)
-    _reject_symlink_components(_lexical_path(paths.master_path).parent.parent, "trusted master root")
-    _regular_file(paths.master_path, "canonical Blender master")
     return contract, paths
 
 
@@ -1027,7 +1038,7 @@ def _validate_recipe_inputs(paths: RecipePaths, contract: AssetContract) -> str:
         raise TypeError("paths must be a RecipePaths instance")
     if not isinstance(contract, AssetContract) or contract.asset_id != ASSET_ID:
         raise ValueError("contract must be the loot-container AssetContract")
-    _regular_file(paths.master_path, "Blender master")
+    _validate_master_candidate(paths.master_path, require_file=True)
     raw_path = paths.task_dir / "raw.glb"
     _regular_file(raw_path, "task-local raw.glb")
     raw_hash = governance.file_sha256(raw_path, max_bytes=_MAX_GLB_BYTES)
