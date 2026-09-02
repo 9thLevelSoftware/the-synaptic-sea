@@ -947,20 +947,40 @@ def _compare_approved_baseline(
         raise ValueError("private scratch GLB does not match approved baseline")
 
 
-def _load_approved_baseline(paths: RecipePaths) -> tuple[dict[str, Any], bytes, bytes]:
-    _regular_file(paths.manifest_path, "approved recipe manifest")
-    manifest_payload = paths.manifest_path.read_bytes()
+def _source_manifest_path(paths: RecipePaths) -> Path:
+    return paths.master_path.parent / "build_recipe_manifest.json"
+
+
+def _load_manifest(
+    path: Path, label: str, expected_master_path: Path
+) -> tuple[dict[str, Any], bytes]:
+    _regular_file(path, label)
+    manifest_payload = path.read_bytes()
     try:
         manifest = json.loads(manifest_payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("approved recipe manifest is not valid JSON") from exc
+        raise ValueError(label + " is not valid JSON") from exc
     if not isinstance(manifest, dict):
-        raise ValueError("approved recipe manifest must be an object")
-    errors = validate_manifest_document(manifest, expected_master_path=paths.master_path)
+        raise ValueError(label + " must be an object")
+    errors = validate_manifest_document(manifest, expected_master_path=expected_master_path)
     if errors:
-        raise ValueError("approved recipe manifest is invalid: " + "; ".join(errors))
+        raise ValueError(label + " is invalid: " + "; ".join(errors))
     if manifest_payload != canonical_json_bytes(manifest):
-        raise ValueError("approved recipe manifest is not canonical JSON")
+        raise ValueError(label + " is not canonical JSON")
+    return manifest, manifest_payload
+
+
+def _load_approved_baseline(paths: RecipePaths) -> tuple[dict[str, Any], bytes, bytes]:
+    source_manifest, source_payload = _load_manifest(
+        _source_manifest_path(paths), "source recipe manifest", paths.master_path
+    )
+    _evidence_manifest, evidence_payload = _load_manifest(
+        paths.manifest_path, "approved recipe manifest", paths.master_path
+    )
+    if source_payload != evidence_payload:
+        raise ValueError("source and evidence recipe manifests do not match")
+
+    manifest = source_manifest
 
     renders = manifest.get("renders")
     if not isinstance(renders, Mapping) or set(renders) != set(RENDER_LEAVES):
@@ -978,11 +998,7 @@ def _load_approved_baseline(paths: RecipePaths) -> tuple[dict[str, Any], bytes, 
     approved_scratch = paths.scratch_glb.read_bytes()
     if approved_scratch[:4] != b"glTF":
         raise ValueError("approved scratch GLB is not GLB")
-    return manifest, manifest_payload, approved_scratch
-
-
-def _source_manifest_path(paths: RecipePaths) -> Path:
-    return paths.master_path.parent / "build_recipe_manifest.json"
+    return manifest, source_payload, approved_scratch
 
 
 def _validate_runtime_evidence(evidence: Mapping[str, Any]) -> None:
@@ -1089,6 +1105,13 @@ def run_blender_recipe(paths: RecipePaths, contract: AssetContract, mode: str) -
             _compare_approved_baseline(
                 approved_baseline[0], manifest, approved_baseline[2], private_glb_payload
             )
+        if mode == "publish-cleaned":
+            _preflight_destination(
+                paths.task_dir / "cleaned.glb",
+                paths.task_dir,
+                hashlib.sha256(private_glb_payload).hexdigest(),
+                len(private_glb_payload),
+            )
         _publish_leaf(paths.master_path, master_payload, "updated Blender master")
         for leaf in RENDER_LEAVES:
             _publish_leaf(paths.evidence_dir / leaf, (run_dir / leaf).read_bytes(), leaf)
@@ -1176,26 +1199,20 @@ def build_blender_command(paths: RecipePaths, contract_path: Path, mode: str) ->
     ]
 
 
-def publish_cleaned(source_glb: Path, destination: Path, allowed_root: Path) -> PublishedArtifact:
-    """Exclusively publish a cleaned GLB, allowing only identical idempotency."""
-
-    source = Path(source_glb)
-    _regular_file(source, "source GLB")
-    if source.stat().st_size > _MAX_GLB_BYTES:
-        raise ValueError("source GLB exceeds the size limit")
-    try:
-        payload = source.read_bytes()
-    except OSError as exc:
-        raise ValueError("source GLB could not be read") from exc
-    if not payload:
-        raise ValueError("source GLB must be non-empty")
-    digest = hashlib.sha256(payload).hexdigest()
-    size = len(payload)
-
+def _preflight_destination(
+    destination: PathLike,
+    allowed_root: PathLike,
+    expected_sha256: str,
+    expected_size: int,
+) -> tuple[Path, Path, bool]:
     allowed_root_lexical = _lexical_path(allowed_root)
     _reject_symlink_components(allowed_root_lexical, "allowed root")
     root = allowed_root_lexical.resolve(strict=False)
-    if not root.is_dir() or root.is_symlink():
+    try:
+        root_info = os.lstat(root)
+    except OSError as exc:
+        raise ValueError("allowed root must be a regular directory") from exc
+    if not stat.S_ISDIR(root_info.st_mode):
         raise ValueError("allowed root must be a regular directory")
     target = _lexical_path(destination)
     _reject_symlink_components(target, "cleaned GLB destination")
@@ -1211,8 +1228,29 @@ def publish_cleaned(source_glb: Path, destination: Path, allowed_root: Path) -> 
             existing_hash = governance.file_sha256(target, max_bytes=_MAX_GLB_BYTES)
         except (OSError, TypeError, ValueError) as exc:
             raise ValueError("existing cleaned GLB could not be hashed") from exc
-        if existing_hash != digest or info.st_size != size:
+        if existing_hash != expected_sha256 or info.st_size != expected_size:
             raise ValueError("existing cleaned GLB does not match source")
+        return root, target, True
+    return root, target, False
+
+
+def publish_cleaned(source_glb: Path, destination: Path, allowed_root: Path) -> PublishedArtifact:
+    """Exclusively publish a cleaned GLB, allowing only identical idempotency."""
+
+    source = Path(source_glb)
+    _regular_file(source, "source GLB")
+    if source.stat().st_size > _MAX_GLB_BYTES:
+        raise ValueError("source GLB exceeds the size limit")
+    try:
+        payload = source.read_bytes()
+    except OSError as exc:
+        raise ValueError("source GLB could not be read") from exc
+    if not payload:
+        raise ValueError("source GLB must be non-empty")
+    digest = hashlib.sha256(payload).hexdigest()
+    size = len(payload)
+    root, target, existing = _preflight_destination(destination, allowed_root, digest, size)
+    if existing:
         return PublishedArtifact(target, digest, size)
 
     try:

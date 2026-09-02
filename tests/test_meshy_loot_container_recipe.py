@@ -940,6 +940,26 @@ def _recipe_case(tmp_path: Path):
     return recipe, contract, paths
 
 
+def _publication_snapshot(recipe, paths):
+    leaves = [
+        paths.master_path,
+        *(paths.evidence_dir / leaf for leaf in recipe.RENDER_LEAVES),
+        paths.scratch_glb,
+        recipe._source_manifest_path(paths),
+        paths.manifest_path,
+        paths.task_dir / "cleaned.glb",
+    ]
+    snapshot = {}
+    for path in leaves:
+        if not os.path.lexists(path):
+            snapshot[path] = None
+            continue
+        payload = path.read_bytes()
+        info = path.stat()
+        snapshot[path] = (payload, hashlib.sha256(payload).hexdigest(), info.st_ino, info.st_mtime_ns)
+    return snapshot
+
+
 def test_approved_comparison_checks_manifest_render_hashes_and_glb_bytes() -> None:
     from tools import meshy_loot_container_recipe as recipe
 
@@ -955,6 +975,103 @@ def test_approved_comparison_checks_manifest_render_hashes_and_glb_bytes() -> No
     generated = json.loads(json.dumps(approved))
     with pytest.raises(ValueError, match="scratch GLB"):
         recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF changed")
+
+
+def test_publish_cleaned_preflights_mismatch_before_canonical_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    destination = paths.task_dir / "cleaned.glb"
+    destination.write_bytes(b"mismatching cleaned glb")
+    before = _publication_snapshot(recipe, paths)
+
+    with pytest.raises(ValueError, match="existing cleaned GLB does not match source"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_publish_rejects_divergent_source_manifest_before_runner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+    from tools.meshy_asset_contract import canonical_json_bytes
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    source_manifest = recipe._source_manifest_path(paths)
+    divergent = json.loads(source_manifest.read_text(encoding="utf-8"))
+    divergent["triangle_count"] = 2
+    source_manifest.write_bytes(canonical_json_bytes(divergent))
+    before = _publication_snapshot(recipe, paths)
+    calls = []
+    runner = _fake_recipe_runner(b"glTF approved")
+
+    def spy(command, cwd, timeout):
+        calls.append((command, cwd, timeout))
+        return runner(command, cwd, timeout)
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", spy)
+    with pytest.raises(ValueError, match="source.*evidence|manifest"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert calls == []
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_publish_rejects_divergent_evidence_manifest_before_runner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+    from tools.meshy_asset_contract import canonical_json_bytes
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    divergent = json.loads(paths.manifest_path.read_text(encoding="utf-8"))
+    divergent["triangle_count"] = 2
+    paths.manifest_path.write_bytes(canonical_json_bytes(divergent))
+    before = _publication_snapshot(recipe, paths)
+    calls = []
+    runner = _fake_recipe_runner(b"glTF approved")
+
+    def spy(command, cwd, timeout):
+        calls.append((command, cwd, timeout))
+        return runner(command, cwd, timeout)
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", spy)
+    with pytest.raises(ValueError, match="source.*evidence|manifest"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert calls == []
+    assert _publication_snapshot(recipe, paths) == before
+
+
+def test_identical_source_and_evidence_manifests_publish_and_task_leaf_is_idempotent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    source_manifest = recipe._source_manifest_path(paths)
+    assert source_manifest.read_bytes() == paths.manifest_path.read_bytes()
+
+    first = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    destination = paths.task_dir / "cleaned.glb"
+    first_stat = destination.stat()
+    second = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    second_stat = destination.stat()
+
+    assert first["marker"] == second["marker"]
+    assert destination.read_bytes() == b"glTF approved"
+    assert (second_stat.st_ino, second_stat.st_mtime_ns) == (first_stat.st_ino, first_stat.st_mtime_ns)
 
 
 def test_publish_cleaned_mismatch_fails_before_task_leaf_or_canonical_touch(
