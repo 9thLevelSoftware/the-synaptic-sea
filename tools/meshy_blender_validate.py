@@ -307,16 +307,19 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
         times = [float(sample[0]) for sample in input_samples.values]
         if any(later <= earlier for earlier, later in zip(times, times[1:])):
             raise BlenderValidationError("hinge animation input times must be strictly increasing")
+        if times[0] < 0.0:
+            raise BlenderValidationError("hinge animation input times must be nonnegative")
 
         quaternions: List[Tuple[float, float, float, float]] = []
         for sample in output_samples.values:
-            values = tuple(float(value) for value in sample)
-            length = math.sqrt(sum(value * value for value in values))
+            qx, qy, qz, qw = (float(value) for value in sample)
+            length = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
             if length <= 1e-12:
                 raise BlenderValidationError("hinge animation quaternion samples must be nonzero")
             if abs(length - 1.0) > 1e-4:
                 raise BlenderValidationError("hinge animation quaternion samples must be unit length")
-            quaternions.append(values)
+            # Normalize so 1e-4 unit-length slack cannot mask a stationary track.
+            quaternions.append((qx / length, qy / length, qz / length, qw / length))
 
         rest_rotation = _finite_vector(
             node.get("rotation", [0.0, 0.0, 0.0, 1.0]),
