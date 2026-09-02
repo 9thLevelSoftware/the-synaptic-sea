@@ -1,0 +1,32 @@
+{
+  "asset_id": "biomatter_swarm_kit_v1",
+  "candidate_count": 3,
+  "contract_sha256": "b50b1694a563a8521994bdcbc1b9f0e7b41d00f4df28278282607d82399da6be",
+  "cost_per_candidate": 5,
+  "endpoint": "/openapi/v1/image-to-3d",
+  "maximum_credits": 15,
+  "pricing_checked_at": "2026-08-31",
+  "pricing_expires_at": "2026-09-30",
+  "pricing_id": "meshy_api_2026_08_31",
+  "pricing_sha256": "b2c729a587fd2e69bc1ea93a90379fd1d6ad2b6eb589736c03b8501fe2369413",
+  "pricing_source_url": "https://docs.meshy.ai/api/pricing.md",
+  "prompt_packet_sha256": "c8a26cb97781807151a8130d146e438831b1c8700735fe439e180116d2043e65",
+  "prompt_profile_id": "synaptic_sea_derelict_v1",
+  "prompt_profile_sha256": "b8abb9cf4c9bfb4f1cceb254a30b255da4553e70daae5489cb330739b4aa4254",
+  "references_resolved": false,
+  "request": {
+    "ai_model": "meshy-t2",
+    "model_type": "smart-topology",
+    "should_texture": false,
+    "target_formats": [
+      "glb"
+    ],
+    "target_polycount": 800
+  },
+  "required_views": [
+    "front",
+    "side",
+    "back",
+    "three_quarter"
+  ]
+}

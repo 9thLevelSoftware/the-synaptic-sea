@@ -1,0 +1,32 @@
+{
+  "asset_id": "stalker_v1",
+  "candidate_count": 4,
+  "contract_sha256": "fb31123b77453a42372715468d97a579b6f6a2433198d3ff0f00758c8cb3f9ff",
+  "cost_per_candidate": 20,
+  "endpoint": "/openapi/v1/multi-image-to-3d",
+  "maximum_credits": 80,
+  "pricing_checked_at": "2026-08-31",
+  "pricing_expires_at": "2026-09-30",
+  "pricing_id": "meshy_api_2026_08_31",
+  "pricing_sha256": "b2c729a587fd2e69bc1ea93a90379fd1d6ad2b6eb589736c03b8501fe2369413",
+  "pricing_source_url": "https://docs.meshy.ai/api/pricing.md",
+  "prompt_packet_sha256": "14e9b3a036e8a268a0c78215e65e1a9c2cc4566c91dbdf8df8b6f15bd1e071bb",
+  "prompt_profile_id": "synaptic_sea_derelict_v1",
+  "prompt_profile_sha256": "b8abb9cf4c9bfb4f1cceb254a30b255da4553e70daae5489cb330739b4aa4254",
+  "references_resolved": false,
+  "request": {
+    "ai_model": "meshy-7",
+    "model_type": "standard",
+    "should_texture": false,
+    "target_formats": [
+      "glb"
+    ],
+    "target_polycount": 12000
+  },
+  "required_views": [
+    "front",
+    "side",
+    "back",
+    "three_quarter"
+  ]
+}

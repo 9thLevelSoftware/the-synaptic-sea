@@ -4,19 +4,190 @@
 
 No completion claim without fresh validation evidence.
 
+## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
+
+Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
+Requirements: `REQ-AIAP-001` through `REQ-AIAP-010`.
+
+The toolchain is implemented and host/toolchain verified at commit
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. This section records current commands and evidence
+boundaries. No real provider task, candidate artifact, external Blender master, or six-case
+candidate runtime capture is claimed here; those are post-PR live-pilot evidence.
+
+The authority chain is:
+
+```text
+asset contract -> consistent separate reference images -> Meshy candidate
+  -> Blender canonical master/cleanup -> staged validation
+  -> temporary Godot overlay locked-isometric review -> separate reviewed promotion
+```
+
+The review overlay must use the real `breach_field` environment and locked-isometric camera at
+seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting. Meshy cannot author
+structural floors, walls, doors, ramps, sockets, collision, or damage topology. Blender owns
+the editable master, topology, UV, exact meter scale, pivot, `+Z` forward, state derivation,
+rig, and export. Godot wrappers/runtime data own collision, navigation, sockets, integrity,
+VFX/animation integration, and gameplay bindings.
+
+### Contract, plan, and focused Python tests — IMPLEMENTED
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 -m pytest -q \
+  tests/test_meshy_asset_contract.py \
+  tests/test_meshy_stage.py \
+  tests/test_meshy_candidate_review.py \
+  tests/test_meshy_blender_tools.py \
+  tests/test_meshy_texture_packet.py \
+  tests/test_meshy_promotion_packet.py \
+  tests/test_meshy_runtime_review.py \
+  tests/test_validate_prop_visual_bindings.py \
+  tests/test_prop_visual_metadata.py
+```
+
+At the implementation snapshot, this focused suite completed **340 passed in 185.67s**.
+That duration is the canonical citation for this snapshot; ADR-0058 and
+`docs/superpowers/proofs/meshy-skill-pressure-tests.md` must reuse it rather than a later
+rerun. The contract validator and all nine host CLI help surfaces also passed with
+`/usr/bin/python3`.
+The read-only plan makes no provider call and records `references_resolved=false` until real
+rights-cleared reference files are supplied for the pilot:
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py plan \
+  --project-root . \
+  --contract data/asset_generation/contracts/<asset_id>.json \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json
+```
+
+### Current host-Python lifecycle
+
+Run from the repository root. The candidate plan's `maximum_credits` applies to
+`meshy_stage.py generate` and `resume`: their required `--approved-credits` value must equal that
+plan value as a request-envelope/integrity check. This candidate-plan equality does not apply to
+the optional texture packet. Standing subscription authorization means spend and cap bookkeeping
+are not a human blocker. The optional texture packet is proposal-only, uses a separate current
+10-credit integrity estimate, and does not create a provider task. The texture packet's `--approved-credits`
+value must be greater than or equal to the current fixed 10-credit estimate, so
+`TEXTURE_APPROVED_CREDITS` must be `10` or greater. It still requires selected candidate, Blender,
+and UV evidence and does not weaken task/artifact integrity. The lifecycle is
+plan → generate → resume/verify → candidate review → Blender master and validator → optional
+texture packet after selection/UV → runtime review → binder → proposal only:
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py generate \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --approved-credits <maximum_credits> --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py resume \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --approved-credits <maximum_credits> \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root <reference_root> --reference front=<front_file> \
+  --reference side=<side_file> --reference back=<back_file> \
+  --reference three_quarter=<three_quarter_file> --output-license paid-private
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py verify \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --batch-journal <batch_journal> --pricing-file data/asset_generation/meshy_pricing_v1.json
+```
+
+Each governed batch retains exactly the contract `candidate_count`. The loot-container pilot is
+one batch with four candidate records, with one paid creation POST attempt per record. A timeout,
+transport failure, `429`, `5xx`, or other ambiguous creation result is reconciled from the
+immutable journal and is never automatically retried. One selected Blender master derives all
+alternate states; single-attempt safety never reduces candidate cardinality.
+
+After explicit candidate selection and the Blender UV pass:
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py select \
+  --project-root . --task-dir "<task_dir>" --reviewer "<reviewer>" \
+  --check silhouette_readable --check proportions_match_contract \
+  --check functional_volume_present --check movable_parts_separable \
+  --check cleanup_bounded --check camera_readability
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_blender_master.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --reviewer "<reviewer>"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_blender_validate.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --glb "<task_dir>/cleaned.glb" \
+  --report "<task_dir>/blender-validation.json"
+TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_texture_packet.py \
+  --project-root . --contract data/asset_generation/contracts/<asset_id>.json \
+  --task-dir "<task_dir>" --material-family "<family>" --resolution 1024 \
+  --reviewer "<reviewer>" --approved-credits "$TEXTURE_APPROVED_CREDITS"
+```
+
+The Blender commands are host-Python launchers; do not invoke them as `blender --python`.
+Blender focused evidence at the snapshot is 2 passed tests for valid re-import/publication and
+non-affine rejection. No external pilot master or cleaned GLB is present yet.
+
+### Locked-isometric runtime review and proposal boundary
+
+```bash
+TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
+TASK_DIR="assets/_staging/meshy/stalker_v1/${TASK_ID}"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_runtime_review.py \
+  --project-root . --contract data/asset_generation/contracts/stalker_v1.json \
+  --task-dir "$TASK_DIR" --preview-dir artifacts/validation-previews/meshy/stalker_v1
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py bind \
+  --project-root . --task-dir "$TASK_DIR"
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_promotion_packet.py threat \
+  --project-root . --task-dir "$TASK_DIR" \
+  --archetype stalker
+```
+
+The runner uses the real `breach_field` environment and locked-isometric camera for exactly six
+cases: seeds `42` and `777` × `normal`, `emergency`, and `dark` lighting. It publishes captures
+only after complete PNGs, clean diagnostics, task/artifact identity, selected/SUCCEEDED evidence,
+and the Blender re-import report pass. The exact producer marker requires task identity:
+
+```text
+MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
+```
+
+There is no Meshy task directory, raw/cleaned GLB, generation/review record, external master, or
+six runtime captures in this phase; the real candidate lifecycle is pending the post-PR live
+pilot. Runtime review, the binder, and the proposal command never write live catalogs, generated
+indexes, wrappers, or imported assets. The promotion packet is a proposal only and application
+requires a separate reviewed task.
+
+### Existing Godot regression smokes — current commands
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+```
+
+These existing production-environment smokes remain regression evidence. Fresh results for the
+parent's isolated Godot lane are not supplied by this documentation phase, and this section does
+not claim `builder_playable_runtime_fields_smoke.gd` is green. Unexpected `ERROR:`, `WARNING:`,
+or `SCRIPT ERROR:` lines block runtime acceptance unless the exact output is classified in this
+plan; a pass marker or zero exit code does not override an unclassified diagnostic. Generation
+and review must not write to `assets/imported`, `data/combat/threat_visual_catalog.json`,
+`data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is separate.
+
 ## Godot binary
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2`
+`$GODOT` (the caller-supplied Godot 4.7.1 executable)
 
 ## Project root
 
-`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
+`ROOT="${ROOT:-.}"`
 
 ## Focused route-control validation
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected markers:
@@ -32,7 +203,7 @@ Registered in the regression bundle after GREEN.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
 ```
 
@@ -46,7 +217,7 @@ Feature: `docs/game/features/enclosed_slot_fill.md`.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 ```
 
@@ -62,7 +233,7 @@ Registered in the regression bundle after GREEN.
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 ```
 
@@ -76,7 +247,7 @@ Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golde
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 ```
 
@@ -92,7 +263,7 @@ Feature: `docs/game/features/derelict_builder_runtime_preview.md`. The preview i
 
 ```bash
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 MANIFEST="${DERELICT_BUILDER_MANIFEST:?set DERELICT_BUILDER_MANIFEST to a validated derelict_builder_bundle manifest}"
 "$GODOT" --headless --path "$ROOT" res://scenes/procgen/derelict_builder_preview.tscn -- --manifest "$MANIFEST"
 ```
@@ -127,7 +298,7 @@ These require clean `BUILDER AUTHORED PORTALS PASS`, `BUILDER PLACED PROPS PASS`
 ```bash
 set -euo pipefail
 ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
@@ -234,7 +405,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING|SCRIPT ERROR):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -1003,10 +1174,11 @@ bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
 must block the change):
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
-for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
+for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
+  "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
 done
 ```
 
@@ -1019,7 +1191,7 @@ section (and update the allowlist) before re-running.
 Use after gameplay-system milestones where the user asked to avoid proof churn:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
+ROOT="${ROOT:-.}"
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 ```
@@ -1042,7 +1214,9 @@ Gate 1 accepts two evidence paths:
 Automated Gate 1 command:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.
