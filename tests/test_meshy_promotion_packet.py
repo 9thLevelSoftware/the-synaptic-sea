@@ -63,7 +63,7 @@ def _canonical_fixture(
 ) -> Tuple[Path, Path]:
     """Build selected -> promotion_ready evidence through real governed code."""
     tmp_path.mkdir(parents=True, exist_ok=True)
-    from tests.test_meshy_runtime_review import _bound_runtime_fixture
+    from tests.test_meshy_runtime_review import _bound_runtime_fixture, _solid_png_bytes
     from tools import meshy_blender_validate as blender_validate
     from tools import meshy_runtime_review as runtime_review
     from tools.meshy_candidate_review import bind_promotion_evidence
@@ -81,19 +81,53 @@ def _canonical_fixture(
     monkeypatch.setattr(
         blender_validate, "_reimport_with_blender_process", fake_reimport, raising=False
     )
+    staged_visibility = {
+        "pass": True,
+        "opaque_pixels": 2304,
+        "luma_range": 1.0,
+    }
+    contextual_visibility = {
+        "pass": True,
+        "reference_pixels": 2304,
+        "changed_pixels": 1152,
+        "max_delta": 1.0,
+    }
+    monkeypatch.setattr(runtime_review, "_png_is_visible", lambda _path: True)
+    monkeypatch.setattr(
+        runtime_review,
+        "_derive_pixel_evidence",
+        lambda *_paths: (dict(staged_visibility), dict(contextual_visibility)),
+    )
 
     inputs, _review, _generation, root = runtime_review._load_runtime_inputs(
         project_root, None, task_dir
     )
     preview = root / runtime_review.PREVIEW_ROOT_RELATIVE / contract.asset_id
     preview.mkdir(parents=True, mode=0o700)
-    png = _visible_png_bytes()
+    preview.chmod(0o700)
+    final_png = _visible_png_bytes()
+    staged_png = final_png
+    reference_png = _solid_png_bytes(0, 0, 0)
     captures = []
     for seed in runtime_review.SEEDS:
         for lighting in runtime_review.LIGHTING_MODES:
             name = runtime_review.capture_name(seed, lighting)
-            (preview / name).write_bytes(png)
-            (preview / name).chmod(0o600)
+            final_path = preview / name
+            final_path.write_bytes(final_png)
+            final_path.chmod(0o600)
+            staged_path = preview / runtime_review.auxiliary_capture_name(
+                seed, lighting, "staged"
+            )
+            staged_path.write_bytes(staged_png)
+            staged_path.chmod(0o600)
+            reference_path = preview / runtime_review.auxiliary_capture_name(
+                seed, lighting, "reference"
+            )
+            reference_path.write_bytes(reference_png)
+            reference_path.chmod(0o600)
+            staged_visibility, contextual_visibility = runtime_review._derive_pixel_evidence(
+                staged_path, reference_path, final_path
+            )
             captures.append(
                 {
                     "seed": seed,
@@ -104,12 +138,11 @@ def _canonical_fixture(
                         "target": [0.5, 1.399999976, 0.000005],
                         "size": 1.5,
                     },
-                    "staged_visibility": {
-                        "pass": True,
-                        "opaque_pixels": 2304,
-                        "luma_range": 1.0,
-                    },
-                    "output_sha256": hashlib.sha256(png).hexdigest(),
+                    "staged_visibility": staged_visibility,
+                    "contextual_visibility": contextual_visibility,
+                    "output_sha256": hashlib.sha256(final_png).hexdigest(),
+                    "_staged_output_sha256": hashlib.sha256(staged_png).hexdigest(),
+                    "_reference_output_sha256": hashlib.sha256(reference_png).hexdigest(),
                     "pass": True,
                     "reason": "pass",
                 }

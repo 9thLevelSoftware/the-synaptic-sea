@@ -13,6 +13,14 @@ const IMAGE_SIZE: Vector2i = Vector2i(1600, 900)
 const REVIEW_ROOT: String = "res://assets/_review/meshy/"
 const SEEDS: Array[int] = [42, 777]
 const LIGHTING_MODES: Array[String] = ["normal", "emergency", "dark"]
+const STAGED_SAMPLE_STEP_X: int = 25
+const STAGED_SAMPLE_STEP_Y: int = 25
+const STAGED_SAMPLE_MAX: int = 2304
+const CONTEXTUAL_REFERENCE_MIN: int = 2
+const CONTEXTUAL_CHANGED_MIN: int = 2
+const CONTEXTUAL_CHANGED_FRACTION_MIN: float = 0.5
+const CONTEXTUAL_RGB_DELTA_MIN: float = 0.02
+const CONTEXTUAL_RGB_DELTA_MAX: float = 1.0
 
 var review_camera: Camera3D
 var key_light: DirectionalLight3D
@@ -29,6 +37,7 @@ var asset_id: String = ""
 var asset_category: String = ""
 var generated_derelict: Node3D
 var staged_visual_root: Node3D
+var staged_silhouette_image: Image
 var staged_camera_target: Vector3 = Vector3.ZERO
 var staged_camera_size: float = 0.0
 
@@ -90,6 +99,7 @@ func _initialize() -> void:
 		return
 	if not _mount_staged_asset():
 		return
+	_apply_local_cutaway()
 	if not _fit_locked_isometric_camera():
 		return
 	call_deferred("_capture_after_frames")
@@ -214,6 +224,9 @@ func _mount_staged_asset() -> bool:
 	if visual == null:
 		return false
 	var mount_position: Vector3 = _mount_position()
+	if not mount_position.is_finite():
+		_fail("no valid occupied cell exists")
+		return false
 	var mount: Node3D
 	if asset_category.begins_with("threat"):
 		mount = ThreatPlaceholderRendererScript.build_placeholder(asset_id, [], mount_position)
@@ -263,39 +276,111 @@ func _load_glb(path: String) -> Node3D:
 
 
 func _mount_position() -> Vector3:
-	var center: Vector3 = Vector3.ZERO
+	var selected_position: Vector3 = Vector3.INF
+	var selected_score: float = -INF
 	if generated_derelict != null and generated_derelict.has_method("get_layout_copy"):
 		var layout: Dictionary = generated_derelict.get_layout_copy()
 		var plan_variant: Variant = layout.get("structural_plan", {})
 		if plan_variant is Dictionary:
-			var positions: Array[Vector3] = []
 			var plan: Dictionary = plan_variant
 			var occupancy: Variant = plan.get("occupancy", {})
 			if occupancy is Dictionary:
 				for record_variant in (occupancy as Dictionary).values():
 					var position: Vector3 = _read_position(record_variant.get("position", null) if record_variant is Dictionary else null)
-					if position != Vector3.INF:
-						positions.append(position)
-			if not positions.is_empty():
-					for position in positions:
-						center += position
-					center /= float(positions.size())
-	return center + Vector3(0.0, 0.9, 0.0)
+					if position == Vector3.INF:
+						continue
+					var score: float = position.x + position.z
+					if selected_position == Vector3.INF or score > selected_score or (score == selected_score and _mount_position_precedes(position, selected_position)):
+						selected_position = position
+						selected_score = score
+		if selected_position != Vector3.INF:
+			return selected_position + Vector3(0.0, 0.9, 0.0)
+	return Vector3.INF
+
+
+func _mount_position_precedes(candidate: Vector3, current: Vector3) -> bool:
+	if not is_equal_approx(candidate.x, current.x):
+		return candidate.x > current.x
+	if not is_equal_approx(candidate.z, current.z):
+		return candidate.z > current.z
+	return candidate.y > current.y
 
 
 func _read_position(raw: Variant) -> Vector3:
 	if raw is Vector3:
-		return raw
-	if raw is Array and (raw as Array).size() >= 3:
+		var vector: Vector3 = raw
+		return vector if vector.is_finite() else Vector3.INF
+	if raw is Array and (raw as Array).size() == 3:
 		var values: Array = raw
-		return Vector3(float(values[0]), float(values[1]), float(values[2]))
+		var components: Array[float] = []
+		for value in values:
+			if value is bool or (not value is int and not value is float):
+				return Vector3.INF
+			var component: float = float(value)
+			if not is_finite(component):
+				return Vector3.INF
+			components.append(component)
+		return Vector3(components[0], components[1], components[2])
 	if raw is String:
 		var text: String = str(raw).strip_edges()
-		text = text.trim_prefix("Vector3(").trim_suffix(")")
+		if text.begins_with("Vector3(") and text.ends_with(")"):
+			text = text.trim_prefix("Vector3(").trim_suffix(")")
+		elif text.begins_with("(") and text.ends_with(")"):
+			text = text.trim_prefix("(").trim_suffix(")")
+		else:
+			return Vector3.INF
 		var parts: PackedStringArray = text.split(",")
-		if parts.size() >= 3 and parts[0].strip_edges().is_valid_float() and parts[1].strip_edges().is_valid_float() and parts[2].strip_edges().is_valid_float():
-			return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+		if parts.size() != 3:
+			return Vector3.INF
+		var parsed_components: Array[float] = []
+		for part in parts:
+			var component_text: String = part.strip_edges()
+			if not component_text.is_valid_float():
+				return Vector3.INF
+			var component: float = float(component_text)
+			if not is_finite(component):
+				return Vector3.INF
+			parsed_components.append(component)
+		return Vector3(parsed_components[0], parsed_components[1], parsed_components[2])
 	return Vector3.INF
+
+
+func _apply_local_cutaway() -> void:
+	if generated_derelict == null or staged_visual_root == null:
+		return
+	var staged_mount: Node3D = staged_visual_root.get_parent_node_3d()
+	if staged_mount == null:
+		return
+	var mount_position: Vector3 = staged_mount.position
+	_apply_local_cutaway_recursive(
+		generated_derelict,
+		mount_position,
+		Transform3D.IDENTITY,
+	)
+
+
+func _apply_local_cutaway_recursive(
+	node: Node,
+	mount_position: Vector3,
+	parent_transform: Transform3D,
+) -> void:
+	var node_transform: Transform3D = parent_transform
+	if node is Node3D:
+		var wrapper: Node3D = node as Node3D
+		node_transform = parent_transform * wrapper.transform
+		var wrapper_position: Vector3 = node_transform.origin
+		var horizontal: Vector2 = Vector2(
+			wrapper_position.x - mount_position.x,
+			wrapper_position.z - mount_position.z,
+		)
+		var distance: float = horizontal.length()
+		var name: String = wrapper.name
+		if name.begins_with("Ceiling_") and distance <= 2.0:
+			wrapper.visible = false
+		elif name.begins_with("StructuralEdge_") and distance <= 3.0 and horizontal.dot(Vector2(1.0, 1.0).normalized()) > 0.0:
+			wrapper.visible = false
+	for child in node.get_children():
+		_apply_local_cutaway_recursive(child as Node, mount_position, node_transform)
 
 
 func _expand_visual_bounds(node: Node, bounds: Array, parent_transform: Transform3D) -> void:
@@ -353,7 +438,9 @@ func _fit_locked_isometric_camera() -> bool:
 		return false
 	staged_camera_target = visual_bounds.position + visual_bounds.size * 0.5
 	var locked_direction: Vector3 = Vector3(16.0, 14.0, 16.0).normalized()
-	var camera_distance: float = max(visual_bounds.size.length() * 2.5, 32.0)
+	var camera_distance: float = max(visual_bounds.size.length() * 2.5, 4.0)
+	if camera_distance <= 4.0:
+		camera_distance = 4.00001
 	var camera_position: Vector3 = staged_camera_target + locked_direction * camera_distance
 	var camera_parent: Node3D = review_camera.get_parent_node_3d()
 	var camera_parent_transform: Transform3D = _harness_transform(camera_parent) if camera_parent != null else Transform3D.IDENTITY
@@ -411,8 +498,8 @@ func _staged_visibility_evidence(image: Image) -> Dictionary:
 	var maximum: float = 0.0
 	var opaque_count: int = 0
 	var sample_count: int = 0
-	var step_x: int = max(1, int(IMAGE_SIZE.x / 64))
-	var step_y: int = max(1, int(IMAGE_SIZE.y / 36))
+	var step_x: int = STAGED_SAMPLE_STEP_X
+	var step_y: int = STAGED_SAMPLE_STEP_Y
 	for y in range(0, IMAGE_SIZE.y, step_y):
 		for x in range(0, IMAGE_SIZE.x, step_x):
 			var pixel: Color = image.get_pixel(x, y)
@@ -431,6 +518,7 @@ func _staged_visibility_evidence(image: Image) -> Dictionary:
 
 
 func _capture_staged_visibility() -> Dictionary:
+	staged_silhouette_image = null
 	var staged_mount: Node3D = staged_visual_root.get_parent_node_3d() if staged_visual_root != null else null
 	var hidden_nodes: Array = []
 	for child in generated_root.get_children():
@@ -449,7 +537,9 @@ func _capture_staged_visibility() -> Dictionary:
 	review_environment.environment = null
 	for _frame_index in 6:
 		await process_frame
-	var evidence: Dictionary = _staged_visibility_evidence(capture_viewport.get_texture().get_image())
+	var staged_image: Image = capture_viewport.get_texture().get_image()
+	staged_silhouette_image = staged_image
+	var evidence: Dictionary = _staged_visibility_evidence(staged_image)
 	for item in hidden_mount_children:
 		var mount_child: Node3D = item["node"] as Node3D
 		mount_child.visible = bool(item["visible"])
@@ -458,6 +548,65 @@ func _capture_staged_visibility() -> Dictionary:
 		hidden_node.visible = bool(item["visible"])
 	review_environment.environment = previous_environment
 	return evidence
+
+
+func _contextual_visibility_evidence(reference_image: Image, final_image: Image) -> Dictionary:
+	if staged_silhouette_image == null or reference_image == null or final_image == null:
+		return {"pass": false, "reference_pixels": 0, "changed_pixels": 0, "max_delta": 0.0}
+	if staged_silhouette_image.get_size() != IMAGE_SIZE or reference_image.get_size() != IMAGE_SIZE or final_image.get_size() != IMAGE_SIZE:
+		return {"pass": false, "reference_pixels": 0, "changed_pixels": 0, "max_delta": 0.0}
+	var reference_pixels: int = 0
+	var changed_pixels: int = 0
+	var max_delta: float = 0.0
+	for y in range(0, IMAGE_SIZE.y, STAGED_SAMPLE_STEP_Y):
+		for x in range(0, IMAGE_SIZE.x, STAGED_SAMPLE_STEP_X):
+			if staged_silhouette_image.get_pixel(x, y).a < 0.05:
+				continue
+			reference_pixels += 1
+			var reference_pixel: Color = reference_image.get_pixel(x, y)
+			var final_pixel: Color = final_image.get_pixel(x, y)
+			var delta: float = max(
+				max(abs(final_pixel.r - reference_pixel.r), abs(final_pixel.g - reference_pixel.g)),
+				abs(final_pixel.b - reference_pixel.b),
+			)
+			max_delta = max(max_delta, delta)
+			if delta >= CONTEXTUAL_RGB_DELTA_MIN:
+				changed_pixels += 1
+	var pass_gate: bool = (
+			reference_pixels >= CONTEXTUAL_REFERENCE_MIN
+			and reference_pixels <= STAGED_SAMPLE_MAX
+			and changed_pixels >= CONTEXTUAL_CHANGED_MIN
+			and changed_pixels <= reference_pixels
+			and float(changed_pixels) / float(reference_pixels) >= CONTEXTUAL_CHANGED_FRACTION_MIN
+			and max_delta >= CONTEXTUAL_RGB_DELTA_MIN
+			and max_delta <= CONTEXTUAL_RGB_DELTA_MAX
+	)
+	return {
+		"pass": pass_gate,
+		"reference_pixels": reference_pixels,
+		"changed_pixels": changed_pixels,
+		"max_delta": max_delta,
+	}
+
+
+func _capture_contextual_visibility() -> Dictionary:
+	var staged_mount: Node3D = staged_visual_root.get_parent_node_3d() if staged_visual_root != null else null
+	if staged_mount == null:
+		return {"evidence": {"pass": false, "reference_pixels": 0, "changed_pixels": 0, "max_delta": 0.0}, "image": null}
+	var previous_visibility: bool = staged_mount.visible
+	staged_mount.visible = false
+	for _frame_index in 6:
+		await process_frame
+	var reference_image: Image = capture_viewport.get_texture().get_image()
+	staged_mount.visible = previous_visibility
+	for _frame_index in 6:
+		await process_frame
+	var final_image: Image = capture_viewport.get_texture().get_image()
+	return {
+		"evidence": _contextual_visibility_evidence(reference_image, final_image),
+		"reference_image": reference_image,
+		"image": final_image,
+	}
 
 
 func _format_vector(value: Vector3) -> String:
@@ -469,10 +618,18 @@ func _capture_after_frames() -> void:
 	if staged_visibility.get("pass") != true:
 		_fail("staged visual visibility evidence failed")
 		return
-	for _frame_index in 6:
-		await process_frame
-	var image: Image = capture_viewport.get_texture().get_image()
-	if image == null or image.get_size() != IMAGE_SIZE:
+	var contextual_capture: Dictionary = await _capture_contextual_visibility()
+	var contextual_visibility: Dictionary = contextual_capture.get("evidence", {})
+	if contextual_visibility.get("pass") != true:
+		_fail("contextual visual visibility evidence failed")
+		return
+	var image: Image = contextual_capture.get("image", null)
+	var reference_image: Image = contextual_capture.get("reference_image", null)
+	var staged_image: Image = staged_silhouette_image
+	if image == null or reference_image == null or staged_image == null:
+		_fail("pixel evidence images are missing")
+		return
+	if image.get_size() != IMAGE_SIZE or reference_image.get_size() != IMAGE_SIZE or staged_image.get_size() != IMAGE_SIZE:
 		_fail("viewport capture was not 1600x900")
 		return
 	if not _has_visible_variance(image):
@@ -483,11 +640,21 @@ func _capture_after_frames() -> void:
 	if directory_error != OK and directory_error != ERR_ALREADY_EXISTS:
 		_fail("could not create capture output directory")
 		return
+	var staged_output_path: String = output_path.get_basename() + "-staged.png"
+	var reference_output_path: String = output_path.get_basename() + "-reference.png"
+	var staged_save_error: Error = staged_image.save_png(staged_output_path)
+	if staged_save_error != OK:
+		_fail("staged PNG capture failed error=%d" % staged_save_error)
+		return
+	var reference_save_error: Error = reference_image.save_png(reference_output_path)
+	if reference_save_error != OK:
+		_fail("reference PNG capture failed error=%d" % reference_save_error)
+		return
 	var save_error: Error = image.save_png(output_path)
 	if save_error != OK:
 		_fail("PNG capture failed error=%d" % save_error)
 		return
-	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_position=%s camera_target=%s camera_size=%.9f staged_visibility=pass staged_opaque_pixels=%d staged_luma_range=%.9f output=%s" % [seed_value, lighting_mode, _format_vector(review_camera.global_position), _format_vector(staged_camera_target), staged_camera_size, int(staged_visibility["opaque_pixels"]), float(staged_visibility["luma_range"]), output_path])
+	print("MESHY RUNTIME CAPTURE PASS seed=%d lighting=%s camera_position=%s camera_target=%s camera_size=%.9f staged_visibility=pass staged_opaque_pixels=%d staged_luma_range=%.9f contextual_visibility=pass contextual_reference_pixels=%d contextual_changed_pixels=%d contextual_max_delta=%.9f output=%s" % [seed_value, lighting_mode, _format_vector(review_camera.global_position), _format_vector(staged_camera_target), staged_camera_size, int(staged_visibility["opaque_pixels"]), float(staged_visibility["luma_range"]), int(contextual_visibility["reference_pixels"]), int(contextual_visibility["changed_pixels"]), float(contextual_visibility["max_delta"]), output_path])
 	quit(0)
 
 
