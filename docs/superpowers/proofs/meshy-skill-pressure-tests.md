@@ -179,7 +179,9 @@ fixes the stale policy without turning a missing preflight input into permission
 - Parent content marker: `R7_V211_PARENT_CONTENT_PASS version=2.1.1 verified_hashes=5 linked_files=7 repo_mutated=false`.
 - Focused parent tests passed: `test_plan_mode_writes_nothing_and_calls_no_api`; `test_meshy_client_retries_only_safe_gets`.
 - Planner marker: `R7_V211_PLANNER_POST_PASS candidate_count=4 cost_per_candidate=5 maximum_credits=20 post_attempts_per_record=1`.
-- Complete Meshy host suite: `340 passed in 184.74s`.
+- Complete Meshy host suite: `340 passed in 185.67s`. Canonical duration for this
+  implementation-snapshot figure is `docs/game/06_validation_plan.md` (also cited by
+  ADR-0058); later wall-clock reruns must not replace it.
 - Documentation RED was confirmed: the old-proof verifier exited `1` before correction and found the personal name,
   stale version/hash assertions, and the incorrect one-candidate-task claim.
 - RED corpus: 8 scenarios, 7 SAFE, 1 STALE, stale scenario `7`; SHA-256:

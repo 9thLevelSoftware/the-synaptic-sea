@@ -331,9 +331,35 @@ def test_runtime_command_binds_asset_and_category_as_user_args(tmp_path: Path) -
         category="gameplay_prop",
     )
 
-    assert command[command.index("--asset-id") + 1] == "fixture_triangle"
-    assert command[command.index("--category") + 1] == "gameplay_prop"
+    separator = command.index("--")
+    user_args = command[separator + 1 :]
+    assert user_args[user_args.index("--lighting") + 1] == "normal"
+    assert user_args[user_args.index("--asset-id") + 1] == "fixture_triangle"
+    assert user_args[user_args.index("--category") + 1] == "gameplay_prop"
+    assert "--asset-id" not in command[:separator]
     assert "shell=True" not in command
+
+
+def test_runtime_command_keeps_user_args_intact_with_macos_renderer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        review,
+        "_godot_render_args",
+        lambda: ("--display-driver", "macos", "--rendering-method", "gl_compatibility"),
+    )
+    command = review.build_godot_command(
+        tmp_path / "overlay",
+        42,
+        "normal",
+        tmp_path / "capture.png",
+        asset_id="fixture_triangle",
+        category="gameplay_prop",
+    )
+    user_args = command[command.index("--") + 1 :]
+    assert user_args[user_args.index("--lighting") + 1] == "normal"
+    assert user_args[user_args.index("--asset-id") + 1] == "fixture_triangle"
+    assert user_args[user_args.index("--category") + 1] == "gameplay_prop"
 
 
 def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
@@ -369,10 +395,10 @@ def test_capture_rejects_missing_or_false_staged_visibility_evidence(evidence: s
         review.parse_capture_marker(marker, 42, "normal")
 
 
-def _bound_runtime_fixture(tmp_path: Path):
+def _bound_runtime_fixture(tmp_path: Path, category: str | None = None):
     from tests.test_meshy_blender_tools import _bound_fixture_task
 
-    project_root, task_dir, contract = _bound_fixture_task(tmp_path)
+    project_root, task_dir, contract = _bound_fixture_task(tmp_path, category=category)
     report = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     report["blender_reimport_passed"] = True
     (task_dir / "blender-validation.json").write_bytes(canonical_json_bytes(report))

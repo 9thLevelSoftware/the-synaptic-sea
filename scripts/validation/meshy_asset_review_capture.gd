@@ -230,10 +230,20 @@ func _mount_staged_asset() -> bool:
 		visual.free()
 		return false
 	generated_root.add_child(mount)
+	_hide_existing_mount_visuals(mount)
 	visual.position = Vector3.ZERO
 	mount.add_child(visual)
 	staged_visual_root = visual
 	return true
+
+
+func _hide_existing_mount_visuals(mount: Node3D) -> void:
+	# Keep the wrapper/factory seam (collision, metadata, node path) but hide
+	# catalog fallback Mesh / CatalogMesh children so promotion-gating captures
+	# show only the staged candidate.
+	for child in mount.get_children():
+		if child is Node3D:
+			(child as Node3D).visible = false
 
 
 func _load_glb(path: String) -> Node3D:

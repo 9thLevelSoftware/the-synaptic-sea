@@ -12,6 +12,7 @@ import pytest
 
 from tools.meshy_asset_contract import AssetContract, canonical_json_bytes, load_contract
 from tools.meshy_stage import generate_batch
+from tests.test_meshy_stage import _valid_png_bytes
 from tools.meshy_candidate_review import (
     CHECK_FIELDS,
     ReviewError,
@@ -136,9 +137,8 @@ def _write_review_references(root: Path) -> dict[str, str]:
         "back": "back.png",
         "three_quarter": "three-quarter.png",
     }
-    payload = b"\x89PNG\r\n\x1a\nreference"
     for index, name in enumerate(names.values()):
-        (root / name).write_bytes(payload + bytes([index]))
+        (root / name).write_bytes(_valid_png_bytes(index + 1))
     return names
 
 

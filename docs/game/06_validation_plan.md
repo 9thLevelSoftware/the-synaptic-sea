@@ -45,8 +45,11 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 -m pytest -q \
   tests/test_prop_visual_metadata.py
 ```
 
-At the implementation snapshot, this focused suite completed **340 passed in 185.67s**. The
-contract validator and all nine host CLI help surfaces also passed with `/usr/bin/python3`.
+At the implementation snapshot, this focused suite completed **340 passed in 185.67s**.
+That duration is the canonical citation for this snapshot; ADR-0058 and
+`docs/superpowers/proofs/meshy-skill-pressure-tests.md` must reuse it rather than a later
+rerun. The contract validator and all nine host CLI help surfaces also passed with
+`/usr/bin/python3`.
 The read-only plan makes no provider call and records `references_resolved=false` until real
 rights-cleared reference files are supplied for the pilot:
 
@@ -132,9 +135,9 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_runtime_revi
   --task-dir "$TASK_DIR" --preview-dir artifacts/validation-previews/meshy/stalker_v1
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py bind \
   --project-root . --task-dir "$TASK_DIR"
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_promotion_packet.py prop \
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_promotion_packet.py threat \
   --project-root . --task-dir "$TASK_DIR" \
-  --target-path res://assets/imported/props/dressing/stalker_v1.sidecar.json
+  --archetype stalker
 ```
 
 The runner uses the real `breach_field` environment and locked-isometric camera for exactly six
