@@ -314,9 +314,11 @@ def test_validate_accepts_hinge_sample_count_at_limit(contract, tmp_path: Path) 
     "mutation,expected",
     [
         pytest.param("all-identity", "final sample must be rotation-distinct", id="all-identity-no-motion"),
+        pytest.param("near-unit-identity", "final sample must be rotation-distinct", id="near-unit-identity-no-motion"),
         pytest.param("first-not-rest", "first sample must match node rest rotation", id="first-sample-not-rest"),
         pytest.param("final-sign-equivalent", "final sample must be rotation-distinct", id="final-pose-sign-equivalent-to-first"),
         pytest.param("non-increasing-times", "strictly increasing", id="non-increasing-times"),
+        pytest.param("negative-times", "must be nonnegative", id="negative-times"),
         pytest.param("non-finite-time", "could not be decoded", id="non-finite-time"),
         pytest.param("non-finite-quaternion", "could not be decoded", id="non-finite-quaternion"),
         pytest.param("zero-quaternion", "must be nonzero", id="zero-quaternion"),
@@ -332,12 +334,17 @@ def test_validate_rejects_invalid_hinge_animation_samples(
     rotations = (identity, open_rotation, open_rotation)
     if mutation == "all-identity":
         rotations = (identity, identity, identity)
+    elif mutation == "near-unit-identity":
+        near_identity = (0.0, 0.0, 0.0, 0.99991)
+        rotations = (near_identity, near_identity, near_identity)
     elif mutation == "first-not-rest":
         rotations = ((0.70710678, 0.0, 0.0, 0.70710678), open_rotation, open_rotation)
     elif mutation == "final-sign-equivalent":
         rotations = (identity, open_rotation, (0.0, 0.0, 0.0, -1.0))
     elif mutation == "non-increasing-times":
         times = (0.0, 1.0, 1.0)
+    elif mutation == "negative-times":
+        times = (-2.0, -1.0, 0.0)
     elif mutation == "non-finite-time":
         times = (0.0, 1.0, float("nan"))
     elif mutation == "non-finite-quaternion":
