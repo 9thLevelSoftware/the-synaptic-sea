@@ -70,6 +70,7 @@ class _BlenderReimportEvidence:
 
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _ASSET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -1065,11 +1066,19 @@ def verify_validation_report(
     report: Dict[str, Any],
     *,
     task_id: Optional[str] = None,
+    expected_contract_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Recompute and re-import one fixed R4 report without publishing it."""
 
+    if expected_contract_sha256 is not None and (
+        not isinstance(expected_contract_sha256, str)
+        or _HASH_RE.fullmatch(expected_contract_sha256) is None
+    ):
+        raise BlenderValidationError("expected contract hash must be lowercase 64-hex")
     _validate_report_record(report)
     expected = validate_cleaned_glb(cleaned_glb, contract, task_id=task_id)
+    if expected_contract_sha256 is not None:
+        expected["contract_sha256"] = expected_contract_sha256
     expected["blender_reimport_passed"] = True
     try:
         reimport_evidence = _reimport_with_blender(
@@ -1134,6 +1143,51 @@ def _resolve_task_inputs(project_root: PathLike, contract_path: PathLike, task_d
     return contract, cleaned, report
 
 
+def _resolve_verify_inputs(
+    project_root: PathLike,
+    contract_path: PathLike,
+    task_dir: PathLike,
+    glb_alias: PathLike,
+    report_alias: PathLike,
+) -> Tuple[AssetContract, str, Path, Path]:
+    """Resolve governed source/artifact bindings for fixed report verification."""
+
+    _caller_contract, cleaned, report = _resolve_task_inputs(
+        project_root, contract_path, task_dir, glb_alias, report_alias
+    )
+    try:
+        from tools import meshy_candidate_review as candidate_review
+
+        review_path, review, generation, root, _asset_root = candidate_review._load_task_record(
+            project_root, task_dir
+        )
+        if review.get("state") != "selected" or generation.get("status") != "SUCCEEDED":
+            raise BlenderValidationError(
+                "verify-only requires a selected review and SUCCEEDED generation"
+            )
+        resolved_task = Path(review_path).parent
+        task_contract_path = candidate_review._governed_artifact(
+            root, resolved_task, "contract.json"
+        )
+        task_contract_document, task_contract_raw = governance.strict_load_json_bytes(
+            task_contract_path, "task contract", 4 * 1024 * 1024
+        )
+        if task_contract_raw != canonical_json_bytes(task_contract_document):
+            raise BlenderValidationError("task contract is not canonical JSON")
+        task_contract = load_contract(task_contract_path)
+        if (
+            task_contract.asset_id != resolved_task.parent.name
+            or generation.get("contract_artifact_sha256")
+            != hashlib.sha256(task_contract_raw).hexdigest()
+        ):
+            raise BlenderValidationError("task contract artifact is not bound")
+        return task_contract, str(generation["contract_sha256"]), cleaned, report
+    except BlenderValidationError:
+        raise
+    except Exception as exc:
+        raise BlenderValidationError("verify-only task evidence is not fully governed: " + str(exc)) from exc
+
+
 def write_validation_report(project_root: PathLike, task_dir: PathLike, report: Optional[Dict[str, Any]] = None) -> None:
     """Publish one fully validated PASS at the fixed task-local report leaf."""
 
@@ -1161,7 +1215,13 @@ def write_validation_report(project_root: PathLike, task_dir: PathLike, report: 
     if report.get("contract_sha256") != generation.get("contract_sha256"):
         raise BlenderValidationError("validation report contract hash is not bound")
     cleaned = resolved_task / "cleaned.glb"
-    verify_validation_report(cleaned, task_contract, report, task_id=resolved_task.name)
+    verify_validation_report(
+        cleaned,
+        task_contract,
+        report,
+        task_id=resolved_task.name,
+        expected_contract_sha256=generation["contract_sha256"],
+    )
     try:
         governance.atomic_write_json(target, report, project_root=root, allowed_root=resolved_task, mode=0o600)
         persisted, raw = governance.strict_load_json_bytes(target, "Blender validation report", 4 * 1024 * 1024)
@@ -1355,22 +1415,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.verify_only:
             if args.glb is None or args.report is None:
                 raise BlenderValidationError("verify-only requires --glb and --report")
-            task_dir = Path(args.task_dir).expanduser().resolve()
-            cleaned = Path(args.glb).expanduser().resolve()
-            report_path = Path(args.report).expanduser().resolve()
-            if cleaned != task_dir / "cleaned.glb" or report_path != task_dir / "blender-validation.json":
-                raise BlenderValidationError("verify-only paths must be exact task leaves")
-            contract_path = Path(args.contract).expanduser().resolve()
-            if contract_path != task_dir / "contract.json":
-                raise BlenderValidationError("verify-only contract must be the exact task leaf")
-            contract = load_contract(contract_path)
+            task_contract, source_contract_hash, cleaned, report_path = _resolve_verify_inputs(
+                args.project_root,
+                args.contract,
+                args.task_dir,
+                args.glb,
+                args.report,
+            )
             report, raw = governance.strict_load_json_bytes(
                 report_path, "Blender validation report", 4 * 1024 * 1024
             )
             if raw != canonical_json_bytes(report):
                 raise BlenderValidationError("Blender validation report is not canonical JSON")
+            _validate_report_record(report)
+            if report.get("contract_sha256") != source_contract_hash:
+                raise BlenderValidationError("validation report contract hash is not bound")
             expected = verify_validation_report(
-                cleaned, contract, report, task_id=task_dir.name
+                cleaned,
+                task_contract,
+                report,
+                task_id=cleaned.parent.name,
+                expected_contract_sha256=source_contract_hash,
             )
             print(
                 "MESHY BLENDER VALIDATION VERIFY PASS sha256={0} byte_size={1} triangle_count={2}".format(

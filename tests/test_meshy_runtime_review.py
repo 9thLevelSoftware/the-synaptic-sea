@@ -405,6 +405,51 @@ def _bound_runtime_fixture(tmp_path: Path, category: str | None = None):
     return project_root, task_dir, contract
 
 
+def _bound_dual_hash_runtime_fixture(tmp_path: Path):
+    from tests.test_meshy_blender_tools import _dual_hash_bound_fixture_task
+
+    project_root, task_dir, source_contract, task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    (task_dir / "blender-validation.json").write_bytes(canonical_json_bytes(report))
+    return project_root, task_dir, source_contract, task_contract
+
+
+def test_reverification_with_authenticated_caller_source_contract_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _bound_dual_hash_runtime_fixture(tmp_path)
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda glb_path, expected_triangles: SimpleNamespace(
+            sha256=review.governance.file_sha256(glb_path),
+            byte_size=glb_path.stat().st_size,
+            triangle_count=expected_triangles,
+        ),
+    )
+
+    inputs, _review, generation, _root = review._load_runtime_inputs(
+        project_root, tmp_path / "source-contract.json", task_dir
+    )
+    assert generation["contract_sha256"] == source_contract.sha256
+    assert inputs.cleaned_glb == task_dir / "cleaned.glb"
+
+
+def test_reverification_without_caller_source_contract_remains_fail_closed_for_dual_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, _source_contract, _task_contract = _bound_dual_hash_runtime_fixture(tmp_path)
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: pytest.fail("runtime must reject before Blender re-import"),
+    )
+
+    with pytest.raises(review.ReviewError, match="task-local contract"):
+        review._load_runtime_inputs(project_root, None, task_dir)
+
+
 def test_reverification_without_caller_contract_rejects_forged_generation_hash(
     tmp_path: Path,
 ) -> None:

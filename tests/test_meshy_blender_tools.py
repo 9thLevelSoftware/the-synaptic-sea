@@ -502,7 +502,12 @@ def test_validate_retains_explicit_humanoid_rigging_allowance(contract, tmp_path
 
 
 
-def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
+def _bound_fixture_task(
+    tmp_path: Path,
+    *,
+    category: str | None = None,
+    contract_path: Path = CONTRACT_PATH,
+):
     from tests.test_meshy_candidate_review import (
         _ReviewFakeMeshyClient,
         _true_checks,
@@ -515,9 +520,8 @@ def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
     project_root.mkdir()
     references = project_root / "references"
     references.mkdir()
-    contract_path = CONTRACT_PATH
     if category is not None:
-        document = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        document = json.loads(contract_path.read_text(encoding="utf-8"))
         if document.get("category") != category:
             document["category"] = category
             contract_path = tmp_path / "rewritten_contract.json"
@@ -542,6 +546,105 @@ def _bound_fixture_task(tmp_path: Path, *, category: str | None = None):
     select_candidate(project_root, task_dir, "operator", _true_checks())
     shutil.copy2(GLB_PATH, task_dir / "cleaned.glb")
     return project_root, task_dir, contract
+
+
+def _dual_hash_bound_fixture_task(tmp_path: Path):
+    document = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    source_path = tmp_path / "source-contract.json"
+    source_path.write_bytes(
+        json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
+    )
+    project_root, task_dir, source_contract = _bound_fixture_task(
+        tmp_path, contract_path=source_path
+    )
+    task_contract = load_contract(task_dir / "contract.json")
+    assert source_contract.snapshot_bytes() == task_contract.snapshot_bytes()
+    assert source_contract.sha256 != task_contract.sha256
+    generation = json.loads((task_dir / "generation.json").read_text(encoding="utf-8"))
+    assert generation["contract_sha256"] == source_contract.sha256
+    assert generation["contract_artifact_sha256"] == task_contract.sha256
+    return project_root, task_dir, source_contract, task_contract
+
+
+def test_dual_hash_report_writer_preserves_authenticated_source_hash(tmp_path: Path, monkeypatch) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport)
+    write_validation_report(project_root, task_dir, report)
+    assert json.loads((task_dir / "blender-validation.json").read_text()) == report
+    assert report["contract_sha256"] == source_contract.sha256
+
+
+def test_dual_hash_report_writer_rejects_forged_source_without_mutating_report(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    report_path.write_bytes(b"existing report")
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    report["contract_sha256"] = "f" * 64
+
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    with pytest.raises(BlenderValidationError, match="contract hash is not bound"):
+        write_validation_report(project_root, task_dir, report)
+    assert report_path.read_bytes() == b"existing report"
+
+
+def test_verify_validation_report_accepts_authenticated_source_hash(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _project_root, task_dir, source_contract, task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+
+    expected = validate_module.verify_validation_report(
+        task_dir / "cleaned.glb",
+        task_contract,
+        report,
+        task_id=task_dir.name,
+        expected_contract_sha256=source_contract.sha256,
+    )
+    assert expected["contract_sha256"] == source_contract.sha256
+
+
+def test_verify_validation_report_rejects_noncanonical_expected_source_hash(contract) -> None:
+    report = validate_cleaned_glb(GLB_PATH, contract, task_id="task-1")
+    report["blender_reimport_passed"] = True
+    with pytest.raises(BlenderValidationError, match="expected contract hash"):
+        validate_module.verify_validation_report(
+            GLB_PATH,
+            contract,
+            report,
+            task_id="task-1",
+            expected_contract_sha256="A" * 64,
+        )
 
 
 def test_parse_glb_rejects_duplicate_json_duplicate_bin_unknown_and_illegal_chunk_order() -> None:
@@ -1372,11 +1475,12 @@ def test_host_python_cli_publishes_report_after_blender_reimport(tmp_path: Path)
     assert blender.is_file() and os.access(blender, os.X_OK)
     host_python = Path("/usr/bin/python3")
     assert host_python.is_file() and os.access(host_python, os.X_OK)
-    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
     report_path = task_dir / "blender-validation.json"
     command = [
         str(host_python), str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"),
-        "--project-root", str(project_root), "--contract", str(CONTRACT_PATH),
+        "--project-root", str(project_root), "--contract", str(source_contract_path),
         "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
         "--report", str(report_path),
     ]
@@ -1391,3 +1495,113 @@ def test_host_python_cli_publishes_report_after_blender_reimport(tmp_path: Path)
     assert report_path.is_file()
     persisted = json.loads(report_path.read_text(encoding="utf-8"))
     assert persisted["blender_reimport_passed"] is True
+    assert persisted["contract_sha256"] == source_contract.sha256
+
+
+def test_verify_only_accepts_governed_dual_hash_report(tmp_path: Path, monkeypatch) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(task_dir / "blender-validation.json"),
+            "--verify-only",
+        ]
+    )
+    assert result == 0
+
+
+def test_verify_only_rejects_forged_governed_binding_without_report_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+    report_path = task_dir / "blender-validation.json"
+    report_bytes = report_path.read_bytes()
+    generation_path = task_dir / "generation.json"
+    generation = json.loads(generation_path.read_text(encoding="utf-8"))
+    generation["contract_artifact_sha256"] = "f" * 64
+    generation_path.write_bytes(canonical_json_bytes(generation))
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(report_path),
+            "--verify-only",
+        ]
+    )
+    assert result == 1
+    assert report_path.read_bytes() == report_bytes
+
+
+def test_verify_only_rejects_forged_source_hash_before_reimport(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _dual_hash_bound_fixture_task(tmp_path)
+    source_contract_path = tmp_path / "source-contract.json"
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: SimpleNamespace(
+            sha256=report["sha256"],
+            byte_size=report["byte_size"],
+            triangle_count=report["triangle_count"],
+        ),
+    )
+    write_validation_report(project_root, task_dir, report)
+    report_path = task_dir / "blender-validation.json"
+    forged = json.loads(report_path.read_text(encoding="utf-8"))
+    forged["contract_sha256"] = "f" * 64
+    report_path.write_bytes(canonical_json_bytes(forged))
+    report_bytes = report_path.read_bytes()
+    monkeypatch.setattr(
+        validate_module,
+        "_reimport_with_blender",
+        lambda *_args: pytest.fail("forged source hash must reject before re-import"),
+    )
+
+    result = validate_module.main(
+        [
+            "--project-root", str(project_root),
+            "--contract", str(source_contract_path),
+            "--task-dir", str(task_dir),
+            "--glb", str(task_dir / "cleaned.glb"),
+            "--report", str(report_path),
+            "--verify-only",
+        ]
+    )
+    assert result == 1
+    assert report_path.read_bytes() == report_bytes
