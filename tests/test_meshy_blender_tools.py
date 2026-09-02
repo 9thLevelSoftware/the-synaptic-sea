@@ -360,7 +360,7 @@ def test_validate_rejects_invalid_hinge_animation_samples(
         validate_cleaned_glb(path, hinge_contract)
 
 
-def test_validate_rejects_oversized_hinge_sample_count(contract, tmp_path: Path) -> None:
+def test_validate_rejects_oversized_hinge_sample_count(contract, tmp_path: Path, monkeypatch) -> None:
     identity = (0.0, 0.0, 0.0, 1.0)
     open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
     sample_count = validate_module._MAX_HINGE_SAMPLES + 1
@@ -379,6 +379,16 @@ def test_validate_rejects_oversized_hinge_sample_count(contract, tmp_path: Path)
         {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
     )
 
+    hinge_sampler = document["animations"][0]["samplers"][0]
+    hinge_accessor_indices = {hinge_sampler["input"], hinge_sampler["output"]}
+    original_accessor_values = validate_module._accessor_values
+
+    def forbid_hinge_decode(document, binary, accessor_index):
+        if accessor_index in hinge_accessor_indices:
+            raise AssertionError("oversized hinge samples must be rejected before accessor decoding")
+        return original_accessor_values(document, binary, accessor_index)
+
+    monkeypatch.setattr(validate_module, "_accessor_values", forbid_hinge_decode)
     with pytest.raises(
         ValueError,
         match=r"hinge animation sampler accessor count exceeds the limit \({0} > {1}\)".format(
