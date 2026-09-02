@@ -508,6 +508,11 @@ def test_runtime_capture_source_contract_covers_mount_cutaway_and_exact_image_ev
     assert "_apply_local_cutaway" in source
     assert 'name.begins_with("Ceiling_")' in source
     assert 'name.begins_with("StructuralEdge_")' in source
+    cutaway_source = source[
+        source.index("func _apply_local_cutaway") : source.index("func _expand_visual_bounds")
+    ]
+    assert ".global_position" not in cutaway_source
+    assert "parent_transform * wrapper.transform" in cutaway_source
     assert "Vector2(1.0, 1.0).normalized()" in source
     assert "max(visual_bounds.size.length() * 2.5, 4.0)" in source
     assert "contextual_visibility" in source

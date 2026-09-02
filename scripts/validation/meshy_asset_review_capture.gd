@@ -348,16 +348,27 @@ func _apply_local_cutaway() -> void:
 	var staged_mount: Node3D = staged_visual_root.get_parent_node_3d()
 	if staged_mount == null:
 		return
-	var mount_position: Vector3 = staged_mount.global_position
-	_apply_local_cutaway_recursive(generated_derelict, mount_position)
+	var mount_position: Vector3 = staged_mount.position
+	_apply_local_cutaway_recursive(
+		generated_derelict,
+		mount_position,
+		Transform3D.IDENTITY,
+	)
 
 
-func _apply_local_cutaway_recursive(node: Node, mount_position: Vector3) -> void:
+func _apply_local_cutaway_recursive(
+	node: Node,
+	mount_position: Vector3,
+	parent_transform: Transform3D,
+) -> void:
+	var node_transform: Transform3D = parent_transform
 	if node is Node3D:
 		var wrapper: Node3D = node as Node3D
+		node_transform = parent_transform * wrapper.transform
+		var wrapper_position: Vector3 = node_transform.origin
 		var horizontal: Vector2 = Vector2(
-			wrapper.global_position.x - mount_position.x,
-			wrapper.global_position.z - mount_position.z,
+			wrapper_position.x - mount_position.x,
+			wrapper_position.z - mount_position.z,
 		)
 		var distance: float = horizontal.length()
 		var name: String = wrapper.name
@@ -366,7 +377,7 @@ func _apply_local_cutaway_recursive(node: Node, mount_position: Vector3) -> void
 		elif name.begins_with("StructuralEdge_") and distance <= 3.0 and horizontal.dot(Vector2(1.0, 1.0).normalized()) > 0.0:
 			wrapper.visible = false
 	for child in node.get_children():
-		_apply_local_cutaway_recursive(child as Node, mount_position)
+		_apply_local_cutaway_recursive(child as Node, mount_position, node_transform)
 
 
 func _expand_visual_bounds(node: Node, bounds: Array, parent_transform: Transform3D) -> void:
