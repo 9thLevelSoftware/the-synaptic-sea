@@ -35,6 +35,7 @@ _MAX_GLB_BYTES = 512 * 1024 * 1024
 _MAX_JSON_BYTES = 16 * 1024 * 1024
 _MAX_JSON_DEPTH = 64
 _MAX_PROCESS_OUTPUT = 1024 * 1024
+_MAX_HINGE_SAMPLES = 1024
 _CANONICAL_FIELDS = (
     "schema_version", "document_kind", "status", "task_id", "asset_id",
     "contract_sha256", "sha256", "byte_size", "mesh_count", "triangle_count",
@@ -287,6 +288,8 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
         output_count = _integer(output_accessor.get("count"), "hinge animation sampler output accessor count")
         if output_count != input_count:
             raise BlenderValidationError("hinge animation sampler input and output accessor counts must match")
+        if input_count > _MAX_HINGE_SAMPLES:
+            raise BlenderValidationError("hinge animation sampler accessor count exceeds the limit")
         if sampler.get("interpolation") != "LINEAR":
             raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
         try:

@@ -227,15 +227,21 @@ def _unchecked_contract_variant(tmp_path: Path, contract, animation: dict) -> As
     return AssetContract(path, hashlib.sha256(snapshot).hexdigest(), snapshot)
 
 
-def _hinge_fixture(document: dict, binary: bytes) -> bytes:
+def _hinge_fixture(document: dict, binary: bytes, *, times=None, rotations=None) -> bytes:
     document["nodes"][0]["name"] = "HingePivot"
-    input_data = struct.pack("<6f", 0.0, 1.0, 2.0, 0.0, 0.0, 0.0)
-    output_data = struct.pack(
-        "<12f",
-        0.0, 0.0, 0.0, 1.0,
-        -0.79335334, 0.0, 0.0, 0.60876143,
-        -0.79335334, 0.0, 0.0, 0.60876143,
-    )
+    if times is None:
+        times = (0.0, 1.0, 2.0)
+    if rotations is None:
+        rotations = (
+            (0.0, 0.0, 0.0, 1.0),
+            (-0.79335334, 0.0, 0.0, 0.60876143),
+            (-0.79335334, 0.0, 0.0, 0.60876143),
+        )
+    if len(times) != len(rotations):
+        raise ValueError("hinge fixture times and rotations must match")
+    input_data = struct.pack("<" + "f" * len(times), *times)
+    output_values = [value for rotation in rotations for value in rotation]
+    output_data = struct.pack("<" + "f" * len(output_values), *output_values)
     input_view = len(document["bufferViews"])
     output_view = input_view + 1
     input_accessor = len(document["accessors"])
@@ -252,8 +258,8 @@ def _hinge_fixture(document: dict, binary: bytes) -> bytes:
     )
     document["accessors"].extend(
         [
-            {"bufferView": input_view, "componentType": 5126, "count": 3, "type": "SCALAR"},
-            {"bufferView": output_view, "componentType": 5126, "count": 3, "type": "VEC4"},
+            {"bufferView": input_view, "componentType": 5126, "count": len(times), "type": "SCALAR"},
+            {"bufferView": output_view, "componentType": 5126, "count": len(rotations), "type": "VEC4"},
         ]
     )
     document["buffers"][0]["byteLength"] = len(binary) + len(input_data) + len(output_data)
@@ -281,6 +287,30 @@ def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: 
     document, binary = _fixture_document_and_binary()
     binary = _hinge_fixture(document, binary)
     path = tmp_path / "hinge.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    report = validate_cleaned_glb(path, hinge_contract)
+
+    assert report["status"] == "PASS"
+
+
+def test_validate_accepts_hinge_sample_count_at_limit(contract, tmp_path: Path) -> None:
+    identity = (0.0, 0.0, 0.0, 1.0)
+    open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
+    sample_count = validate_module._MAX_HINGE_SAMPLES
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(
+        document,
+        binary,
+        times=tuple(float(index) for index in range(sample_count)),
+        rotations=(identity,) + (open_rotation,) * (sample_count - 1),
+    )
+    path = tmp_path / "hinge-at-limit.glb"
     path.write_bytes(_pack_glb(document, binary))
     hinge_contract = _contract_variant(
         tmp_path,
@@ -341,6 +371,45 @@ def test_validate_rejects_invalid_hinge_animation_samples(contract, tmp_path: Pa
 
     with pytest.raises(ValueError, match="hinge animation"):
         validate_cleaned_glb(path, hinge_contract)
+
+
+def test_validate_rejects_oversized_hinge_sample_count_before_decode(
+    contract, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(validate_module, "_MAX_HINGE_SAMPLES", 3)
+    decoded_accessors = []
+    original_accessor_values = validate_module._accessor_values
+
+    def tracking_accessor_values(document, binary, accessor_index):
+        decoded_accessors.append(accessor_index)
+        return original_accessor_values(document, binary, accessor_index)
+
+    monkeypatch.setattr(validate_module, "_accessor_values", tracking_accessor_values)
+    identity = (0.0, 0.0, 0.0, 1.0)
+    open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(
+        document,
+        binary,
+        times=(0.0, 1.0, 2.0, 3.0),
+        rotations=(identity, open_rotation, open_rotation, open_rotation),
+    )
+    hinge_accessors = {
+        document["animations"][0]["samplers"][0]["input"],
+        document["animations"][0]["samplers"][0]["output"],
+    }
+    path = tmp_path / "oversized-hinge-samples.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="hinge animation sampler accessor count exceeds the limit"):
+        validate_cleaned_glb(path, hinge_contract)
+
+    assert hinge_accessors.isdisjoint(decoded_accessors)
 
 
 def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:
