@@ -140,6 +140,21 @@ def test_review_does_not_expose_arbitrary_capture_publisher() -> None:
     assert not any("publish" in name.lower() for name, value in inspect.getmembers(review, callable))
 
 
+def _canonical_contextual_visibility(
+    *,
+    passed: bool = True,
+    reference_pixels: int = 100,
+    changed_pixels: int = 50,
+    max_delta: float = 0.25,
+) -> dict:
+    return {
+        "pass": passed,
+        "reference_pixels": reference_pixels,
+        "changed_pixels": changed_pixels,
+        "max_delta": max_delta,
+    }
+
+
 def _locked_real_marker(
     *,
     position: str = "19.742138317,18.236871003,19.242143317",
@@ -147,11 +162,12 @@ def _locked_real_marker(
     size: str = "1.500000000",
     pixels: str = "2304",
     luma: str = "1.000000000",
+    contextual: str = "contextual_visibility=pass contextual_reference_pixels=100 contextual_changed_pixels=50 contextual_max_delta=0.250000000",
 ) -> str:
     return (
         "MESHY RUNTIME CAPTURE PASS seed=42 lighting=normal "
         f"camera_position={position} camera_target={target} camera_size={size} "
-        f"staged_visibility=pass staged_opaque_pixels={pixels} staged_luma_range={luma}"
+        f"staged_visibility=pass staged_opaque_pixels={pixels} staged_luma_range={luma} {contextual}"
     )
 
 
@@ -252,6 +268,7 @@ def test_binder_rejects_forged_runtime_document_before_promotion_ready(
                         "opaque_pixels": 2304,
                         "luma_range": 1.0,
                     },
+                    "contextual_visibility": _canonical_contextual_visibility(),
                     "output_sha256": hashlib.sha256(png).hexdigest(),
                     "pass": True,
                     "reason": "pass",
@@ -373,6 +390,7 @@ def test_camera_marker_is_parsed_as_actual_finite_transform() -> None:
         "target": [0.5, 1.399999976, 0.000005],
         "size": 1.5,
         "staged_visibility": {"pass": True, "opaque_pixels": 2304, "luma_range": 1.0},
+        "contextual_visibility": _canonical_contextual_visibility(),
     }
 
 
@@ -393,6 +411,108 @@ def test_capture_rejects_missing_or_false_staged_visibility_evidence(evidence: s
     ).rstrip()
     with pytest.raises(review.ReviewError, match="staged|visibility|canonical"):
         review.parse_capture_marker(marker, 42, "normal")
+
+
+def test_capture_marker_requires_canonical_contextual_visibility_evidence() -> None:
+    parsed = review.parse_capture_marker(_locked_real_marker(), 42, "normal")
+    assert parsed["contextual_visibility"] == _canonical_contextual_visibility()
+
+    invalid_context = (
+        "",
+        "contextual_visibility=fail contextual_reference_pixels=100 contextual_changed_pixels=50 contextual_max_delta=0.25",
+        "contextual_visibility=pass contextual_reference_pixels=1 contextual_changed_pixels=1 contextual_max_delta=0.25",
+        "contextual_visibility=pass contextual_reference_pixels=100 contextual_changed_pixels=101 contextual_max_delta=0.25",
+        "contextual_visibility=pass contextual_reference_pixels=100 contextual_changed_pixels=49 contextual_max_delta=0.25",
+        "contextual_visibility=pass contextual_reference_pixels=100 contextual_changed_pixels=50 contextual_max_delta=nan",
+        "contextual_visibility=pass contextual_reference_pixels=nope contextual_changed_pixels=50 contextual_max_delta=0.25",
+        "contextual_visibility=pass contextual_reference_pixels=100 contextual_changed_pixels=50 contextual_max_delta=0.25 contextual_max_delta=0.25",
+    )
+    for contextual in invalid_context:
+        marker = _locked_real_marker(contextual=contextual).rstrip()
+        with pytest.raises(review.ReviewError, match="contextual|visibility|canonical"):
+            review.parse_capture_marker(marker, 42, "normal")
+
+
+def _runtime_record(seed: int, lighting: str) -> dict:
+    return {
+        "seed": seed,
+        "lighting": lighting,
+        "camera_transform": {
+            "projection": "orthogonal",
+            "position": [19.742138317, 18.236871003, 19.242143317],
+            "target": [0.5, 1.399999976, 0.000005],
+            "size": 1.5,
+        },
+        "staged_visibility": {
+            "pass": True,
+            "opaque_pixels": 2304,
+            "luma_range": 1.0,
+        },
+        "contextual_visibility": _canonical_contextual_visibility(),
+        "output_sha256": "c" * 64,
+        "pass": True,
+        "reason": "pass",
+    }
+
+
+def _runtime_inputs() -> review.ValidatedTask:
+    return review.ValidatedTask(
+        asset_id="fixture_triangle",
+        task_id="task-1",
+        task_dir=Path("task-1"),
+        cleaned_glb=Path("cleaned.glb"),
+        validation_report=Path("blender-validation.json"),
+        contract_hash="a" * 64,
+        cleaned_glb_hash="b" * 64,
+        blender_validation_hash="d" * 64,
+        bounds_dimensions=(1.0, 1.0, 1.0),
+    )
+
+
+def test_runtime_record_and_document_reject_absent_or_forged_contextual_evidence() -> None:
+    inputs = _runtime_inputs()
+    captures = [
+        _runtime_record(seed, lighting)
+        for seed in SEEDS
+        for lighting in LIGHTING
+    ]
+    document = review.build_runtime_review_document(inputs, captures)
+    assert all("contextual_visibility" in item for item in document["captures"])
+
+    absent = [dict(item) for item in captures]
+    absent[0].pop("contextual_visibility")
+    with pytest.raises(review.ReviewError, match="contextual|visibility|canonical"):
+        review.build_runtime_review_document(inputs, absent)
+
+    forged = [dict(item) for item in captures]
+    forged[0]["contextual_visibility"] = _canonical_contextual_visibility(passed=False)
+    with pytest.raises(review.ReviewError, match="contextual|visibility|canonical"):
+        review.build_runtime_review_document(inputs, forged)
+
+    forged_document = dict(document)
+    forged_document["captures"] = [dict(item) for item in document["captures"]]
+    forged_document["captures"][0]["contextual_visibility"] = _canonical_contextual_visibility(
+        changed_pixels=49
+    )
+    with pytest.raises(review.ReviewError, match="contextual|visibility|canonical"):
+        review._validate_runtime_document(forged_document, inputs)
+
+
+def test_runtime_capture_source_contract_covers_mount_cutaway_and_exact_image_evidence() -> None:
+    source = (ROOT / "scripts/validation/meshy_asset_review_capture.gd").read_text(
+        encoding="utf-8"
+    )
+    assert 'text.begins_with("Vector3(")' in source
+    assert 'text.begins_with("(")' in source
+    assert "position.x + position.z" in source
+    assert "_apply_local_cutaway" in source
+    assert 'name.begins_with("Ceiling_")' in source
+    assert 'name.begins_with("StructuralEdge_")' in source
+    assert "Vector2(1.0, 1.0).normalized()" in source
+    assert "max(visual_bounds.size.length() * 2.5, 4.0)" in source
+    assert "contextual_visibility" in source
+    assert "get_texture().get_image()" in source
+    assert "image.save_png(output_path)" in source
 
 
 def _bound_runtime_fixture(tmp_path: Path, category: str | None = None):

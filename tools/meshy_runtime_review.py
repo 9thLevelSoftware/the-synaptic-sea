@@ -71,6 +71,12 @@ STAGED_SAMPLE_STEP_Y = max(1, CAPTURE_SIZE[1] // 36)
 STAGED_SAMPLE_MAX = len(range(0, CAPTURE_SIZE[0], STAGED_SAMPLE_STEP_X)) * len(
     range(0, CAPTURE_SIZE[1], STAGED_SAMPLE_STEP_Y)
 )
+# Contextual RGB deltas use the normalized renderer scale [0.0, 1.0].
+CONTEXTUAL_REFERENCE_MIN = 2
+CONTEXTUAL_CHANGED_MIN = 2
+CONTEXTUAL_CHANGED_FRACTION_MIN = 0.5
+CONTEXTUAL_RGB_DELTA_MIN = 0.02
+CONTEXTUAL_RGB_DELTA_MAX = 1.0
 RUNTIME_DOCUMENT_FIELDS = frozenset(
     (
         "schema_version",
@@ -94,6 +100,7 @@ CAPTURE_FIELDS = frozenset(
         "lighting",
         "camera_transform",
         "staged_visibility",
+        "contextual_visibility",
         "output_sha256",
         "pass",
         "reason",
@@ -639,6 +646,41 @@ def _validate_staged_visibility(value: object) -> Dict[str, Any]:
     }
 
 
+def _validate_contextual_visibility(value: object) -> Dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {
+        "pass",
+        "reference_pixels",
+        "changed_pixels",
+        "max_delta",
+    }:
+        raise ReviewError("contextual visibility evidence is not canonical")
+    reference_pixels = value.get("reference_pixels")
+    changed_pixels = value.get("changed_pixels")
+    max_delta = value.get("max_delta")
+    if (
+        value.get("pass") is not True
+        or type(reference_pixels) is not int
+        or reference_pixels < CONTEXTUAL_REFERENCE_MIN
+        or reference_pixels > STAGED_SAMPLE_MAX
+        or type(changed_pixels) is not int
+        or changed_pixels < CONTEXTUAL_CHANGED_MIN
+        or changed_pixels > reference_pixels
+        or changed_pixels / reference_pixels < CONTEXTUAL_CHANGED_FRACTION_MIN
+        or isinstance(max_delta, bool)
+        or not isinstance(max_delta, (int, float))
+        or not math.isfinite(float(max_delta))
+        or float(max_delta) < CONTEXTUAL_RGB_DELTA_MIN
+        or float(max_delta) > CONTEXTUAL_RGB_DELTA_MAX
+    ):
+        raise ReviewError("contextual visibility evidence is outside the strict pixel gate")
+    return {
+        "pass": True,
+        "reference_pixels": reference_pixels,
+        "changed_pixels": changed_pixels,
+        "max_delta": float(max_delta),
+    }
+
+
 def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any]:
     """Parse the exact marker and retain the camera values emitted by Godot."""
 
@@ -656,6 +698,10 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
         + r"staged_visibility=(?P<visibility>pass|fail) "
         + r"staged_opaque_pixels=(?P<pixels>[0-9]+) "
         + r"staged_luma_range=(?P<luma>[^ ]+)"
+        + r" contextual_visibility=(?P<contextual>pass|fail) "
+        + r"contextual_reference_pixels=(?P<reference>[0-9]+) "
+        + r"contextual_changed_pixels=(?P<changed>[0-9]+) "
+        + r"contextual_max_delta=(?P<delta>[^ ]+)"
         + r"(?: output=(?P<output>.+))?$"
     )
     match = pattern.fullmatch(line)
@@ -677,6 +723,20 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
             "luma_range": luma_range,
         }
     )
+    try:
+        reference_pixels = int(match.group("reference"))
+        changed_pixels = int(match.group("changed"))
+        max_delta = float(match.group("delta"))
+    except ValueError as exc:
+        raise ReviewError("contextual visibility evidence is not numeric") from exc
+    contextual_visibility = _validate_contextual_visibility(
+        {
+            "pass": match.group("contextual") == "pass",
+            "reference_pixels": reference_pixels,
+            "changed_pixels": changed_pixels,
+            "max_delta": max_delta,
+        }
+    )
     camera_transform = _validate_camera_transform(
         {
             "projection": "orthogonal",
@@ -686,6 +746,7 @@ def parse_capture_marker(stdout: str, seed: int, lighting: str) -> Dict[str, Any
         }
     )
     camera_transform["staged_visibility"] = staged_visibility
+    camera_transform["contextual_visibility"] = contextual_visibility
     return {
         **camera_transform,
     }
@@ -872,6 +933,7 @@ def run_capture(
         )
     camera_transform = parse_capture_marker(stdout, seed, lighting)
     staged_visibility = camera_transform.pop("staged_visibility")
+    contextual_visibility = camera_transform.pop("contextual_visibility")
     _validate_png(output)
     if not _png_is_visible(output):
         raise ReviewError("Godot capture is blank or near-uniform")
@@ -880,6 +942,7 @@ def run_capture(
         "lighting": lighting,
         "camera_transform": camera_transform,
         "staged_visibility": staged_visibility,
+        "contextual_visibility": contextual_visibility,
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
         "pass": True,
         "reason": "pass",
@@ -932,6 +995,7 @@ def build_runtime_review_document(
             bounds_dimensions=inputs.bounds_dimensions,
         )
         _validate_staged_visibility(item.get("staged_visibility"))
+        _validate_contextual_visibility(item.get("contextual_visibility"))
         key = (seed, lighting)
         if key in by_key:
             raise ReviewError("duplicate runtime capture")
@@ -1188,6 +1252,7 @@ def _validate_runtime_document(
             bounds_dimensions=inputs.bounds_dimensions,
         )
         _validate_staged_visibility(item.get("staged_visibility"))
+        _validate_contextual_visibility(item.get("contextual_visibility"))
     if set(by_key) != set(expected):
         raise ReviewError("runtime review capture identity is invalid")
     if [(item["seed"], item["lighting"]) for item in captures] != expected:
