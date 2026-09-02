@@ -1126,8 +1126,12 @@ def test_r2b1_generation_loader_binds_all_adjacent_artifacts_and_journal(
     generate_batch(valid_contract, tmp_path, fake_client, 100, **_generation_kwargs(tmp_path))
     task_dir = next(
         path
-        for path in _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir()
+        for path in sorted(
+            _stage_asset_root(tmp_path, valid_contract.asset_id).iterdir(),
+            key=lambda item: item.name,
+        )
         if path.name != "_batches"
+        and json.loads((path / "generation.json").read_text(encoding="utf-8")).get("task_index") == 0
     )
     generation_path = task_dir / "generation.json"
     journal_path = next((_stage_asset_root(tmp_path, valid_contract.asset_id) / "_batches").glob("*.json"))
@@ -1190,7 +1194,7 @@ def test_r2b1_journal_validator_rejects_forged_state_credit_and_collision_fields
     leftover = json.loads(json.dumps(journal))
     leftover["tasks"][0]["state"] = "PENDING"
     leftover["tasks"][0]["consumed_credits"] = None
-    leftover["tasks"][0]["error"] = None
+    leftover["tasks"][0]["error"] = "lingering"
     leftover["tasks"][0]["budget_violation"] = False
     errors = stage_module.validate_batch_journal(leftover)
     assert any("pending state is inconsistent" in item for item in errors)

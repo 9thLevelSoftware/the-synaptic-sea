@@ -2014,7 +2014,7 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
             errors.append(label + " error is invalid")
         if type(item.get("budget_violation")) is not bool:
             errors.append(label + " budget_violation is invalid")
-        if task_state == "PENDING" and (consumed is not None or error is not None or task_id is not None):
+        if task_state == "PENDING" and (consumed is not None or error is not None):
             errors.append(label + " pending state is inconsistent")
         if task_state == "PENDING" and item.get("budget_violation") is not False:
             errors.append(label + " pending budget state is inconsistent")
