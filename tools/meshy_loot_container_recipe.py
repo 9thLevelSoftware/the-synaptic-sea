@@ -741,6 +741,7 @@ def _export_glb(bpy: Any, scene: Any, export_objects: list[Any], path: Path) -> 
         "export_materials": "EXPORT",
         "export_texcoords": True,
         "export_animations": True,
+        "export_yup": False,
         "export_cameras": False,
         "export_lights": False,
         "export_current_frame": False,
@@ -791,7 +792,11 @@ def _fresh_glb_evidence(bpy: Any, glb_path: Path, raw_preserved: bool) -> dict[s
     objects = list(bpy.data.objects)
     mesh_objects = [obj for obj in objects if obj.type == "MESH"]
     minimum, maximum = _bounds_for_meshes(mesh_objects)
-    dimensions = [maximum[index] - minimum[index] for index in range(3)]
+    imported_dimensions = [maximum[index] - minimum[index] for index in range(3)]
+    # Blender re-imports glTF with Z-up coordinates.  The GLB is intentionally
+    # exported without the Y-up conversion, so report dimensions in the GLB's
+    # contract order rather than Blender's re-import order.
+    dimensions = [imported_dimensions[0], imported_dimensions[2], imported_dimensions[1]]
     materials = sorted({material.name for obj in mesh_objects for material in obj.data.materials})
     uvs_present = bool(mesh_objects) and all(bool(obj.data.uv_layers) for obj in mesh_objects)
     triangles = sum(_mesh_triangles(obj) for obj in mesh_objects)
@@ -924,6 +929,58 @@ def _publish_leaf(path: Path, payload: bytes, label: str) -> None:
     _regular_file(path, label)
 
 
+def _compare_approved_baseline(
+    approved_manifest: Mapping[str, Any],
+    generated_manifest: Mapping[str, Any],
+    approved_scratch: bytes,
+    private_scratch: bytes,
+) -> None:
+    if approved_manifest.get("renders") != generated_manifest.get("renders"):
+        raise ValueError("private render hashes do not match approved baseline")
+    if canonical_json_bytes(approved_manifest) != canonical_json_bytes(generated_manifest):
+        raise ValueError("private manifest does not match approved baseline")
+    if (
+        len(approved_scratch) != len(private_scratch)
+        or hashlib.sha256(approved_scratch).hexdigest() != hashlib.sha256(private_scratch).hexdigest()
+        or approved_scratch != private_scratch
+    ):
+        raise ValueError("private scratch GLB does not match approved baseline")
+
+
+def _load_approved_baseline(paths: RecipePaths) -> tuple[dict[str, Any], bytes, bytes]:
+    _regular_file(paths.manifest_path, "approved recipe manifest")
+    manifest_payload = paths.manifest_path.read_bytes()
+    try:
+        manifest = json.loads(manifest_payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("approved recipe manifest is not valid JSON") from exc
+    if not isinstance(manifest, dict):
+        raise ValueError("approved recipe manifest must be an object")
+    errors = validate_manifest_document(manifest, expected_master_path=paths.master_path)
+    if errors:
+        raise ValueError("approved recipe manifest is invalid: " + "; ".join(errors))
+    if manifest_payload != canonical_json_bytes(manifest):
+        raise ValueError("approved recipe manifest is not canonical JSON")
+
+    renders = manifest.get("renders")
+    if not isinstance(renders, Mapping) or set(renders) != set(RENDER_LEAVES):
+        raise ValueError("approved recipe manifest must contain every render hash")
+    for leaf in RENDER_LEAVES:
+        render_hash = renders.get(leaf)
+        if not isinstance(render_hash, str) or _HASH_RE.fullmatch(render_hash) is None:
+            raise ValueError("approved render hash is invalid: " + leaf)
+        render_path = paths.evidence_dir / leaf
+        _regular_file(render_path, "approved " + leaf)
+        if _hash_decoded_rgba(render_path) != render_hash:
+            raise ValueError("approved render does not match manifest hash: " + leaf)
+
+    _regular_file(paths.scratch_glb, "approved scratch GLB")
+    approved_scratch = paths.scratch_glb.read_bytes()
+    if approved_scratch[:4] != b"glTF":
+        raise ValueError("approved scratch GLB is not GLB")
+    return manifest, manifest_payload, approved_scratch
+
+
 def _source_manifest_path(paths: RecipePaths) -> Path:
     return paths.master_path.parent / "build_recipe_manifest.json"
 
@@ -970,6 +1027,7 @@ def run_blender_recipe(paths: RecipePaths, contract: AssetContract, mode: str) -
     if mode not in _ALLOWED_MODES:
         raise ValueError("mode must be preview or publish-cleaned")
     raw_hash = _validate_recipe_inputs(paths, contract)
+    approved_baseline = _load_approved_baseline(paths) if mode == "publish-cleaned" else None
     from tools.meshy_blender_master import _run_bounded_process
 
     with tempfile.TemporaryDirectory(prefix=".meshy-loot-recipe-", dir=str(paths.evidence_dir)) as temporary:
@@ -1026,20 +1084,36 @@ def run_blender_recipe(paths: RecipePaths, contract: AssetContract, mode: str) -
         if errors:
             raise ValueError("manifest validation failed: " + "; ".join(errors))
         master_payload = master_copy.read_bytes()
+        private_glb_payload = glb_path.read_bytes()
+        if approved_baseline is not None:
+            _compare_approved_baseline(
+                approved_baseline[0], manifest, approved_baseline[2], private_glb_payload
+            )
         _publish_leaf(paths.master_path, master_payload, "updated Blender master")
         for leaf in RENDER_LEAVES:
             _publish_leaf(paths.evidence_dir / leaf, (run_dir / leaf).read_bytes(), leaf)
-        _publish_leaf(paths.scratch_glb, glb_path.read_bytes(), "scratch GLB")
+        _publish_leaf(paths.scratch_glb, private_glb_payload, "scratch GLB")
         manifest_payload = canonical_json_bytes(manifest)
         source_manifest = _source_manifest_path(paths)
         _publish_leaf(source_manifest, manifest_payload, "source recipe manifest")
         _publish_leaf(paths.manifest_path, manifest_payload, "evidence recipe manifest")
-        print("LOOT CONTAINER RECIPE PASS mode={0} asset={1} states=closed,open,looted".format(mode, ASSET_ID))
+        if mode == "publish-cleaned":
+            published = publish_cleaned(
+                glb_path, paths.task_dir / "cleaned.glb", allowed_root=paths.task_dir
+            )
+            if published.path.read_bytes() != private_glb_payload:
+                raise ValueError("published cleaned GLB readback does not match private GLB")
+            marker = "LOOT CONTAINER RECIPE PASS mode=publish-cleaned task=" + SELECTED_TASK_ID
+        else:
+            marker = "LOOT CONTAINER RECIPE PASS mode={0} asset={1} states=closed,open,looted".format(
+                mode, ASSET_ID
+            )
+        print(marker)
         result = dict(manifest)
         result["runtime_evidence"] = evidence
         result["stdout"] = stdout
         result["stderr"] = stderr
-        result["marker"] = "LOOT CONTAINER RECIPE PASS mode={0} asset={1} states=closed,open,looted".format(mode, ASSET_ID)
+        result["marker"] = marker
         return result
 
 

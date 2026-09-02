@@ -862,3 +862,199 @@ print('TASK2_JSON='+json.dumps({'export_objects':[name for name in required if b
     assert master_info["seeded_orphan_mesh"] is False
     assert master_info["seeded_owner_datablocks"] == []
     assert master_info["owned_suffixes"] == []
+
+
+def _fake_recipe_runner(payload: bytes):
+    from PIL import Image
+
+    evidence = {
+        "action_names": ["lid_open"],
+        "state_mesh_names": [
+            "ContainerRoot",
+            "ContainerBody",
+            "HingePivot",
+            "ContainerLid",
+            "FrontHandle",
+            "LatchLeft",
+            "LatchRight",
+            "LootVisual",
+        ],
+        "object_inventory": [
+            "ContainerRoot",
+            "ContainerBody",
+            "HingePivot",
+            "ContainerLid",
+            "FrontHandle",
+            "LatchLeft",
+            "LatchRight",
+            "LootVisual",
+        ],
+        "triangle_count": 1,
+        "materials": ["painted_ship_alloy", "warning_accent"],
+        "uvs_present": True,
+        "dimensions_m": [0.9, 0.55, 0.65],
+        "root_location": [0.0, 0.0, 0.0],
+        "raw_preserved": True,
+    }
+
+    def run(command, cwd, timeout):
+        run_dir = Path(command[command.index("--run-dir") + 1])
+        (run_dir / "updated_master.blend").write_bytes(b"updated master")
+        (run_dir / "cleaned.preview.glb").write_bytes(payload)
+        colors = {
+            "closed.png": (20, 30, 40, 255),
+            "open.png": (30, 40, 50, 255),
+            "looted.png": (40, 50, 60, 255),
+        }
+        for leaf, color in colors.items():
+            Image.new("RGBA", (1, 1), color).save(run_dir / leaf, format="PNG")
+        (run_dir / "runtime_evidence.json").write_bytes(
+            json.dumps(evidence, sort_keys=True).encode("utf-8")
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
+
+    return run
+
+
+def _recipe_case(tmp_path: Path):
+    from tools import meshy_loot_container_recipe as recipe
+
+    project_root = tmp_path / "project"
+    task_dir = project_root / "assets/_staging/meshy" / ASSET_ID / TASK_ID
+    master_path = tmp_path / "master" / ASSET_ID / (ASSET_ID + "_master.blend")
+    evidence_dir = tmp_path / "evidence"
+    task_dir.mkdir(parents=True)
+    master_path.parent.mkdir(parents=True)
+    evidence_dir.mkdir()
+    master_path.write_bytes(b"canonical master")
+    (task_dir / "raw.glb").write_bytes(b"raw glb")
+    contract = load_contract(CONTRACT_PATH)
+    paths = recipe.RecipePaths(
+        project_root=project_root,
+        task_dir=task_dir,
+        master_path=master_path,
+        evidence_dir=evidence_dir,
+        scratch_glb=evidence_dir / "cleaned.preview.glb",
+        manifest_path=evidence_dir / "build_recipe_manifest.json",
+    )
+    return recipe, contract, paths
+
+
+def test_approved_comparison_checks_manifest_render_hashes_and_glb_bytes() -> None:
+    from tools import meshy_loot_container_recipe as recipe
+
+    approved = _valid_manifest(Path("/tmp/loot_container_derelict_v1_master.blend"))
+    approved["renders"] = {leaf: "a" * 64 for leaf in recipe.RENDER_LEAVES}
+    generated = json.loads(json.dumps(approved))
+    recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF approved")
+
+    generated["renders"]["open.png"] = "b" * 64
+    with pytest.raises(ValueError, match="render hashes"):
+        recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF approved")
+
+    generated = json.loads(json.dumps(approved))
+    with pytest.raises(ValueError, match="scratch GLB"):
+        recipe._compare_approved_baseline(approved, generated, b"glTF approved", b"glTF changed")
+
+
+def test_publish_cleaned_mismatch_fails_before_task_leaf_or_canonical_touch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+    approved_manifest = paths.manifest_path.read_bytes()
+    approved_scratch = paths.scratch_glb.read_bytes()
+
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF changed"))
+    with pytest.raises(ValueError, match="approved baseline|scratch GLB"):
+        recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+
+    assert not (paths.task_dir / "cleaned.glb").exists()
+    assert paths.manifest_path.read_bytes() == approved_manifest
+    assert paths.scratch_glb.read_bytes() == approved_scratch
+
+
+def test_publish_cleaned_exact_match_publishes_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF approved"))
+    recipe.run_blender_recipe(paths, contract, "preview")
+
+    first = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    destination = paths.task_dir / "cleaned.glb"
+    first_stat = destination.stat()
+    assert first["marker"] == "LOOT CONTAINER RECIPE PASS mode=publish-cleaned task=" + TASK_ID
+    assert destination.read_bytes() == b"glTF approved"
+
+    second = recipe.run_blender_recipe(paths, contract, "publish-cleaned")
+    second_stat = destination.stat()
+    assert second["marker"] == first["marker"]
+    assert destination.read_bytes() == b"glTF approved"
+    assert (second_stat.st_ino, second_stat.st_mtime_ns) == (first_stat.st_ino, first_stat.st_mtime_ns)
+
+
+def test_preview_does_not_require_approved_baseline_and_keeps_generic_marker(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import meshy_blender_master
+
+    recipe, contract, paths = _recipe_case(tmp_path)
+    monkeypatch.setattr(meshy_blender_master, "_run_bounded_process", _fake_recipe_runner(b"glTF preview"))
+
+    result = recipe.run_blender_recipe(paths, contract, "preview")
+
+    assert result["marker"] == (
+        "LOOT CONTAINER RECIPE PASS mode=preview asset=loot_container_derelict_v1 "
+        "states=closed,open,looted"
+    )
+    assert not (paths.task_dir / "cleaned.glb").exists()
+
+
+def test_real_private_glb_uses_contract_dimension_order_for_pure_validator(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    from tools import meshy_loot_container_recipe as recipe
+    from tools.meshy_blender_validate import BlenderValidationError, validate_cleaned_glb
+
+    canonical_master = Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
+        "loot_container_derelict_v1_master.blend"
+    )
+    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1" / TASK_ID / "raw.glb"
+    assert canonical_master.is_file() and canonical_raw.is_file()
+    contract = load_contract(CONTRACT_PATH)
+    case = tmp_path / "closed-default"
+    master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
+    task = case / "task"
+    evidence = case / "evidence"
+    master.parent.mkdir(parents=True)
+    task.mkdir()
+    evidence.mkdir()
+    shutil.copy2(canonical_master, master)
+    shutil.copy2(canonical_raw, task / "raw.glb")
+    paths = recipe.RecipePaths(
+        project_root=ROOT,
+        task_dir=task,
+        master_path=master,
+        evidence_dir=evidence,
+        scratch_glb=evidence / "cleaned.preview.glb",
+        manifest_path=evidence / "build_recipe_manifest.json",
+    )
+    result = recipe.run_blender_recipe(paths, contract, "preview")
+    assert result["runtime_evidence"]["dimensions_m"] == pytest.approx(
+        [0.9, 0.55, 0.65], abs=1e-5
+    )
+    assert result["renders"] == {
+        leaf: recipe._hash_decoded_rgba(evidence / leaf) for leaf in recipe.RENDER_LEAVES
+    }
+
+    try:
+        report = validate_cleaned_glb(paths.scratch_glb, contract, TASK_ID)
+    except BlenderValidationError as failure:
+        assert str(failure) == "animation or rig data is forbidden by the contract"
+    else:
+        assert report["status"] == "PASS"
