@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.meshy_asset_contract import load_contract
+from tools.meshy_asset_contract import AssetContract, load_contract
 from tools.meshy_blender_master import (
     BLENDER_PATH,
     build_blender_command,
@@ -192,6 +192,219 @@ def _pack_glb(document: dict, binary: bytes = b"") -> bytes:
         result.extend(struct.pack("<II", len(binary), int.from_bytes(b"BIN\0", "little")))
         result.extend(binary)
     return bytes(result)
+
+
+def _hinge_animation(name: str = "lid_open", node: int = 0, path: str = "rotation") -> dict:
+    return {
+        "name": name,
+        "channels": [{"sampler": 0, "target": {"node": node, "path": path}}],
+        "samplers": [{"input": 0, "output": 0, "interpolation": "LINEAR"}],
+    }
+
+
+def _contract_variant(tmp_path: Path, contract, animation: dict) -> AssetContract:
+    document = contract.document
+    document["animation"] = animation
+    path = tmp_path / "contract.json"
+    snapshot = (json.dumps(document, separators=(",", ":")) + "\n").encode("utf-8")
+    path.write_bytes(snapshot)
+    return load_contract(path)
+
+
+def _unchecked_contract_variant(tmp_path: Path, contract, animation: dict) -> AssetContract:
+    document = contract.document
+    document["animation"] = animation
+    path = tmp_path / "unchecked-contract.json"
+    snapshot = (json.dumps(document, separators=(",", ":")) + "\n").encode("utf-8")
+    path.write_bytes(snapshot)
+    return AssetContract(path, hashlib.sha256(snapshot).hexdigest(), snapshot)
+
+
+def _hinge_fixture(document: dict) -> None:
+    document["nodes"][0]["name"] = "HingePivot"
+    document["animations"] = [_hinge_animation()]
+    document["skins"] = []
+
+
+def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    path = tmp_path / "hinge.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    report = validate_cleaned_glb(path, hinge_contract)
+
+    assert report["status"] == "PASS"
+
+
+def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    document["skins"] = [{}]
+    path = tmp_path / "hinge-skin.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="skin"):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize(
+    "animations",
+    [
+        pytest.param([], id="missing"),
+        pytest.param([_hinge_animation(name="not_lid_open")], id="wrong-name"),
+        pytest.param([_hinge_animation(), _hinge_animation()], id="duplicate"),
+    ],
+)
+def test_validate_rejects_hinge_animation_name_or_count(contract, tmp_path: Path, animations: list[dict]) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    document["animations"] = animations
+    path = tmp_path / "invalid-hinge-animation.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("mutation", ["wrong-node", "translation"])
+def test_validate_rejects_hinge_channel_target_or_path(contract, tmp_path: Path, mutation: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    if mutation == "wrong-node":
+        document["nodes"][0]["name"] = "OtherPivot"
+    else:
+        document["animations"][0]["channels"][0]["target"]["path"] = "translation"
+    path = tmp_path / "invalid-hinge-channel.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("inventory", ["animations", "skins"])
+def test_validate_rejects_hinge_non_array_inventories(contract, tmp_path: Path, inventory: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    document[inventory] = {}
+    path = tmp_path / "invalid-hinge-inventory.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("meshy_rigging_allowed,rigging_target", [(True, "non_humanoid"), (False, "humanoid_biped")])
+def test_validate_rejects_hinge_wrong_contract_flags(
+    contract, tmp_path: Path, meshy_rigging_allowed: bool, rigging_target: str
+) -> None:
+    document, binary = _fixture_document_and_binary()
+    _hinge_fixture(document)
+    path = tmp_path / "invalid-hinge-contract.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _unchecked_contract_variant(
+        tmp_path,
+        contract,
+        {
+            "kind": "hinge",
+            "meshy_rigging_allowed": meshy_rigging_allowed,
+            "rigging_target": rigging_target,
+        },
+    )
+
+    with pytest.raises(ValueError):
+        validate_cleaned_glb(path, hinge_contract)
+
+
+@pytest.mark.parametrize("populated", [False, True], ids=["empty-inventories", "populated-inventories"])
+def test_validate_rejects_unknown_animation_kind(contract, tmp_path: Path, populated: bool) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = [_hinge_animation()] if populated else []
+    document["skins"] = []
+    if populated:
+        document["nodes"][0]["name"] = "HingePivot"
+    path = tmp_path / "unknown-kind.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    unknown_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "unknown_animation_kind", "meshy_rigging_allowed": True, "rigging_target": "humanoid_biped"},
+    )
+
+    with pytest.raises(ValueError, match="kind"):
+        validate_cleaned_glb(path, unknown_contract)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "static_gameplay_prop",
+        "blender_segmented_chain_rig",
+        "godot_multimesh_particles_behavior",
+    ],
+)
+def test_validate_accepts_supported_non_humanoid_empty_inventories(contract, tmp_path: Path, kind: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = []
+    document["skins"] = []
+    path = tmp_path / "static.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    static_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": kind, "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    report = validate_cleaned_glb(path, static_contract)
+
+    assert report["status"] == "PASS"
+
+
+def test_validate_retains_explicit_humanoid_rigging_allowance(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = [{"name": "MeshyRig"}]
+    document["skins"] = [{}]
+    path = tmp_path / "humanoid.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    humanoid_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {
+            "kind": "optional_humanoid_biped_rig_after_selection",
+            "meshy_rigging_allowed": True,
+            "rigging_target": "humanoid_biped",
+        },
+    )
+
+    report = validate_cleaned_glb(path, humanoid_contract)
+
+    assert report["status"] == "PASS"
+
 
 
 def _bound_fixture_task(tmp_path: Path):

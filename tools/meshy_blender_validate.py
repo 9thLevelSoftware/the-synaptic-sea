@@ -196,6 +196,94 @@ def _integer(value: Any, label: str, minimum: int = 0) -> int:
     return value
 
 
+_SUPPORTED_ANIMATION_KINDS = frozenset(
+    {
+        "hinge",
+        "optional_humanoid_biped_rig_after_selection",
+        "blender_segmented_chain_rig",
+        "godot_multimesh_particles_behavior",
+        "static_gameplay_prop",
+        "static",  # legacy fixture contract retained for validator compatibility
+    }
+)
+
+
+def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict[str, Any]) -> None:
+    animations = document.get("animations", [])
+    skins = document.get("skins", [])
+    if not isinstance(animations, list) or not isinstance(skins, list):
+        raise BlenderValidationError("animation and skin inventories must be arrays")
+
+    animation_document = contract_document.get("animation")
+    if not isinstance(animation_document, dict):
+        raise BlenderValidationError("contract animation policy must be an object")
+    kind = animation_document.get("kind")
+    if not isinstance(kind, str) or kind not in _SUPPORTED_ANIMATION_KINDS:
+        raise BlenderValidationError("contract animation kind is unsupported")
+
+    rigging_allowed = animation_document.get("meshy_rigging_allowed")
+    rigging_target = animation_document.get("rigging_target")
+    if kind == "hinge":
+        if rigging_allowed is not False or rigging_target != "non_humanoid":
+            raise BlenderValidationError("hinge animation contract flags are invalid")
+        if skins:
+            raise BlenderValidationError("hinge animation contract forbids skins")
+        if len(animations) != 1:
+            raise BlenderValidationError("hinge animation inventory must contain exactly one animation")
+        animation = animations[0]
+        if not isinstance(animation, dict) or animation.get("name") != "lid_open":
+            raise BlenderValidationError("hinge animation must be named lid_open")
+        channels = animation.get("channels")
+        samplers = animation.get("samplers")
+        if not isinstance(channels, list) or not channels or not isinstance(samplers, list) or not samplers:
+            raise BlenderValidationError("hinge animation channels and samplers must be non-empty arrays")
+        if len(channels) != 1 or len(samplers) != 1:
+            raise BlenderValidationError("hinge animation must contain exactly one channel and sampler")
+
+        channel = channels[0]
+        if not isinstance(channel, dict):
+            raise BlenderValidationError("hinge animation channel must be an object")
+        sampler_index = _integer(channel.get("sampler"), "hinge animation sampler index")
+        if sampler_index >= len(samplers):
+            raise BlenderValidationError("hinge animation sampler index is out of range")
+        target = channel.get("target")
+        if not isinstance(target, dict):
+            raise BlenderValidationError("hinge animation channel target must be an object")
+        node_index = _integer(target.get("node"), "hinge animation target node index")
+        nodes = document.get("nodes")
+        if not isinstance(nodes, list) or node_index >= len(nodes):
+            raise BlenderValidationError("hinge animation target node index is out of range")
+        node = nodes[node_index]
+        if not isinstance(node, dict) or node.get("name") != "HingePivot":
+            raise BlenderValidationError("hinge animation target node must be HingePivot")
+        if target.get("path") != "rotation":
+            raise BlenderValidationError("hinge animation target path must be rotation")
+
+        sampler = samplers[sampler_index]
+        if not isinstance(sampler, dict):
+            raise BlenderValidationError("hinge animation sampler must be an object")
+        accessors = document.get("accessors")
+        if not isinstance(accessors, list):
+            raise BlenderValidationError("hinge animation accessors must be an array")
+        for field in ("input", "output"):
+            accessor_index = _integer(sampler.get(field), "hinge animation sampler " + field + " accessor")
+            if accessor_index >= len(accessors):
+                raise BlenderValidationError("hinge animation sampler accessor index is out of range")
+        if sampler.get("interpolation") != "LINEAR":
+            raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
+        return
+
+    if kind == "optional_humanoid_biped_rig_after_selection":
+        if rigging_allowed is not True or rigging_target != "humanoid_biped":
+            raise BlenderValidationError("humanoid animation contract flags are invalid")
+        return
+
+    if rigging_allowed is not False or rigging_target != ("none" if kind == "static" else "non_humanoid"):
+        raise BlenderValidationError("non-humanoid animation contract flags are invalid")
+    if animations or skins:
+        raise BlenderValidationError("animation or rig data is forbidden by the contract")
+
+
 def _number(value: Any, label: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
         raise BlenderValidationError(label + " must be finite")
@@ -874,14 +962,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     declared_length = _integer(buffers[0].get("byteLength"), "buffer byteLength")
     _validate_images(document, views, declared_length)
     _validate_node_policies(document, worlds, bounds_min, bounds_max, contract_document, default_reachable)
-    animations = document.get("animations", [])
-    skins = document.get("skins", [])
-    if not isinstance(animations, list) or not isinstance(skins, list):
-        raise BlenderValidationError("animation and skin inventories must be arrays")
-    animation_document = contract_document.get("animation")
-    rigging_allowed = isinstance(animation_document, dict) and animation_document.get("meshy_rigging_allowed") is True
-    if (animations or skins) and (not rigging_allowed or animation_document.get("rigging_target") != "humanoid_biped"):  # type: ignore
-        raise BlenderValidationError("animation or rig data is forbidden by the contract")
+    _validate_animation_policy(document, contract_document)
     return {
         "schema_version": "1.0.0",
         "document_kind": "meshy_blender_validation",
