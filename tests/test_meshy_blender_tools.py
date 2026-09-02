@@ -233,8 +233,8 @@ def _hinge_fixture(document: dict, binary: bytes) -> bytes:
     output_data = struct.pack(
         "<12f",
         0.0, 0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0, 1.0,
+        -0.79335334, 0.0, 0.0, 0.60876143,
+        -0.79335334, 0.0, 0.0, 0.60876143,
     )
     input_view = len(document["bufferViews"])
     output_view = input_view + 1
@@ -264,6 +264,19 @@ def _hinge_fixture(document: dict, binary: bytes) -> bytes:
     return binary + input_data + output_data
 
 
+def _rewrite_hinge_samples(document: dict, binary: bytes, *, times=None, rotations=None) -> bytes:
+    sampler = document["animations"][0]["samplers"][0]
+    result = bytearray(binary)
+    if times is not None:
+        input_view = document["bufferViews"][document["accessors"][sampler["input"]]["bufferView"]]
+        struct.pack_into("<" + "f" * len(times), result, input_view["byteOffset"], *times)
+    if rotations is not None:
+        output_view = document["bufferViews"][document["accessors"][sampler["output"]]["bufferView"]]
+        values = [value for rotation in rotations for value in rotation]
+        struct.pack_into("<" + "f" * len(values), result, output_view["byteOffset"], *values)
+    return bytes(result)
+
+
 def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: Path) -> None:
     document, binary = _fixture_document_and_binary()
     binary = _hinge_fixture(document, binary)
@@ -278,6 +291,56 @@ def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: 
     report = validate_cleaned_glb(path, hinge_contract)
 
     assert report["status"] == "PASS"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        pytest.param("all-identity", id="all-identity-no-motion"),
+        pytest.param("first-not-rest", id="first-sample-not-rest"),
+        pytest.param("final-sign-equivalent", id="final-pose-sign-equivalent-to-first"),
+        pytest.param("non-increasing-times", id="non-increasing-times"),
+        pytest.param("non-finite-time", id="non-finite-time"),
+        pytest.param("non-finite-quaternion", id="non-finite-quaternion"),
+        pytest.param("zero-quaternion", id="zero-quaternion"),
+        pytest.param("non-unit-quaternion", id="non-unit-quaternion"),
+    ],
+)
+def test_validate_rejects_invalid_hinge_animation_samples(contract, tmp_path: Path, mutation: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    identity = (0.0, 0.0, 0.0, 1.0)
+    open_rotation = (-0.79335334, 0.0, 0.0, 0.60876143)
+    if mutation == "all-identity":
+        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, identity, identity])
+    elif mutation == "first-not-rest":
+        binary = _rewrite_hinge_samples(
+            document,
+            binary,
+            rotations=[(0.70710678, 0.0, 0.0, 0.70710678), open_rotation, open_rotation],
+        )
+    elif mutation == "final-sign-equivalent":
+        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, -1.0)])
+    elif mutation == "non-increasing-times":
+        binary = _rewrite_hinge_samples(document, binary, times=[0.0, 1.0, 1.0])
+    elif mutation == "non-finite-time":
+        binary = _rewrite_hinge_samples(document, binary, times=[0.0, 1.0, float("nan")])
+    elif mutation == "non-finite-quaternion":
+        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (float("nan"), 0.0, 0.0, 1.0)])
+    elif mutation == "zero-quaternion":
+        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, 0.0)])
+    else:
+        binary = _rewrite_hinge_samples(document, binary, rotations=[identity, open_rotation, (0.0, 0.0, 0.0, 2.0)])
+    path = tmp_path / "invalid-hinge-samples.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="hinge animation"):
+        validate_cleaned_glb(path, hinge_contract)
 
 
 def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:

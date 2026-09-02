@@ -212,7 +212,7 @@ _SUPPORTED_ANIMATION_KINDS = frozenset(
 )
 
 
-def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict[str, Any]) -> None:
+def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict[str, Any], binary: bytes) -> None:
     animations = document.get("animations", [])
     skins = document.get("skins", [])
     if not isinstance(animations, list) or not isinstance(skins, list):
@@ -289,6 +289,48 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
             raise BlenderValidationError("hinge animation sampler input and output accessor counts must match")
         if sampler.get("interpolation") != "LINEAR":
             raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
+        try:
+            input_samples = _accessor_values(document, binary, accessor_indices["input"])
+            output_samples = _accessor_values(document, binary, accessor_indices["output"])
+        except (BlenderValidationError, struct.error) as exc:
+            raise BlenderValidationError("hinge animation samples could not be decoded") from exc
+        if len(input_samples.values) != input_count or len(output_samples.values) != output_count:
+            raise BlenderValidationError("hinge animation samples could not be decoded")
+        times = [float(sample[0]) for sample in input_samples.values]
+        if any(not math.isfinite(time) for time in times):
+            raise BlenderValidationError("hinge animation input times must be finite")
+        if any(later <= earlier for earlier, later in zip(times, times[1:])):
+            raise BlenderValidationError("hinge animation input times must be strictly increasing")
+
+        quaternions: List[Tuple[float, float, float, float]] = []
+        for sample in output_samples.values:
+            if len(sample) != 4 or any(not math.isfinite(float(value)) for value in sample):
+                raise BlenderValidationError("hinge animation quaternion samples must be finite")
+            length = math.sqrt(sum(float(value) * float(value) for value in sample))
+            if not math.isfinite(length) or length <= 1e-12:
+                raise BlenderValidationError("hinge animation quaternion samples must be nonzero")
+            if abs(length - 1.0) > 1e-4:
+                raise BlenderValidationError("hinge animation quaternion samples must be unit length")
+            qx, qy, qz, qw = (float(sample[index]) for index in range(4))
+            quaternions.append((qx / length, qy / length, qz / length, qw / length))
+
+        rest_rotation = _finite_vector(
+            node.get("rotation", [0.0, 0.0, 0.0, 1.0]),
+            "hinge animation target node rest rotation",
+            4,
+        )
+        rest_length = math.sqrt(sum(value * value for value in rest_rotation))
+        if not math.isfinite(rest_length) or rest_length <= 1e-12:
+            raise BlenderValidationError("hinge animation target node rest rotation must be nonzero")
+        rest_rotation = tuple(value / rest_length for value in rest_rotation)
+        first = quaternions[0]
+        final = quaternions[-1]
+        first_rest_dot = abs(sum(first[index] * rest_rotation[index] for index in range(4)))
+        if first_rest_dot < 1.0 - 1e-4:
+            raise BlenderValidationError("hinge animation first sample must match node rest rotation")
+        first_final_dot = abs(sum(first[index] * final[index] for index in range(4)))
+        if first_final_dot >= 1.0 - 1e-4:
+            raise BlenderValidationError("hinge animation final sample must be rotation-distinct")
         return
 
     if kind == "optional_humanoid_biped_rig_after_selection":
@@ -980,7 +1022,7 @@ def validate_cleaned_glb(glb: PathLike, contract: Union[AssetContract, PathLike]
     declared_length = _integer(buffers[0].get("byteLength"), "buffer byteLength")
     _validate_images(document, views, declared_length)
     _validate_node_policies(document, worlds, bounds_min, bounds_max, contract_document, default_reachable)
-    _validate_animation_policy(document, contract_document)
+    _validate_animation_policy(document, contract_document, parsed.binary)
     return {
         "schema_version": "1.0.0",
         "document_kind": "meshy_blender_validation",
