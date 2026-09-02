@@ -195,11 +195,17 @@ def _pack_glb(document: dict, binary: bytes = b"") -> bytes:
     return bytes(result)
 
 
-def _hinge_animation(name: str = "lid_open", node: int = 0, path: str = "rotation") -> dict:
+def _hinge_animation(
+    name: str = "lid_open",
+    node: int = 0,
+    path: str = "rotation",
+    input_accessor: int = 3,
+    output_accessor: int = 4,
+) -> dict:
     return {
         "name": name,
         "channels": [{"sampler": 0, "target": {"node": node, "path": path}}],
-        "samplers": [{"input": 0, "output": 0, "interpolation": "LINEAR"}],
+        "samplers": [{"input": input_accessor, "output": output_accessor, "interpolation": "LINEAR"}],
     }
 
 
@@ -221,15 +227,46 @@ def _unchecked_contract_variant(tmp_path: Path, contract, animation: dict) -> As
     return AssetContract(path, hashlib.sha256(snapshot).hexdigest(), snapshot)
 
 
-def _hinge_fixture(document: dict) -> None:
+def _hinge_fixture(document: dict, binary: bytes) -> bytes:
     document["nodes"][0]["name"] = "HingePivot"
-    document["animations"] = [_hinge_animation()]
+    input_data = struct.pack("<6f", 0.0, 1.0, 2.0, 0.0, 0.0, 0.0)
+    output_data = struct.pack(
+        "<12f",
+        0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0,
+    )
+    input_view = len(document["bufferViews"])
+    output_view = input_view + 1
+    input_accessor = len(document["accessors"])
+    output_accessor = input_accessor + 1
+    input_offset = len(binary)
+    output_offset = input_offset + len(input_data)
+    assert input_offset % 4 == 0
+    assert output_offset % 4 == 0
+    document["bufferViews"].extend(
+        [
+            {"buffer": 0, "byteOffset": input_offset, "byteLength": len(input_data)},
+            {"buffer": 0, "byteOffset": output_offset, "byteLength": len(output_data)},
+        ]
+    )
+    document["accessors"].extend(
+        [
+            {"bufferView": input_view, "componentType": 5126, "count": 3, "type": "SCALAR"},
+            {"bufferView": output_view, "componentType": 5126, "count": 3, "type": "VEC4"},
+        ]
+    )
+    document["buffers"][0]["byteLength"] = len(binary) + len(input_data) + len(output_data)
+    document["animations"] = [
+        _hinge_animation(input_accessor=input_accessor, output_accessor=output_accessor)
+    ]
     document["skins"] = []
+    return binary + input_data + output_data
 
 
 def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: Path) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     path = tmp_path / "hinge.glb"
     path.write_bytes(_pack_glb(document, binary))
     hinge_contract = _contract_variant(
@@ -245,7 +282,7 @@ def test_validate_accepts_contract_declared_hinge_animation(contract, tmp_path: 
 
 def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     document["skins"] = [{}]
     path = tmp_path / "hinge-skin.glb"
     path.write_bytes(_pack_glb(document, binary))
@@ -269,7 +306,7 @@ def test_validate_rejects_hinge_skin(contract, tmp_path: Path) -> None:
 )
 def test_validate_rejects_hinge_animation_name_or_count(contract, tmp_path: Path, animations: list[dict]) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     document["animations"] = animations
     path = tmp_path / "invalid-hinge-animation.glb"
     path.write_bytes(_pack_glb(document, binary))
@@ -286,7 +323,7 @@ def test_validate_rejects_hinge_animation_name_or_count(contract, tmp_path: Path
 @pytest.mark.parametrize("mutation", ["wrong-node", "translation"])
 def test_validate_rejects_hinge_channel_target_or_path(contract, tmp_path: Path, mutation: str) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     if mutation == "wrong-node":
         document["nodes"][0]["name"] = "OtherPivot"
     else:
@@ -306,7 +343,7 @@ def test_validate_rejects_hinge_channel_target_or_path(contract, tmp_path: Path,
 @pytest.mark.parametrize("inventory", ["animations", "skins"])
 def test_validate_rejects_hinge_non_array_inventories(contract, tmp_path: Path, inventory: str) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     document[inventory] = {}
     path = tmp_path / "invalid-hinge-inventory.glb"
     path.write_bytes(_pack_glb(document, binary))
@@ -320,12 +357,45 @@ def test_validate_rejects_hinge_non_array_inventories(contract, tmp_path: Path, 
         validate_cleaned_glb(path, hinge_contract)
 
 
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda d, i, o: d["accessors"][i].update(type="VEC2"), id="input-type"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(componentType=5123), id="input-component-type"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(count=2), id="input-count-too-small"),
+        pytest.param(lambda d, i, o: d["accessors"][i].update(count=3.0), id="input-count-not-integer"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(type="VEC3"), id="output-type"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(componentType=5123), id="output-component-type"),
+        pytest.param(lambda d, i, o: d["accessors"][o].update(count=2), id="output-count-mismatch"),
+        pytest.param(lambda d, i, o: d["accessors"].__setitem__(i, []), id="malformed-input-accessor"),
+        pytest.param(lambda d, i, o: d["accessors"].__setitem__(o, {}), id="malformed-output-accessor"),
+    ],
+)
+def test_validate_rejects_hinge_accessor_semantics(contract, tmp_path: Path, mutate) -> None:
+    document, binary = _fixture_document_and_binary()
+    binary = _hinge_fixture(document, binary)
+    sampler = document["animations"][0]["samplers"][0]
+    input_accessor = sampler["input"]
+    output_accessor = sampler["output"]
+    mutate(document, input_accessor, output_accessor)
+    path = tmp_path / "invalid-hinge-accessor.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    hinge_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": "hinge", "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="accessor|hinge animation"):
+        validate_cleaned_glb(path, hinge_contract)
+
+
 @pytest.mark.parametrize("meshy_rigging_allowed,rigging_target", [(True, "non_humanoid"), (False, "humanoid_biped")])
 def test_validate_rejects_hinge_wrong_contract_flags(
     contract, tmp_path: Path, meshy_rigging_allowed: bool, rigging_target: str
 ) -> None:
     document, binary = _fixture_document_and_binary()
-    _hinge_fixture(document)
+    binary = _hinge_fixture(document, binary)
     path = tmp_path / "invalid-hinge-contract.glb"
     path.write_bytes(_pack_glb(document, binary))
     hinge_contract = _unchecked_contract_variant(
@@ -365,11 +435,14 @@ def test_validate_rejects_unknown_animation_kind(contract, tmp_path: Path, popul
     "kind",
     [
         "static_gameplay_prop",
+        "static_mesh",
+        "structural_architecture",
+        "environment",
         "blender_segmented_chain_rig",
         "godot_multimesh_particles_behavior",
     ],
 )
-def test_validate_accepts_supported_non_humanoid_empty_inventories(contract, tmp_path: Path, kind: str) -> None:
+def test_validate_accepts_supported_static_non_humanoid_empty_inventories(contract, tmp_path: Path, kind: str) -> None:
     document, binary = _fixture_document_and_binary()
     document["animations"] = []
     document["skins"] = []
@@ -384,6 +457,27 @@ def test_validate_accepts_supported_non_humanoid_empty_inventories(contract, tmp
     report = validate_cleaned_glb(path, static_contract)
 
     assert report["status"] == "PASS"
+
+
+@pytest.mark.parametrize("kind", ["static_mesh", "structural_architecture", "environment"])
+@pytest.mark.parametrize("inventory", ["animations", "skins"])
+def test_validate_rejects_populated_inventory_for_new_static_kinds(
+    contract, tmp_path: Path, kind: str, inventory: str
+) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["animations"] = []
+    document["skins"] = []
+    document[inventory] = [{"name": "unexpected"}] if inventory == "animations" else [{}]
+    path = tmp_path / "populated-static.glb"
+    path.write_bytes(_pack_glb(document, binary))
+    static_contract = _contract_variant(
+        tmp_path,
+        contract,
+        {"kind": kind, "meshy_rigging_allowed": False, "rigging_target": "non_humanoid"},
+    )
+
+    with pytest.raises(ValueError, match="animation or rig data"):
+        validate_cleaned_glb(path, static_contract)
 
 
 def test_validate_retains_explicit_humanoid_rigging_allowance(contract, tmp_path: Path) -> None:

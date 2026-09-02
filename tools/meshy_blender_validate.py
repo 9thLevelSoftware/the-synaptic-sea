@@ -203,6 +203,9 @@ _SUPPORTED_ANIMATION_KINDS = frozenset(
         "blender_segmented_chain_rig",
         "godot_multimesh_particles_behavior",
         "static_gameplay_prop",
+        "static_mesh",
+        "structural_architecture",
+        "environment",
         "static",  # legacy fixture contract retained for validator compatibility
     }
 )
@@ -265,10 +268,24 @@ def _validate_animation_policy(document: Dict[str, Any], contract_document: Dict
         accessors = document.get("accessors")
         if not isinstance(accessors, list):
             raise BlenderValidationError("hinge animation accessors must be an array")
+        accessor_indices = {}
         for field in ("input", "output"):
             accessor_index = _integer(sampler.get(field), "hinge animation sampler " + field + " accessor")
             if accessor_index >= len(accessors):
                 raise BlenderValidationError("hinge animation sampler accessor index is out of range")
+            accessor_indices[field] = accessor_index
+        input_accessor = accessors[accessor_indices["input"]]
+        output_accessor = accessors[accessor_indices["output"]]
+        if not isinstance(input_accessor, dict) or not isinstance(output_accessor, dict):
+            raise BlenderValidationError("hinge animation sampler accessors must be objects")
+        if input_accessor.get("type") != "SCALAR" or input_accessor.get("componentType") != 5126:
+            raise BlenderValidationError("hinge animation sampler input must be a float SCALAR accessor")
+        input_count = _integer(input_accessor.get("count"), "hinge animation sampler input accessor count", 3)
+        if output_accessor.get("type") != "VEC4" or output_accessor.get("componentType") != 5126:
+            raise BlenderValidationError("hinge animation sampler output must be a float VEC4 accessor")
+        output_count = _integer(output_accessor.get("count"), "hinge animation sampler output accessor count")
+        if output_count != input_count:
+            raise BlenderValidationError("hinge animation sampler input and output accessor counts must match")
         if sampler.get("interpolation") != "LINEAR":
             raise BlenderValidationError("hinge animation sampler interpolation must be LINEAR")
         return
