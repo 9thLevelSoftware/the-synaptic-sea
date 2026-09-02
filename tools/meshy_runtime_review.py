@@ -63,6 +63,7 @@ SCHEMA_VERSION = "1.0.0"
 DOCUMENT_KIND = "meshy_runtime_review"
 LOCKED_CAMERA_DIRECTION = (16.0, 14.0, 16.0)
 LOCKED_CAMERA_DIRECTION_TOLERANCE = 1e-4
+CAMERA_DISTANCE_MIN = 4.0
 CAMERA_SIZE_MIN = 1.5
 CAMERA_SIZE_MAX = 4096.0
 CAMERA_SIZE_DIMENSION_SCALE = 16.0
@@ -110,6 +111,11 @@ FIXED_OUTPUT_NAMES = tuple(
     "seed-{0}-{1}.png".format(seed, lighting)
     for seed in SEEDS
     for lighting in LIGHTING_MODES
+) + tuple(
+    "seed-{0}-{1}-{2}.png".format(seed, lighting, kind)
+    for seed in SEEDS
+    for lighting in LIGHTING_MODES
+    for kind in ("staged", "reference")
 ) + ("runtime-review.json",)
 # Kept for the small public helper API used by older callers.  Runtime runs
 # never use this value as evidence; they record the marker's actual transform.
@@ -473,6 +479,17 @@ def capture_name(seed: int, lighting: str) -> str:
     return "seed-{0}-{1}.png".format(seed, lighting)
 
 
+def auxiliary_capture_name(seed: int, lighting: str, kind: str) -> str:
+    capture_name(seed, lighting)
+    if kind not in ("staged", "reference"):
+        raise ReviewError("unsupported auxiliary capture kind: {0}".format(kind))
+    return "seed-{0}-{1}-{2}.png".format(seed, lighting, kind)
+
+
+def _auxiliary_capture_path(output: Path, seed: int, lighting: str, kind: str) -> Path:
+    return output.parent / auxiliary_capture_name(seed, lighting, kind)
+
+
 def _bounded_text(value: object) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
@@ -601,8 +618,8 @@ def _validate_camera_transform(
         vectors[field] = values
     delta = [vectors["position"][index] - vectors["target"][index] for index in range(3)]
     distance = math.sqrt(sum(item * item for item in delta))
-    if not math.isfinite(distance) or distance <= 1e-9:
-        raise ReviewError("camera position and target must be distinct and finite")
+    if not math.isfinite(distance) or distance < CAMERA_DISTANCE_MIN:
+        raise ReviewError("camera distance is below the governed minimum")
     locked_length = math.sqrt(sum(item * item for item in LOCKED_CAMERA_DIRECTION))
     normalized = [item / distance for item in delta]
     locked = [item / locked_length for item in LOCKED_CAMERA_DIRECTION]
@@ -850,8 +867,14 @@ def _validate_png(path: Path) -> None:
     _png_chunks(path.read_bytes(), path)
 
 
-def _png_is_visible(path: Path) -> bool:
-    """Apply the same conservative nonblank gate used by the Godot capture."""
+def _decode_png_samples(
+    path: Path,
+    *,
+    sample_step_x: int,
+    sample_step_y: int,
+    sample_rows: Optional[set[int]] = None,
+) -> list[Tuple[int, int, float, float, float, float, float]]:
+    """Decode exact governed pixels using the bounded PNG decoder."""
 
     width, height, color_type, decoded = _png_chunks(path.read_bytes(), path)
     channels = {2: 3, 4: 2, 6: 4}[color_type]
@@ -860,7 +883,7 @@ def _png_is_visible(path: Path) -> bool:
     if len(decoded) != expected:
         raise ReviewError("capture PNG scanlines are invalid: {0}".format(path))
     previous = bytearray(row_bytes)
-    samples: list[Tuple[float, float]] = []
+    samples: list[Tuple[int, int, float, float, float, float, float]] = []
     for y in range(height):
         filter_type = decoded[y * (row_bytes + 1)]
         source = decoded[y * (row_bytes + 1) + 1 : (y + 1) * (row_bytes + 1)]
@@ -887,8 +910,10 @@ def _png_is_visible(path: Path) -> bool:
             else:
                 raise ReviewError("capture PNG uses an unknown filter: {0}".format(path))
             row[index] = result
-        if y in {0, height // 8, height // 4, height // 2, (3 * height) // 4, height - 1}:
-            for x in range(0, width, max(1, width // 32)):
+        if (
+            sample_rows is not None and y in sample_rows
+        ) or (sample_rows is None and y % max(1, sample_step_y) == 0):
+            for x in range(0, width, max(1, sample_step_x)):
                 pixel = row[x * channels : (x + 1) * channels]
                 alpha = float(pixel[-1]) / 255.0 if color_type in (4, 6) else 1.0
                 if color_type == 6:
@@ -897,13 +922,110 @@ def _png_is_visible(path: Path) -> bool:
                     rgb = pixel[:1] * 3
                 else:
                     rgb = pixel[:3]
-                luma = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255.0
-                samples.append((luma, alpha))
+                red = float(rgb[0]) / 255.0
+                green = float(rgb[1]) / 255.0
+                blue = float(rgb[2]) / 255.0
+                luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                samples.append((x, y, red, green, blue, alpha, luma))
         previous = row
-    visible = [luma for luma, alpha in samples if alpha >= 0.05]
+    return samples
+
+
+def _png_is_visible(path: Path) -> bool:
+    """Apply the same conservative nonblank gate used by the Godot capture."""
+
+    samples = _decode_png_samples(
+        path,
+        sample_step_x=max(1, CAPTURE_SIZE[0] // 32),
+        sample_step_y=1,
+        sample_rows={0, CAPTURE_SIZE[1] // 8, CAPTURE_SIZE[1] // 4, CAPTURE_SIZE[1] // 2,
+                     (3 * CAPTURE_SIZE[1]) // 4, CAPTURE_SIZE[1] - 1},
+    )
+    visible = [sample[6] for sample in samples if sample[5] >= 0.05]
     if len(visible) < max(2, len(samples) // 8):
         return False
     return max(visible) - min(visible) >= 0.004
+
+
+def _staged_pixel_evidence(
+    samples: Sequence[Tuple[int, int, float, float, float, float, float]],
+) -> Dict[str, Any]:
+    minimum = min((sample[6] for sample in samples), default=1.0)
+    maximum = max((sample[6] for sample in samples), default=0.0)
+    opaque_pixels = sum(1 for sample in samples if sample[5] >= 0.05)
+    luma_range = maximum - minimum
+    return {
+        "pass": opaque_pixels >= 2 and bool(samples) and luma_range >= 0.004,
+        "opaque_pixels": opaque_pixels,
+        "luma_range": luma_range,
+    }
+
+
+def _contextual_pixel_evidence(
+    staged: Sequence[Tuple[int, int, float, float, float, float, float]],
+    reference: Sequence[Tuple[int, int, float, float, float, float, float]],
+    final: Sequence[Tuple[int, int, float, float, float, float, float]],
+) -> Dict[str, Any]:
+    if not (len(staged) == len(reference) == len(final)):
+        raise ReviewError("governed pixel evidence uses inconsistent sample grids")
+    reference_pixels = 0
+    changed_pixels = 0
+    max_delta = 0.0
+    for staged_pixel, reference_pixel, final_pixel in zip(staged, reference, final):
+        if staged_pixel[:2] != reference_pixel[:2] or staged_pixel[:2] != final_pixel[:2]:
+            raise ReviewError("governed pixel evidence uses inconsistent coordinates")
+        if staged_pixel[5] < 0.05:
+            continue
+        reference_pixels += 1
+        delta = max(
+            abs(final_pixel[2] - reference_pixel[2]),
+            abs(final_pixel[3] - reference_pixel[3]),
+            abs(final_pixel[4] - reference_pixel[4]),
+        )
+        max_delta = max(max_delta, delta)
+        if delta >= CONTEXTUAL_RGB_DELTA_MIN:
+            changed_pixels += 1
+    return {
+        "pass": (
+            reference_pixels >= CONTEXTUAL_REFERENCE_MIN
+            and reference_pixels <= STAGED_SAMPLE_MAX
+            and changed_pixels >= CONTEXTUAL_CHANGED_MIN
+            and changed_pixels <= reference_pixels
+            and float(changed_pixels) / float(reference_pixels) >= CONTEXTUAL_CHANGED_FRACTION_MIN
+            and max_delta >= CONTEXTUAL_RGB_DELTA_MIN
+            and max_delta <= CONTEXTUAL_RGB_DELTA_MAX
+        ),
+        "reference_pixels": reference_pixels,
+        "changed_pixels": changed_pixels,
+        "max_delta": max_delta,
+    }
+
+
+def _derive_pixel_evidence(
+    staged_path: Path, reference_path: Path, final_path: Path
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    staged_samples = _decode_png_samples(
+        staged_path,
+        sample_step_x=STAGED_SAMPLE_STEP_X,
+        sample_step_y=STAGED_SAMPLE_STEP_Y,
+    )
+    reference_samples = _decode_png_samples(
+        reference_path,
+        sample_step_x=STAGED_SAMPLE_STEP_X,
+        sample_step_y=STAGED_SAMPLE_STEP_Y,
+    )
+    final_samples = _decode_png_samples(
+        final_path,
+        sample_step_x=STAGED_SAMPLE_STEP_X,
+        sample_step_y=STAGED_SAMPLE_STEP_Y,
+    )
+    staged_evidence = _staged_pixel_evidence(staged_samples)
+    contextual_evidence = _contextual_pixel_evidence(
+        staged_samples, reference_samples, final_samples
+    )
+    _validate_staged_visibility(staged_evidence)
+    _validate_contextual_visibility(contextual_evidence)
+    return staged_evidence, contextual_evidence
 
 
 def run_capture(
@@ -931,12 +1053,20 @@ def run_capture(
                 seed, lighting, _cap_text(stdout + "\n" + stderr)
             )
         )
-    camera_transform = parse_capture_marker(stdout, seed, lighting)
-    staged_visibility = camera_transform.pop("staged_visibility")
-    contextual_visibility = camera_transform.pop("contextual_visibility")
+    camera_marker = parse_capture_marker(stdout, seed, lighting)
+    camera_transform = {
+        key: camera_marker[key] for key in ("projection", "position", "target", "size")
+    }
+    staged_path = _auxiliary_capture_path(output, seed, lighting, "staged")
+    reference_path = _auxiliary_capture_path(output, seed, lighting, "reference")
     _validate_png(output)
+    _validate_png(staged_path)
+    _validate_png(reference_path)
     if not _png_is_visible(output):
         raise ReviewError("Godot capture is blank or near-uniform")
+    staged_visibility, contextual_visibility = _derive_pixel_evidence(
+        staged_path, reference_path, output
+    )
     return {
         "seed": seed,
         "lighting": lighting,
@@ -944,6 +1074,8 @@ def run_capture(
         "staged_visibility": staged_visibility,
         "contextual_visibility": contextual_visibility,
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "_staged_output_sha256": hashlib.sha256(staged_path.read_bytes()).hexdigest(),
+        "_reference_output_sha256": hashlib.sha256(reference_path.read_bytes()).hexdigest(),
         "pass": True,
         "reason": "pass",
     }
@@ -981,25 +1113,39 @@ def build_runtime_review_document(
     inputs: ValidatedTask, captures: Sequence[Mapping[str, Any]]
 ) -> Dict[str, Any]:
     expected = [(seed, lighting) for seed in SEEDS for lighting in LIGHTING_MODES]
-    by_key: Dict[Tuple[int, str], Mapping[str, Any]] = {}
+    by_key: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    evidence_hashes: Dict[Tuple[int, str], Tuple[Optional[str], Optional[str]]] = {}
     for item in captures:
-        if set(item) != CAPTURE_FIELDS:
+        canonical_item = dict(item)
+        staged_hash = canonical_item.pop("_staged_output_sha256", None)
+        reference_hash = canonical_item.pop("_reference_output_sha256", None)
+        if (staged_hash is None) != (reference_hash is None):
+            raise ReviewError("runtime pixel evidence hashes are incomplete")
+        if staged_hash is not None and (
+            not isinstance(staged_hash, str)
+            or not isinstance(reference_hash, str)
+            or HASH_RE.fullmatch(staged_hash) is None
+            or HASH_RE.fullmatch(reference_hash) is None
+        ):
+            raise ReviewError("runtime pixel evidence hash is invalid")
+        if set(canonical_item) != CAPTURE_FIELDS:
             raise ReviewError("runtime capture fields are not canonical")
-        seed = item.get("seed")
-        lighting = item.get("lighting")
+        seed = canonical_item.get("seed")
+        lighting = canonical_item.get("lighting")
         if type(seed) is not int or not isinstance(lighting, str):
             raise ReviewError("runtime capture identity is invalid")
         capture_name(seed, lighting)
         _validate_camera_transform(
-            item.get("camera_transform"),
+            canonical_item.get("camera_transform"),
             bounds_dimensions=inputs.bounds_dimensions,
         )
-        _validate_staged_visibility(item.get("staged_visibility"))
-        _validate_contextual_visibility(item.get("contextual_visibility"))
+        _validate_staged_visibility(canonical_item.get("staged_visibility"))
+        _validate_contextual_visibility(canonical_item.get("contextual_visibility"))
         key = (seed, lighting)
         if key in by_key:
             raise ReviewError("duplicate runtime capture")
-        by_key[key] = item
+        by_key[key] = canonical_item
+        evidence_hashes[key] = (staged_hash, reference_hash)
     if set(by_key) != set(expected):
         raise ReviewError("runtime review requires exactly six captures")
     ordered = [by_key[key] for key in expected]
@@ -1012,12 +1158,17 @@ def build_runtime_review_document(
         raise ReviewError("runtime input hashes are invalid")
     if not HASH_RE.fullmatch(inputs.blender_validation_hash):
         raise ReviewError("runtime Blender validation hash is invalid")
-    output_hashes = {
-        capture_name(int(item["seed"]), str(item["lighting"])): str(item["output_sha256"])
-        for item in ordered
-    }
-    if any(not HASH_RE.fullmatch(value) for value in output_hashes.values()):
-        raise ReviewError("runtime capture hash is invalid")
+    output_hashes: Dict[str, str] = {}
+    for key, item in zip(expected, ordered):
+        seed, lighting = key
+        final_hash = str(item["output_sha256"])
+        if HASH_RE.fullmatch(final_hash) is None:
+            raise ReviewError("runtime capture hash is invalid")
+        output_hashes[capture_name(seed, lighting)] = final_hash
+        staged_hash, reference_hash = evidence_hashes[key]
+        if staged_hash is not None and reference_hash is not None:
+            output_hashes[auxiliary_capture_name(seed, lighting, "staged")] = staged_hash
+            output_hashes[auxiliary_capture_name(seed, lighting, "reference")] = reference_hash
     return {
         "schema_version": SCHEMA_VERSION,
         "document_kind": DOCUMENT_KIND,
@@ -1028,7 +1179,7 @@ def build_runtime_review_document(
         "blender_validation_sha256": inputs.blender_validation_hash,
         "seeds": list(SEEDS),
         "lighting": list(LIGHTING_MODES),
-        "captures": [dict(item) for item in ordered],
+        "captures": ordered,
         "output_hashes": output_hashes,
         "pass": True,
         "reason": "pass",
@@ -1260,6 +1411,8 @@ def _validate_runtime_document(
     output_hashes = document.get("output_hashes")
     if not isinstance(output_hashes, dict) or set(output_hashes) != set(FIXED_OUTPUT_NAMES[:-1]):
         raise ReviewError("runtime output hash map is not canonical")
+    if any(not isinstance(value, str) or HASH_RE.fullmatch(value) is None for value in output_hashes.values()):
+        raise ReviewError("runtime output hash map contains an invalid hash")
     for seed, lighting in expected:
         name = capture_name(seed, lighting)
         if output_hashes.get(name) != by_key[(seed, lighting)].get("output_sha256"):
@@ -1286,16 +1439,31 @@ def verify_evidence_chain(
         raise ReviewError("runtime-review.json is invalid") from exc
     if raw != canonical_json_bytes(document) or stat.S_IMODE(report_path.lstat().st_mode) != 0o600:
         raise ReviewError("runtime-review.json is not canonical mode-0600 evidence")
-    _validate_runtime_document(document, inputs)
+    validated = _validate_runtime_document(document, inputs)
+    captures = {
+        (item["seed"], item["lighting"]): item for item in validated["captures"]
+    }
     for seed, lighting in ((seed, lighting) for seed in SEEDS for lighting in LIGHTING_MODES):
-        path = destination / capture_name(seed, lighting)
-        _validate_existing_leaf(path, None, "capture " + path.name)
-        capture_bytes = path.read_bytes()
-        _validate_png(path)
-        if not _png_is_visible(path):
-            raise ReviewError("runtime capture is blank or near-uniform: " + path.name)
-        if hashlib.sha256(capture_bytes).hexdigest() != document["output_hashes"][path.name]:
-            raise ReviewError("runtime capture hash does not match report: " + path.name)
+        final_path = destination / capture_name(seed, lighting)
+        staged_path = destination / auxiliary_capture_name(seed, lighting, "staged")
+        reference_path = destination / auxiliary_capture_name(seed, lighting, "reference")
+        for path in (final_path, staged_path, reference_path):
+            _validate_existing_leaf(path, None, "capture " + path.name)
+            _validate_png(path)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if digest != validated["output_hashes"][path.name]:
+                raise ReviewError("runtime capture hash does not match report: " + path.name)
+        if not _png_is_visible(final_path):
+            raise ReviewError("runtime capture is blank or near-uniform: " + final_path.name)
+        staged_visibility, contextual_visibility = _derive_pixel_evidence(
+            staged_path, reference_path, final_path
+        )
+        expected_capture = captures[(seed, lighting)]
+        if (
+            staged_visibility != expected_capture["staged_visibility"]
+            or contextual_visibility != expected_capture["contextual_visibility"]
+        ):
+            raise ReviewError("runtime pixel evidence does not match report: " + final_path.name)
     return document
 
 
@@ -1329,6 +1497,8 @@ def run(args: argparse.Namespace) -> RunResult:
                     raise ReviewError("runtime review requires all six captures before publication")
                 if set(document) != RUNTIME_DOCUMENT_FIELDS or document.get("pass") is not True:
                     raise ReviewError("runtime review report is not canonical PASS")
+                if set(document.get("output_hashes", {})) != set(FIXED_OUTPUT_NAMES[:-1]):
+                    raise ReviewError("runtime review report lacks governed pixel hashes")
                 destination = _fixed_preview_path(root, inputs.asset_id)
                 if destination.exists():
                     entries = _output_entries(destination)
@@ -1338,6 +1508,12 @@ def run(args: argparse.Namespace) -> RunResult:
                 for key, source in normalised.items():
                     _validate_png(source)
                     payloads[capture_name(*key)] = source.read_bytes()
+                    for kind in ("staged", "reference"):
+                        auxiliary_source = _auxiliary_capture_path(source, *key, kind)
+                        _validate_png(auxiliary_source)
+                        payloads[auxiliary_capture_name(*key, kind)] = auxiliary_source.read_bytes()
+                if set(payloads) != set(FIXED_OUTPUT_NAMES[:-1]):
+                    raise ReviewError("runtime pixel evidence publication is incomplete")
                 report_bytes = canonical_json_bytes(document)
                 report_path = destination / "runtime-review.json"
 

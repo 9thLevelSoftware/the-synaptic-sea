@@ -207,6 +207,19 @@ def test_capture_marker_requires_locked_camera_and_real_world_target() -> None:
             review.parse_capture_marker(marker, 42, "normal")
 
 
+def test_capture_marker_rejects_locked_camera_distance_below_four_metres() -> None:
+    target = [0.5, 1.399999976, 0.000005]
+    direction = review.LOCKED_CAMERA_DIRECTION
+    length = math.sqrt(sum(component * component for component in direction))
+    position = [target[index] + direction[index] / length for index in range(3)]
+    marker = _locked_real_marker(
+        position=",".join("%.9f" % component for component in position)
+    )
+
+    with pytest.raises(review.ReviewError, match="camera|distance"):
+        review.parse_capture_marker(marker, 42, "normal")
+
+
 def _visible_png_bytes() -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
         return (
@@ -276,6 +289,14 @@ def test_binder_rejects_forged_runtime_document_before_promotion_ready(
             )
             (preview / name).write_bytes(png)
             (preview / name).chmod(0o600)
+            for kind in ("staged", "reference"):
+                auxiliary_name = review.auxiliary_capture_name(seed, lighting, kind)
+                (preview / auxiliary_name).write_bytes(png)
+                (preview / auxiliary_name).chmod(0o600)
+                # The report is deliberately forged below; these hashes only
+                # make the governed artifact set complete for that check.
+                document_hash = hashlib.sha256(png).hexdigest()
+                capture_records[-1]["_" + kind + "_output_sha256"] = document_hash
     document = review.build_runtime_review_document(inputs, capture_records)
     document["captures"][0]["camera_transform"]["target"] = [0.0, 0.0, 0.0]
     document["captures"][1]["staged_visibility"]["opaque_pixels"] = 999999
@@ -518,6 +539,78 @@ def test_runtime_capture_source_contract_covers_mount_cutaway_and_exact_image_ev
     assert "contextual_visibility" in source
     assert "get_texture().get_image()" in source
     assert "image.save_png(output_path)" in source
+    mount_source = source[source.index("func _mount_staged_asset") : source.index("func _hide_existing_mount_visuals")]
+    position_source = source[source.index("func _mount_position()") : source.index("func _mount_position_precedes")]
+    assert "if not mount_position.is_finite()" in mount_source
+    assert "no valid occupied cell exists" in mount_source
+    assert "return Vector3.INF" in position_source
+
+
+def _solid_png_bytes(red: int, green: int, blue: int) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    pixel = bytes((red, green, blue, 255))
+    rows = (b"\x00" + pixel * review.CAPTURE_SIZE[0]) * review.CAPTURE_SIZE[1]
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1600, 900, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _auxiliary_capture_name(seed: int, lighting: str, kind: str) -> str:
+    return "seed-{0}-{1}-{2}.png".format(seed, lighting, kind)
+
+
+def test_run_capture_derives_visibility_from_pixel_artifacts_not_marker_metrics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "seed-42-normal.png"
+    staged = _visible_png_bytes()
+    reference = _solid_png_bytes(0, 0, 0)
+    forged_marker = _locked_real_marker(
+        pixels="2",
+        luma="0.020000000",
+        contextual=(
+            "contextual_visibility=pass contextual_reference_pixels=2 "
+            "contextual_changed_pixels=2 contextual_max_delta=0.020000000"
+        ),
+    )
+
+    def fake_capture(_command, *, cwd):
+        output.write_bytes(staged)
+        output.with_name(_auxiliary_capture_name(42, "normal", "staged")).write_bytes(staged)
+        output.with_name(_auxiliary_capture_name(42, "normal", "reference")).write_bytes(reference)
+        return SimpleNamespace(returncode=0, stdout=forged_marker, stderr="")
+
+    monkeypatch.setattr(review, "_run_bounded_process", fake_capture)
+    record = review.run_capture(
+        tmp_path,
+        "fixture_triangle",
+        "gameplay_prop",
+        42,
+        "normal",
+        output,
+    )
+
+    assert record["staged_visibility"] == {
+        "pass": True,
+        "opaque_pixels": 2304,
+        "luma_range": 1.0,
+    }
+    assert record["contextual_visibility"] == {
+        "pass": True,
+        "reference_pixels": 2304,
+        "changed_pixels": 1152,
+        "max_delta": 1.0,
+    }
 
 
 def _bound_runtime_fixture(tmp_path: Path, category: str | None = None):
@@ -639,3 +732,62 @@ def test_preview_directory_must_be_fixed_to_asset_leaf(tmp_path: Path) -> None:
                 str(tmp_path / "artifacts/validation-previews/meshy/other"),
             ]
         )
+
+
+def test_verify_evidence_chain_recomputes_persisted_pixel_metrics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, contract = _bound_runtime_fixture(tmp_path)
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=review.governance.file_sha256(glb_path),
+            byte_size=glb_path.stat().st_size,
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport, raising=False)
+    monkeypatch.setattr(validate_module, "_reimport_with_blender_process", fake_reimport, raising=False)
+    inputs, _review, _generation, root = review._load_runtime_inputs(project_root, None, task_dir)
+    preview = root / review.PREVIEW_ROOT_RELATIVE / contract.asset_id
+    preview.mkdir(parents=True, mode=0o700)
+    staged = _visible_png_bytes()
+    reference = _solid_png_bytes(0, 0, 0)
+    records = []
+    expected = [(seed, lighting) for seed in SEEDS for lighting in LIGHTING]
+    for seed, lighting in expected:
+        final_path = preview / review.capture_name(seed, lighting)
+        final_path.write_bytes(staged)
+        final_path.chmod(0o600)
+        for kind, payload in (("staged", staged), ("reference", reference)):
+            auxiliary_path = preview / _auxiliary_capture_name(seed, lighting, kind)
+            auxiliary_path.write_bytes(payload)
+            auxiliary_path.chmod(0o600)
+        record = _runtime_record(seed, lighting)
+        record["staged_visibility"] = {
+            "pass": True,
+            "opaque_pixels": 2,
+            "luma_range": 0.02,
+        }
+        record["contextual_visibility"] = _canonical_contextual_visibility(
+            reference_pixels=2, changed_pixels=2, max_delta=0.02
+        )
+        record["output_sha256"] = hashlib.sha256(staged).hexdigest()
+        records.append(record)
+    document = review.build_runtime_review_document(inputs, records)
+
+    output_names = [name for name in review.FIXED_OUTPUT_NAMES if name != "runtime-review.json"]
+    for seed, lighting in expected:
+        for kind in ("staged", "reference"):
+            name = _auxiliary_capture_name(seed, lighting, kind)
+            if name not in output_names:
+                output_names.append(name)
+            payload = staged if kind == "staged" else reference
+            document["output_hashes"][name] = hashlib.sha256(payload).hexdigest()
+    monkeypatch.setattr(review, "FIXED_OUTPUT_NAMES", tuple(output_names) + ("runtime-review.json",))
+    report = preview / "runtime-review.json"
+    report.write_bytes(canonical_json_bytes(document))
+    report.chmod(0o600)
+
+    with pytest.raises(review.ReviewError, match="pixel|visibility|evidence"):
+        review.verify_evidence_chain(project_root, task_dir)

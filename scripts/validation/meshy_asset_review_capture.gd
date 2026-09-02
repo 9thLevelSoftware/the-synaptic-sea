@@ -224,6 +224,9 @@ func _mount_staged_asset() -> bool:
 	if visual == null:
 		return false
 	var mount_position: Vector3 = _mount_position()
+	if not mount_position.is_finite():
+		_fail("no valid occupied cell exists")
+		return false
 	var mount: Node3D
 	if asset_category.begins_with("threat"):
 		mount = ThreatPlaceholderRendererScript.build_placeholder(asset_id, [], mount_position)
@@ -292,7 +295,7 @@ func _mount_position() -> Vector3:
 						selected_score = score
 		if selected_position != Vector3.INF:
 			return selected_position + Vector3(0.0, 0.9, 0.0)
-	return Vector3.ZERO
+	return Vector3.INF
 
 
 func _mount_position_precedes(candidate: Vector3, current: Vector3) -> bool:
@@ -436,6 +439,8 @@ func _fit_locked_isometric_camera() -> bool:
 	staged_camera_target = visual_bounds.position + visual_bounds.size * 0.5
 	var locked_direction: Vector3 = Vector3(16.0, 14.0, 16.0).normalized()
 	var camera_distance: float = max(visual_bounds.size.length() * 2.5, 4.0)
+	if camera_distance <= 4.0:
+		camera_distance = 4.00001
 	var camera_position: Vector3 = staged_camera_target + locked_direction * camera_distance
 	var camera_parent: Node3D = review_camera.get_parent_node_3d()
 	var camera_parent_transform: Transform3D = _harness_transform(camera_parent) if camera_parent != null else Transform3D.IDENTITY
@@ -599,6 +604,7 @@ func _capture_contextual_visibility() -> Dictionary:
 	var final_image: Image = capture_viewport.get_texture().get_image()
 	return {
 		"evidence": _contextual_visibility_evidence(reference_image, final_image),
+		"reference_image": reference_image,
 		"image": final_image,
 	}
 
@@ -618,7 +624,12 @@ func _capture_after_frames() -> void:
 		_fail("contextual visual visibility evidence failed")
 		return
 	var image: Image = contextual_capture.get("image", null)
-	if image == null or image.get_size() != IMAGE_SIZE:
+	var reference_image: Image = contextual_capture.get("reference_image", null)
+	var staged_image: Image = staged_silhouette_image
+	if image == null or reference_image == null or staged_image == null:
+		_fail("pixel evidence images are missing")
+		return
+	if image.get_size() != IMAGE_SIZE or reference_image.get_size() != IMAGE_SIZE or staged_image.get_size() != IMAGE_SIZE:
 		_fail("viewport capture was not 1600x900")
 		return
 	if not _has_visible_variance(image):
@@ -628,6 +639,16 @@ func _capture_after_frames() -> void:
 	var directory_error: Error = DirAccess.make_dir_recursive_absolute(output_parent)
 	if directory_error != OK and directory_error != ERR_ALREADY_EXISTS:
 		_fail("could not create capture output directory")
+		return
+	var staged_output_path: String = output_path.get_basename() + "-staged.png"
+	var reference_output_path: String = output_path.get_basename() + "-reference.png"
+	var staged_save_error: Error = staged_image.save_png(staged_output_path)
+	if staged_save_error != OK:
+		_fail("staged PNG capture failed error=%d" % staged_save_error)
+		return
+	var reference_save_error: Error = reference_image.save_png(reference_output_path)
+	if reference_save_error != OK:
+		_fail("reference PNG capture failed error=%d" % reference_save_error)
 		return
 	var save_error: Error = image.save_png(output_path)
 	if save_error != OK:
