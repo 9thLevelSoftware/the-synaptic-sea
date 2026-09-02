@@ -1223,7 +1223,6 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
 
     task_dir = Path(glb_path).parent
     contract_path = task_dir / "contract.json"
-    report_path = task_dir / "blender-validation.json"
     command = [
         BLENDER_PATH,
         "--background",
@@ -1239,9 +1238,9 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
         str(task_dir),
         "--glb",
         str(glb_path),
-        "--report",
-        str(report_path),
-        "--verify-only",
+        "--reimport-only",
+        "--expected-triangles",
+        str(expected_triangles),
     ]
     try:
         result = _run_bounded_process(command, cwd=task_dir, timeout=120.0)
@@ -1254,9 +1253,10 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
     if result.returncode != 0:
         raise BlenderValidationError("Blender re-import process failed: " + (stderr or stdout)[-4096:])
     matches = list(re.finditer(
-        r"MESHY BLENDER VALIDATION VERIFY PASS sha256=(?P<sha256>[0-9a-f]{64}) "
-        r"byte_size=(?P<byte_size>[0-9]+) triangle_count=(?P<triangle_count>[0-9]+)",
+        r"^MESHY BLENDER REIMPORT PASS sha256=(?P<sha256>[0-9a-f]{64}) "
+        r"byte_size=(?P<byte_size>[0-9]+) triangle_count=(?P<triangle_count>[0-9]+)$",
         stdout,
+        re.MULTILINE,
     ))
     if len(matches) != 1:
         raise BlenderValidationError("Blender re-import process did not emit canonical authority")
@@ -1269,6 +1269,48 @@ def _reimport_with_blender_process(glb_path: Path, expected_triangles: int) -> _
     return evidence
 
 
+def _positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("expected a positive integer")
+    return parsed
+
+
+def _reimport_only_inputs(args: argparse.Namespace) -> Tuple[Path, int]:
+    if not _is_blender_runtime():
+        raise BlenderValidationError("reimport-only requires Blender runtime")
+    try:
+        import bpy  # type: ignore  # noqa: F401
+    except Exception as exc:
+        raise BlenderValidationError("reimport-only requires Blender runtime") from exc
+    if args.glb is None:
+        raise BlenderValidationError("reimport-only requires --glb")
+    if args.expected_triangles is None:
+        raise BlenderValidationError("reimport-only requires --expected-triangles")
+    if not isinstance(args.expected_triangles, int) or isinstance(args.expected_triangles, bool) or args.expected_triangles <= 0:
+        raise BlenderValidationError("reimport-only requires positive --expected-triangles")
+    if args.report is not None:
+        raise BlenderValidationError("reimport-only does not accept --report")
+    task_dir = Path(args.task_dir).expanduser().resolve()
+    cleaned = Path(args.glb).expanduser().resolve()
+    contract_path = Path(args.contract).expanduser().resolve()
+    if cleaned != task_dir / "cleaned.glb":
+        raise BlenderValidationError("reimport-only GLB must be the exact task cleaned.glb leaf")
+    if contract_path != task_dir / "contract.json":
+        raise BlenderValidationError("reimport-only contract must be the exact task contract.json leaf")
+    for path, label in ((cleaned, "cleaned.glb"), (contract_path, "contract.json")):
+        try:
+            info = os.lstat(path)
+        except OSError as exc:
+            raise BlenderValidationError("reimport-only " + label + " is missing") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise BlenderValidationError("reimport-only " + label + " must be a regular file")
+    return cleaned, args.expected_triangles
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, required=True)
@@ -1276,7 +1318,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task-dir", type=Path, required=True)
     parser.add_argument("--glb", type=Path, required=False)
     parser.add_argument("--report", type=Path, required=False)
-    parser.add_argument("--verify-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--verify-only", action="store_true")
+    mode.add_argument("--reimport-only", action="store_true")
+    parser.add_argument("--expected-triangles", type=_positive_integer, required=False)
     return parser
 
 
@@ -1333,6 +1378,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 )
             )
             return 0
+        if args.reimport_only:
+            cleaned, expected_triangles = _reimport_only_inputs(args)
+            evidence = _reimport_with_blender(cleaned, expected_triangles)
+            print(
+                "MESHY BLENDER REIMPORT PASS sha256={0} byte_size={1} triangle_count={2}".format(
+                    evidence.sha256, evidence.byte_size, evidence.triangle_count
+                )
+            )
+            return 0
+        if args.expected_triangles is not None:
+            raise BlenderValidationError("--expected-triangles requires --reimport-only")
         contract, cleaned, report_path = _resolve_task_inputs(args.project_root, args.contract, args.task_dir, args.glb, args.report)
         report = validate_cleaned_glb(cleaned, contract, task_id=cleaned.parent.name)
         report["blender_reimport_passed"] = True

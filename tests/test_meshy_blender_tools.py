@@ -873,8 +873,8 @@ def test_report_writer_recomputes_all_semantics_and_rejects_host_boolean(tmp_pat
     monkeypatch.undo()
     honest = validate_cleaned_glb(task_dir / "cleaned.glb", contract, task_id=task_dir.name)
     honest["blender_reimport_passed"] = True
-    with pytest.raises(BlenderValidationError, match="runtime|re-import"):
-        write_validation_report(project_root, task_dir, honest)
+    write_validation_report(project_root, task_dir, honest)
+    assert json.loads((task_dir / "blender-validation.json").read_text()) == honest
 
 
 def test_verify_validation_report_has_no_caller_reimport_authority(contract) -> None:
@@ -1293,3 +1293,101 @@ def test_validate_rejects_non_affine_glb_matrix(contract, tmp_path: Path) -> Non
     path.write_bytes(_pack_glb(document, binary))
     with pytest.raises(ValueError, match="affine|matrix"):
         validate_cleaned_glb(path, contract)
+
+
+def test_validate_reimport_only_parser_requires_positive_triangles(tmp_path: Path) -> None:
+    base = [
+        "--project-root", str(tmp_path), "--contract", str(tmp_path / "contract.json"),
+        "--task-dir", str(tmp_path), "--glb", str(tmp_path / "cleaned.glb"),
+    ]
+    args = build_validate_parser().parse_args(base + ["--reimport-only", "--expected-triangles", "1"])
+    assert args.reimport_only is True
+    assert args.expected_triangles == 1
+    with pytest.raises(SystemExit):
+        build_validate_parser().parse_args(base + ["--reimport-only", "--expected-triangles", "0"])
+    with pytest.raises(SystemExit):
+        build_validate_parser().parse_args(base + ["--verify-only", "--reimport-only", "--expected-triangles", "1"])
+
+
+def test_validate_reimport_process_uses_distinct_marker_and_no_report(tmp_path: Path, monkeypatch) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    glb_path = task_dir / "cleaned.glb"
+    command_calls = []
+    marker = "MESHY BLENDER REIMPORT PASS sha256={0} byte_size=12 triangle_count=1\n".format("a" * 64)
+
+    def fake_run(command, cwd, timeout):
+        command_calls.append((command, cwd, timeout))
+        return SimpleNamespace(returncode=0, stdout=marker, stderr="")
+
+    monkeypatch.setattr(master_module, "_run_bounded_process", fake_run)
+    evidence = validate_module._reimport_with_blender_process(glb_path, 1)
+
+    assert evidence == validate_module._BlenderReimportEvidence("a" * 64, 12, 1)
+    command, cwd, timeout = command_calls[0]
+    assert cwd == task_dir
+    assert timeout == 120.0
+    assert "--reimport-only" in command
+    assert command[command.index("--expected-triangles") + 1] == "1"
+    assert "--report" not in command
+
+
+def test_validate_reimport_only_rejects_host_python(tmp_path: Path) -> None:
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        "/usr/bin/python3", str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"),
+        "--project-root", str(project_root), "--contract", str(task_dir / "contract.json"),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--reimport-only", "--expected-triangles", "1",
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT)
+    result = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert "requires Blender runtime" in result.stderr
+    assert not report_path.exists()
+
+
+def test_real_blender_reimport_only_emits_evidence_without_report(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", BLENDER_PATH))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        str(blender), "--background", "--factory-startup", "--python",
+        str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"), "--",
+        "--project-root", str(project_root), "--contract", str(task_dir / "contract.json"),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--reimport-only", "--expected-triangles", "1",
+    ]
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("MESHY BLENDER REIMPORT PASS") == 1
+    assert not report_path.exists()
+
+
+def test_host_python_cli_publishes_report_after_blender_reimport(tmp_path: Path) -> None:
+    blender = Path(os.environ.get("BLENDER", BLENDER_PATH))
+    assert blender.is_file() and os.access(blender, os.X_OK)
+    host_python = Path("/usr/bin/python3")
+    assert host_python.is_file() and os.access(host_python, os.X_OK)
+    project_root, task_dir, _contract = _bound_fixture_task(tmp_path)
+    report_path = task_dir / "blender-validation.json"
+    command = [
+        str(host_python), str(MASTER_SCRIPT.parent / "meshy_blender_validate.py"),
+        "--project-root", str(project_root), "--contract", str(CONTRACT_PATH),
+        "--task-dir", str(task_dir), "--glb", str(task_dir / "cleaned.glb"),
+        "--report", str(report_path),
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT)
+    result = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, (
+        "host validator failed: returncode={0} stderr={1!r} stdout={2!r} report_exists={3}".format(
+            result.returncode, result.stderr, result.stdout, report_path.exists()
+        )
+    )
+    assert report_path.is_file()
+    persisted = json.loads(report_path.read_text(encoding="utf-8"))
+    assert persisted["blender_reimport_passed"] is True
