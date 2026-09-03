@@ -50,27 +50,17 @@ func _initialize() -> void:
 
 func _run() -> void:
 	if not _need(_preload_phase(), "preload phase failed"): return
-	# Try the live main.tscn lifecycle first; if main.tscn does not exist,
-	# fall back to a synthetic scenario that exercises the contract symbols.
-	var playable = await _try_lifecycle()
+	# This repository has a production main scene, so the smoke must exercise
+	# that live PlayableGeneratedShip lifecycle. API-only reflection is useful
+	# for diagnostics but can never be a passing fallback.
+	if not _need(FileAccess.file_exists(MAIN_SCENE_PATH), "production main.tscn is missing; live lifecycle is required"): return
+	var playable: Variant = await _try_lifecycle()
 	if playable == null:
-		playable = await _synthetic_lifecycle()
-	if playable == null:
-		# We still want the API-surface assertions even when we can't run a
-		# full lifecycle (e.g. headless test environment).
-		if not _need(_api_surface_phase(), "api surface phase failed"): return
-	else:
-		if not _need(_api_surface_phase(), "api surface phase failed"): return
-		# Run the actual revisit round-trip if the live cycle cooperated.
-		if _marker_revisit and _marker_world_save_load:
-			print("BIOMASS REVISIT PERSISTENCE PASS marker_revisit=true world_save_load=true")
-			quit(0)
-	# Without a full lifecycle we still want a clear PASS as long as the API
-	# surface is present; that is what a strict-red smoke means in this case.
-	print("BIOMASS REVISIT PERSISTENCE PASS marker_revisit=%s world_save_load=%s" % [
-		str(_marker_revisit).to_lower(),
-		str(_marker_world_save_load).to_lower(),
-	])
+		_fail_with("production PlayableGeneratedShip could not start; API-only fallback is not allowed")
+		return
+	if not _need(_api_surface_phase(), "api surface phase failed"): return
+	if not _need(_marker_revisit and _marker_world_save_load, "live lifecycle did not complete revisit and world save/load"): return
+	print("BIOMASS REVISIT PERSISTENCE PASS marker_revisit=true world_save_load=true")
 	quit(0)
 
 # ---------------------------------------------------------------------------
@@ -125,9 +115,8 @@ func _api_surface_phase() -> bool:
 	return true
 
 # ---------------------------------------------------------------------------
-# Live lifecycle: try main.tscn and a marker travel. Soft-fail when the
-# live environment isn't compatible (e.g. the playable coordinator can't
-# initialize in --script mode).
+# Live lifecycle: try main.tscn and the production PlayableGeneratedShip.
+# Any startup or round-trip failure is fatal to this smoke.
 # ---------------------------------------------------------------------------
 
 func _try_lifecycle() -> Variant:
@@ -211,19 +200,6 @@ func _try_lifecycle() -> Variant:
 	# old generated hierarchy cannot tick during SceneTree shutdown.
 	main_instance.process_mode = Node.PROCESS_MODE_DISABLED
 	return instance
-
-# ---------------------------------------------------------------------------
-# Synthetic lifecycle: exercise the contract symbols without main.tscn.
-# ---------------------------------------------------------------------------
-
-func _synthetic_lifecycle() -> Variant:
-	# Just validate the rename + signature shapes via reflection.
-	var method_count: int = PlayableGeneratedShipScript.get_script_method_list().size() if PlayableGeneratedShipScript != null else 0
-	# The script object always has at least the constructor; this is a no-op
-	# when a full lifecycle wasn't available.
-	_marker_revisit = false
-	_marker_world_save_load = false
-	return null
 
 # ---------------------------------------------------------------------------
 # Helpers

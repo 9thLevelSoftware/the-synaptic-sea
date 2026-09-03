@@ -969,6 +969,53 @@ def test_validator_accepts_a_valid_compiler_plan(tmp_path: Path):
     assert "PROCGEN VALIDATOR PROBE PASS" in output
 
 
+def test_validator_accepts_distinct_solid_boundary_beside_portal_same_room_pair(
+    tmp_path: Path,
+):
+    result = _run_validator_probe(
+        tmp_path,
+        """
+        var topology: Dictionary = {
+            "rooms": [
+                {"id": "A", "deck": 0, "cells": [[0, 0], [0, 1]]},
+                {"id": "B", "deck": 0, "cells": [[1, 0], [1, 1]]},
+            ],
+            "portals": [{
+                "from_room": "A",
+                "to_room": "B",
+                "type": "door",
+                "required": true,
+                "edge_key": "0|v|0|0",
+            }],
+        }
+        var plan: Dictionary = Compiler.new().compile(topology)
+        var solid_edge: Dictionary = plan["edges"].get("0|v|1|0", {})
+        if String(solid_edge.get("kind", "")) != "SOLID":
+            _fail("wide shared boundary did not retain its distinct SOLID segment")
+        if solid_edge.get("room_ids", []) != ["A", "B"]:
+            _fail("distinct SOLID segment lost its shared room pair")
+        var portal_edge: Dictionary = plan["edges"].get("0|v|0|0", {})
+        if String(portal_edge.get("kind", "")) != "DOOR":
+            _fail("wide shared boundary portal was not compiled as DOOR")
+        var verdict: Dictionary = Validator.new().validate(plan, topology)
+        if not bool(verdict.get("ok", false)):
+            _fail("distinct SOLID beside portal was rejected: " + JSON.stringify(verdict.get("errors", [])))
+        var reversed_topology: Dictionary = topology.duplicate(true)
+        var reversed_portal: Dictionary = (reversed_topology["portals"][0] as Dictionary).duplicate(true)
+        reversed_portal.erase("edge_key")
+        reversed_portal["from_room"] = "B"
+        reversed_portal["to_room"] = "A"
+        reversed_portal["from_cell"] = [1, 0]
+        reversed_portal["to_cell"] = [0, 0]
+        reversed_topology["portals"] = [reversed_portal]
+        var reversed_verdict: Dictionary = Validator.new().validate(plan, reversed_topology)
+        if not bool(reversed_verdict.get("ok", false)):
+            _fail("reversed topology portal orientation was rejected: " + JSON.stringify(reversed_verdict.get("errors", [])))
+        """,
+    )
+    _assert_validator_probe_passed(result)
+
+
 def test_validator_rejects_duplicate_edge_placement_as_nonzero_probe(tmp_path: Path):
     body = """
     var topology: Dictionary = {
@@ -1034,9 +1081,16 @@ def test_validator_rejects_required_portal_blocked_by_solid_as_nonzero_probe(tmp
         if String(placement.get("edge_key", "")) == "0|v|0|0":
             placement["kind"] = "SOLID"
             placement["state"] = "SOLID"
-    """ + _validator_case_body("blocked-required-portal", "plan", "topology-connected")
+    """ + _validator_case_body(
+        "blocked-required-portal",
+        "plan",
+        "topology-connected rooms blocked by SOLID edge: 0|v|0|0",
+    )
     result = _run_validator_probe(tmp_path, body)
-    _assert_validator_probe_failed(result, "topology-connected")
+    _assert_validator_probe_failed(
+        result,
+        "topology-connected rooms blocked by SOLID edge: 0|v|0|0",
+    )
 
 
 def test_validator_rejects_strict_portal_and_reachability_contracts_with_distinct_errors(

@@ -1326,25 +1326,20 @@ func _validate_placement_reconciliation(plan: Dictionary, topology: Dictionary, 
 					errors.append("edge endpoint leaves occupancy: %s" % edge_key_value)
 		# Detect SOLID edges that override a topology-connected portal
 		# contract. The validator never silently downgrades a required
-		# portal to a wall — it must surface the topology mismatch.
-		# Topology portals are matched either as (from->to) or (to->from)
-		# because the compiler picks the owner_room from whichever side
-		# owns the cell at the time of stamping.
+		# portal to a wall — it must surface the topology mismatch. Match
+		# the canonical edge identity, not just the room pair: a wide shared
+		# boundary may contain a portal and distinct SOLID segments. The
+		# topology edge-key helper normalizes either endpoint orientation.
 		if canonical_kind == "SOLID" and placement_kind == "SOLID":
-			var room_ids_variant: Variant = canonical.get("room_ids", [])
-			if typeof(room_ids_variant) == TYPE_ARRAY and (room_ids_variant as Array).size() == 2:
-				var owner_room_id: String = str((room_ids_variant as Array)[0])
-				var other_room_id: String = str((room_ids_variant as Array)[1])
-				if not owner_room_id.is_empty() and not other_room_id.is_empty():
-					var topology_portal: Variant = topology.get("portals", [])
-					if typeof(topology_portal) == TYPE_ARRAY:
-						for tp in (topology_portal as Array):
-							if typeof(tp) != TYPE_DICTIONARY:
-								continue
-							var tp_dict: Dictionary = tp
-							if str(tp_dict.get("from_room", "")) == owner_room_id and str(tp_dict.get("to_room", "")) == other_room_id:
-								errors.append("topology-connected rooms blocked by SOLID edge: %s" % edge_key_value)
-								break
+			var topology_portals_variant: Variant = topology.get("portals", [])
+			if typeof(topology_portals_variant) == TYPE_ARRAY:
+				for topology_portal_variant in (topology_portals_variant as Array):
+					if typeof(topology_portal_variant) != TYPE_DICTIONARY:
+						continue
+					var topology_portal: Dictionary = topology_portal_variant
+					if _topology_portal_edge_key(topology_portal, topology) == edge_key_value:
+						errors.append("topology-connected rooms blocked by SOLID edge: %s" % edge_key_value)
+						break
 		# room_ids must remain a known room (non-empty) and the other_room must
 		# not be a ghost room.
 		var room_ids_variant: Variant = placement.get("room_ids", canonical.get("room_ids", []))
@@ -1386,3 +1381,49 @@ func _room_id_known(plan: Dictionary, room_id: String) -> bool:
 		if str((record_variant as Dictionary).get("room_id", "")) == room_id:
 			return true
 	return false
+
+
+# Returns the canonical edge identity for a topology portal. Explicit edge_key
+# is authoritative; older topology records carry only endpoint cells, so derive
+# the same normalized identity from either (from_cell -> to_cell) orientation.
+func _topology_portal_edge_key(portal: Dictionary, topology: Dictionary) -> String:
+	var explicit_edge_key: String = str(portal.get("edge_key", ""))
+	if not explicit_edge_key.is_empty():
+		return explicit_edge_key
+
+	var room_decks: Dictionary = _room_decks(topology)
+	var from_room: String = str(portal.get("from_room", ""))
+	var from_default_deck: int = int(room_decks.get(from_room, -1))
+	if _is_integer(portal.get("deck", null)):
+		from_default_deck = int(portal.get("deck"))
+
+	# Logical-boundary records may provide a canonical edge cell/direction even
+	# when their logical endpoints are diagonal or otherwise non-adjacent.
+	var edge_direction: String = str(portal.get("edge_direction", portal.get("direction", "")))
+	if CompilerScript.DIRECTIONS.has(edge_direction):
+		var edge_cell_info: Dictionary = _read_cell(portal.get("edge_cell", portal.get("cell", null)), from_default_deck)
+		if bool(edge_cell_info.get("ok", false)):
+			return CompilerScript.edge_key(
+				int(edge_cell_info["deck"]), edge_cell_info["cell"], edge_direction)
+
+	var to_room: String = str(portal.get("to_room", ""))
+	var to_default_deck: int = int(room_decks.get(to_room, from_default_deck))
+	var from_cell_value: Variant = portal.get("from_cell", portal.get("logical_from_cell", null))
+	var to_cell_value: Variant = portal.get("to_cell", portal.get("logical_to_cell", null))
+	var source_cells_variant: Variant = portal.get("source_cells", null)
+	if typeof(source_cells_variant) == TYPE_ARRAY and (source_cells_variant as Array).size() >= 2:
+		from_cell_value = (source_cells_variant as Array)[0]
+		to_cell_value = (source_cells_variant as Array)[1]
+	var from_info: Dictionary = _read_cell(from_cell_value, from_default_deck)
+	var to_info: Dictionary = _read_cell(to_cell_value, to_default_deck)
+	if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
+		return ""
+	if int(from_info["deck"]) != int(to_info["deck"]):
+		return ""
+
+	var delta: Vector2i = to_info["cell"] - from_info["cell"]
+	for direction_variant in CompilerScript.DIRECTIONS.keys():
+		var direction: String = str(direction_variant)
+		if CompilerScript.DIRECTIONS[direction] == delta:
+			return CompilerScript.edge_key(int(from_info["deck"]), from_info["cell"], direction)
+	return ""
