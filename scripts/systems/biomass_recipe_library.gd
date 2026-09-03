@@ -2,7 +2,23 @@ extends RefCounted
 class_name BiomassRecipeLibrary
 
 const RecipeScript: GDScript = preload("res://scripts/systems/biomass_recipe.gd")
+const PartCatalogScript: GDScript = preload("res://scripts/systems/biomass_part_catalog.gd")
 const CATALOG_FIELDS: Array[String] = ["schema_version", "document_kind", "recipes", "archetype_pools"]
+const CANONICAL_RECIPE_IDS: Array[String] = [
+	"biped_puppet_v1",
+	"four_legged_scrambler_v1",
+	"intestinal_dragger_v1",
+	"tendril_knot_v1",
+	"tripod_hound_v1",
+]
+const CANONICAL_ARCHETYPE_IDS: Array[String] = [
+	"biomatter_swarm",
+	"drone_swarm",
+	"hull_tendril",
+	"mimic",
+	"puppet_corpse",
+	"stalker",
+]
 
 var _recipes: Dictionary = {}
 var _pools: Dictionary = {}
@@ -10,7 +26,7 @@ var _pools: Dictionary = {}
 func load_path(path: String, parts: Variant) -> bool:
 	_recipes.clear()
 	_pools.clear()
-	if parts == null:
+	if not parts is Object or parts.get_script() != PartCatalogScript:
 		return false
 	var text: String = FileAccess.get_file_as_string(path)
 	if text.is_empty():
@@ -29,6 +45,8 @@ func load_path(path: String, parts: Variant) -> bool:
 		return false
 	var recipe_records: Dictionary = recipes_value
 	var pool_records: Dictionary = pools_value
+	if not _has_exact_keys(recipe_records, CANONICAL_RECIPE_IDS) or not _has_exact_keys(pool_records, CANONICAL_ARCHETYPE_IDS):
+		return false
 	if recipe_records.is_empty() or pool_records.is_empty():
 		return false
 
@@ -93,6 +111,17 @@ func pool_for(archetype_id: String) -> PackedStringArray:
 	if value is PackedStringArray:
 		return (value as PackedStringArray).duplicate()
 	return PackedStringArray()
+
+func _has_exact_keys(value: Dictionary, keys: Array[String]) -> bool:
+	if value.size() != keys.size():
+		return false
+	for key in keys:
+		if not value.has(key):
+			return false
+	for actual_key in value.keys():
+		if not actual_key is String or not keys.has(actual_key):
+			return false
+	return true
 
 func _has_exact_fields(value: Dictionary, fields: Array[String]) -> bool:
 	if value.size() != fields.size():

@@ -1,6 +1,7 @@
 extends RefCounted
 class_name BiomassRecipe
 
+const PartCatalogScript: GDScript = preload("res://scripts/systems/biomass_part_catalog.gd")
 const SUPPORTED_LOCOMOTION: Array[String] = ["biped", "quadruped", "crawl", "drag", "slither"]
 const CONNECTOR_PART_ID: String = "biomass_gunk_connector_v1"
 const RECIPE_FIELDS: Array[String] = ["recipe_id", "locomotion_hint", "core", "attachments"]
@@ -24,7 +25,7 @@ static func from_dict(document: Dictionary, catalog: Variant) -> BiomassRecipe:
 	if not _has_exact_fields(document, RECIPE_FIELDS, "recipe", errors):
 		recipe._set_invalid(errors)
 		return recipe
-	if catalog == null:
+	if not catalog is Object or catalog.get_script() != PartCatalogScript:
 		errors.append("part_catalog: catalog is required")
 		recipe._set_invalid(errors)
 		return recipe
@@ -158,11 +159,9 @@ static func from_dict(document: Dictionary, catalog: Variant) -> BiomassRecipe:
 			elif not child_part.is_empty() and catalog.socket(child_part_id, "root_0").is_empty():
 				errors.append("%s.child_socket: child part is missing root socket" % path)
 
-			if not instance_id.is_empty() and not seen_instances.has(instance_id):
+			if parent_is_seen and not instance_id.is_empty() and not seen_instances.has(instance_id):
 				seen_instances[instance_id] = child_part_id
-				var child_depth: int = int(limits.get("max_depth", 0)) + 1
-				if parent_is_seen:
-					child_depth = int(depths.get(parent_id, int(limits.get("max_depth", 0)) + 1)) + 1
+				var child_depth: int = int(depths.get(parent_id, int(limits.get("max_depth", 0)) + 1)) + 1
 				depths[instance_id] = child_depth
 				if not child_part.is_empty():
 					occurrences.append(child_part)

@@ -34,6 +34,14 @@ const ARCHETYPE_IDS: Array[String] = [
 	"puppet_corpse",
 	"stalker",
 ]
+const EXPECTED_POOLS: Dictionary = {
+	"biomatter_swarm": ["intestinal_dragger_v1", "tripod_hound_v1"],
+	"drone_swarm": ["tendril_knot_v1", "tripod_hound_v1"],
+	"hull_tendril": ["intestinal_dragger_v1", "tendril_knot_v1"],
+	"mimic": ["four_legged_scrambler_v1", "tripod_hound_v1"],
+	"puppet_corpse": ["biped_puppet_v1", "tripod_hound_v1"],
+	"stalker": ["biped_puppet_v1", "four_legged_scrambler_v1"],
+}
 
 func _initialize() -> void:
 	_cleanup_temp_files()
@@ -107,7 +115,9 @@ func _recipe_library_checks(recipes: Variant, parts: Variant) -> bool:
 	if not _need(independent.is_valid() and independent.to_dict().get("core").get("part_id") == "biomass_humanoid_torso_v1", "recipe retained caller-owned input"): return false
 	for archetype_id in ARCHETYPE_IDS:
 		var pool: PackedStringArray = recipes.pool_for(archetype_id)
-		if not _need(pool.size() == 2 and pool == _sorted_pool(pool), "pool is missing, unsorted, or aliased %s" % archetype_id): return false
+		var expected_pool: PackedStringArray = PackedStringArray(EXPECTED_POOLS[archetype_id])
+		expected_pool.sort()
+		if not _need(pool.size() == 2 and pool == expected_pool and pool == _sorted_pool(pool), "pool is missing, unsorted, or has wrong membership %s" % archetype_id): return false
 		var mutated: PackedStringArray = pool
 		mutated[0] = "mutated"
 		if not _need(recipes.pool_for(archetype_id)[0] != "mutated", "pool_for leaked mutable state"): return false
@@ -118,11 +128,21 @@ func _invalid_recipe_checks(recipes: Variant, parts: Variant) -> bool:
 	var base: Dictionary = recipes.get_recipe("biped_puppet_v1").to_dict()
 	var unknown_part: Dictionary = base.duplicate(true)
 	unknown_part["attachments"][0]["part_id"] = "unknown_part"
-	if not _expect_invalid(unknown_part, parts, "unknown part"): return false
+	if not _expect_stable_invalid(unknown_part, parts, "unknown part"): return false
 
 	var forward_parent: Dictionary = base.duplicate(true)
 	forward_parent["attachments"][0]["parent_instance_id"] = "later"
 	if not _expect_invalid(forward_parent, parts, "forward parent"): return false
+
+	var forward_chain: Dictionary = base.duplicate(true)
+	forward_chain["attachments"][0]["instance_id"] = "rejected_child"
+	forward_chain["attachments"][0]["parent_instance_id"] = "later"
+	forward_chain["attachments"][1]["parent_instance_id"] = "rejected_child"
+	var forward_chain_recipe: Variant = RecipeScript.from_dict(forward_chain, parts)
+	if not _need(forward_chain_recipe != null and not forward_chain_recipe.is_valid(), "forward chain was accepted"): return false
+	var forward_chain_diagnostics: PackedStringArray = forward_chain_recipe.diagnostics()
+	if not _need(forward_chain_diagnostics.has("recipe.attachments[0].parent_instance_id: parent-before-child reference required"), "first forward chain edge was not diagnosed"): return false
+	if not _need(forward_chain_diagnostics.has("recipe.attachments[1].parent_instance_id: parent-before-child reference required"), "second forward chain edge was not diagnosed"): return false
 
 	var duplicate_occupancy: Dictionary = base.duplicate(true)
 	duplicate_occupancy["attachments"][1]["parent_socket"] = duplicate_occupancy["attachments"][0]["parent_socket"]
@@ -165,6 +185,24 @@ func _expect_invalid(document: Dictionary, parts: Variant, label: String) -> boo
 	if not _need(recipe.to_dict().is_empty(), "%s retained invalid input" % label): return false
 	return true
 
+func _expect_stable_invalid(document: Dictionary, parts: Variant, label: String) -> bool:
+	var first: Variant = RecipeScript.from_dict(document, parts)
+	var second: Variant = RecipeScript.from_dict(document, parts)
+	if not _need(first != null and second != null and not first.is_valid() and not second.is_valid(), "%s was accepted" % label): return false
+	var first_diagnostics: PackedStringArray = first.diagnostics()
+	var second_diagnostics: PackedStringArray = second.diagnostics()
+	if not _need(not first_diagnostics.is_empty(), "%s had no diagnostics" % label): return false
+	if not _need(first_diagnostics == second_diagnostics, "%s diagnostics were not stable" % label): return false
+	var sorted: PackedStringArray = first_diagnostics.duplicate()
+	sorted.sort()
+	if not _need(first_diagnostics == sorted, "%s diagnostics were not sorted" % label): return false
+	var seen: Dictionary = {}
+	for diagnostic in first_diagnostics:
+		if not _need(not seen.has(diagnostic), "%s diagnostics were not deduplicated" % label): return false
+		seen[diagnostic] = true
+	if not _need(first.to_dict().is_empty() and second.to_dict().is_empty(), "%s retained invalid input" % label): return false
+	return true
+
 func _loader_failure_checks(parts: Variant) -> bool:
 	if not _need(not parts.load_path("res://data/combat/biomass_part_catalog_missing.json"), "missing part catalog was accepted"): return false
 	if not _need(parts.get_part("biomass_human_arm_v1").is_empty() and parts.find_by_role("locomotor").is_empty(), "part loader retained state after missing input"): return false
@@ -174,11 +212,53 @@ func _loader_failure_checks(parts: Variant) -> bool:
 	return true
 
 func _recipe_loader_failure_checks(recipes: Variant, parts: Variant) -> bool:
+	var canonical_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(RECIPES_PATH))
+	if not _need(canonical_variant is Dictionary, "canonical recipe catalog fixture did not parse"): return false
+	var canonical: Dictionary = canonical_variant
+
+	var missing_recipe: Dictionary = canonical.duplicate(true)
+	var missing_recipe_records: Dictionary = missing_recipe["recipes"]
+	missing_recipe_records.erase("biped_puppet_v1")
+	var missing_recipe_pools: Dictionary = missing_recipe["archetype_pools"]
+	(missing_recipe_pools["stalker"] as Array).erase("biped_puppet_v1")
+	(missing_recipe_pools["puppet_corpse"] as Array).erase("biped_puppet_v1")
+	if not _expect_recipe_library_rejected(recipes, missing_recipe, parts, "missing recipe key"): return false
+
+	var extra_recipe: Dictionary = canonical.duplicate(true)
+	var extra_recipe_records: Dictionary = extra_recipe["recipes"]
+	var extra_recipe_value: Dictionary = extra_recipe_records["biped_puppet_v1"].duplicate(true)
+	extra_recipe_value["recipe_id"] = "unexpected_recipe_v1"
+	extra_recipe_records["unexpected_recipe_v1"] = extra_recipe_value
+	if not _expect_recipe_library_rejected(recipes, extra_recipe, parts, "extra recipe key"): return false
+
+	var missing_pool: Dictionary = canonical.duplicate(true)
+	var missing_pool_records: Dictionary = missing_pool["archetype_pools"]
+	missing_pool_records.erase("stalker")
+	if not _expect_recipe_library_rejected(recipes, missing_pool, parts, "missing archetype pool key"): return false
+
+	var extra_pool: Dictionary = canonical.duplicate(true)
+	var extra_pool_records: Dictionary = extra_pool["archetype_pools"]
+	extra_pool_records["unexpected_archetype"] = ["biped_puppet_v1"]
+	if not _expect_recipe_library_rejected(recipes, extra_pool, parts, "extra archetype pool key"): return false
+
+	if not _need(recipes.load_path(RECIPES_PATH, parts), "canonical recipe catalog did not reload after key mutations"): return false
+	var valid_document: Dictionary = recipes.get_recipe("biped_puppet_v1").to_dict()
+	if not _expect_stable_invalid(valid_document, {}, "missing runtime catalog"): return false
+	var untyped_library: Variant = RecipeLibraryScript.new()
+	if not _need(not untyped_library.load_path(RECIPES_PATH, {}), "recipe library accepted an untyped catalog"): return false
+	if not _need(untyped_library.recipe_ids().is_empty() and untyped_library.pool_for("stalker").is_empty(), "recipe library retained state after untyped catalog"): return false
+
 	if not _need(not recipes.load_path("res://data/combat/biomass_recipe_catalog_missing.json", parts), "missing recipe catalog was accepted"): return false
 	if not _need(recipes.get_recipe("biped_puppet_v1") == null and recipes.recipe_ids().is_empty(), "recipe loader retained state after missing input"): return false
 	if not _write_text(TEMP_RECIPES_PATH, "{}"): return false
 	if not _need(not recipes.load_path(TEMP_RECIPES_PATH, parts), "malformed recipe catalog was accepted"): return false
 	if not _need(recipes.get_recipe("biped_puppet_v1") == null and recipes.recipe_ids().is_empty(), "recipe loader retained state after malformed input"): return false
+	return true
+
+func _expect_recipe_library_rejected(recipes: Variant, document: Dictionary, parts: Variant, label: String) -> bool:
+	if not _write_text(TEMP_RECIPES_PATH, JSON.stringify(document)): return false
+	if not _need(not recipes.load_path(TEMP_RECIPES_PATH, parts), "%s was accepted" % label): return false
+	if not _need(recipes.recipe_ids().is_empty() and recipes.get_recipe("biped_puppet_v1") == null and recipes.pool_for("stalker").is_empty(), "%s retained library state" % label): return false
 	return true
 
 func _edge(instance_id: String, part_id: String, parent_id: String, socket_name: String) -> Dictionary:
