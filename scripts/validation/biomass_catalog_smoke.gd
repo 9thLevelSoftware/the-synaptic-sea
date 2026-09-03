@@ -210,26 +210,42 @@ func _loader_failure_checks(parts: Variant) -> bool:
 	if not _need(not parts.load_path(TEMP_PARTS_PATH), "malformed part catalog was accepted"): return false
 	if not _need(parts.get_part("biomass_human_arm_v1").is_empty(), "part loader retained state after malformed input"): return false
 
-	var canonical_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(PARTS_PATH))
-	if not _need(canonical_variant is Dictionary, "canonical part catalog fixture did not parse"): return false
-	var canonical: Dictionary = canonical_variant
-	var float_budget: Dictionary = canonical.duplicate(true)
-	var float_budget_parts: Dictionary = float_budget["parts"]
-	var float_budget_part: Dictionary = float_budget_parts["biomass_human_arm_v1"]
-	float_budget_part["triangle_budget"] = 2500.0
-	if not _expect_part_catalog_rejected(parts, float_budget, "integral float triangle budget"): return false
+	var canonical_text: String = FileAccess.get_file_as_string(PARTS_PATH)
+	if not _need(not canonical_text.is_empty(), "canonical part catalog fixture was empty"): return false
 
-	var float_limit: Dictionary = canonical.duplicate(true)
-	var float_limit_values: Dictionary = float_limit["limits"]
-	float_limit_values["max_attachments"] = 8.0
-	if not _expect_part_catalog_rejected(parts, float_limit, "integral float fixed limit"): return false
+	var float_budget_text: String = _replace_exact_once(canonical_text, "\"triangle_budget\": 2500", "\"triangle_budget\": 2500.0", "integral float triangle budget")
+	if not _expect_part_catalog_rejected(parts, float_budget_text, "integral float triangle budget"): return false
 
-	if not _need(parts.load_path(PARTS_PATH), "canonical part catalog did not reload after numeric mutations"): return false
-	if not _need(not parts.get_part("biomass_human_arm_v1").is_empty() and not parts.find_by_role("locomotor").is_empty() and not parts.limits().is_empty(), "canonical part catalog state was not restored after numeric mutations"): return false
+	var float_limit_text: String = _replace_exact_once(canonical_text, "\"max_attachments\": 8", "\"max_attachments\": 8.0", "integral float fixed limit")
+	if not _expect_part_catalog_rejected(parts, float_limit_text, "integral float fixed limit"): return false
+
+	var null_part_text: String = _replace_part_value_with_null(canonical_text, "biomass_human_arm_v1", "biomass_insect_leg_v1")
+	if not _expect_part_catalog_rejected(parts, null_part_text, "null nested part value"): return false
+
+	if not _need(parts.load_path(PARTS_PATH), "canonical part catalog did not reload after source mutations"): return false
+	if not _need(not parts.get_part("biomass_human_arm_v1").is_empty() and not parts.find_by_role("locomotor").is_empty() and not parts.limits().is_empty(), "canonical part catalog state was not restored after source mutations"): return false
 	return true
 
-func _expect_part_catalog_rejected(parts: Variant, document: Dictionary, label: String) -> bool:
-	if not _write_text(TEMP_PARTS_PATH, JSON.stringify(document)): return false
+func _replace_exact_once(text: String, marker: String, replacement: String, label: String) -> String:
+	var marker_index: int = text.find(marker)
+	if not _need(marker_index >= 0, "%s marker was absent" % label):
+		return ""
+	return text.substr(0, marker_index) + replacement + text.substr(marker_index + marker.length())
+
+func _replace_part_value_with_null(text: String, part_id: String, next_part_id: String) -> String:
+	var start_marker: String = "\"%s\": {" % part_id
+	var next_marker: String = "\"%s\": {" % next_part_id
+	var start: int = text.find(start_marker)
+	var next: int = text.find(next_marker, start + start_marker.length())
+	if not _need(start >= 0 and next >= 0, "nested part replacement markers were missing"): return ""
+	if not _need(text.count(start_marker) == 1 and text.count(next_marker) == 1, "nested part replacement markers were not unique"): return ""
+	var next_line_start: int = text.rfind("\n", next)
+	if not _need(next_line_start >= 0, "nested part replacement suffix was missing"): return ""
+	var suffix: String = text.substr(next_line_start + 1)
+	return text.substr(0, start) + "\"%s\": null,\n" % part_id + suffix
+
+func _expect_part_catalog_rejected(parts: Variant, text: String, label: String) -> bool:
+	if not _write_text(TEMP_PARTS_PATH, text): return false
 	if not _need(not parts.load_path(TEMP_PARTS_PATH), "%s was accepted" % label): return false
 	if not _need(parts.get_part("biomass_human_arm_v1").is_empty() and parts.find_by_role("locomotor").is_empty() and parts.limits().is_empty(), "%s retained part catalog state" % label): return false
 	return true

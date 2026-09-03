@@ -58,6 +58,8 @@ func load_path(path: String) -> bool:
 	var text: String = FileAccess.get_file_as_string(path)
 	if text.is_empty():
 		return false
+	if not _integer_fields_have_integer_tokens(text):
+		return false
 	var parsed: Variant = JSON.parse_string(text)
 	if not parsed is Dictionary:
 		return false
@@ -77,8 +79,6 @@ func load_path(path: String) -> bool:
 		return false
 	var parts: Dictionary = parts_value
 	if not _has_exact_keys(parts, CANONICAL_PART_IDS):
-		return false
-	if not _restore_integer_fields(document, text):
 		return false
 	for limit_name in LIMITS:
 		var actual_limit: Variant = limits.get(limit_name)
@@ -285,28 +285,27 @@ func _valid_vector(value: Variant, positive: bool) -> bool:
 			return false
 	return true
 
-func _restore_integer_fields(document: Dictionary, text: String) -> bool:
+func _integer_fields_have_integer_tokens(text: String) -> bool:
 	var integer_field_pattern: RegEx = RegEx.new()
 	var regex_error: Error = integer_field_pattern.compile("\"(?:max_attachments|max_depth|max_triangles|max_nodes|triangle_budget)\"\\s*:\\s*([^,}\\s]+)")
 	if regex_error != OK:
 		return false
-	for match in integer_field_pattern.search_all(text):
+	var matches: Array[RegExMatch] = integer_field_pattern.search_all(text)
+	if matches.size() != LIMITS.size() + CANONICAL_PART_IDS.size():
+		return false
+	for match in matches:
 		if not match.get_string(1).is_valid_int():
 			return false
-	var limits: Dictionary = document["limits"]
-	for limit_name in LIMITS:
-		limits[limit_name] = int(limits[limit_name])
-	var parts: Dictionary = document["parts"]
-	for part_id in CANONICAL_PART_IDS:
-		var part: Dictionary = parts[part_id]
-		part["triangle_budget"] = int(part["triangle_budget"])
 	return true
 
 func _valid_positive_bounded_integer(value: Variant, maximum: int) -> bool:
-	if typeof(value) != TYPE_INT:
+	var value_type: int = typeof(value)
+	if value_type != TYPE_INT and value_type != TYPE_FLOAT:
 		return false
-	var number: int = int(value)
-	return number > 0 and number <= maximum
+	var number: float = float(value)
+	if not is_finite(number) or number != floor(number):
+		return false
+	return number > 0.0 and number <= float(maximum)
 
 func _valid_albedo(value: Variant) -> bool:
 	if not value is String or value.length() != 7 or not value.begins_with("#"):
