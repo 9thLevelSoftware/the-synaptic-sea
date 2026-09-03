@@ -2113,3 +2113,33 @@ runtime source, and promotion is always a separate reviewed task.
   - Exact biomass validator CLI and focused tests.
   - `git diff -- assets/imported scenes/wrappers data/combat/threat_visual_catalog.json` remains empty during this task.
 
+## REQ-BIO-011: Governed biomass asset pipeline
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / asset governance
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Public recipe path resolution accepts only the fixed external source and live-pilot roots; test-only injected roots cannot be exposed through the CLI.
+  - The exact modes are `archive-raw`, `rehydrate-raw`, `preview`, `approve-preview`, and `publish-cleaned`; archive works without a master, rehydrate invokes neither Blender nor Meshy, and the other modes require an exact regular master.
+  - Preview writes five renders, `cleaned.preview.glb`, and a closed preview manifest; approval is no-Blender/no-provider, requires a non-empty reviewer, and immutably binds all preview, render, GLB, contract, catalog, generation, raw, archive, and master hashes.
+  - Publish requires the approval baseline, privately reproduces and compares it before writing task-local `cleaned.glb` and a closed recipe manifest; existing recipe output is exact-byte idempotent only.
+  - External coupled leaves are preflighted as mode-`0600` non-symlink regular files and published atomically under the validated external evidence directory, with rollback on injected failure.
+- Verification:
+  - `tests/test_meshy_biomass_part_recipe.py`, including mode, root, approval, baseline, symlink, idempotence, and rollback tests.
+  - `tests/test_meshy_promotion_packet.py`, `tests/test_meshy_runtime_review.py`, and `tests/test_meshy_blender_tools.py`.
+
+## REQ-BIO-012: Exact biomass evidence and reference audit
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / provenance / legal
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Task 12 requires the Task 8 proof to exist, persists exactly eight canonical plans at `assets/_staging/meshy/_plans/<asset_id>.json`, and records both `request_plan_file_sha256` and `provider_payload_sha256`.
+  - The stdlib reference audit requires PNG dimensions at least 1024×1024, opaque alpha, project-owned rights, exact `three_quarter` paths, unique regular non-symlink files, and a central connected subject with at least 90% foreground pixels, no second component at 5%, and a bounding box not touching the border.
+  - The audit manifest is canonical mode `0600`, has `status:"pass"`, records per-asset rights/path/view/hash/size/dimensions/alpha/component metrics plus contract/catalog hashes, and is required by Task 13 before any paid generation.
+  - Each biomass plan has candidate count 4, cost 5, maximum 20, `should_texture=false`; aggregate maximum is 160. No plan or audit command calls a provider or mutates runtime state.
+- Verification:
+  - `tests/test_biomass_reference_audit.py` and the explicit eight-plan/audit inventory and dry-run checks in the implementation plan.
+

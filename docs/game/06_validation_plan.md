@@ -155,6 +155,47 @@ pilot. Runtime review, the binder, and the proposal command never write live cat
 indexes, wrappers, or imported assets. The promotion packet is a proposal only and application
 requires a separate reviewed task.
 
+### Biomass Tasks 10–12 readiness and Task 14/15 ordering
+
+Before paid generation, Task 8's proof must exist and Task 12 must pass the stdlib reference audit
+for exactly eight `three_quarter` PNGs (decoded dimensions ≥1024×1024, opaque alpha, one central
+connected foreground component ≥90%, no second component ≥5%, non-border bounding box, unique
+regular non-symlink paths, project-owned rights). Persist exactly eight canonical mode-`0600` plans
+at `assets/_staging/meshy/_plans/<asset_id>.json` and the canonical mode-`0600` audit manifest; run
+each plan twice and require both parsed records to be byte-identical. Record
+`request_plan_file_sha256` and `provider_payload_sha256`; every plan has candidate count 4, cost 5,
+maximum 20, `should_texture=false`, aggregate maximum 160. The audit must report `status:"pass"`.
+
+Task 10's fixed sequence is archive raw → create the exact external Blender master → preview →
+human inspection and `--mode approve-preview --reviewer <non-empty>` → publish-cleaned. Archive
+does not require a master; rehydrate requires neither master nor Blender. Preview directly calls
+`meshy_blender_validate.validate_cleaned_glb(cleaned_preview_path, contract, task_id=...)` and runs
+the node/extras policy; the generic validator CLI/report remains after task-local `cleaned.glb`.
+Approval performs no Blender/provider work and binds the preview-manifest SHA, all five render
+hashes, preview GLB hash, and contract/catalog/generation/raw/archive/master hashes. Publish must
+privately reproduce that exact baseline and may not bypass approval; an existing recipe manifest
+is accepted only byte/hash-identically.
+
+Public path resolution accepts only `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/`
+and `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<task_id>/`; injected roots
+are test-only. All external coupled leaves are preflighted as regular non-symlink mode-`0600`
+files, staged under the validated evidence directory as the atomic allowed root, and tested for
+rollback after injected failure. Task 11 uses the exact biomass builder/writer APIs and closed
+`biomass_part_catalog_patch_v1`, `biomass_wrapper_proposal_v1`, and existing `asset_provenance`
+records; its hash matrix is generation(task/asset/contract/raw), source-raw(generation/raw/archive),
+recipe(contract/catalog/generation/raw/archive/master/cleaned/approval), Blender(task/contract/
+cleaned, `master_provenance:null`), and runtime(task/asset/contract/cleaned/Blender-report/captures).
+
+Focused readiness command:
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q \
+  tests/test_meshy_biomass_part_recipe.py tests/test_biomass_reference_audit.py \
+  tests/test_meshy_promotion_packet.py tests/test_meshy_governance.py \
+  tests/test_meshy_candidate_review.py tests/test_meshy_runtime_review.py \
+  tests/test_meshy_blender_tools.py
+```
+
 ### Existing Godot regression smokes — current commands
 
 ```bash

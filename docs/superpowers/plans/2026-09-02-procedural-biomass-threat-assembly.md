@@ -1278,13 +1278,13 @@ git commit -m "feat: enforce Godot-owned biomass sockets"
 
 **Interfaces:**
 - Consumes: selected governed task, immutable AI contract, exact matching entry/hash from `data/combat/biomass_part_catalog.json`, and—only for Blender modes—the canonical external master from `meshy_blender_master.py`.
-- Canonical external paths are fixed as `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/<asset_id>_master.blend` and `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/`; no other evidence root is accepted.
+- Canonical external paths are fixed as `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/<asset_id>_master.blend` and `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/`; no other evidence root is accepted. Public `resolve_recipe_paths(..., mode: str)` always uses those roots and exposes no root override. Tests may call private `_resolve_recipe_paths(..., trusted_roots: RecipeRoots)` only through an explicitly test-injected seam; integration uses temporary `RecipeRoots` while separately testing the unpatched production-root acceptance/rejection gate.
 - Produces:
   - `RecipePaths`
-  - `resolve_recipe_paths(project_root: Path, contract_path: Path, catalog_path: Path, expected_part_catalog_sha256: str, task_dir: Path, evidence_dir: Path) -> tuple[AssetContract, Mapping[str, Any], RecipePaths]`
+  - `resolve_recipe_paths(project_root: Path, contract_path: Path, catalog_path: Path, expected_part_catalog_sha256: str, task_dir: Path, evidence_dir: Path, mode: str) -> tuple[AssetContract, Mapping[str, Any], RecipePaths]`; allowed modes are exactly `archive-raw`, `rehydrate-raw`, `preview`, `approve-preview`, and `publish-cleaned`.
   - `build_socket_guides(catalog_entry: Mapping[str, Any]) -> tuple[SocketGuide, ...]`
   - `run_blender_recipe(paths: RecipePaths, contract: AssetContract, catalog_entry: Mapping[str, Any], mode: str) -> dict[str, Any]`
-  - One CLI with required `--project-root`, `--contract`, `--part-catalog`, `--expected-part-catalog-sha256`, `--task-dir`, `--evidence-dir`, and `--mode {archive-raw,rehydrate-raw,preview,publish-cleaned}` options.
+  - One CLI with required `--project-root`, `--contract`, `--part-catalog`, `--expected-part-catalog-sha256`, `--task-dir`, `--evidence-dir`, and `--mode {archive-raw,rehydrate-raw,preview,approve-preview,publish-cleaned}` options. `--reviewer` is optional generally and required/non-empty only for `approve-preview`; there are no CLI root options.
 
 - [ ] **Step 1: Write RED host safety and socket-spec tests**
 
@@ -1303,7 +1303,7 @@ def triangle_limits(contract: AssetContract) -> tuple[int, int]:
     return target, hard_max
 ```
 
-Biomass contracts use the object form, so their hard cap is specifically `budget.triangles.max`; integer support remains only for existing generic contracts. Add threshold tests: `triangles <= target` reports `target_met=true`; `target < triangles <= hard_max` remains reviewable but emits a structured low-poly-target warning and `target_met=false`; `triangles > hard_max` is a hard failure.
+Biomass contracts use the object form, so their hard cap is specifically `budget.triangles.max`; integer support remains only for existing generic contracts. Add threshold tests: `triangles <= target` reports `low_poly_target:{status:"met",target_triangles:int,measured_triangles:int,hard_max:int}`; `target < triangles <= hard_max` reports the same object with `status:"review_required"` and remains reviewable; `triangles > hard_max` is a hard failure.
 
 - [ ] **Step 2: Run RED tests**
 
@@ -1311,7 +1311,7 @@ Biomass contracts use the object form, so their hard cap is specifically `budget
 
 - [ ] **Step 3: Implement host-safe path and command layer**
 
-Use `/opt/homebrew/bin/blender`, `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/<asset_id>_master.blend`, and exactly `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/`. Require selected review state, SUCCEEDED generation, matching raw hash, immutable contract snapshot, exact part-catalog hash, regular-file roots, and bounded process-group timeout. Implement all four modes behind the single required `--mode` option: `archive-raw` and `rehydrate-raw` perform only the bounded, atomic copy/verification behavior from Step 1; `preview` writes external `cleaned.preview.glb`; `publish-cleaned` writes only task-local `cleaned.glb` after explicit visual approval. Both Blender modes first require task-local `raw.glb` and the external `source.raw.glb` archive to match the same bound generation hash, so a clean-worker recovery never silently changes the selected source.
+Use `/opt/homebrew/bin/blender`, `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/<asset_id>_master.blend`, and exactly `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/`. Require selected review state, SUCCEEDED generation, matching raw hash, immutable contract snapshot, exact part-catalog hash, regular-file roots, and bounded process-group timeout. The five modes are exact: `archive-raw` and `rehydrate-raw` perform only bounded atomic copy/verification; `preview` writes external `cleaned.preview.glb`, five renders, and the closed preview manifest; `approve-preview` performs no Blender/provider work and writes only the immutable approval record; `publish-cleaned` writes only task-local `cleaned.glb` and recipe manifest after approved-baseline reproduction. Both Blender modes first require task-local `raw.glb` and the external `source.raw.glb` archive to match the same bound generation hash, so a clean-worker recovery never silently changes the selected source.
 
 - [ ] **Step 4: Implement deterministic Blender authoring**
 
@@ -1319,11 +1319,11 @@ Inside Blender only: preserve hidden immutable `SOURCE_RAW`; duplicate selected 
 
 - [ ] **Step 5: Render fixed evidence**
 
-Render `front.png`, `side.png`, `three_quarter.png`, `socket_overlay.png`, and `contact_sheet.png`. `socket_overlay.png` renders the non-exported guide collection against the cleaned visual mesh. `preview` writes canonical `biomass-part-preview.json`; `publish-cleaned` writes canonical `biomass-part-recipe.json` to the same exact external evidence leaf. The publish manifest binds contract, part-catalog, generation, raw archive, input/published master, and cleaned-output hashes; dimensions; target/hard-max/measured triangles; materials; UV status; guide inventory/transforms; `socket_guides_exported: false`; `source_raw_preserved: true`; and `runtime_promoted: false`. Re-hash every named regular file after publication. Task 11 treats `biomass-part-recipe.json` as the sole master-to-cleaned provenance record; the generic Blender validation report remains independent and must keep `master_provenance: null`.
+Render `front.png`, `side.png`, `three_quarter.png`, `socket_overlay.png`, and `contact_sheet.png`. `socket_overlay.png` renders the non-exported guide collection against the cleaned visual mesh. Preview writes canonical `biomass-part-preview.json`; publish writes canonical `biomass-part-recipe.json` only after approval-baseline comparison. The recipe binds contract, part-catalog, generation, raw archive, input/published master, approval, and cleaned-output hashes; dimensions; target/hard-max/measured triangles; materials; UV status; guide inventory/transforms; `socket_guides_exported: false`; `source_raw_preserved: true`; and `runtime_promoted: false`. Re-hash every named regular file after publication. Task 11 treats the recipe as the sole master-to-cleaned provenance record; the generic Blender validation report remains independent and must keep `master_provenance: null`.
 
 - [ ] **Step 6: Add a bounded Blender integration probe**
 
-Create a synthetic cube task/master under pytest temp paths, invoke Blender once, parse the scratch GLB through `meshy_blender_validate`, and assert the visual-only export passes while containing no node whose name/extras identify a socket or marker. Separately verify the preview manifest binds the catalog guide inventory/hash. Skip only when `/opt/homebrew/bin/blender` is absent; do not skip on authoring/validation failures.
+Create a synthetic cube task/master under pytest temp paths through private injected `RecipeRoots`, invoke Blender once, call `meshy_blender_validate.validate_cleaned_glb(cleaned_preview_path, contract, task_id=...)` directly, and assert the visual-only export passes while containing no node whose name/extras identify a socket or marker. Separately verify the preview manifest binds the catalog guide inventory/hash. Add injected-failure rollback tests for raw+manifest and preview bundles; all external leaves use the validated evidence directory as the atomic-writer allowed root, mode `0600`, and existing leaves must be regular non-symlinks with byte-identical content. Skip only when `/opt/homebrew/bin/blender` is absent; do not skip on authoring/validation failures.
 
 - [ ] **Step 7: Run GREEN tests**
 
@@ -1339,6 +1339,13 @@ git add tools/meshy_biomass_part_recipe.py tests/test_meshy_biomass_part_recipe.
 git commit -m "feat: author visual-only biomass part masters"
 ```
 
+Task 10 publication is a governed bundle, not a sequence of independent writes. Preflight every
+existing coupled leaf for regular non-symlink status, canonical bytes, and mode `0600`; stage all
+missing leaves privately under the validated external evidence directory and use that directory as
+the atomic-writer allowed root. Reject symlinks, non-regular files, mismatches, and repository-root
+authorization. Inject failures after each leaf and compensate only newly-created hash-matching
+leaves, proving all-or-none behavior; byte-identical existing leaves are idempotent.
+
 ---
 
 ### Task 11: Review-only biomass part promotion packets
@@ -1348,8 +1355,8 @@ git commit -m "feat: author visual-only biomass part masters"
 - Modify: `tests/test_meshy_promotion_packet.py`
 
 **Interfaces:**
-- Consumes: `promotion_ready` task with hash-bound visual-only Blender validation, canonical external `source-raw-manifest.json` and `biomass-part-recipe.json`, per-part runtime review, and the exact repository-authoritative part-catalog entry/hash. `blender-validation.json.master_provenance` must be `null`; master provenance comes only from the separately verified recipe manifest.
-- Produces: CLI subcommand `biomass-part --project-root PATH --contract PATH --task-dir PATH --evidence-dir PATH --part-catalog PATH --expected-part-catalog-sha256 HEX` and immutable leaves `biomass_part_catalog.patch.json`, `biomass_wrapper.proposal.json`, and `asset-provenance.json` under the task directory.
+- Consumes: `promotion_ready` task with hash-bound visual-only Blender validation, canonical external `source-raw-manifest.json` and `biomass-part-recipe.json`, per-part runtime review, and the exact repository-authoritative part-catalog entry/hash. `blender-validation.json.master_provenance` must be `null`; master provenance comes only from the separately verified recipe manifest. The exact APIs are `build_biomass_part_promotion_proposal(project_root, contract_path, task_dir, evidence_dir, part_catalog_path, expected_part_catalog_sha256) -> dict[str, dict[str, Any]]` and matching `write_biomass_part_promotion_proposal(...)`.
+- Produces: CLI subcommand `biomass-part --project-root PATH --contract PATH --task-dir PATH --evidence-dir PATH --part-catalog PATH --expected-part-catalog-sha256 HEX` and immutable leaves `biomass_part_catalog.patch.json`, `biomass_wrapper.proposal.json`, and `asset-provenance.json` under the task directory. Their closed kinds are respectively `biomass_part_catalog_patch_v1`, `biomass_wrapper_proposal_v1`, and the existing `asset_provenance` convention: envelope `{provenance,extensions}`, provenance `{provider,license_state}`, extensions `{ai_generated,ai_generation}`, and ai_generation `{provider,task_id,model,input_sha256,raw_output_sha256,cleaned_output_sha256,contract_sha256,human_cleanup,reviewer}`.
 
 - [ ] **Step 1: Write RED proposal tests**
 
@@ -1365,7 +1372,7 @@ Assert a valid proposal names only:
 }
 ```
 
-Assert it rejects non-biomass categories, wrong asset IDs/paths, a non-canonical evidence directory, changed catalog hashes, a proposal socket inventory/transform that differs from the catalog entry, any GLB socket/marker/helper node, collision objects in GLB, non-null `blender-validation.json.master_provenance`, unsigned/mismatched reports, secret fields, signed URLs, symlink leaves, and any attempted runtime write. Require cross-file equality for asset/task/contract/catalog/raw/master/cleaned hashes among `generation.json`, `source-raw-manifest.json`, `biomass-part-recipe.json`, `blender-validation.json`, `runtime-review.json`, and the actual regular files; only `biomass-part-recipe.json` may establish the master path/hash. Add CLI tests proving `prop --help` and `threat --help` retain their live arguments/behavior, `biomass-part --help` lists exactly the six required options, and missing/unknown biomass options exit through argparse without writes.
+Assert it rejects non-biomass categories, wrong asset IDs/paths, a non-canonical evidence directory, changed catalog hashes, a proposal socket inventory/transform that differs from the catalog entry, any GLB socket/marker/helper node, collision objects in GLB, non-null `blender-validation.json.master_provenance`, unsigned/mismatched reports, secret fields, signed URLs, symlink leaves, and any attempted runtime write. Require cross-file equality through the owning records: generation owns task/asset/contract/raw; source-raw manifest owns generation/raw/archive; recipe owns contract/catalog/generation/raw/archive/master/cleaned/approval; Blender validation owns task/contract/cleaned and retains `master_provenance: null`; runtime review owns task/asset/contract/cleaned/Blender-report/captures. Compare actual regular files and never demand catalog/raw/master fields from closed records that do not own them. Preflight all three leaves for canonical bytes, mode `0600`, and non-symlink regular-file status before any write; stage privately and compensate newly-created hash-matching leaves after injected failure after leaf 1 or 2. A byte-identical full bundle is idempotent; mixed existing/missing/mismatched bundles fail before write. Add CLI tests proving `prop --help` and `threat --help` retain their live arguments/behavior, `biomass-part --help` lists exactly the six required options, and missing/unknown biomass options exit through argparse without writes.
 
 - [ ] **Step 2: Run RED tests**
 
@@ -1381,7 +1388,7 @@ Snapshot protected runtime paths before and after proposal creation and assert b
 
 - [ ] **Step 5: Run full promotion regression**
 
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q tests/test_meshy_promotion_packet.py tests/test_meshy_governance.py tests/test_meshy_candidate_review.py`
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q tests/test_meshy_promotion_packet.py tests/test_meshy_governance.py tests/test_meshy_candidate_review.py tests/test_meshy_runtime_review.py tests/test_meshy_blender_tools.py`
 
 - [ ] **Step 6: Commit Task 11**
 
@@ -1397,12 +1404,13 @@ git commit -m "feat: propose governed biomass part promotion"
 **Files:**
 - Create: `assets/_staging/meshy/<each-pilot-id>/_references/three_quarter.png`
 - Modify: `.gitignore` — add only `!assets/_staging/meshy/*/_references/*.png` after the broad Meshy PNG ignore.
-- Modify: `docs/superpowers/proofs/procedural-biomass-pilot.md`
+- Modify: `docs/superpowers/proofs/procedural-biomass-pilot.md` (Task 8 must create this proof first; block if it is absent).
+- Create exactly eight canonical `assets/_staging/meshy/_plans/<asset_id>.json` files and `assets/_staging/meshy/_plans/biomass_reference_audit.json`; create `tools/biomass_reference_audit.py` and `tests/test_biomass_reference_audit.py`.
 - No runtime/catalog/wrapper mutations.
 
 **Interfaces:**
 - Consumes: eight active contracts and working runtime proof.
-- Produces: eight project-owned reference images and eight deterministic request plans.
+- Produces: eight project-owned reference images, eight deterministic request plans, and a canonical reference-audit manifest with `status:"pass"`.
 
 - [ ] **Step 1: Generate one reference image per contract**
 
@@ -1410,7 +1418,7 @@ Use a neutral orthographic three-quarter view matched to the production locked-i
 
 - [ ] **Step 2: Validate image files and contract binding**
 
-Require PNG, decoded dimensions at least 1024×1024, alpha/opaque consistency, byte size under 16 MiB, project-owned rights, and a SHA-256 recorded in the proof. Reject collage files. Add this exact `.gitignore` exception immediately after `assets/_staging/meshy/**/*.png`:
+Require PNG, decoded dimensions at least 1024×1024, opaque alpha, byte size under 16 MiB, project-owned rights, and a SHA-256 recorded in the proof. The stdlib audit must reject malformed/undersized/transparent/symlink/duplicate paths and collages or disconnected geometry: one central foreground component must contain at least 90% of foreground pixels, no second component may reach 5%, and its bounding box must not touch the border. Add this exact `.gitignore` exception immediately after `assets/_staging/meshy/**/*.png`:
 
 ```gitignore
 !assets/_staging/meshy/*/_references/*.png
@@ -1420,13 +1428,15 @@ After creating each file, run `git check-ignore assets/_staging/meshy/<asset_id>
 
 - [ ] **Step 3: Run eight read-only plans**
 
+For each contract, derive `asset_id` from JSON and run the read-only command twice. Require byte-identical parsed records, canonicalize and atomically replace the mode-`0600` plan at `assets/_staging/meshy/_plans/<asset_id>.json`, and record both `request_plan_file_sha256` and the CLI-emitted `provider_payload_sha256`. The eight exact IDs are `biomass_human_arm_v1`, `biomass_insect_leg_v1`, `biomass_cephalopod_tentacle_v1`, `biomass_animal_skull_v1`, `biomass_humanoid_torso_v1`, `biomass_gunk_connector_v1`, `biomass_claw_v1`, and `biomass_maw_v1`; each uses exactly `three_quarter`, `image_to_3d`, `should_texture=false`, `candidate_count=4`, cost 5, maximum 20, aggregate maximum 160. No shell-redirection partial writes.
+
 For each contract, derive `asset_id` from JSON and run:
 
 ```bash
 /opt/homebrew/bin/python3.11 tools/meshy_stage.py plan --project-root . --contract data/asset_generation/contracts/biomass_human_arm_v1.json --reference-root assets/_staging/meshy/biomass_human_arm_v1/_references --reference three_quarter=three_quarter.png
 ```
 
-Repeat with the other seven exact IDs. Run each plan twice and compare canonical request packet hashes. Confirm each plan costs at most 20 credits and the aggregate bound is 160.
+Repeat with the other seven exact IDs. The audit manifest records per asset rights/path/view/hash/size/dimensions/alpha/component metrics plus contract/catalog hashes and must be `status:"pass"`; Task 13 must require its path and SHA before paid generation.
 
 - [ ] **Step 4: Re-run runtime and protected-path gates**
 
@@ -1435,7 +1445,7 @@ Run Tasks 1-11 focused tests and compare protected runtime snapshots before/afte
 - [ ] **Step 5: Commit references and dry-run proof**
 
 ```bash
-git add .gitignore assets/_staging/meshy/biomass_*_v1/_references/three_quarter.png docs/superpowers/proofs/procedural-biomass-pilot.md
+git add .gitignore assets/_staging/meshy/biomass_*_v1/_references/three_quarter.png assets/_staging/meshy/_plans/*.json tools/biomass_reference_audit.py tests/test_biomass_reference_audit.py docs/superpowers/proofs/procedural-biomass-pilot.md
 /opt/homebrew/bin/python3.11 -c 'import subprocess; names=subprocess.check_output(["git","diff","--cached","--name-only","--","assets/_staging/meshy"], text=True).splitlines(); refs=[n for n in names if n.endswith("/_references/three_quarter.png")]; assert len(refs)==8, refs'
 git commit -m "art: stage biomass pilot references"
 ```
@@ -1574,11 +1584,18 @@ Run the complete preview command for each master:
   --evidence-dir "$EVIDENCE_DIR" --mode preview
 ```
 
-Inspect front/side/three-quarter/guide overlay/contact sheet. Reject any planned catalog socket guide inside solid geometry, distal attachment region with no usable clearance, pivot mismatch, inconsistent low-poly density/style, high-frequency detail that disappears at the locked-isometric gameplay view, unreadable silhouette, or connector that cannot cover the seam. Guides remain outside the exported GLB.
+Inspect front/side/three-quarter/guide overlay/contact sheet. Reject any planned catalog socket guide inside solid geometry, distal attachment region with no usable clearance, pivot mismatch, inconsistent low-poly density/style, high-frequency detail that disappears at the locked-isometric gameplay view, unreadable silhouette, or connector that cannot cover the seam. Guides remain outside the exported GLB. After human inspection, run `--mode approve-preview --reviewer <reviewer>`; this performs no Blender/provider work and immutably binds the preview manifest SHA, all five render hashes, preview GLB hash, and contract/catalog/generation/raw/archive/master hashes. Publish is forbidden without this exact approval.
+
+```bash
+/opt/homebrew/bin/python3.11 tools/meshy_biomass_part_recipe.py \
+  --project-root . --contract "$CONTRACT" --part-catalog "$CATALOG" \
+  --expected-part-catalog-sha256 "$CATALOG_SHA256" --task-dir "$TASK_DIR" \
+  --evidence-dir "$EVIDENCE_DIR" --mode approve-preview --reviewer "<reviewer>"
+```
 
 - [ ] **Step 3: Publish selected cleaned GLBs only after visual approval**
 
-For each approved part, rerun the same exact invocation with `--mode publish-cleaned`:
+For each approved part, rerun the same exact invocation with `--mode publish-cleaned`. The command must require the exact closed approval record, privately rerun Blender, compare manifest/render/preview-GLB bytes and hashes to that approved baseline before any publication, and publish only task-local `cleaned.glb` plus the closed recipe manifest. If a recipe manifest already exists, only an exact byte/hash-identical rerun succeeds; approval cannot be bypassed.
 
 ```bash
 /opt/homebrew/bin/python3.11 tools/meshy_biomass_part_recipe.py \
@@ -1687,7 +1704,7 @@ CATALOG_SHA256=$(shasum -a 256 "$CATALOG" | cut -d' ' -f1)
   --evidence-dir "$EVIDENCE_DIR" --mode publish-cleaned
 ```
 
-`rehydrate-raw` performs no provider call and must restore only the exact generation-bound `raw.glb`; `publish-cleaned` must deterministically reproduce the cleaned hash in the committed proposal, recipe manifest, Blender report, and runtime report. A missing/mismatched external raw archive, raw manifest, recipe manifest, canonical master, or output hash is a hard block—not permission to call Meshy, select another candidate, or continue partially. Assert the GLB has no socket/marker/helper nodes and abort the entire asset’s promotion on any mismatch.
+`rehydrate-raw` performs no provider call and must restore only the exact generation-bound `raw.glb`; `publish-cleaned` must deterministically reproduce the approved baseline and cleaned hash in the committed proposal, recipe manifest, Blender report, and runtime report. A missing/mismatched external raw archive, raw manifest, approval, recipe manifest, canonical master, or output hash is a hard block—not permission to call Meshy, select another candidate, bypass preview approval, or continue partially. Assert the GLB has no socket/marker/helper nodes and abort the entire asset’s promotion on any mismatch.
 
 - [ ] **Step 2: Copy imported assets atomically**
 
