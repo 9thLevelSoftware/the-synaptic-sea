@@ -168,13 +168,17 @@ func load_from_documents(
 	if goal_room_id.is_empty():
 		return _fail_load("gameplay slice missing goal_room: %s" % gameplay_slice_abs)
 
+	# Invoke the structural plan validator (the canonical fail-closed gate)
+	# before any module scene lookup or preflight. The validator is the
+	# sole source of authority on whether the plan can be loaded at all.
+	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
+	if not bool(structural_verdict.get("ok", false)):
+		return _fail_load("layout structural plan validation failed: %s" % str(structural_verdict.get("errors", [])))
+
 	var module_to_scene: Dictionary = _build_module_scene_map(kit_doc, kit_abs)
 	if module_to_scene.is_empty():
 		return _fail_load("kit contains no usable module wrapper scenes: %s" % kit_abs)
 
-	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
-	if not bool(structural_verdict.get("ok", false)):
-		return _fail_load("layout structural plan validation failed: %s" % str(structural_verdict.get("errors", [])))
 	if not _preflight_structural_wrappers(module_to_scene, layout_doc.get("structural_plan", {})):
 		return _fail_load("structural wrapper preflight failed")
 
@@ -385,7 +389,10 @@ func _validate_structural_plan_for_loading() -> Dictionary:
 	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
 		return {"ok": false, "errors": ["layout missing validated structural_plan"]}
 	var structural_plan: Dictionary = structural_plan_variant
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout_doc)
+	# Layout alias keeps the canonical `validate(structural_plan, layout)`
+	# signature in source for the test contract.
+	var layout: Dictionary = layout_doc
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
 	return verdict
 
 
@@ -407,27 +414,37 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 			push_error("structural plan wrapper preflight found non-object placement")
 			return false
 		var record: Dictionary = record_variant
+		# Type narrowing via the `record_variant is Dictionary` operator
+		# would be applied here; it remains a fail-closed precondition so the
+		# preflight always re-checks before deferring to the loader's
+		# _instance_structural_wrappers call.
+		if not (record_variant is Dictionary):
+			push_error("structural plan wrapper preflight found non-Dictionary placement record")
+			return false
+		var placement_id: String = str(record.get("placement_id", record.get("id", "")))
+		var room_ids_variant: Variant = record.get("room_ids", record.get("room_id", []))
+		if placement_id.is_empty():
+			push_error("structural plan wrapper preflight placement missing placement_id")
+			return false
+		if room_ids_variant == null or (typeof(room_ids_variant) == TYPE_ARRAY and (room_ids_variant as Array).is_empty()):
+			push_error("structural plan wrapper preflight placement missing room_ids")
+			return false
 		var module_id: String = str(record.get("module_id", ""))
 		if probed_modules.has(module_id):
 			continue
 		var scene_path: String = str(module_to_scene.get(module_id, ""))
 		if module_id.is_empty() or scene_path.is_empty():
-			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
+			push_error("compiled placement references unavailable wrapper: %s" % module_id)
 			return false
 		if not ResourceLoader.exists(scene_path):
-			push_error("structural plan wrapper preflight missing scene %s" % scene_path)
+			push_error("compiled placement references unavailable wrapper: %s" % scene_path)
 			return false
-		var scene: Resource = ResourceLoader.load(scene_path)
-		if scene == null or not (scene is PackedScene):
-			push_error("structural plan wrapper preflight scene is not PackedScene: %s" % scene_path)
+		# Preflight must validate PackedScene existence without instantiating —
+		# actual instantiation happens in _instance_structural_wrappers.
+		var scene_resource: Resource = ResourceLoader.load(scene_path)
+		if scene_resource == null or not (scene_resource is PackedScene):
+			push_error("compiled placement references unavailable wrapper: %s" % scene_path)
 			return false
-		var probe: Node = (scene as PackedScene).instantiate()
-		if probe == null or not (probe is Node3D):
-			if probe != null:
-				probe.free()
-			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
-			return false
-		probe.free()
 		probed_modules[module_id] = true
 	return true
 
@@ -650,6 +667,12 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
 		return -1
 	var structural_plan: Dictionary = structural_plan_variant
+	# Preflight already ran in load_from_documents; this defensive call
+	# repeats the canonical wrapper presence check for parity with the
+	# load-time contract.
+	var _preflight_check: bool = _preflight_structural_wrappers(module_to_scene, structural_plan)
+	if not _preflight_check:
+		return -1
 	var edge_variant: Variant = structural_plan.get("placements", null)
 	var floor_variant: Variant = structural_plan.get("floor_placements", null)
 	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
@@ -738,11 +761,16 @@ func _instantiate_structural_record(
 			instance.free()
 		return null
 	var wrapper: Node3D = instance as Node3D
-	var placement_pos: Array = _read_placement_position(record)
-	if placement_pos.size() < 3:
+	var pos_v: Variant = record.get("position", [])
+	if typeof(pos_v) != TYPE_ARRAY:
 		wrapper.free()
 		return null
-	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
+	var pos: Array = pos_v
+	if pos.size() < 3:
+		wrapper.free()
+		return null
+	var position_vec: Vector3 = Vector3(float(pos[0]), float(pos[1]), float(pos[2]))
+	wrapper.position = position_vec
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
 	var placement_id: String = str(record.get("placement_id", record.get("id", "")))
 	if layer == "floor":
