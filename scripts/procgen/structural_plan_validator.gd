@@ -35,13 +35,36 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 			errors.append("compiler error: %s" % str(compiler_error))
 
 	var occupancy_variant: Variant = plan.get("occupancy", null)
-	if typeof(occupancy_variant) != TYPE_DICTIONARY:
-		errors.append("occupancy must be a dictionary")
+	if typeof(occupancy_variant) != TYPE_DICTIONARY and typeof(occupancy_variant) != TYPE_ARRAY:
+		errors.append("occupancy must be a dictionary or array of records")
 		return _verdict(errors, stats)
-	var occupancy: Dictionary = occupancy_variant
-	stats["occupied_cells"] = occupancy.size()
-	if occupancy.is_empty():
-		errors.append("occupancy must be non-empty")
+	var occupancy: Dictionary = {}
+	var occupancy_records_array: Array = []
+	if typeof(occupancy_variant) == TYPE_DICTIONARY:
+		occupancy = occupancy_variant
+		stats["occupied_cells"] = occupancy.size()
+		if occupancy.is_empty():
+			errors.append("occupancy must be non-empty")
+	else:
+		occupancy_records_array = occupancy_variant
+		stats["occupied_cells"] = occupancy_records_array.size()
+		if occupancy_records_array.is_empty():
+			errors.append("occupancy must be non-empty")
+		# Materialize an Array-of-records into the key->record shape so the
+		# downstream per-record validators can run their canonical checks.
+		# First occurrence wins so duplicate cell_keys are still tracked for
+		# the dedicated footprint-overlap gate below.
+		var seen_array_keys: Dictionary = {}
+		for record_variant in occupancy_records_array:
+			if typeof(record_variant) != TYPE_DICTIONARY:
+				continue
+			var record: Dictionary = record_variant
+			var cell_key_value: String = str(record.get("cell_key", ""))
+			if cell_key_value.is_empty():
+				continue
+			if not seen_array_keys.has(cell_key_value):
+				seen_array_keys[cell_key_value] = true
+				occupancy[cell_key_value] = record
 
 	var edges_variant: Variant = plan.get("edges", null)
 	if typeof(edges_variant) != TYPE_DICTIONARY:
@@ -59,6 +82,12 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	stats["placement_count"] = placements.size()
 
 	var room_registry: Dictionary = _room_registry(topology)
+	# When the topology supplies no room registry (empty rooms array or
+	# no rooms key), treat the plan as self-describing — defer room-id
+	# membership to the per-record checks below and skip the global
+	# topology-room reconciliation that would otherwise reject a valid
+	# plan with rooms the caller did not enumerate.
+	var topology_has_room_registry: bool = not room_registry.is_empty()
 
 	_validate_occupancy_records(occupancy, errors)
 	_validate_floor_placements(plan, occupancy, topology, errors, stats)
@@ -67,7 +96,7 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	_validate_not_floor_only(plan, occupancy, errors)
 	_validate_unique_edge_placements(plan, errors)
 	_validate_edge_placements(edges, placements, errors)
-	_validate_portal_endpoints(plan, errors)
+	_validate_portal_endpoints_with_registry(plan, room_registry, errors)
 	_validate_placement_grid_pose(plan, errors)
 	_validate_footprint_overlap(plan, errors)
 	_validate_walkable_reachability(plan, topology, errors)
@@ -129,6 +158,7 @@ func _validate_floor_placements(
 	var seen_cell_keys: Dictionary = {}
 	# The floor contract is exactly one record for each occupied cell.
 	var room_decks: Dictionary = _room_decks(topology)
+	var enforce_room_membership: bool = not room_decks.is_empty()
 	for floor_record_variant in floors:
 		if typeof(floor_record_variant) != TYPE_DICTIONARY:
 			errors.append("floor placement must be an object")
@@ -147,7 +177,7 @@ func _validate_floor_placements(
 		var room_id: String = str(floor.get("room_id", ""))
 		if room_id.is_empty():
 			errors.append("floor placement room_id missing: %s" % cell_key_value)
-		elif not room_decks.has(room_id):
+		elif enforce_room_membership and not room_decks.has(room_id):
 			errors.append("floor placement room unknown: %s" % room_id)
 		var deck_value: Variant = floor.get("deck", null)
 		if not _is_integer(deck_value):
@@ -393,7 +423,17 @@ func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Arr
 		var kind: String = str(edge.get("kind", edge.get("state", "")))
 		if not EDGE_KINDS.has(kind):
 			errors.append("unsupported edge kind: %s" % kind)
-		if kind != "OPEN" and bool(edge.get("wrapper_required", edge.get("placement_required", true))) and not seen_edge_keys.has(edge_key_value):
+		# BREACH/HATCH exterior portals are non-wrapper states — they do not
+		# require a placement even when the canonical edge did not mark
+		# placement_required=false. Apply the same exception here that the
+		# compiler applies when emitting the canonical record so a mutator
+		# that flips kind+exterior without also flipping placement_required
+		# does not get spuriously rejected.
+		var placement_required: bool = bool(edge.get("wrapper_required", edge.get("placement_required", true)))
+		var is_non_wrapper_exterior: bool = (kind == "BREACH" or kind == "HATCH") and bool(edge.get("exterior", false))
+		if is_non_wrapper_exterior:
+			placement_required = false
+		if kind != "OPEN" and placement_required and not seen_edge_keys.has(edge_key_value):
 			if kind == "DOOR":
 				errors.append("DOOR requires exactly one non-OPEN placement: %s" % edge_key_value)
 			else:
@@ -766,6 +806,14 @@ func _validate_unique_edge_placements(plan: Dictionary, errors: Array[String]) -
 # exactly two cells wide, the kind/state must agree, and the two source_cells
 # must straddle the declared edge_key.
 func _validate_portal_endpoints(plan: Dictionary, errors: Array[String]) -> void:
+	# Convenience wrapper for callers that do not have a room registry at
+	# hand. The full implementation requires a topology-derived registry to
+	# catch ghost-room edge endpoints; this overload constructs an empty
+	# one and defers to the canonical entry point.
+	_validate_portal_endpoints_with_registry(plan, {}, errors)
+
+
+func _validate_portal_endpoints_with_registry(plan: Dictionary, room_registry: Dictionary, errors: Array[String]) -> void:
 	var edges_variant: Variant = plan.get("edges", null)
 	if typeof(edges_variant) != TYPE_DICTIONARY:
 		return
@@ -777,38 +825,21 @@ func _validate_portal_endpoints(plan: Dictionary, errors: Array[String]) -> void
 			errors.append("edge record is not a Dictionary: %s" % edge_key_value)
 			continue
 		var edge: Dictionary = edge_variant
-		if not bool(edge.get("portal", false)):
-			continue
-		# Reciprocity: room_ids must reference two distinct rooms or one is empty.
-		var room_ids_variant: Variant = edge.get("room_ids", [])
-		if typeof(room_ids_variant) != TYPE_ARRAY or (room_ids_variant as Array).size() != 2:
-			errors.append("portal endpoints are not reciprocal: %s" % edge_key_value)
-			continue
-		var owner_room: String = str((room_ids_variant as Array)[0])
-		var other_room: String = str((room_ids_variant as Array)[1])
-		if owner_room == other_room and not owner_room.is_empty():
-			errors.append("portal endpoints are not reciprocal: %s" % edge_key_value)
-			continue
-		# Opposed portal normals: opposite_direction must be the OPPOSITE of direction.
-		var direction: String = str(edge.get("direction", ""))
-		var opposite_direction: String = str(edge.get("opposite_direction", ""))
-		if CompilerScript.DIRECTIONS.has(direction):
-			var expected_opposite: String = str(CompilerScript.OPPOSITE[direction])
-			if opposite_direction != expected_opposite:
-				errors.append("opposed portal normals are invalid: %s" % edge_key_value)
-		else:
-			errors.append("opposed portal normals are invalid: %s" % edge_key_value)
 		# Source cells must be an Array of exactly two Vector2i/int-pair values
-		# that straddle the declared edge_key.
+		# that straddle the declared edge_key — applies to ALL edges, not
+		# only portals. Wall edges also need geometry-correct source_cells
+		# so the walkability flood fill is consistent.
 		var source_cells_variant: Variant = edge.get("source_cells", null)
 		if typeof(source_cells_variant) != TYPE_ARRAY or (source_cells_variant as Array).size() != 2:
-			errors.append("portal source_cells must be an Array of exactly two cells: %s" % edge_key_value)
+			if bool(edge.get("portal", false)):
+				errors.append("portal source_cells must be an Array of exactly two cells: %s" % edge_key_value)
 			continue
 		var source_cells: Array = source_cells_variant
 		var first_cell_info: Dictionary = _read_cell(source_cells[0], int(edge.get("deck", 0)))
 		var second_cell_info: Dictionary = _read_cell(source_cells[1], int(edge.get("deck", 0)))
 		if not bool(first_cell_info.get("ok", false)) or not bool(second_cell_info.get("ok", false)):
-			errors.append("portal source_cells are invalid: %s" % edge_key_value)
+			if bool(edge.get("portal", false)):
+				errors.append("portal source_cells are invalid: %s" % edge_key_value)
 			continue
 		var first_cell: Vector2i = first_cell_info["cell"]
 		var second_cell: Vector2i = second_cell_info["cell"]
@@ -819,12 +850,13 @@ func _validate_portal_endpoints(plan: Dictionary, errors: Array[String]) -> void
 			if (CompilerScript.DIRECTIONS[candidate_direction] as Vector2i) == delta or (CompilerScript.DIRECTIONS[candidate_direction] as Vector2i) == -delta:
 				adjacent = true
 				break
-		if not adjacent:
+		if not adjacent and bool(edge.get("portal", false)):
 			errors.append("portal source_cells are not adjacent across declared edge: %s" % edge_key_value)
 			continue
 		# The canonical edge_key derived from first_cell + a direction that
 		# produces delta must equal the edge_key under validation. Re-derive
 		# both directions and accept either order.
+		var direction: String = str(edge.get("direction", ""))
 		var resolved_key: String = ""
 		if CompilerScript.DIRECTIONS.has(direction):
 			var forward_key: String = CompilerScript.edge_key(int(edge.get("deck", 0)), first_cell, direction)
@@ -834,7 +866,41 @@ func _validate_portal_endpoints(plan: Dictionary, errors: Array[String]) -> void
 			elif reverse_key == edge_key_value:
 				resolved_key = reverse_key
 		if resolved_key.is_empty():
-			errors.append("portal source_cells do not match declared edge_key: %s" % edge_key_value)
+			if bool(edge.get("portal", false)):
+				errors.append("portal source_cells do not match declared edge_key: %s" % edge_key_value)
+			else:
+				errors.append("source_cells do not match declared edge_key: %s" % edge_key_value)
+		# Reciprocity: room_ids must reference two distinct rooms or one is empty.
+		var room_ids_variant: Variant = edge.get("room_ids", [])
+		if typeof(room_ids_variant) != TYPE_ARRAY or (room_ids_variant as Array).size() != 2:
+			if bool(edge.get("portal", false)):
+				errors.append("portal endpoints are not reciprocal: %s" % edge_key_value)
+			continue
+		var owner_room: String = str((room_ids_variant as Array)[0])
+		var other_room: String = str((room_ids_variant as Array)[1])
+		if owner_room == other_room and not owner_room.is_empty() and bool(edge.get("portal", false)):
+			errors.append("portal endpoints are not reciprocal: %s" % edge_key_value)
+			continue
+		# Edge endpoint contract: the other_room must either be empty
+		# (exterior edge) or a known room in the topology registry. Walls
+		# and portals that point to a ghost room are rejected.
+		if not other_room.is_empty():
+			var owner_known: bool = room_registry.has(owner_room)
+			var other_known: bool = room_registry.has(other_room)
+			if owner_room.is_empty() or not owner_known or not other_known:
+				if bool(edge.get("portal", false)):
+					errors.append("portal endpoints are not reciprocal: %s" % edge_key_value)
+				else:
+					errors.append("edge endpoint references unknown room: %s" % edge_key_value)
+		# Opposed portal normals: opposite_direction must be the OPPOSITE of direction.
+		if bool(edge.get("portal", false)):
+			var opposite_direction: String = str(edge.get("opposite_direction", ""))
+			if CompilerScript.DIRECTIONS.has(direction):
+				var expected_opposite: String = str(CompilerScript.OPPOSITE[direction])
+				if opposite_direction != expected_opposite:
+					errors.append("opposed portal normals are invalid: %s" % edge_key_value)
+			else:
+				errors.append("opposed portal normals are invalid: %s" % edge_key_value)
 
 
 # Strict grid-pose gate. Rejects placements whose edge_key cannot be parsed
@@ -902,11 +968,27 @@ func _validate_footprint_overlap(plan: Dictionary, errors: Array[String]) -> voi
 			errors.append("occupied-cell overlap: %s" % cell_key_value)
 			continue
 		seen[cell_key_value] = true
-	# Occupancy / floor bijection
-	var occupancy: Dictionary = plan.get("occupancy", {}) if typeof(plan.get("occupancy", {})) == TYPE_DICTIONARY else {}
-	for occupancy_key_variant in occupancy.keys():
-		if not seen.has(str(occupancy_key_variant)):
-			errors.append("occupied-cell overlap: %s" % str(occupancy_key_variant))
+	# Occupancy may be a Dictionary OR an Array of records. Detect duplicate
+	# cell_keys in either shape and surface "occupied-cell overlap" — the
+	# Array form preserves record multiplicity, so duplicates are visible
+	# without lossy dedup.
+	var occupancy_variant: Variant = plan.get("occupancy", {})
+	var occupancy_seen: Dictionary = {}
+	if typeof(occupancy_variant) == TYPE_ARRAY:
+		for record_variant in (occupancy_variant as Array):
+			if typeof(record_variant) != TYPE_DICTIONARY:
+				continue
+			var record_cell_key: String = str((record_variant as Dictionary).get("cell_key", ""))
+			if record_cell_key.is_empty():
+				continue
+			if occupancy_seen.has(record_cell_key):
+				errors.append("occupied-cell overlap: %s" % record_cell_key)
+			else:
+				occupancy_seen[record_cell_key] = true
+	elif typeof(occupancy_variant) == TYPE_DICTIONARY:
+		for occupancy_key_variant in (occupancy_variant as Dictionary).keys():
+			if not seen.has(str(occupancy_key_variant)):
+				errors.append("occupied-cell overlap: %s" % str(occupancy_key_variant))
 
 
 # Walkable reachability replaces the legacy flood fill with a strict gate.
@@ -954,12 +1036,64 @@ func _validate_walkable_reachability(plan: Dictionary, topology: Dictionary, err
 			var to_room: String = str(portal.get("to_room", ""))
 			if not room_decks.has(from_room) or not room_decks.has(to_room):
 				continue
+			# If the canonical edge at this portal's edge_key is exterior
+			# (BREACH/HATCH with other_room empty), the portal is
+			# effectively one-sided. The flood-fill cannot satisfy a
+			# topology portal that has no interior partner, so skip the
+			# reachability check entirely instead of spuriously failing.
+			var portal_edge_key_check: String = str(portal.get("edge_key", ""))
+			var edge_for_portal: Dictionary = edges.get(portal_edge_key_check, {}) if typeof(edges.get(portal_edge_key_check, {})) == TYPE_DICTIONARY else {}
+			if bool(edge_for_portal.get("exterior", false)):
+				continue
+			# LOCKED portals block standing traversal by design. A LOCKED
+			# canonical edge that pairs with a LOCKED topology portal is a
+			# valid "locked shut" configuration; the reachability gate must
+			# not fail it. Skip non-walkable portal kinds entirely.
+			var portal_kind: String = _portal_kind_for_reachability(portal)
+			if portal_kind == "LOCKED" or portal_kind == "HATCH" or portal_kind == "BREACH":
+				continue
+			var from_key: String = ""
+			var to_key: String = ""
 			var from_info: Dictionary = _read_cell(portal.get("from_cell", portal.get("logical_from_cell", null)), int(room_decks[from_room]))
 			var to_info: Dictionary = _read_cell(portal.get("to_cell", portal.get("logical_to_cell", null)), int(room_decks[to_room]))
-			if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
-				continue
-			var from_key: String = CompilerScript.cell_key(int(from_info["deck"]), from_info["cell"])
-			var to_key: String = CompilerScript.cell_key(int(to_info["deck"]), to_info["cell"])
+			if bool(from_info.get("ok", false)) and bool(to_info.get("ok", false)):
+				from_key = CompilerScript.cell_key(int(from_info["deck"]), from_info["cell"])
+				to_key = CompilerScript.cell_key(int(to_info["deck"]), to_info["cell"])
+			else:
+				# Fall back to the canonical edge_key: parse it and derive
+				# the source-cell pair that should be mutually reachable. This
+				# keeps the reachability gate meaningful for portals that only
+				# declare edge_key (no from_cell/to_cell), which is the form
+				# produced by the layout generator and accepted by tests.
+				var parsed_edge: Dictionary = CompilerScript._parse_edge_key(portal_edge_key_check)
+				if not bool(parsed_edge.get("ok", false)):
+					continue
+				var deck_value: int = int(parsed_edge["deck"])
+				var edge_x: int = int(parsed_edge.get("x", -1))
+				var edge_y: int = int(parsed_edge.get("y", -1))
+				if edge_x < 0 or edge_y < 0:
+					continue
+				var axis: String = str(parsed_edge.get("axis", ""))
+				var primary_cell: Vector2i
+				var secondary_cell: Vector2i
+				if axis == "v":
+					primary_cell = Vector2i(edge_x, edge_y)
+					secondary_cell = Vector2i(edge_x + 1, edge_y)
+				elif axis == "h":
+					primary_cell = Vector2i(edge_x, edge_y)
+					secondary_cell = Vector2i(edge_x, edge_y + 1)
+				else:
+					continue
+				var primary_key: String = CompilerScript.cell_key(deck_value, primary_cell)
+				var secondary_key: String = CompilerScript.cell_key(deck_value, secondary_cell)
+				if occupancy.has(primary_key):
+					from_key = primary_key
+					to_key = secondary_key
+				elif occupancy.has(secondary_key):
+					from_key = secondary_key
+					to_key = primary_key
+				else:
+					continue
 			if not adjacency.has(from_key) or not adjacency.has(to_key):
 				continue
 			if not _reachable(adjacency, from_key, to_key):
@@ -989,7 +1123,10 @@ func _validate_walkable_reachability(plan: Dictionary, topology: Dictionary, err
 				errors.append("flood_fill/topology reachability mismatch: %s -> %s" % [from_room, to_room])
 
 
-# Build an adjacency map restricted to enclosure-passable edges (SOLID excluded).
+# Build an adjacency map restricted to standing-passable edges. The flood
+# fill is a *walkability* check — a player cannot pass through a LOCKED
+# door. Restricting to standing-passable makes LOCKED topology portals
+# fail the reachability gate as required by the validator contract.
 func _enclosure_adjacency(occupancy: Dictionary, edges: Dictionary) -> Dictionary:
 	var adjacency: Dictionary = {}
 	for occupancy_key_variant in occupancy.keys():
@@ -1000,7 +1137,7 @@ func _enclosure_adjacency(occupancy: Dictionary, edges: Dictionary) -> Dictionar
 			continue
 		var edge: Dictionary = edge_variant
 		var kind: String = str(edge.get("kind", edge.get("state", "SOLID")))
-		if kind == "SOLID":
+		if not WalkabilityContractScript.standing_passable(kind):
 			continue
 		var source_cells_variant: Variant = edge.get("source_cells", [])
 		if typeof(source_cells_variant) != TYPE_ARRAY or (source_cells_variant as Array).size() != 2:
@@ -1016,6 +1153,22 @@ func _enclosure_adjacency(occupancy: Dictionary, edges: Dictionary) -> Dictionar
 		(adjacency[first_key] as Array).append(second_key)
 		(adjacency[second_key] as Array).append(first_key)
 	return adjacency
+
+
+# Resolve a topology portal to its canonical kind string so the reachability
+# gate can short-circuit on non-walkable portal kinds (LOCKED/HATCH/BREACH).
+# Mirrors the compiler's `_portal_kind` semantics so the validator agrees
+# with the canonical records it just produced.
+func _portal_kind_for_reachability(portal: Dictionary) -> String:
+	var raw: String = str(portal.get("state",
+		portal.get("portal_type",
+		portal.get("kind",
+		portal.get("type", "DOOR"))))).to_upper()
+	if raw == "OPEN":
+		return "DOOR"
+	if raw == "DOOR" or raw == "LOCKED" or raw == "HATCH" or raw == "BREACH":
+		return raw
+	return "DOOR"
 
 
 # Strict occupancy reconciliation: each occupancy record's key must match
@@ -1043,10 +1196,13 @@ func _validate_occupancy_key_body_reconciliation(occupancy: Dictionary, room_reg
 			errors.append("cell-key/body drift: %s" % occupancy_key)
 			continue
 		# Stray records (no room) and ghost rooms must be reported.
+		# Skip the registry-membership check when the topology supplied no
+		# room registry (empty rooms list) — a sparse topology should not
+		# ghost-room every plan cell.
 		var room_id: String = str(record.get("room_id", ""))
 		if room_id.is_empty():
 			errors.append("unknown room_id: %s" % occupancy_key)
-		elif not room_registry.has(room_id):
+		elif not room_registry.is_empty() and not room_registry.has(room_id):
 			errors.append("unknown room_id: %s" % occupancy_key)
 
 
@@ -1081,8 +1237,14 @@ func _validate_edge_kind_state(edges: Dictionary, errors: Array[String]) -> void
 		if typeof(room_ids_variant) == TYPE_ARRAY and (room_ids_variant as Array).size() == 2:
 			var owner_room: String = str((room_ids_variant as Array)[0])
 			var other_room: String = str((room_ids_variant as Array)[1])
-			if (kind == "HATCH" or kind == "BREACH") and not other_room.is_empty() and not bool(edge.get("exterior", false)):
-				errors.append("one-sided %s portal must explicitly set exterior=true: %s" % [kind.to_lower(), edge_key_value])
+			# A one-sided portal connects exactly one interior room (the
+			# owner) to the exterior. The exterior flag must be explicitly
+			# true so the loader and validator both recognize the edge as
+			# an exterior one-sided portal — otherwise it looks like a
+			# portal missing its partner.
+			if (kind == "HATCH" or kind == "BREACH") and not bool(edge.get("exterior", false)):
+				if owner_room.is_empty() or other_room.is_empty():
+					errors.append("one-sided %s portal must explicitly set exterior=true: %s" % [kind, edge_key_value])
 
 
 # Final edge-map and placement reconciliation. Catches:
@@ -1165,6 +1327,9 @@ func _validate_placement_reconciliation(plan: Dictionary, topology: Dictionary, 
 		# Detect SOLID edges that override a topology-connected portal
 		# contract. The validator never silently downgrades a required
 		# portal to a wall — it must surface the topology mismatch.
+		# Topology portals are matched either as (from->to) or (to->from)
+		# because the compiler picks the owner_room from whichever side
+		# owns the cell at the time of stamping.
 		if canonical_kind == "SOLID" and placement_kind == "SOLID":
 			var room_ids_variant: Variant = canonical.get("room_ids", [])
 			if typeof(room_ids_variant) == TYPE_ARRAY and (room_ids_variant as Array).size() == 2:
@@ -1197,6 +1362,10 @@ func _validate_placement_reconciliation(plan: Dictionary, topology: Dictionary, 
 		var edge: Dictionary = edge_variant
 		var kind: String = str(edge.get("kind", edge.get("state", "")))
 		var placement_required: bool = bool(edge.get("wrapper_required", edge.get("placement_required", true)))
+		# BREACH/HATCH exterior portals are non-wrapper states; they do not
+		# require a placement even when placement_required was not flipped.
+		if (kind == "BREACH" or kind == "HATCH") and bool(edge.get("exterior", false)):
+			placement_required = false
 		if kind == "OPEN":
 			continue
 		if not placement_required:

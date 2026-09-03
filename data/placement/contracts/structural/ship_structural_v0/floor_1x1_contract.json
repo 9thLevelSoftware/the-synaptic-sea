@@ -85,18 +85,6 @@
         "corridor_edge",
         "wall_base"
       ]
-    },
-    {
-      "id": "floor_top_01",
-      "kind": "floor_top",
-      "position_m": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "compatible_kinds": [
-        "ceiling_bottom"
-      ]
     }
   ],
   "collision": {
@@ -201,18 +189,6 @@
           "floor_edge",
           "corridor_edge",
           "wall_base"
-        ]
-      },
-      {
-        "id": "floor_top_01",
-        "kind": "floor_top",
-        "position_m": [
-          0.0,
-          0.0,
-          0.0
-        ],
-        "compatible_kinds": [
-          "ceiling_bottom"
         ]
       }
     ],

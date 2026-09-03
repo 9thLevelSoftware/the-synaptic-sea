@@ -268,10 +268,124 @@ func _stamp_explicit_structural_layout(layout: Dictionary, cell_grid: Dictionary
 	if not bool(portal_result.get("ok", false)):
 		return false
 	layout["portals"] = portal_result.get("portals", [])
+	# Adjacency intents represent one entry per *room pair*. A pair of rooms
+	# may physically border across multiple cells (e.g. corridor_01 along
+	# column 3 borders corridor_02 along columns 3 AND 4). The compiler,
+	# which iterates cell-by-cell, emits a boundary edge per shared cell-pair;
+	# only portal records whose edge_key matches that cell-pair satisfy
+	# the validator's per-edge topology contract. Augment the portal list
+	# with the remaining unrecorded cell-pair boundaries so every shared
+	# boundary is represented.
+	var augmented: Array = _expand_portals_to_cell_pair_boundaries(
+		layout["portals"], placed_rooms)
+	if augmented != null:
+		layout["portals"] = augmented
 	# This filtered graph is useful to consumers that need only physical seams;
 	# room_links remains the backwards-compatible logical graph.
 	layout["structural_room_links"] = (layout["portals"] as Array).duplicate(true)
 	return true
+
+
+func _expand_portals_to_cell_pair_boundaries(
+		portals: Array, placed_rooms: Dictionary) -> Variant:
+	# The compiler emits one edge per cell-pair boundary between two rooms.
+	# The explicit portal list above may only describe one boundary cell-pair
+	# per room pair, leaving the other boundaries to compile as SOLID walls.
+	# Surface those remaining boundaries as additional portal records so the
+	# compiler treats every shared cell-pair between two portal-connected
+	# rooms as a portal (not a wall).
+	var CARDINAL_OFFSETS: Array = [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1),
+	]
+	var known_edge_keys: Dictionary = {}
+	for portal in portals:
+		var known_ek: String = str(portal.get("edge_key", ""))
+		if not known_ek.is_empty():
+			known_edge_keys[known_ek] = true
+	var cell_to_room: Dictionary = {}
+	var room_deck: Dictionary = {}
+	for rid in placed_rooms.keys():
+		var room_data: Dictionary = placed_rooms[rid]
+		room_deck[str(rid)] = int(room_data.get("deck", 0))
+		var cells: Array = room_data.get("cells", [])
+		for cell_variant in cells:
+			var parsed: Dictionary = _integer_cell(cell_variant)
+			if bool(parsed.get("ok", false)):
+				var key: String = "%d_%d_%d" % [int(room_deck[str(rid)]), (parsed["cell"] as Vector2i).x, (parsed["cell"] as Vector2i).y]
+				cell_to_room[key] = str(rid)
+	var existing: Dictionary = {}
+	for portal in portals:
+		var fr: String = str(portal.get("from_room", ""))
+		var tr: String = str(portal.get("to_room", ""))
+		if not fr.is_empty() and not tr.is_empty():
+			existing["%s|%s" % [fr, tr]] = portal
+			existing["%s|%s" % [tr, fr]] = portal
+	var added: Array = []
+	var seen_pairs: Dictionary = {}
+	for portal in portals:
+		var from_room: String = str(portal.get("from_room", ""))
+		var to_room: String = str(portal.get("to_room", ""))
+		if from_room.is_empty() or to_room.is_empty():
+			continue
+		var from_deck: int = int(room_deck.get(from_room, 0))
+		var to_deck: int = int(room_deck.get(to_room, from_deck))
+		if from_deck != to_deck:
+			continue
+		var from_data: Dictionary = placed_rooms.get(from_room, {})
+		var to_data: Dictionary = placed_rooms.get(to_room, {})
+		if from_data.is_empty() or to_data.is_empty():
+			continue
+		for cell_variant in from_data.get("cells", []):
+			var cell_info: Dictionary = _integer_cell(cell_variant)
+			if not bool(cell_info.get("ok", false)):
+				continue
+			var cell: Vector2i = cell_info["cell"]
+			for delta in CARDINAL_OFFSETS:
+				var neighbor: Vector2i = cell + delta
+				var neighbor_key: String = "%d_%d_%d" % [from_deck, neighbor.x, neighbor.y]
+				var neighbor_room: String = str(cell_to_room.get(neighbor_key, ""))
+				if neighbor_room != to_room:
+					continue
+				var direction: String = ""
+				for d in ["east", "west", "south", "north"]:
+					if StructuralEdgePlanScript.DIRECTIONS[d] == delta:
+						direction = d
+						break
+				if direction.is_empty():
+					continue
+				var edge_key: String = StructuralEdgePlanScript.edge_key(from_deck, cell, direction)
+				if known_edge_keys.has(edge_key):
+					continue
+				if seen_pairs.has(edge_key):
+					continue
+				seen_pairs[edge_key] = true
+				var intent_type: Variant = portal.get("type", portal.get("portal_type", "door"))
+				var required_value: Variant = portal.get("required", true)
+				added.append({
+					"id": "portal:%s" % edge_key,
+					"from_room": from_room,
+					"to_room": to_room,
+					"type": intent_type,
+					"portal_type": intent_type,
+					"required": required_value,
+					"edge_key": edge_key,
+					"deck": from_deck,
+					"cell": cell,
+					"direction": direction,
+					"opposite_direction": str(StructuralEdgePlanScript.OPPOSITE[direction]),
+					"from_cell": cell,
+					"to_cell": neighbor,
+					"source_cells": [cell, neighbor],
+				})
+	if added.is_empty():
+		return null
+	var merged: Array = portals.duplicate(true)
+	for entry in added:
+		merged.append(entry)
+	return merged
 
 
 func _build_explicit_portals(adjacencies: Array, placed_rooms: Dictionary) -> Dictionary:

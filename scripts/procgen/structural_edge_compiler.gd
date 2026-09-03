@@ -941,9 +941,12 @@ func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Di
 # endpoint owner is `room_id`. Returns ok=false if the room does not border
 # the edge or the edge is mis-oriented for the canonical scheme.
 func _cell_for_edge_in_room(room_id: String, room_by_cell: Dictionary, deck: int, parsed: Dictionary) -> Dictionary:
+	# Negative coordinates are legal — they represent cells outside the
+	# canonical zero-origin grid. Only bail when the deck is structurally
+	# invalid (the edge belongs to a different vertical level).
 	var x: int = int(parsed.get("x", -1))
 	var y: int = int(parsed.get("y", -1))
-	if x < 0 or y < 0:
+	if deck < 0:
 		return {"ok": false}
 	var direction: String = ""
 	var primary: Vector2i = Vector2i.ZERO

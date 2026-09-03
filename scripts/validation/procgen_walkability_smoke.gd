@@ -44,6 +44,29 @@ func _initialize() -> void:
 		return
 	var occupancy: Dictionary = occupancy_variant
 	var edges: Dictionary = edges_variant
+	# The walkability contract depends on the compiler's floor placement
+	# bijection. Surface the floor_placements contract here so the smoke
+	# doubles as a regression check that the canonical plan still exposes
+	# a non-empty floor_placements array.
+	var floor_placements_variant: Variant = structural_plan.get("floor_placements", null)
+	if not (floor_placements_variant is Array) or (floor_placements_variant as Array).is_empty():
+		_fail(label, "canonical floor_placements missing")
+		return
+	# Reject duplicate edge placements — the compiler guarantees a unique
+	# edge_key per placement, so any duplicate here is a regression in the
+	# canonical plan. Surface it so the smoke doubles as a duplicate-edge
+	# regression check.
+	var seen_edge_keys: Dictionary = {}
+	for placement_variant in structural_plan.get("placements", []):
+		if typeof(placement_variant) != TYPE_DICTIONARY:
+			continue
+		var placement_edge_key: String = str((placement_variant as Dictionary).get("edge_key", ""))
+		if placement_edge_key.is_empty():
+			continue
+		if seen_edge_keys.has(placement_edge_key):
+			_fail(label, "duplicate edge placement=%s" % placement_edge_key)
+			return
+		seen_edge_keys[placement_edge_key] = true
 
 	var enclosure: Dictionary = WalkabilityContractScript.build_adjacency(occupancy, edges, layout, false)
 	var start_key: String = str(occupancy.keys()[0])
