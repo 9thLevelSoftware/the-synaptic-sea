@@ -2205,3 +2205,68 @@ def test_task9_parity_proof_records_structural_only_acceptance_boundary():
         "structural plan drift",
     ):
         assert required.lower() in proof.lower()
+
+
+def test_template_b_authored_arc_side_endpoint_compiles_from_real_topology(tmp_path: Path):
+    result = _run_validator_probe(
+        tmp_path,
+        """
+        var text: String = FileAccess.get_file_as_string("res://data/procgen/golden/coherent_ship_002/layout.json")
+        var parsed: Variant = JSON.parse_string(text)
+        if not (parsed is Dictionary):
+            _fail("Template-B layout did not parse as a Dictionary")
+        else:
+            var topology: Dictionary = parsed
+            var embedded_plan_variant: Variant = topology.get("structural_plan", null)
+            if not (embedded_plan_variant is Dictionary):
+                _fail("Template-B layout has no embedded structural_plan")
+            else:
+                var embedded_plan: Dictionary = embedded_plan_variant
+                if not bool(embedded_plan.get("validated", false)):
+                    _fail("Template-B embedded structural_plan is not validated")
+                if not (embedded_plan.get("errors", []) as Array).is_empty():
+                    _fail("Template-B embedded structural_plan has errors")
+            topology.erase("structural_plan")
+            var plan: Dictionary = Compiler.new().compile(topology)
+            var second_plan: Dictionary = Compiler.new().compile(topology)
+            if JSON.stringify(plan) != JSON.stringify(second_plan):
+                _fail("Template-B production compiler output is not stable across equivalent compiles")
+            var verdict: Dictionary = Validator.new().validate(plan, topology)
+            var errors: Array = verdict.get("errors", [])
+            if not errors.is_empty():
+                _fail("production validator errors: " + JSON.stringify(errors))
+
+            var edges: Dictionary = plan.get("edges", {})
+            var edge_variant: Variant = edges.get("0|h|-1|2", null)
+            if not (edge_variant is Dictionary):
+                _fail("missing compiled corridor_to_arc_side edge")
+            else:
+                var edge: Dictionary = edge_variant
+                var occupancy: Dictionary = plan.get("occupancy", {})
+                var source_cells: Array = edge.get("source_cells", [])
+                var room_ids: Array = edge.get("room_ids", [])
+                if source_cells.size() != 2 or room_ids.size() != 2:
+                    _fail("corridor_to_arc_side endpoint metadata is incomplete")
+                else:
+                    var has_corridor_endpoint := false
+                    var has_arc_endpoint := false
+                    for index in source_cells.size():
+                        var source: Array = source_cells[index]
+                        var source_key: String = Compiler.cell_key(int(source[2]), Vector2i(int(source[0]), int(source[1])))
+                        if source_key == "0|2|0":
+                            has_corridor_endpoint = true
+                        elif source_key == "0|2|-1":
+                            has_arc_endpoint = true
+                        if not occupancy.has(source_key):
+                            _fail("edge endpoint leaves occupancy: 0|h|-1|2")
+                            continue
+                        var endpoint_owner: String = str((occupancy[source_key] as Dictionary).get("room_id", ""))
+                        if endpoint_owner != str(room_ids[index]):
+                            _fail("edge endpoint ownership mismatch: 0|h|-1|2")
+                    if not has_corridor_endpoint or not has_arc_endpoint:
+                        _fail("corridor_to_arc_side source_cells are not the cardinal endpoints")
+                    if str(edge.get("owner_room", "")) != str(room_ids[0]) or str(edge.get("other_room", "")) != str(room_ids[1]):
+                        _fail("edge owner/other room parity mismatch: 0|h|-1|2")
+        """,
+    )
+    _assert_validator_probe_passed(result)
