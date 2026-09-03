@@ -472,7 +472,9 @@ def _part_category(part: Any) -> str | None:
 
 def _part_budget(part: Any) -> int:
     value = part.get("triangle_budget", 0) if isinstance(part, Mapping) else 0
-    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0 or value > MAX_TRIANGLES:
+        return MAX_TRIANGLES + 1
+    return value
 
 
 def _part_descriptor_count(part: Any) -> int:
@@ -535,7 +537,9 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
         core_part_id = core_record.get("part_id")
         if not isinstance(core_instance, str) or not core_instance:
             _append(errors, "recipe.core.instance_id: must be a non-empty string")
-        if not isinstance(core_part_id, str) or core_part_id not in parts:
+        if not isinstance(core_part_id, str):
+            _append(errors, "recipe.core.part_id: must be a string")
+        elif core_part_id not in parts:
             _append(errors, f"recipe.core.part_id: unknown part_id '{core_part_id}'")
         else:
             core_part = parts[core_part_id]
@@ -575,7 +579,10 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
             _append(errors, f"{path}.instance_id: duplicate instance_id '{instance_id}'")
         if not isinstance(parent_id, str) or not parent_id:
             _append(errors, f"{path}.parent_instance_id: must be a non-empty string")
-        if not isinstance(part_id, str) or part_id not in parts:
+        if not isinstance(part_id, str):
+            _append(errors, f"{path}.part_id: must be a string")
+            child_part = None
+        elif part_id not in parts:
             _append(errors, f"{path}.part_id: unknown part_id '{part_id}'")
             child_part = None
         else:
@@ -704,7 +711,9 @@ def validate_recipe_catalog(document: object, part_catalog: Mapping[str, Any]) -
         elif value != EXPECTED_POOLS[pool_id]:
             _append(errors, f"archetype_pools.{pool_id}: value does not match canonical pool")
         for recipe_id in value if isinstance(value, list) else []:
-            if not isinstance(recipe_id, str) or recipe_id not in recipes:
+            if not isinstance(recipe_id, str):
+                _append(errors, f"archetype_pools.{pool_id}: recipe id must be a string")
+            elif recipe_id not in recipes:
                 _append(errors, f"archetype_pools.{pool_id}: unknown recipe id '{recipe_id}'")
     return sorted(set(errors))
 

@@ -572,3 +572,96 @@ def test_known_pool_rejects_unknown_recipe_id() -> None:
     document = recipes()
     document["archetype_pools"]["stalker"].append("unknown_recipe")
     assert_has(validate_recipe_catalog(document, part_map()), "archetype_pools.stalker: unknown recipe id")
+
+
+def test_oversized_integer_reference_and_budget_diagnostics_are_stable() -> None:
+    huge = 10**10000
+    cases = []
+
+    malformed = recipe()
+    malformed["core"]["part_id"] = huge
+    cases.append(validate_recipe(malformed, part_map()))
+
+    malformed = recipe()
+    malformed["attachments"][0]["part_id"] = huge
+    cases.append(validate_recipe(malformed, part_map()))
+
+    malformed = recipes()
+    malformed["recipes"]["biped_puppet_v1"]["core"]["part_id"] = huge
+    cases.append(validate_recipe_catalog(malformed, part_map()))
+
+    malformed = recipes()
+    malformed["recipes"]["biped_puppet_v1"]["attachments"][0]["part_id"] = huge
+    cases.append(validate_recipe_catalog(malformed, part_map()))
+
+    malformed = recipes()
+    malformed["archetype_pools"]["stalker"] = [huge, "four_legged_scrambler_v1"]
+    cases.append(validate_recipe_catalog(malformed, part_map()))
+
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_humanoid_torso_v1"]["triangle_budget"] = huge
+    cases.append(validate_recipe(recipe(), catalog))
+
+    for errors in cases:
+        assert isinstance(errors, list)
+        assert all(isinstance(error, str) for error in errors)
+        assert errors == sorted(set(errors))
+
+    assert_has(cases[0], "recipe.core.part_id")
+    assert_has(cases[1], "recipe.attachments[0].part_id")
+    assert_has(cases[2], "recipe.core.part_id")
+    assert_has(cases[3], "recipe.attachments[0].part_id")
+    assert_has(cases[4], "archetype_pools.stalker")
+    assert_has(cases[5], "triangle limit exceeded")
+
+
+def test_cli_reports_oversized_integer_diagnostics_without_traceback(tmp_path: Path) -> None:
+    huge_digits = "9" * 10000
+    parts_text = json.dumps(parts()).replace(
+        '"triangle_budget": 2500',
+        f'"triangle_budget": {huge_digits}',
+        1,
+    )
+    recipes_text = json.dumps(recipes())
+    recipes_text = recipes_text.replace(
+        '"core": {"instance_id": "core", "part_id": "biomass_humanoid_torso_v1"}',
+        f'"core": {{"instance_id": "core", "part_id": {huge_digits}}}',
+        1,
+    )
+    recipes_text = recipes_text.replace(
+        '"part_id": "biomass_human_arm_v1"',
+        f'"part_id": {huge_digits}',
+        1,
+    )
+    recipes_text = recipes_text.replace(
+        '"stalker": ["biped_puppet_v1", "four_legged_scrambler_v1"]',
+        f'"stalker": [{huge_digits}, "four_legged_scrambler_v1"]',
+        1,
+    )
+    part_path = tmp_path / "parts.json"
+    recipe_path = tmp_path / "recipes.json"
+    part_path.write_text(parts_text, encoding="utf-8")
+    recipe_path.write_text(recipes_text, encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--project-root",
+            str(ROOT),
+            "--parts",
+            str(part_path),
+            "--recipes",
+            str(recipe_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert result.stderr == ""
+    assert "Traceback" not in result.stdout
+    assert "ERROR: parts:" in result.stdout
+    assert "ERROR: recipes:" in result.stdout
+    assert all(line.startswith("ERROR: ") for line in result.stdout.splitlines())
