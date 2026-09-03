@@ -40,6 +40,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
 | 0058 | docs/game/adr/0058-meshy-candidates-blender-authority.md | Meshy candidate-only generation, Blender canonical masters, staged review, and Godot runtime authority |
 | 0059 | docs/game/adr/0059-procedural-biomass-assembly.md | Procedural biomass assembly: modular body-part threats replace singular creature models |
+| 0060 | docs/game/adr/0060-restore-3d-production-path.md | Accepted locked-isometric 3D production path; supersedes ADR-0048 in part |
 
 ## Notes
 
