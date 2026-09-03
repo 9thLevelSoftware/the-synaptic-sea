@@ -2033,8 +2033,9 @@ runtime source, and promotion is always a separate reviewed task.
 - Acceptance criteria:
   - Random recipes draw only from the canonical catalog, pass the same graph and locomotion checks as curated recipes, and are byte-deterministic for a fixed seed.
   - The six archetype pools remain deterministic and contain only the five curated recipe IDs.
+  - New records may select/generate; restored biomass records never regenerate. Missing/invalid recipe or seed yields a stable diagnostic and whole-threat fallback, while dead restored records remain dead and create no visual/fallback.
 - Verification:
-  - Future seeded recipe-generation smoke and repeated canonical serialization comparison.
+  - Seeded recipe-generation smoke, repeated canonical serialization comparison, and Task 7 restore-matrix smoke with defensive sorted/deduplicated `ThreatManager.get_restore_diagnostics()`.
 
 ## REQ-BIO-006: Five locomotion gait profiles
 
@@ -2065,9 +2066,11 @@ runtime source, and promotion is always a separate reviewed task.
 - Rationale: Reloading an assembled threat must restore its authored graph rather than silently generating a different threat.
 - Acceptance criteria:
   - Save/load preserves recipe ID, locomotion hint, core instance/part, every attachment instance/part, parent instance, parent socket, child root socket, and connector part ID exactly.
-  - The restored graph revalidates without regeneration or catalog mutation.
+  - The restored graph revalidates without regeneration or catalog mutation; malformed records are deterministically omitted/rejected.
+  - `_build_run_snapshot(use_home_ship_summary=false)` serializes home-ship combat when away; `_build_world_snapshot()` syncs active derelict combat once. Load restores home and active combat once each, proven by distinct fingerprints.
+  - After successful `save_load_service.save_world(ws)`, legacy `last_saved_snapshot` is populated from `_build_run_snapshot(away_from_start)`; failed saves never set it and the saved `WorldSnapshot` remains authoritative.
 - Verification:
-  - Future recipe persistence round-trip smoke with canonical recipe bytes.
+  - `biomass_revisit_persistence_smoke.gd` with home-vs-active fingerprints, failed-save/non-null-after-success assertions, and canonical recipe bytes.
 
 ## REQ-BIO-008: Exact eight-part candidate set
 
@@ -2094,9 +2097,11 @@ runtime source, and promotion is always a separate reviewed task.
 - Acceptance criteria:
   - Five recipes are reviewed at seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting: exactly 30 composite captures.
   - All six 3D archetype pools remain covered during the singular-threat migration.
+  - `biomass_visual_review.gd` uses production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, `SliceAtmosphereApplier`, and the exact validation seam; it does not create a neutral standalone camera/floor/environment.
+  - `--visual-stage` is exactly `placeholder|final`, with separate fixed evidence roots; Task 8 runs placeholder only and Task 15 runs final. Each case records exact recipe node/triangle oracles, nodes `<=160`, triangles `<=24000`, finite AABB extents `0.05–20m`, collision/ray metrics, and frozen paired-camera readability values (RGB delta `>=8/255`, changed pixels `>=64`, changed bbox width/height `>=8px`).
   - Unexpected Godot `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks acceptance.
 - Verification:
-  - Future locked-isometric runtime review and capture manifest.
+  - Canonical `biomass_composite_review.py` manifest `run`/`verify`, protected-surface path+SHA snapshot, and manual inspection of all 30 captures.
 
 ## REQ-BIO-010: No auto-promotion or gameplay duplication
 
@@ -2109,6 +2114,8 @@ runtime source, and promotion is always a separate reviewed task.
   - No provider calls or writes to `assets/imported`, exported GLBs, `scenes/wrappers`, or unrelated threat catalogs occur during catalog validation.
   - Promotion remains a separate human-reviewed action.
   - Collision, navigation, sockets/connectors, integrity, and gameplay bindings remain repository/Godot-owned.
+  - `meshy_blender_validate.py` rejects recursively any GLB node extras key or string value containing case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`; benign extras such as `{source:"meshy"}` and visual-only no-helper GLBs remain valid.
+  - `BiomassAssembler` validates every instantiated placeholder/wrapper before accepting it and rejects/frees the whole assembly with stable diagnostics on failure.
 - Verification:
   - Exact biomass validator CLI and focused tests.
   - `git diff -- assets/imported scenes/wrappers data/combat/threat_visual_catalog.json` remains empty during this task.
