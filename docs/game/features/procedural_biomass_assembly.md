@@ -27,6 +27,25 @@ are visual-only and contain no socket markers, marker empties, collision shapes,
   assembly-graph persistence shape.
 - Placeholder-first, locked-isometric review planning for all 30 composite captures.
 
+### Runtime restoration and validation seam (Tasks 7–9)
+
+New records may select or generate a recipe. Restored biomass records never regenerate: the saved
+recipe and nonzero seed are authoritative. Missing/invalid recipe or seed yields a stable diagnostic
+and whole-threat fallback; malformed records are deterministically omitted/rejected; dead restored
+records remain dead and create neither visual nor fallback. `ThreatManager.get_restore_diagnostics()`
+returns a defensive sorted/deduplicated `PackedStringArray`. Fallback uses the existing plain
+placeholder metadata `biomass_whole_threat_fallback=true` and
+`biomass_fallback_reason=<stable diagnostic key>`.
+
+`PlayableGeneratedShip.inject_biomass_validation_encounter(archetype_id: String, recipe_id: String,
+seed: int, world_position: Vector3) -> Variant` is the public validation seam. It delegates to the
+manager, uses valid loaded catalogs and exact recipe ID/seed, and returns the exact assembled/fallback
+visual or `null`; production spawn semantics remain unchanged. `_build_run_snapshot(use_home_ship_summary=false)`
+uses home-ship combat when away, while `_build_world_snapshot()` syncs active derelict combat once.
+Load restores home and active combat once each, proven by distinct fingerprints. Legacy
+`last_saved_snapshot` is assigned only after successful `save_load_service.save_world(ws)` and is not
+authoritative over the saved `WorldSnapshot`.
+
 ### Out of scope for this contract task
 
 - Meshy/provider calls, candidate generation, Blender authoring, or asset promotion.
@@ -34,6 +53,25 @@ are visual-only and contain no socket markers, marker empties, collision shapes,
 - Procedural deformation or skeletal/IK animation.
 - Real-time part swapping, part physics interaction, player-created threats, and damage visuals.
 - Any mutation of `threat_visual_catalog.json`, exported assets, or wrapper scenes.
+
+### Asset pipeline readiness boundary (Tasks 10–15)
+
+The optional Meshy-to-Blender path remains candidate-only until a human-approved preview. Public
+recipe resolution has a non-overridable external root: the exact `source/<asset_id>/<asset_id>_master.blend`
+and `live-pilot/<asset_id>/<task_id>/` paths under `/Volumes/Untitled/SynapticSeaAssets/meshy/`.
+Only tests may inject `RecipeRoots`. The five modes are `archive-raw`, `rehydrate-raw`, `preview`,
+`approve-preview`, and `publish-cleaned`; archive works without a master, rehydrate uses neither
+master nor Blender, and Blender modes require the exact regular master. Task 10 creates the
+external archive; Task 14 order is rehydrate-raw → `meshy_blender_master` (create once) → preview
+→ human inspection/approval → publish.
+
+Preview atomically publishes the scratch GLB, five renders, and closed `biomass-part-preview.json`.
+Approval is no-Blender/no-provider and immutably binds reviewer plus preview-manifest, render, GLB,
+contract, catalog, generation, raw, archive, and master hashes. Publish reruns Blender privately,
+compares the exact approved baseline, and only then writes task-local `cleaned.glb` and closed
+`biomass-part-recipe.json`; an existing recipe permits only byte-identical idempotence. External
+leaves are preflighted, mode `0600`, non-symlink regular files, and staged under the validated
+external evidence directory as the atomic allowed root with rollback on injected failure.
 
 ## Canonical data contract
 
@@ -114,6 +152,17 @@ instance, part, parent, socket, child root, connector, and locomotion hint.
 
 ### Runtime visual and gait boundary (Tasks 5–7)
 
+Task 5 acceptance uses the final assembly smoke rather than intermediate preload-failure evidence.
+Its fixture inventory includes the closed invalid-wrapper catalog, valid core/nested wrappers,
+non-PackedScene and forbidden-physics wrappers, a node-overflow wrapper, and a predelete probe.
+The factory validates before allocation; wrapper validation occurs before cache/retention; and every
+off-tree rejection synchronously frees partial and unattached nodes. Recursive socket lookup is
+unique and independent of child ordering, with ancestor transform composition. Complete core/child
+transform and collision maps include connector occurrences. Loader-valid node and triangle overflow
+fixtures must exceed 160 and exactly 30000 respectively before rejection, with exact diagnostics;
+failure diagnostics are sorted, deduplicated, and byte-identical on repetition. The smoke proves
+behavioral free/tree-removal evidence, not a copied RID validity bit.
+
 When parts and attachment mounts are registered, `BiomassThreatVisual` stores immutable
 assembly-rest `Transform3D` value copies. Part rests are immediate-parent-local `.transform` values:
 visual-local for the core and mount-local for attachment children. Mount rests are visual-root-local
@@ -158,7 +207,13 @@ materialized only as disabled `CollisionShape3D` nodes for uniform deterministic
 must never participate in gameplay collision or physics queries.
 
 The review matrix is five recipes × seeds `42` and `777` × `normal`, `emergency`, and `dark`
-lighting: exactly 30 composite captures. All six 3D archetype pools remain covered during the
+lighting: exactly 30 composite captures. The runner has explicit `--visual-stage {placeholder,final}`
+and fixed placeholder/final roots; Task 8 runs placeholder only, while Task 15 runs final. Captures
+use production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, and `SliceAtmosphereApplier`, not
+a standalone floor/camera/environment. Every case records exact recipe node/triangle oracles, caps
+of 160 nodes and 24,000 triangles, finite 0.05–20 m AABB extents, collision counts and mask-1 ray
+proof, plus frozen paired-camera readability values (RGB delta threshold 8/255, at least 64 changed
+pixels and an 8×8 changed bounding box). All six 3D archetype pools remain covered during the
 singular-threat migration. The migration from `threat_visual_catalog.json` is a separate reviewed
 runtime task.
 
@@ -171,6 +226,13 @@ runtime task.
   and malformed graphs are rejected with stable sorted diagnostics.
 - All 30 review captures are required before visual promotion; Meshy candidate output never
   auto-promotes or mutates repository catalogs, wrappers, or imported assets.
+- Closed in-tool validators define exact fields for source-raw, preview, preview-approval, and
+  recipe records; low-poly status is exactly `low_poly_target` with `status` `met` or
+  `review_required`, target/measured triangle counts, and hard maximum. Above hard maximum blocks.
+- Task 12 persists exactly eight canonical plans at `assets/_staging/meshy/_plans/<asset_id>.json`
+  and a mode-`0600` `biomass_reference_audit.json` with `status:"pass"`; each plan records both
+  `request_plan_file_sha256` and `provider_payload_sha256`. The audit rejects undersized,
+  transparent, duplicate, symlink, collage, or disconnected references before paid generation.
 
 ## Verification commands
 
@@ -181,6 +243,44 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m py
   --parts data/combat/biomass_part_catalog.json \
   --recipes data/combat/biomass_recipe_catalog.json
 ```
+
+## Tasks 13–15 pilot execution contract
+
+Task 13 is a paid, serial candidate stage owned exclusively by `tools/biomass_candidate_batch.py`.
+Its read-only preflight authenticates the exact Task 12 plan/audit/pricing/reference hashes and
+proves no prior journal or task directory exists; it recomputes the live plan immediately because
+`meshy_stage.py generate` has no plan-SHA argument. All commands pin
+`data/asset_generation/meshy_pricing_v1.json`. The stage is exactly eight journals × four unique
+tasks (32 candidates), cost 5, approved/max 20 per asset, aggregate max 160 and actual <=160.
+Unknown POST/SUBMITTING without an ID resumes then stops for reconciliation; known IDs/UNCERTAIN
+resume; bound FAILED with a failure record and contiguous pending suffix continues then verifies.
+Existing inventory never starts a new generate. Reconcile writes the canonical batch manifest.
+Pillow renders deterministic 2x2 1024px contact sheets; tracked JSON binds four task IDs and all
+input/output hashes, while PNGs remain ignored. All eight sheets are built before selection, and
+each selection immediately archives raw evidence externally before commit.
+
+Task 14 starts each selected asset with `rehydrate-raw`, never `archive-raw`, and uses a fail-fast
+variable-pinned loop with fixed reviewer and pricing/catalog hashes. The Blender master is immutable
+and create-once; an existing bound master is verified and never rerun. The order is rehydrate,
+master, preview, human inspection, approve-preview, publish-cleaned. Fresh checkouts explicitly
+restore fixed evidence permissions (directory 0700, 18 PNGs and review JSON 0600). Runtime review
+transitions to `promotion_ready`; the candidate-review `verify` command is verify-only. The exact
+commit inventory is eight selected records and eight fixed 18-PNG runtime leaves, with no binaries,
+unselected tasks, contact sheets, or temporary files.
+
+Task 15 is exclusively written by `tools/biomass_pilot_promote.py` (`plan`, `apply`, `verify`,
+`rollback`, `finalize`). Plan preflights all eight packets against one pre-mutation catalog and a
+protected prestate digest. Apply stages all GLBs, deterministic thin wrappers, catalog bytes and
+import targets in a restrictive transaction journal; wrappers are Node3D + one imported GLB child
+plus direct plain Node3D catalog sockets, with no collision/physics/animation. Publication accepts
+only absent or byte-identical targets. Two Godot 4.7.1 imports must yield eight stable descriptors
+and no `.godot/imported` staging. Every import/validation failure rolls back only newly created
+hash-matching leaves and catalog bytes; interruption blocks until rollback or exact recovery.
+Final review uses `--visual-stage final` at `artifacts/validation-previews/biomass-assembly-final`
+and requires exactly 30 cases, caps, collision/LOS/readability, and visual approval. The executable
+playable smoke proves eight wrappers, six archetypes, five gaits, kill/travel, and exact save/load
+recipe/seed/graph/transform/collision fingerprints, printing the canonical pilot marker. Only
+`finalize` may set this feature to Implemented; ADR-0059 remains Accepted.
 
 ## Open questions
 

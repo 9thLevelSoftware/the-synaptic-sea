@@ -4,6 +4,53 @@
 
 No completion claim without fresh validation evidence.
 
+## Procedural biomass assembly Tasks 7–9 — execution contracts
+
+Task 7 must load the valid production part/recipe catalogs and inject malformed or incompatible
+restored `biomass_recipe` dictionaries to exercise `BiomassRecipe.from_dict` →
+`BiomassAssembler.build`; an invalid catalog fixture is not valid evidence because the library rejects
+it before assembly. The restore matrix proves new records may generate, restored records never
+regenerate, missing/invalid recipe or seed yields stable diagnostics plus whole-threat fallback, dead
+records remain dead with no visual/fallback, malformed records are deterministically rejected, and
+`ThreatManager.get_restore_diagnostics()` is defensive, sorted, and deduplicated. Fallback metadata is
+exactly `biomass_whole_threat_fallback=true` and `biomass_fallback_reason=<stable diagnostic key>`.
+The smoke preloads and exact-script-compares Task 5/6 dependencies (PartCatalog, Recipe,
+RecipeLibrary, Generator, PlaceholderFactory, BiomassThreatVisual, BiomassAssembler, GaitController).
+`_build_run_snapshot(use_home_ship_summary=false)` distinguishes home-ship combat from the active
+derelict; world sync/load restore each once and assert distinct fingerprints. `last_saved_snapshot`
+is non-null only after successful `save_load_service.save_world(ws)`; the saved WorldSnapshot is the
+authority. The public seam is
+`PlayableGeneratedShip.inject_biomass_validation_encounter(archetype_id, recipe_id, seed,
+world_position)`.
+
+Task 8 uses `biomass_visual_review.gd` against production `scenes/main.tscn`, waits for
+`PlayableGeneratedShip`, uses its `IsoCameraRig`, injects the exact recipe/seed through the seam,
+and applies `breach_field` through `SliceAtmosphereApplier`; no neutral standalone floor/camera/
+environment is permitted. Lighting is exactly `normal`, `emergency`, `dark`, matrix 5×2×3=30.
+`--visual-stage` is exactly `{placeholder,final}` with fixed roots
+`artifacts/validation-previews/biomass-assembly-placeholder/` and
+`artifacts/validation-previews/biomass-assembly-final/`; Task 8 runs placeholder only and Task 15
+runs final. Placeholder requires empty wrapper paths and PrimitiveMesh part meshes; final requires
+nonempty wrapper paths and no PrimitiveMesh. Each case records exact recipe node/triangle oracles,
+nodes <=160, triangles <=24000, finite AABB extents 0.05–20m, collision/connector/direct-child/layer-
+mask=1 counts, and mask-1 ray-hit/miss after queue_free+frames. Frozen paired-camera readability
+uses RGB delta >=8/255, changed_pixels >=64, changed bbox width/height >=8px. The runner rejects
+all unallowlisted WARNING/ERROR/SCRIPT ERROR output (only named teardown diagnostics allowed),
+snapshots protected regular-file paths+SHA before/after, writes privately then atomically publishes,
+and cleans failed/stale outputs. `biomass_composite_review.py` is the sole canonical manifest writer;
+the manifest owns all 30 case IDs, commands/output, commit, Godot version, stage, input/output hashes,
+metrics, and protected digests; verify recomputes them. Proof stores only manifest path+SHA.
+
+Task 9 adds `tools/meshy_blender_validate.py` and `scripts/threats/biomass_assembler.gd` to its exact
+file scope. RED tests first prove current acceptance of mesh-node extras `{"biomass_socket":true}`.
+Production validation then recursively rejects every GLB node extras key or string value containing
+case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`, including hidden/mesh nodes;
+benign `{source:"meshy"}` and visual-only no-helper fixtures pass. Godot signatures remain
+headless-safe (`validate_part(instance:Node3D, entry:Dictionary)` and
+`validate_assembly(visual:Variant, recipe:Variant, parts:Variant)`), with exact preloaded script
+identity checks. The assembler validates every placeholder/wrapper before accepting it and frees the
+whole assembly on diagnostics; ADR-0058 remains authoritative.
+
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
 Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
@@ -154,6 +201,74 @@ six runtime captures in this phase; the real candidate lifecycle is pending the 
 pilot. Runtime review, the binder, and the proposal command never write live catalogs, generated
 indexes, wrappers, or imported assets. The promotion packet is a proposal only and application
 requires a separate reviewed task.
+
+### Biomass Tasks 10–12 readiness and Task 14/15 ordering
+
+Before paid generation, Task 8's proof must exist and Task 12 must pass the stdlib reference audit
+for exactly eight `three_quarter` PNGs (decoded dimensions ≥1024×1024, opaque alpha, one central
+connected foreground component ≥90%, no second component ≥5%, non-border bounding box, unique
+regular non-symlink paths, project-owned rights). Persist exactly eight canonical mode-`0600` plans
+at `assets/_staging/meshy/_plans/<asset_id>.json` and the canonical mode-`0600` audit manifest; run
+each plan twice and require both parsed records to be byte-identical. Record
+`request_plan_file_sha256` and `provider_payload_sha256`; every plan has candidate count 4, cost 5,
+maximum 20, `should_texture=false`, aggregate maximum 160. The audit must report `status:"pass"`.
+
+Task 10's fixed sequence is archive raw → create the exact external Blender master → preview →
+human inspection and `--mode approve-preview --reviewer <non-empty>` → publish-cleaned. Archive
+does not require a master; rehydrate requires neither master nor Blender. Preview directly calls
+`meshy_blender_validate.validate_cleaned_glb(cleaned_preview_path, contract, task_id=...)` and runs
+the node/extras policy; the generic validator CLI/report remains after task-local `cleaned.glb`.
+Approval performs no Blender/provider work and binds the preview-manifest SHA, all five render
+hashes, preview GLB hash, and contract/catalog/generation/raw/archive/master hashes. Publish must
+privately reproduce that exact baseline and may not bypass approval; an existing recipe manifest
+is accepted only byte/hash-identically.
+
+Public path resolution accepts only `/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/`
+and `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<task_id>/`; injected roots
+are test-only. All external coupled leaves are preflighted as regular non-symlink mode-`0600`
+files, staged under the validated evidence directory as the atomic allowed root, and tested for
+rollback after injected failure. Task 11 uses the exact biomass builder/writer APIs and closed
+`biomass_part_catalog_patch_v1`, `biomass_wrapper_proposal_v1`, and existing `asset_provenance`
+records; its hash matrix is generation(task/asset/contract/raw), source-raw(generation/raw/archive),
+recipe(contract/catalog/generation/raw/archive/master/cleaned/approval), Blender(task/contract/
+cleaned, `master_provenance:null`), and runtime(task/asset/contract/cleaned/Blender-report/captures).
+
+Task 13 is validated with `biomass_candidate_batch.py` tests and a no-provider fake client. For
+each asset, read-only preflight must prove exact Task 12 plan/audit/pricing/reference hashes and
+absence of prior state before recomputing the live plan. Reconcile requires exactly eight completed
+journals, 32 globally unique task IDs, four candidates per journal, cost 5, per-asset max/approved
+20, aggregate max 160, and actual <=160. Ambiguous POST/SUBMITTING states with no ID must resume
+and stop for reconciliation; no path may blindly POST or rerun generate. All eight deterministic
+2x2/1024px Pillow contact sheets and tracked hash-binding JSON records are required before selection;
+each selected raw source is archived and verified before commit.
+
+Task 14 verification begins with no-provider `rehydrate-raw`, checks the create-once immutable
+master and fixed reviewer/hash variables, and enforces preview -> human approval -> publish. Fresh
+checkouts restore the fixed runtime evidence directory to 0700 and its 18 PNGs plus review JSON to
+0600 before inventory verification. Runtime review performs the binder transition to
+`promotion_ready`; `meshy_candidate_review.py verify` is verify-only. The commit inventory is
+programmatically checked for exactly eight selected records and eight 18-PNG runtime leaves.
+
+Task 15 is tested through failure injection after every publication/import/validation stage. The
+promotion tool alone may write, and its durable transaction must prove all-or-none rollback, stable
+double-imported descriptors, no `.godot/imported` staging, and no overwrite of mismatched targets.
+The final composite command is `--visual-stage final` with report/root
+`artifacts/validation-previews/biomass-assembly-final`; exactly 30 cases, no PrimitiveMesh, node
+<=160 and triangle <=24000, collision/LOS/readability, and visual approval are mandatory. The
+executable playable smoke must emit exactly
+`BIOMASS PLAYABLE PILOT PASS wrappers=8 archetypes=6 gaits=5 kill=true travel=true save_load=true`
+after exercising all five gaits, kill/travel, and exact save/load fingerprints. `finalize` is the
+only status transition to Implemented.
+
+Focused readiness command:
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q \
+  tests/test_meshy_biomass_part_recipe.py tests/test_biomass_reference_audit.py \
+  tests/test_meshy_promotion_packet.py tests/test_meshy_governance.py \
+  tests/test_meshy_candidate_review.py tests/test_meshy_runtime_review.py \
+  tests/test_meshy_blender_tools.py
+```
 
 ### Existing Godot regression smokes — current commands
 

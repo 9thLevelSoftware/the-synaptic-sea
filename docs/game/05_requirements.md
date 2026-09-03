@@ -2013,6 +2013,9 @@ runtime source, and promotion is always a separate reviewed task.
 - Rationale: The runtime assembler must apply repository socket-space graphs without moving gameplay authority into visual assets, and gait setup must fail closed before an invalid visual becomes live.
 - Acceptance criteria:
   - A per-manager `RefCounted` assembler creates wrapper-owned runtime nodes under the calling threat manager; no assembler or gait controller autoload, shared service, or scene-tree controller is introduced.
+  - The final Task 5 fixture inventory includes the closed invalid-wrapper catalog, valid core/nested wrappers, non-PackedScene and forbidden-physics wrappers, a node-overflow wrapper, and a predelete probe. The primitive factory validates before allocation; wrapper validation occurs before caching/retention; every off-tree failure synchronously frees partial and unattached nodes.
+  - Socket lookup recursively requires exactly one order-independent match and composes transforms through all ancestors. Complete core/child transform and collision maps include connector occurrences; repeated failures emit sorted, deduplicated, byte-identical diagnostics.
+  - Loader-valid node- and triangle-overflow fixtures are non-vacuous: measured counts exceed the exact 160-node and 30000-triangle caps before rejection, with exact overflow diagnostics. The factory and assembler do not leak nodes on rejection.
   - Each assembled `BiomassThreatVisual` owns exactly one private `RefCounted` gait controller and records immutable assembly-rest transforms without adding Nodes or changing node/triangle/collision counts: each part rest is immediate-parent-local (visual-local core or mount-local child), while each direct-child mount rest is visual-root-local.
   - The visual exposes `part_rest_transform(instance_id: String) -> Variant` and `attachment_rest_transform(instance_id: String) -> Variant`, returning the corresponding local `Transform3D` for a known ID and `null` otherwise; reset restores mounts then parts directly and never assigns visual-root-local `part_to_visual` to a mount-parented child.
   - `configure_gait(parts, recipe, biomass_seed)` is called only after `assembler.build(recipe, parts)` succeeds and before scene-tree registration or gait stepping; false frees the visual synchronously and selects the existing whole-threat primitive fallback.
@@ -2020,7 +2023,7 @@ runtime source, and promotion is always a separate reviewed task.
   - Godot wrappers own collision, navigation, connectors, and gameplay bindings; the core, visual/root transform, world position, recipe, AI state, meshes, and bones remain under their existing authorities.
   - A core may be a skull; a torso is not mandatory.
 - Verification:
-  - `scripts/validation/biomass_assembly_smoke.gd` for rest APIs, fail-closed setup, exact assembly preservation, and the Task 6 gait marker.
+  - `scripts/validation/biomass_assembly_smoke.gd` for the final five-recipe oracles, rest APIs, fail-closed setup, recursive/order-independent sockets, behavioral synchronous-free evidence, non-vacuous overflow probes, exact assembly preservation, and the Task 6 gait marker.
   - `scripts/validation/biomass_threat_manager_smoke.gd` for six configured archetype visuals, no controller Node child, and exactly one whole-threat fallback for the invalid fixture.
 
 ## REQ-BIO-005: Deterministic random recipes
@@ -2033,8 +2036,9 @@ runtime source, and promotion is always a separate reviewed task.
 - Acceptance criteria:
   - Random recipes draw only from the canonical catalog, pass the same graph and locomotion checks as curated recipes, and are byte-deterministic for a fixed seed.
   - The six archetype pools remain deterministic and contain only the five curated recipe IDs.
+  - New records may select/generate; restored biomass records never regenerate. Missing/invalid recipe or seed yields a stable diagnostic and whole-threat fallback, while dead restored records remain dead and create no visual/fallback.
 - Verification:
-  - Future seeded recipe-generation smoke and repeated canonical serialization comparison.
+  - Seeded recipe-generation smoke, repeated canonical serialization comparison, and Task 7 restore-matrix smoke with defensive sorted/deduplicated `ThreatManager.get_restore_diagnostics()`.
 
 ## REQ-BIO-006: Five locomotion gait profiles
 
@@ -2065,9 +2069,11 @@ runtime source, and promotion is always a separate reviewed task.
 - Rationale: Reloading an assembled threat must restore its authored graph rather than silently generating a different threat.
 - Acceptance criteria:
   - Save/load preserves recipe ID, locomotion hint, core instance/part, every attachment instance/part, parent instance, parent socket, child root socket, and connector part ID exactly.
-  - The restored graph revalidates without regeneration or catalog mutation.
+  - The restored graph revalidates without regeneration or catalog mutation; malformed records are deterministically omitted/rejected.
+  - `_build_run_snapshot(use_home_ship_summary=false)` serializes home-ship combat when away; `_build_world_snapshot()` syncs active derelict combat once. Load restores home and active combat once each, proven by distinct fingerprints.
+  - After successful `save_load_service.save_world(ws)`, legacy `last_saved_snapshot` is populated from `_build_run_snapshot(away_from_start)`; failed saves never set it and the saved `WorldSnapshot` remains authoritative.
 - Verification:
-  - Future recipe persistence round-trip smoke with canonical recipe bytes.
+  - `biomass_revisit_persistence_smoke.gd` with home-vs-active fingerprints, failed-save/non-null-after-success assertions, and canonical recipe bytes.
 
 ## REQ-BIO-008: Exact eight-part candidate set
 
@@ -2080,7 +2086,11 @@ runtime source, and promotion is always a separate reviewed task.
   - The exact IDs are `biomass_human_arm_v1`, `biomass_insect_leg_v1`, `biomass_cephalopod_tentacle_v1`,
     `biomass_animal_skull_v1`, `biomass_humanoid_torso_v1`, `biomass_gunk_connector_v1`,
     `biomass_claw_v1`, and `biomass_maw_v1`.
-  - Meshy remains candidate-only; no provider call, asset mutation, or automatic promotion occurs in this contract task.
+  - Task 13 produces exactly 32 candidates in eight four-task journals, with cost 5 and approved/max
+    20 per asset, aggregate max 160 and actual <=160; all eight contact sheets are built before
+    one candidate per part is selected and its raw source is archived externally.
+  - Meshy remains candidate-only until the separately reviewed Task 15 promotion transaction; no
+    provider call is permitted during preflight, reconciliation, validation, or catalog checks.
 - Verification:
   - Part catalog validator and ADR-0058 candidate-only gate review.
 
@@ -2094,9 +2104,13 @@ runtime source, and promotion is always a separate reviewed task.
 - Acceptance criteria:
   - Five recipes are reviewed at seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting: exactly 30 composite captures.
   - All six 3D archetype pools remain covered during the singular-threat migration.
+  - `biomass_visual_review.gd` uses production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, `SliceAtmosphereApplier`, and the exact validation seam; it does not create a neutral standalone camera/floor/environment.
+  - `--visual-stage` is exactly `placeholder|final`, with separate fixed evidence roots; Task 8 runs placeholder only and Task 15 runs final. Each case records exact recipe node/triangle oracles, nodes `<=160`, triangles `<=24000`, finite AABB extents `0.05–20m`, collision/ray metrics, and frozen paired-camera readability values (RGB delta `>=8/255`, changed pixels `>=64`, changed bbox width/height `>=8px`).
+  - Task 14 runtime review owns the transition to `promotion_ready`; Task 15 uses `--visual-stage final`
+    at `artifacts/validation-previews/biomass-assembly-final` and cannot finalize without visual approval.
   - Unexpected Godot `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks acceptance.
 - Verification:
-  - Future locked-isometric runtime review and capture manifest.
+  - Canonical `biomass_composite_review.py` manifest `run`/`verify`, protected-surface path+SHA snapshot, and manual inspection of all 30 captures.
 
 ## REQ-BIO-010: No auto-promotion or gameplay duplication
 
@@ -2109,7 +2123,43 @@ runtime source, and promotion is always a separate reviewed task.
   - No provider calls or writes to `assets/imported`, exported GLBs, `scenes/wrappers`, or unrelated threat catalogs occur during catalog validation.
   - Promotion remains a separate human-reviewed action.
   - Collision, navigation, sockets/connectors, integrity, and gameplay bindings remain repository/Godot-owned.
+  - `meshy_blender_validate.py` rejects recursively any GLB node extras key or string value containing case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`; benign extras such as `{source:"meshy"}` and visual-only no-helper GLBs remain valid.
+  - `BiomassAssembler` validates every instantiated placeholder/wrapper before accepting it and rejects/frees the whole assembly with stable diagnostics on failure.
+  - Task 15 promotion is performed only by `biomass_pilot_promote.py` under a durable restrictive
+    transaction; it publishes absent or byte-identical targets only and rolls back on any failed
+    import, validation, composite, or playable-smoke gate. Finalize alone may set the feature to
+    Implemented, and the ADR remains Accepted.
 - Verification:
   - Exact biomass validator CLI and focused tests.
   - `git diff -- assets/imported scenes/wrappers data/combat/threat_visual_catalog.json` remains empty during this task.
+
+## REQ-BIO-011: Governed biomass asset pipeline
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / asset governance
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Public recipe path resolution accepts only the fixed external source and live-pilot roots; test-only injected roots cannot be exposed through the CLI.
+  - The exact modes are `archive-raw`, `rehydrate-raw`, `preview`, `approve-preview`, and `publish-cleaned`; archive works without a master, rehydrate invokes neither Blender nor Meshy, and the other modes require an exact regular master.
+  - Preview writes five renders, `cleaned.preview.glb`, and a closed preview manifest; approval is no-Blender/no-provider, requires a non-empty reviewer, and immutably binds all preview, render, GLB, contract, catalog, generation, raw, archive, and master hashes.
+  - Publish requires the approval baseline, privately reproduces and compares it before writing task-local `cleaned.glb` and a closed recipe manifest; existing recipe output is exact-byte idempotent only.
+  - External coupled leaves are preflighted as mode-`0600` non-symlink regular files and published atomically under the validated external evidence directory, with rollback on injected failure.
+- Verification:
+  - `tests/test_meshy_biomass_part_recipe.py`, including mode, root, approval, baseline, symlink, idempotence, and rollback tests.
+  - `tests/test_meshy_promotion_packet.py`, `tests/test_meshy_runtime_review.py`, and `tests/test_meshy_blender_tools.py`.
+
+## REQ-BIO-012: Exact biomass evidence and reference audit
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / provenance / legal
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Task 12 requires the Task 8 proof to exist, persists exactly eight canonical plans at `assets/_staging/meshy/_plans/<asset_id>.json`, and records both `request_plan_file_sha256` and `provider_payload_sha256`.
+  - The stdlib reference audit requires PNG dimensions at least 1024×1024, opaque alpha, project-owned rights, exact `three_quarter` paths, unique regular non-symlink files, and a central connected subject with at least 90% foreground pixels, no second component at 5%, and a bounding box not touching the border.
+  - The audit manifest is canonical mode `0600`, has `status:"pass"`, records per-asset rights/path/view/hash/size/dimensions/alpha/component metrics plus contract/catalog hashes, and is required by Task 13 before any paid generation.
+  - Each biomass plan has candidate count 4, cost 5, maximum 20, `should_texture=false`; aggregate maximum is 160. No plan or audit command calls a provider or mutates runtime state.
+- Verification:
+  - `tests/test_biomass_reference_audit.py` and the explicit eight-plan/audit inventory and dry-run checks in the implementation plan.
 
