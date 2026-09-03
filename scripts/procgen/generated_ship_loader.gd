@@ -761,12 +761,15 @@ func _instantiate_structural_record(
 			instance.free()
 		return null
 	var wrapper: Node3D = instance as Node3D
-	var position_value: Variant = record.get("position", null)
-	var position_info: Dictionary = _read_position(position_value)
-	if not bool(position_info.get("ok", false)):
+	var pos_v: Variant = record.get("position", [])
+	if typeof(pos_v) != TYPE_ARRAY:
 		wrapper.free()
 		return null
-	var position_vec: Vector3 = position_info["value"]
+	var pos: Array = pos_v
+	if pos.size() < 3:
+		wrapper.free()
+		return null
+	var position_vec: Vector3 = Vector3(float(pos[0]), float(pos[1]), float(pos[2]))
 	wrapper.position = position_vec
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
 	var placement_id: String = str(record.get("placement_id", record.get("id", "")))
