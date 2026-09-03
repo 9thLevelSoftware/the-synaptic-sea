@@ -1301,9 +1301,48 @@ git commit -m "feat: enforce Godot-owned biomass sockets"
   - `run_blender_recipe(paths: RecipePaths, contract: AssetContract, catalog_entry: Mapping[str, Any], mode: str) -> dict[str, Any]`
   - One CLI with required `--project-root`, `--contract`, `--part-catalog`, `--expected-part-catalog-sha256`, `--task-dir`, `--evidence-dir`, and `--mode {archive-raw,rehydrate-raw,preview,approve-preview,publish-cleaned}` options. `--reviewer` is optional generally and required/non-empty only for `approve-preview`; there are no CLI root options.
 
+The public manifest boundary is closed and is consumed by Task 11. Implement these exact
+host-safe helpers (including annotations) in `tools/meshy_biomass_part_recipe.py`:
+
+```python
+def load_source_raw_manifest(path: Path) -> Mapping[str, Any]:
+def load_preview_manifest(path: Path) -> Mapping[str, Any]:
+def load_preview_approval(path: Path) -> Mapping[str, Any]:
+def load_recipe_manifest(path: Path) -> Mapping[str, Any]:
+```
+
+Each helper strictly parses UTF-8 JSON with duplicate-key rejection, bounded file size and
+nesting depth, finite scalar/type validation, canonical scalar forms, and closed fields at every
+specified object boundary. It returns defensive data that callers cannot mutate through the
+loader's retained state. Task 11 performs cross-record equality using its approved ownership
+matrix; these loaders do not silently fill defaults or regenerate records.
+
+The four manifest documents use these exact top-level fields and `document_kind` values (no
+unknown fields are permitted):
+
+| filename | `document_kind` | exact top-level fields |
+|---|---|---|
+| `source-raw-manifest.json` | `biomass_source_raw_manifest_v1` | `schema_version, document_kind, asset_id, task_id, generation_sha256, contract_sha256, raw_source, archive` |
+| `biomass-part-preview.json` | `biomass_part_preview_v1` | `schema_version, document_kind, asset_id, task_id, contract_sha256, part_catalog_sha256, generation_sha256, source_raw_manifest_sha256, raw_sha256, archive_sha256, master_path, master_sha256, preview_glb, dimensions_m, low_poly_target, material_names, material_slot_count, uvs_present, socket_guides, socket_guides_exported, source_raw_preserved, runtime_promoted, renders` |
+| `biomass-part-preview-approval.json` | `biomass_part_preview_approval_v1` | `schema_version, document_kind, asset_id, task_id, reviewer, decision, preview_manifest_sha256, preview_glb_sha256, render_hashes, contract_sha256, part_catalog_sha256, generation_sha256, source_raw_manifest_sha256, raw_sha256, archive_sha256, master_path, master_sha256` |
+| `biomass-part-recipe.json` | `biomass_part_recipe_v1` | `schema_version, document_kind, asset_id, task_id, contract_sha256, part_catalog_sha256, generation_sha256, source_raw_manifest_sha256, raw_sha256, archive_sha256, master_path, master_sha256, preview_approval_sha256, cleaned_glb, dimensions_m, low_poly_target, material_names, material_slot_count, uvs_present, socket_guides, socket_guides_exported, source_raw_preserved, runtime_promoted` |
+
+`raw_source`, `archive`, `preview_glb`, and `cleaned_glb` are closed objects exactly
+`{path, sha256, byte_size}`. In the source manifest, `raw_source` is task-local and `archive`
+is the exact external evidence leaf; their hashes and sizes equal `generation_sha256`.
+`preview_glb` has the same shape. The recipe's `cleaned_glb` is task-local `cleaned.glb`.
+`renders` is an exact map of `front.png`, `side.png`, `three_quarter.png`,
+`socket_overlay.png`, and `contact_sheet.png` to `{sha256, byte_size, width, height}`.
+`render_hashes` is the exact five-leaf SHA map. `socket_guides` is the sorted catalog guide
+record list `{name, position_m, rotation_deg}`; `low_poly_target` retains the exact
+`{status, target_triangles, measured_triangles, hard_max}` shape. Approval `decision` is the
+constant `approved` and has no timestamp or free-text field. The preview and recipe booleans
+are explicit; recipe publication uses `socket_guides_exported: false`,
+`source_raw_preserved: true`, and `runtime_promoted: false`.
+
 - [ ] **Step 1: Write RED host safety and socket-spec tests**
 
-Verify host import never loads `bpy`; paths stay under the exact selected task, exact asset-specific master leaf, and exact `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/` evidence leaf; runtime/import/catalog/wrapper paths are rejected as write targets; guide specs are derived from the exact catalog entry/hash; duplicate sockets and non-regular/symlink masters or evidence inputs fail closed. Add RED tests for two non-Blender recovery modes: `archive-raw` accepts only task-local `raw.glb` whose hash/size match bound `generation.json`, atomically writes `source.raw.glb` plus canonical `source-raw-manifest.json`, and treats a byte-identical preexisting archive as idempotent; `rehydrate-raw` accepts only that exact regular external archive/manifest, creates a missing task-local `raw.glb` atomically, read-back verifies the generation hash/size, and rejects a differing or symlink destination without overwrite. Neither recovery mode invokes Blender, Meshy, or a paid endpoint. Implement and test one exact normalization helper in `meshy_biomass_part_recipe.py`:
+Verify host import never loads `bpy`; paths stay under the exact selected task, exact asset-specific master leaf, and exact `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<selected_task_id>/` evidence leaf; runtime/import/catalog/wrapper paths are rejected as write targets; guide specs are derived from the exact catalog entry/hash; duplicate sockets and non-regular/symlink masters or evidence inputs fail closed. Add RED tests for two non-Blender recovery modes: `archive-raw` accepts only task-local `raw.glb` whose hash/size match bound `generation.json`, atomically writes `source.raw.glb` plus canonical `source-raw-manifest.json`, and treats a byte-identical preexisting archive as idempotent; `rehydrate-raw` accepts only that exact regular external archive/manifest, creates a missing task-local `raw.glb` atomically, read-back verifies the generation hash/size, and rejects a differing or symlink destination without overwrite. Neither recovery mode invokes Blender, Meshy, or a paid endpoint. Add malformed-manifest tests for each public loader: malformed JSON, duplicate keys, invalid UTF-8, oversized/deep documents, noncanonical hashes/numbers, wrong nested types, missing required fields, and unknown fields at every closed boundary must fail closed. Test that returned nested mappings/lists are defensive. Implement and test one exact normalization helper in `meshy_biomass_part_recipe.py`:
 
 ```python
 def triangle_limits(contract: AssetContract) -> tuple[int, int]:
@@ -1334,7 +1373,7 @@ Inside Blender only: preserve hidden immutable `SOURCE_RAW`; duplicate selected 
 
 - [ ] **Step 5: Render fixed evidence**
 
-Render `front.png`, `side.png`, `three_quarter.png`, `socket_overlay.png`, and `contact_sheet.png`. `socket_overlay.png` renders the non-exported guide collection against the cleaned visual mesh. Preview writes canonical `biomass-part-preview.json`; publish writes canonical `biomass-part-recipe.json` only after approval-baseline comparison. The recipe binds contract, part-catalog, generation, raw archive, input/published master, approval, and cleaned-output hashes; dimensions; target/hard-max/measured triangles; materials; UV status; guide inventory/transforms; `socket_guides_exported: false`; `source_raw_preserved: true`; and `runtime_promoted: false`. Re-hash every named regular file after publication. Task 11 treats the recipe as the sole master-to-cleaned provenance record; the generic Blender validation report remains independent and must keep `master_provenance: null`.
+Render `front.png`, `side.png`, `three_quarter.png`, `socket_overlay.png`, and `contact_sheet.png`. `socket_overlay.png` renders the non-exported guide collection against the cleaned visual mesh. Preview writes canonical `biomass-part-preview.json` with kind `biomass_part_preview_v1`; approve-preview writes `biomass-part-preview-approval.json` with kind `biomass_part_preview_approval_v1`; publish writes canonical `biomass-part-recipe.json` with kind `biomass_part_recipe_v1` only after approval-baseline comparison. The recipe binds contract, part-catalog, generation, raw archive, input/published master, approval, and cleaned-output hashes; dimensions; target/hard-max/measured triangles; materials; UV status; guide inventory/transforms; `socket_guides_exported: false`; `source_raw_preserved: true`; and `runtime_promoted: false`. Re-hash every named regular file after publication. Task 11 treats the recipe as the sole master-to-cleaned provenance record and consumes the four exact loader helpers/kinds; the generic Blender validation report remains independent and must keep `master_provenance: null`.
 
 - [ ] **Step 6: Add a bounded Blender integration probe**
 
