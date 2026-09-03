@@ -56,7 +56,7 @@ _IGNORED_COPY_NAMES = frozenset(
     }
 )
 _DIAGNOSTIC_MARKERS = ("ERROR:", "WARNING:", "SCRIPT ERROR:")
-_PASS_MARKER = "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=4 collision=true"
+_PASS_MARKER = "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=5 collision=true"
 _KIT_ID = "ship_structural_v0"
 _MODULE_FAMILY = "portal"
 _CANONICAL_CONTRACT_PATH = f"res://{_CONTRACT_RELATIVE.as_posix()}"
@@ -80,6 +80,12 @@ _EXPECTED_ANCHORS = (
         "name": "Anchor_SOCK_portal_center_internal_01",
         "kind": "attachment",
         "socket_id": "portal_center_internal_01",
+        "surface": "custom",
+    },
+    {
+        "name": "Anchor_SOCK_wall_base_01",
+        "kind": "attachment",
+        "socket_id": "wall_base_01",
         "surface": "custom",
     },
 )
@@ -579,6 +585,7 @@ def _validate_scene_text(scene_text: str) -> None:
         "Anchor_SOCK_portal_edge_west_01",
         "Anchor_SOCK_portal_edge_east_01",
         "Anchor_SOCK_portal_center_internal_01",
+        "Anchor_SOCK_wall_base_01",
     }
     if direct_root.get("Pressure_Door_1x1") != "Node3D":
         raise ValueError("invalid staged wrapper root")
@@ -737,6 +744,7 @@ def _validate_contract(project_root: Path) -> None:
         ("portal_edge_west_01", "portal_edge"),
         ("portal_edge_east_01", "portal_edge"),
         ("portal_center_internal_01", "portal_center"),
+        ("wall_base_01", "wall_base"),
     )
     if not isinstance(sockets, list) or not all(isinstance(item, dict) for item in sockets):
         raise ValueError("pressure-door contract socket set mismatch")

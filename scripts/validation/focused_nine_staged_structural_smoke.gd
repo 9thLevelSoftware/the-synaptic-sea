@@ -1,12 +1,13 @@
 extends SceneTree
 
 const WRAPPER_PATH: String = "res://scenes/wrappers/structural/ship_structural_v0/pressure_door_1x1.tscn"
-const PASS_MARKER: String = "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=4 collision=true"
+const PASS_MARKER: String = "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=5 collision=true"
 const EXPECTED_ANCHORS: Array[String] = [
     "Anchor_FloorCenter",
     "Anchor_SOCK_portal_edge_west_01",
     "Anchor_SOCK_portal_edge_east_01",
     "Anchor_SOCK_portal_center_internal_01",
+    "Anchor_SOCK_wall_base_01",
 ]
 const EXPECTED_VARIANTS: Array[String] = [
     "VisualInstance_Intact",
