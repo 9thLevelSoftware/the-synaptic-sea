@@ -33,6 +33,18 @@ PILOT_IDS = {
     "crafting_station_derelict_v1",
 }
 
+BIOMASS_CATEGORIES = getattr(
+    contract_module,
+    "BIOMASS_CATEGORIES",
+    frozenset({
+        "biomass_core",
+        "biomass_limb",
+        "biomass_head",
+        "biomass_connector",
+        "biomass_appendage",
+    }),
+)
+
 PILOT_POLICY_MATRIX = {
     "stalker_v1": {
         "required_views": ["front", "side", "back", "three_quarter"],
@@ -105,7 +117,11 @@ PILOT_POLICY_MATRIX = {
 def test_all_pilot_contracts_validate_and_share_one_prompt_profile() -> None:
     root = Path(__file__).resolve().parents[1]
     contract_root = root / "data/asset_generation/contracts"
-    contracts = [load_contract(path) for path in sorted(contract_root.glob("*.json"))]
+    contracts = [
+        load_contract(path)
+        for path in sorted(contract_root.glob("*.json"))
+        if path.stem in PILOT_IDS
+    ]
     assert {contract.asset_id for contract in contracts} == PILOT_IDS
     assert {contract.document["prompt_profile"] for contract in contracts} == {
         "synaptic_sea_derelict_v1"
@@ -117,7 +133,11 @@ def test_pilot_contracts_match_exact_task_four_policy_matrix() -> None:
     contract_root = root / "data/asset_generation/contracts"
     documents = {
         contract.asset_id: contract.document
-        for contract in (load_contract(path) for path in sorted(contract_root.glob("*.json")))
+        for contract in (
+            load_contract(path)
+            for path in sorted(contract_root.glob("*.json"))
+            if path.stem in PILOT_IDS
+        )
     }
     assert set(documents) == set(PILOT_POLICY_MATRIX)
 
@@ -644,3 +664,111 @@ def test_cli_validate_invalid_is_nonzero_and_path_scoped(tmp_path: Path) -> None
     )
     assert result.returncode == 1
     assert f"{path}: candidate_count must be between 3 and 6" in result.stderr
+
+
+BIOMASS_CONTRACT_SPECS = {
+    "biomass_human_arm_v1": ("biomass_limb", [0.28, 0.28, 1.00], 1400, 2500, "attachment"),
+    "biomass_insect_leg_v1": ("biomass_limb", [0.35, 0.30, 0.90], 1400, 2500, "attachment"),
+    "biomass_cephalopod_tentacle_v1": ("biomass_limb", [0.32, 0.32, 1.20], 1600, 2500, "attachment"),
+    "biomass_animal_skull_v1": ("biomass_head", [0.45, 0.40, 0.60], 2200, 3500, "attachment"),
+    "biomass_humanoid_torso_v1": ("biomass_core", [0.65, 0.90, 0.40], 3200, 5000, "scene_origin"),
+    "biomass_gunk_connector_v1": ("biomass_connector", [0.35, 0.35, 0.25], 300, 500, "attachment"),
+    "biomass_claw_v1": ("biomass_appendage", [0.35, 0.20, 0.20], 900, 1500, "attachment"),
+    "biomass_maw_v1": ("biomass_appendage", [0.40, 0.30, 0.35], 1000, 1500, "attachment"),
+}
+
+
+def _biomass_document(asset_id: str, category: str) -> dict:
+    document = _valid_document()
+    document.update(
+        asset_id=asset_id,
+        category=category,
+        pivot="scene_origin" if asset_id == "biomass_humanoid_torso_v1" else "attachment",
+        required_states=["default"],
+        state_derivation="single_state",
+        collision_owner="godot_wrapper",
+    )
+    document["animation"] = {
+        "kind": "static_mesh",
+        "meshy_rigging_allowed": False,
+        "rigging_target": "none",
+    }
+    document["generation"]["should_texture"] = False
+    return document
+
+
+def test_biomass_categories_are_closed_and_all_contracts_match_fixed_envelopes() -> None:
+    assert BIOMASS_CATEGORIES == {
+        "biomass_core",
+        "biomass_limb",
+        "biomass_head",
+        "biomass_connector",
+        "biomass_appendage",
+    }
+    root = Path(__file__).resolve().parents[1]
+    contract_root = root / "data/asset_generation/contracts"
+    for asset_id, (category, dimensions, target, maximum, pivot) in BIOMASS_CONTRACT_SPECS.items():
+        document = load_contract(contract_root / (asset_id + ".json")).document
+        assert set(document) <= {
+            "schema_version", "document_kind", "asset_id", "category", "gameplay_role",
+            "dimensions_m", "dimension_tolerance_m", "pivot", "forward_axis", "allowed_yaw_deg",
+            "required_states", "state_derivation", "collision_owner", "animation", "budget",
+            "references", "generation", "review", "prompt_profile", "visual_brief",
+        }
+        assert document["category"] == category
+        assert document["dimensions_m"] == dimensions
+        assert document["pivot"] == pivot
+        assert document["forward_axis"] == "+Z"
+        assert document["required_states"] == ["default"]
+        assert document["state_derivation"] == "single_state"
+        assert document["collision_owner"] == "godot_wrapper"
+        assert document["animation"] == {
+            "kind": "static_mesh", "meshy_rigging_allowed": False, "rigging_target": "none"
+        }
+        assert document["budget"]["triangles"] == {
+            "min": 1, "max": maximum, "scope": "whole_asset"
+        }
+        assert document["budget"]["material_slots"] == 2
+        assert document["budget"]["texture_resolution"] == 2048
+        assert document["generation"]["target_polycount"] == target
+        assert document["generation"]["candidate_count"] == 4
+        assert document["generation"]["should_texture"] is False
+        assert document["references"] == {
+            "required_views": ["three_quarter"],
+            "input_layout": "separate_files",
+            "rights_state": "project-owned",
+        }
+
+
+@pytest.mark.parametrize("category", sorted(BIOMASS_CATEGORIES))
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("collision_owner", "blender", "biomass assets require collision_owner=godot_wrapper"),
+        ("animation", {"kind": "rigged", "meshy_rigging_allowed": False, "rigging_target": "none"}, "biomass assets require animation.kind=static_mesh"),
+        ("animation", {"kind": "static_mesh", "meshy_rigging_allowed": True, "rigging_target": "humanoid_biped"}, "biomass assets prohibit Meshy rigging"),
+        ("required_states", ["living", "dead"], "biomass assets require required_states=[default]"),
+        ("state_derivation", "one_blender_master", "biomass assets require state_derivation=single_state"),
+        ("pivot", "bottom_center", "biomass assets require pivot=attachment"),
+    ],
+)
+def test_biomass_policy_rejects_runtime_authority_and_non_visual_variants(
+    category: str, field: str, value: object, message: str
+) -> None:
+    document = _biomass_document("biomass_test_part_v1", category)
+    if field == "animation":
+        document[field] = value
+    else:
+        document[field] = value
+    errors = validate_contract(document)
+    assert message in errors
+
+
+def test_biomass_policy_rejects_texturing_and_torso_attachment_pivot() -> None:
+    document = _biomass_document("biomass_test_part_v1", "biomass_limb")
+    document["generation"]["should_texture"] = True
+    assert "biomass assets require generation.should_texture=false" in validate_contract(document)
+
+    torso = _biomass_document("biomass_humanoid_torso_v1", "biomass_core")
+    torso["pivot"] = "attachment"
+    assert "biomass_humanoid_torso_v1 requires pivot=scene_origin" in validate_contract(torso)

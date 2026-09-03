@@ -62,6 +62,22 @@ def _valid_glb() -> bytes:
     return b"glTF" + struct.pack("<II", 2, total) + struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little")) + json_chunk
 
 
+def _historical_94588220_byte_glb() -> bytes:
+    json_chunk = b'{"asset":{"version":"2.0"}}'
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    prefix_size = 12 + 8 + len(json_chunk) + 8
+    bin_size = 94_588_220 - prefix_size
+    assert bin_size > 0 and bin_size % 4 == 0
+    return (
+        b"glTF"
+        + struct.pack("<II", 2, 94_588_220)
+        + struct.pack("<II", len(json_chunk), int.from_bytes(b"JSON", "little"))
+        + json_chunk
+        + struct.pack("<II", bin_size, int.from_bytes(b"BIN\x00", "little"))
+        + b"\x00" * bin_size
+    )
+
+
 class FakeMeshyClient:
     """In-process client double; no network or provider credits are used."""
 
@@ -118,6 +134,25 @@ class FakeMeshyClient:
         payload = _valid_glb() if url.endswith(".glb?token=" + SIGNED_DOWNLOAD_TOKEN) else b"\x89PNG\r\n\x1a\nthumbnail"
         assert len(payload) <= max_bytes
         return payload
+
+
+class OneLargeCandidateMeshyClient(FakeMeshyClient):
+    def __init__(self, large_glb: bytes) -> None:
+        super().__init__()
+        self.large_glb = large_glb
+        self.large_returned = False
+        self.glb_limits: List[int] = []
+
+    def download_bytes(self, url: str, max_bytes: int, deadline: float, clock: Any) -> bytes:
+        if url.endswith(".glb?token=" + SIGNED_DOWNLOAD_TOKEN):
+            self.glb_limits.append(max_bytes)
+            if not self.large_returned:
+                self.large_returned = True
+                assert len(self.large_glb) == 94_588_220
+                assert len(self.large_glb) <= max_bytes
+                self.calls.append(("download_bytes", url, max_bytes, deadline))
+                return self.large_glb
+        return super().download_bytes(url, max_bytes, deadline, clock)
 
 
 class AtomicityFakeMeshyClient(FakeMeshyClient):
@@ -1863,6 +1898,140 @@ def test_r2b2_cli_verify_accepts_pricing_file() -> None:
     assert verify.pricing_file == Path("/tmp/custom-pricing.json")
 
 
+LEGACY_CONTRACT_IDENTITIES = {
+    "stalker_v1": ("fb31123b77453a42372715468d97a579b6f6a2433198d3ff0f00758c8cb3f9ff", 1633),
+    "hull_tendril_kit_v1": ("d5139bbbffaa0a5e2f6628efd9f62f91060fcfa9d2b2ac58d430e0d8116533f0", 1755),
+    "biomatter_swarm_kit_v1": ("b50b1694a563a8521994bdcbc1b9f0e7b41d00f4df28278282607d82399da6be", 1782),
+}
+
+
+def test_historical_contracts_remain_at_canonical_paths_and_bytes() -> None:
+    contract_root = ROOT / "data/asset_generation/contracts"
+    for asset_id, (expected_hash, expected_size) in LEGACY_CONTRACT_IDENTITIES.items():
+        path = contract_root / (asset_id + ".json")
+        assert path.is_file()
+        assert path.stat().st_size == expected_size
+        assert _sha256(path) == expected_hash
+
+
+def test_contract_lifecycle_is_closed_and_tracks_retired_contract_bytes() -> None:
+    lifecycle_path = ROOT / "data/asset_generation/contract_lifecycle_v1.json"
+    lifecycle = stage_module.load_contract_lifecycle(lifecycle_path)
+    assert set(lifecycle) == set(LEGACY_CONTRACT_IDENTITIES)
+    for asset_id, (expected_hash, _expected_size) in LEGACY_CONTRACT_IDENTITIES.items():
+        entry = lifecycle[asset_id]
+        assert set(entry) == {
+            "asset_id", "state", "reason", "effective_date", "contract_path", "contract_sha256"
+        }
+        assert entry["asset_id"] == asset_id
+        assert entry["state"] == "retired"
+        assert entry["contract_path"] == "data/asset_generation/contracts/" + asset_id + ".json"
+        assert entry["contract_sha256"] == expected_hash
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda value: value["entries"].append(dict(value["entries"][0])),
+        lambda value: value["entries"][0].update(state="unknown"),
+        lambda value: value["entries"][0].update(contract_path="../outside.json"),
+        lambda value: value["entries"][0].update(unexpected=True),
+    ],
+)
+def test_contract_lifecycle_rejects_duplicate_unknown_traversal_and_unknown_fields(
+    tmp_path: Path, mutator: Any
+) -> None:
+    source = json.loads(
+        (ROOT / "data/asset_generation/contract_lifecycle_v1.json").read_text(encoding="utf-8")
+    )
+    mutator(source)
+    path = tmp_path / "lifecycle.json"
+    path.write_bytes(canonical_json_bytes(source))
+    with pytest.raises(ValueError):
+        stage_module.load_contract_lifecycle(path)
+
+
+@pytest.mark.parametrize("asset_id", sorted(LEGACY_CONTRACT_IDENTITIES))
+def test_new_plan_work_rejects_retired_contracts(asset_id: str, tmp_path: Path) -> None:
+    contract = load_contract(ROOT / "data/asset_generation/contracts" / (asset_id + ".json"))
+    with pytest.raises(ValueError, match="contract lifecycle is retired"):
+        plan_generation(contract, tmp_path, today="2026-09-01")
+
+
+@pytest.mark.parametrize("operation", ["generate", "continue"])
+def test_retired_new_work_is_refused_before_provider_or_filesystem_use(
+    operation: str, tmp_path: Path
+) -> None:
+    contract = load_contract(ROOT / "data/asset_generation/contracts/stalker_v1.json")
+    client = FakeMeshyClient()
+    if operation == "generate":
+        kwargs = _generation_kwargs(tmp_path)
+        with pytest.raises(ValueError, match="contract lifecycle is retired"):
+            generate_batch(contract, tmp_path, client, 100, **kwargs)
+    else:
+        with pytest.raises(ValueError, match="contract lifecycle is retired"):
+            stage_module.continue_batch(
+                contract,
+                tmp_path,
+                client,
+                tmp_path / "missing-batch.json",
+                100,
+                pricing_file=None,
+                reference_root=tmp_path,
+                reference_specs={"front": "front.png"},
+                output_license="paid-private",
+                today="2026-09-01",
+            )
+    assert client.calls == []
+    assert not (tmp_path / STAGING_RELATIVE).exists()
+
+
+def test_safe_error_preserves_only_the_governed_retirement_diagnostic() -> None:
+    assert stage_module._safe_error(
+        ValueError("contract lifecycle is retired: stalker_v1")
+    ) == "contract lifecycle is retired: stalker_v1"
+    assert stage_module._safe_error(
+        ValueError("contract lifecycle is retired: https://secret.example")
+    ) == "Meshy operation failed"
+
+
+@pytest.mark.parametrize(
+    "asset_id",
+    [
+        "loot_container_derelict_v1",
+        "crafting_station_derelict_v1",
+        "biomass_human_arm_v1",
+        "biomass_insect_leg_v1",
+        "biomass_cephalopod_tentacle_v1",
+        "biomass_animal_skull_v1",
+        "biomass_humanoid_torso_v1",
+        "biomass_gunk_connector_v1",
+        "biomass_claw_v1",
+        "biomass_maw_v1",
+    ],
+)
+def test_active_contracts_still_plan_normally(asset_id: str, tmp_path: Path) -> None:
+    contract = load_contract(ROOT / "data/asset_generation/contracts" / (asset_id + ".json"))
+    result = plan_generation(contract, tmp_path, today="2026-09-01")
+    assert result["asset_id"] == asset_id
+    assert result["candidate_count"] == 4
+
+
+def test_absent_lifecycle_manifest_defaults_omitted_ids_to_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stage_module, "CONTRACT_LIFECYCLE_PATH", tmp_path / "missing.json")
+    contract = load_contract(ROOT / "data/asset_generation/contracts/stalker_v1.json")
+    result = plan_generation(contract, tmp_path, today="2026-09-01")
+    assert result["asset_id"] == "stalker_v1"
+
+
+def test_artifact_limits_are_raised_without_weakening_thumbnail_limit() -> None:
+    assert stage_module._GLB_MAX_BYTES == 128 * 1024 * 1024
+    assert stage_module._DOWNLOAD_TOTAL_MAX_BYTES == 256 * 1024 * 1024
+    assert stage_module._THUMBNAIL_MAX_BYTES == 16 * 1024 * 1024
+
+
 def _historical_failed_batch(tmp_path: Path, valid_contract: AssetContract) -> Tuple[dict, Path, Path, Dict[str, Any]]:
     generation_kwargs = _generation_kwargs(tmp_path)
     original = FakeMeshyClient()
@@ -2516,3 +2685,68 @@ def test_continue_cli_parser_has_resume_identity_flags() -> None:
     assert args.command == "continue"
     assert args.batch_journal == Path("/tmp/batch.json")
     assert args.deadline_seconds == 10
+
+
+class _RepeatedChunkResponse:
+    status_code = 200
+
+    def __init__(self, chunk: bytes, count: int) -> None:
+        self.chunk = chunk
+        self.count = count
+        self.closed = False
+
+    def iter_content(self, chunk_size: int):
+        assert chunk_size == 1024 * 1024
+        for _ in range(self.count):
+            yield self.chunk
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _RepeatedChunkSession:
+    def __init__(self, response: _RepeatedChunkResponse) -> None:
+        self.response = response
+
+    def get(self, url: str, **kwargs: Any) -> _RepeatedChunkResponse:
+        assert url == "https://assets.meshy.ai/too-large.glb"
+        assert kwargs["stream"] is True
+        return self.response
+
+
+def test_historical_94588220_byte_glb_survives_generate_and_verify(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    large_glb = _historical_94588220_byte_glb()
+    assert len(large_glb) == 94_588_220
+    client = OneLargeCandidateMeshyClient(large_glb)
+
+    generate_batch(valid_contract, tmp_path, client, 100, **_generation_kwargs(tmp_path))
+
+    generation_paths = _generation_paths(tmp_path, valid_contract.asset_id)
+    assert len(generation_paths) == 4
+    record = stage_module.load_generation_record(generation_paths[0])
+    journal_path = generation_paths[0].parent.parent / "_batches" / (record["batch_id"] + ".json")
+    stage_module._verify_generation_adjacent_artifacts(
+        generation_paths[0], record, journal_path
+    )
+    assert record["outputs"]["raw.glb"] == {
+        "sha256": hashlib.sha256(large_glb).hexdigest(),
+        "byte_size": 94_588_220,
+    }
+    assert client.glb_limits == [128 * 1024 * 1024] * 4
+    assert stage_module._DOWNLOAD_TOTAL_MAX_BYTES == 256 * 1024 * 1024
+
+    repeated_chunk = b"x" * (1024 * 1024)
+    response = _RepeatedChunkResponse(repeated_chunk, 129)
+    streaming_client = stage_module.MeshyClient(
+        api_key="test", session=_RepeatedChunkSession(response)
+    )
+    with pytest.raises(RuntimeError, match="exceeds maximum size"):
+        streaming_client.download_bytes(
+            "https://assets.meshy.ai/too-large.glb",
+            stage_module._GLB_MAX_BYTES,
+            120.0,
+            lambda: 0.0,
+        )
+    assert response.closed

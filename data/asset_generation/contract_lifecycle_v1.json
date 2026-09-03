@@ -1,0 +1,30 @@
+{
+  "document_kind": "contract_lifecycle",
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "asset_id": "stalker_v1",
+      "state": "retired",
+      "reason": "Historical singular-threat contract retained for evidence-only recovery.",
+      "effective_date": "2026-09-02",
+      "contract_path": "data/asset_generation/contracts/stalker_v1.json",
+      "contract_sha256": "fb31123b77453a42372715468d97a579b6f6a2433198d3ff0f00758c8cb3f9ff"
+    },
+    {
+      "asset_id": "hull_tendril_kit_v1",
+      "state": "retired",
+      "reason": "Historical segmented-threat contract retained for evidence-only recovery.",
+      "effective_date": "2026-09-02",
+      "contract_path": "data/asset_generation/contracts/hull_tendril_kit_v1.json",
+      "contract_sha256": "d5139bbbffaa0a5e2f6628efd9f62f91060fcfa9d2b2ac58d430e0d8116533f0"
+    },
+    {
+      "asset_id": "biomatter_swarm_kit_v1",
+      "state": "retired",
+      "reason": "Historical modular-organism contract retained for evidence-only recovery.",
+      "effective_date": "2026-09-02",
+      "contract_path": "data/asset_generation/contracts/biomatter_swarm_kit_v1.json",
+      "contract_sha256": "b50b1694a563a8521994bdcbc1b9f0e7b41d00f4df28278282607d82399da6be"
+    }
+  ]
+}

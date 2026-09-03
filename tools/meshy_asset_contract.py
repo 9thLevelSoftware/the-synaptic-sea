@@ -30,6 +30,13 @@ KIT_TOKEN_RE = re.compile(r"(^|_)kit(_|$)")
 RIGHTS_STATES = {"project-owned", "paid-private", "free-cc-by-4.0"}
 REFERENCE_VIEWS = {"front", "side", "back", "left", "right", "three_quarter"}
 PIVOTS = {"bottom_center", "attachment", "scene_origin"}
+BIOMASS_CATEGORIES = frozenset({
+    "biomass_core",
+    "biomass_limb",
+    "biomass_head",
+    "biomass_connector",
+    "biomass_appendage",
+})
 LIGHTING_MODES = ["normal", "emergency", "dark"]
 REVIEW_SEEDS = [42, 777]
 _PROMPT_PROFILE_FIELDS = (
@@ -462,6 +469,28 @@ def validate_contract(document: object) -> list[str]:
         and provider == "meshy"
     ):
         errors.append("structural geometry cannot use Meshy")
+
+    if isinstance(category, str) and category in BIOMASS_CATEGORIES:
+        if top.get("collision_owner") != "godot_wrapper":
+            errors.append("biomass assets require collision_owner=godot_wrapper")
+        if top.get("state_derivation") != "single_state":
+            errors.append("biomass assets require state_derivation=single_state")
+        if top.get("required_states") != ["default"]:
+            errors.append("biomass assets require required_states=[default]")
+        if generation is None or generation.get("should_texture") is not False:
+            errors.append("biomass assets require generation.should_texture=false")
+        expected_pivot = "scene_origin" if asset_id == "biomass_humanoid_torso_v1" else "attachment"
+        if top.get("pivot") != expected_pivot:
+            if asset_id == "biomass_humanoid_torso_v1":
+                errors.append("biomass_humanoid_torso_v1 requires pivot=scene_origin")
+            else:
+                errors.append("biomass assets require pivot=attachment")
+        if not isinstance(animation, dict) or animation.get("kind") != "static_mesh":
+            errors.append("biomass assets require animation.kind=static_mesh")
+        if not isinstance(animation, dict) or animation.get("meshy_rigging_allowed") is not False:
+            errors.append("biomass assets prohibit Meshy rigging")
+        if not isinstance(animation, dict) or animation.get("rigging_target") != "none":
+            errors.append("biomass assets require animation.rigging_target=none")
 
     review = _check_object_fields(
         top.get("review"),

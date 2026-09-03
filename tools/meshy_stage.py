@@ -25,7 +25,7 @@ import time
 import uuid
 import zlib
 from datetime import date as _date, datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Dict, Iterable, List, Mapping, NamedTuple, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
@@ -48,6 +48,7 @@ ENDPOINTS = {
     "multi_image_to_3d": "/openapi/v1/multi-image-to-3d",
 }
 DEFAULT_PRICING_PATH = Path(__file__).resolve().parents[1] / "data/asset_generation/meshy_pricing_v1.json"
+CONTRACT_LIFECYCLE_PATH = Path(__file__).resolve().parents[1] / "data/asset_generation/contract_lifecycle_v1.json"
 STAGING_RELATIVE = Path("assets/_staging/meshy")
 PROTECTED_RELATIVE = governance.PROTECTED_RUNTIME_RELATIVE_PATHS
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -64,9 +65,9 @@ _PRICING_ID_RE = re.compile(r"^meshy_api_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 _PRICING_MAX_BYTES = 1024 * 1024
 _REFERENCE_FILE_MAX_BYTES = 16 * 1024 * 1024
 _REFERENCE_TOTAL_MAX_BYTES = 48 * 1024 * 1024
-_GLB_MAX_BYTES = 64 * 1024 * 1024
+_GLB_MAX_BYTES = 128 * 1024 * 1024
 _THUMBNAIL_MAX_BYTES = 16 * 1024 * 1024
-_DOWNLOAD_TOTAL_MAX_BYTES = 80 * 1024 * 1024
+_DOWNLOAD_TOTAL_MAX_BYTES = 256 * 1024 * 1024
 _MAX_POLL_ATTEMPTS = 120
 _POLL_DELAYS = (0.0, 0.25, 0.5, 1.0, 2.0)
 _DEFAULT_DEADLINE_SECONDS = 1200
@@ -544,6 +545,101 @@ def load_pricing(path: Optional[Path] = None, today: object = None, date: object
     return PricingRecord(document["pricing_id"], document["checked_at"], document["expires_at"], document["source_url"], hashlib.sha256(raw).hexdigest(), canonical_json_bytes(document))
 
 
+def _validate_lifecycle_path(value: object, label: str, errors: List[str]) -> None:
+    if not isinstance(value, str) or not value or "\x00" in value:
+        errors.append(label + " must be a relative path without NUL")
+        return
+    try:
+        windows_path = PureWindowsPath(value)
+        path = Path(value)
+    except (TypeError, ValueError):
+        errors.append(label + " must be a relative path")
+        return
+    if path.is_absolute() or windows_path.is_absolute() or windows_path.drive:
+        errors.append(label + " must be a relative path")
+    if "\\" in value or path.as_posix() != value or any(part in (".", "..") for part in path.parts):
+        errors.append(label + " must not contain traversal")
+
+
+def validate_contract_lifecycle(document: object) -> List[str]:
+    """Return deterministic diagnostics for a closed contract lifecycle file."""
+
+    if not isinstance(document, dict):
+        return ["contract lifecycle must be an object"]
+    errors: List[str] = []
+    expected_fields = {"document_kind", "schema_version", "entries"}
+    if set(document) != expected_fields:
+        errors.append("contract lifecycle fields are not exact")
+    if document.get("document_kind") != "contract_lifecycle":
+        errors.append("contract lifecycle document_kind is invalid")
+    if document.get("schema_version") != "1.0.0":
+        errors.append("contract lifecycle schema_version is invalid")
+    entries = document.get("entries")
+    if not isinstance(entries, list) or not entries:
+        errors.append("contract lifecycle entries must be a non-empty list")
+        entries = []
+    entry_fields = {
+        "asset_id", "state", "reason", "effective_date", "contract_path", "contract_sha256"
+    }
+    states = {"active", "retired", "experimental"}
+    seen_ids: set[str] = set()
+    for index, entry in enumerate(entries):
+        label = "contract lifecycle entry[{0}]".format(index)
+        if not isinstance(entry, dict) or set(entry) != entry_fields:
+            errors.append(label + " fields are not exact")
+            continue
+        asset_id = entry.get("asset_id")
+        if not isinstance(asset_id, str) or IDENTIFIER_RE.fullmatch(asset_id) is None:
+            errors.append(label + " asset_id is invalid")
+        elif asset_id in seen_ids:
+            errors.append("contract lifecycle contains duplicate asset_id")
+        else:
+            seen_ids.add(asset_id)
+        if entry.get("state") not in states:
+            errors.append(label + " state is invalid")
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(label + " reason is invalid")
+        try:
+            _coerce_iso_date(entry.get("effective_date"), label + " effective_date")
+        except ValueError as exc:
+            errors.append(str(exc))
+        _validate_lifecycle_path(entry.get("contract_path"), label + " contract_path", errors)
+        if not _valid_hash(entry.get("contract_sha256")):
+            errors.append(label + " contract_sha256 is invalid")
+    return sorted(set(errors))
+
+
+def load_contract_lifecycle(path: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Load the optional lifecycle manifest, keyed by contract asset id.
+
+    A missing manifest is an intentional backward-compatible active-by-default
+    state.  A present manifest is closed-world and fail-closed.
+    """
+
+    source = Path(path) if path is not None else CONTRACT_LIFECYCLE_PATH
+    if not source.exists() and not source.is_symlink():
+        return {}
+    try:
+        document, _raw = governance.strict_load_json_bytes(
+            source, "Meshy contract lifecycle", 1024 * 1024
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError("Meshy contract lifecycle could not be read: {0}".format(exc)) from exc
+    errors = validate_contract_lifecycle(document)
+    if errors:
+        raise ValueError("invalid Meshy contract lifecycle: " + "; ".join(errors))
+    entries = document["entries"]
+    return {entry["asset_id"]: dict(entry) for entry in entries}
+
+
+def _ensure_new_work_allowed(contract: AssetContract) -> None:
+    lifecycle = load_contract_lifecycle()
+    entry = lifecycle.get(contract.asset_id)
+    if isinstance(entry, dict) and entry.get("state") == "retired":
+        raise ValueError("contract lifecycle is retired: " + contract.asset_id)
+
+
 def _resolve_reference_root(reference_root: Union[str, os.PathLike]) -> Path:
     candidate = Path(reference_root).expanduser()
     try:
@@ -784,6 +880,9 @@ def build_transient_provider_request(contract: AssetContract, reference_inputs: 
 
 def plan_generation(contract: AssetContract, project_root: Path, client: Any = None, pricing_file: Optional[Path] = None, reference_root: Optional[Path] = None, reference_specs: object = None, today: object = None, date: object = None) -> Dict[str, Any]:
     del project_root, client
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    _ensure_new_work_allowed(contract)
     document = contract._snapshot_document()
     generation = document.get("generation")
     if not isinstance(generation, dict) or generation.get("mode") not in ENDPOINTS:
@@ -836,6 +935,8 @@ def _validate_staging_paths(project_root: Union[str, os.PathLike], asset_id: str
 def _safe_error(exc: BaseException) -> str:
     message = str(exc) or exc.__class__.__name__
     if message in _SAFE_ERROR_MESSAGES:
+        return message
+    if re.fullmatch(r"contract lifecycle is retired: [a-z0-9][a-z0-9_-]*", message):
         return message
     if re.fullmatch(r"Meshy task ended with status [A-Z]+", message):
         return message
@@ -1146,6 +1247,8 @@ def _validate_glb(payload: bytes) -> None:
 
     if not isinstance(payload, bytes) or len(payload) < 12:
         raise ValueError("raw.glb has an invalid GLB header")
+    if len(payload) > _GLB_MAX_BYTES:
+        raise ValueError("raw.glb exceeds maximum size")
     magic, version, declared_length = struct.unpack_from("<4sII", payload, 0)
     if magic != b"glTF":
         raise ValueError("raw.glb has an invalid GLB magic")
@@ -1508,6 +1611,9 @@ def generate_batch(
     clock: Optional[Callable[[], float]] = None,
     deadline: object = _DEFAULT_DEADLINE_SECONDS,
 ) -> Dict[str, Any]:
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    _ensure_new_work_allowed(contract)
     if client is None or not all(hasattr(client, name) for name in ("get_balance", "create_task", "poll_task", "download_bytes")):
         raise ValueError("a Meshy client is required for generation")
     # No staging, balance, journal, or provider work occurs before this full
@@ -3132,11 +3238,12 @@ def continue_batch(
 ) -> Dict[str, Any]:
     """Recover one bound failure, then create only its pending journal suffix."""
 
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    _ensure_new_work_allowed(contract)
     required = ("get_balance", "poll_task", "download_bytes", "create_task")
     if client is None or not all(hasattr(client, name) for name in required):
         raise ValueError("a Meshy continue client must expose balance, polling, download, and create operations")
-    if not isinstance(contract, AssetContract):
-        raise TypeError("contract must be an AssetContract")
     account_lock_id = getattr(client, "account_lock_id", None)
     if not isinstance(account_lock_id, str):
         raise ValueError("Meshy client must expose an account lock id")
@@ -3788,6 +3895,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "plan":
             result = plan_generation(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
         elif args.command == "generate":
+            _ensure_new_work_allowed(contract)
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
             result = generate_batch(contract, args.project_root, MeshyClient(), args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
@@ -3796,6 +3904,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 raise ValueError("approved credit ceiling must be positive")
             result = resume_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
         elif args.command == "continue":
+            _ensure_new_work_allowed(contract)
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
             result = continue_batch(contract, args.project_root, MeshyClient(), args.batch_journal, args.approved_credits, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference, output_license=args.output_license, deadline=args.deadline_seconds)
@@ -3831,6 +3940,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "DEFAULT_PRICING_PATH", "CONTRACT_LIFECYCLE_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "load_batch_journal", "load_contract_lifecycle", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_contract_lifecycle", "validate_generation_record",
 ]

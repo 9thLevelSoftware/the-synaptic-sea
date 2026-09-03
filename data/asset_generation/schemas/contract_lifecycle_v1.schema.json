@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synaptic-sea.invalid/schemas/contract_lifecycle_v1.schema.json",
+  "title": "Synaptic Sea asset contract lifecycle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_kind", "schema_version", "entries"],
+  "properties": {
+    "document_kind": {"const": "contract_lifecycle"},
+    "schema_version": {"const": "1.0.0"},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "state", "reason", "effective_date", "contract_path", "contract_sha256"],
+      "properties": {
+        "asset_id": {"$ref": "#/$defs/identifier"},
+        "state": {"enum": ["active", "retired", "experimental"]},
+        "reason": {"type": "string", "pattern": "\\S"},
+        "effective_date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "contract_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"
+        },
+        "contract_sha256": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}
