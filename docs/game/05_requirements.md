@@ -1955,3 +1955,106 @@ runtime source, and promotion is always a separate reviewed task.
 - Verification:
   - Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`.
 
+---
+
+# Procedural biomass assembly
+
+## REQ-BIO-001: Body-part contract schema
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / asset
+- Priority: must
+- Status: Proposed
+- Rationale: Each body part needs a governed contract with category, species, socket definitions, and budget to participate in the assembly system.
+- Acceptance criteria:
+  - Contract loads, validates, and produces a deterministic prompt packet.
+  - Socket definitions are required for all non-connector categories.
+- Verification:
+  - `PYTHONPATH=. python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/biomass_*.json`
+
+## REQ-BIO-002: Socket marker authoring
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / asset
+- Priority: must
+- Status: Proposed
+- Rationale: Body parts must expose standardized socket markers in the GLB scene tree for the assembler to attach them at runtime.
+- Acceptance criteria:
+  - Every Blender master exposes sockets as empty `Node3D` markers with `extras` metadata.
+  - `meshy_blender_validate.py` rejects parts missing required sockets or with mismatched metadata.
+- Verification:
+  - `PYTHONPATH=. python3 tools/meshy_blender_validate.py --project-root . --contract <part_contract> --task-dir <task_dir> --glb <glb> --report <report>`
+
+## REQ-BIO-003: BiomassRecipe resource
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / gameplay
+- Priority: must
+- Status: Proposed
+- Rationale: Assembled threats need a lightweight resource format that defines which parts to use and how to assemble them.
+- Acceptance criteria:
+  - Recipe loads, references only parts in the catalog, and the assembler produces a valid `Node3D` tree.
+- Verification:
+  - `PYTHONPATH=. python3 tools/validate_biomass_recipe.py --project-root . --recipe <recipe.json>`
+
+## REQ-BIO-004: Runtime assembly
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / gameplay
+- Priority: must
+- Status: Proposed
+- Rationale: The assembler must instantiate parts, attach them at socket positions, fill gaps with connectors, and configure locomotion.
+- Acceptance criteria:
+  - Assembled threat renders in `breach_field` at seeds 42/777 without Godot errors.
+  - Composite collision shape is generated from assembled parts.
+- Verification:
+  - `/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd`
+
+## REQ-BIO-005: Random recipe generation
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / gameplay
+- Priority: should
+- Status: Proposed
+- Rationale: Runtime random assembly creates emergent horror from the part library.
+- Acceptance criteria:
+  - Generated recipe is valid, references only catalog parts, and locomotion hint matches limb count.
+- Verification:
+  - Assembly smoke test with random seed produces valid threats.
+
+## REQ-BIO-008: Pilot part set
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / asset
+- Priority: must
+- Status: Proposed
+- Rationale: Eight parts prove the assembly pipeline before scaling: human_arm, insect_leg, tentacle, animal_skull, humanoid_torso, biomass_gunk, claw, maw.
+- Acceptance criteria:
+  - All 8 parts pass the full Meshy pipeline (contract → generation → selection → Blender master → validation → runtime review → promotion).
+- Verification:
+  - Each part's GLB contains correct socket markers and passes Blender validation.
+
+## REQ-BIO-009: Runtime review of assembled threats
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / gameplay
+- Priority: must
+- Status: Proposed
+- Rationale: Assembled threats must be visually reviewed in the production environment before promotion.
+- Acceptance criteria:
+  - 18 review images (6 cases × 3 assemblies: biped, quadruped, crawl) pass without Godot errors.
+- Verification:
+  - `PYTHONPATH=. python3 tools/meshy_runtime_review.py --project-root . --contract <recipe> --task-dir <dir> --preview-dir <dir>`
+
+## REQ-BIO-010: No auto-promotion for body parts
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / governance
+- Priority: must
+- Status: Proposed
+- Rationale: Body parts follow the same promotion gate as all Meshy assets.
+- Acceptance criteria:
+  - No writes to `assets/imported`, `data/combat/biomass_part_catalog.json`, or `scenes/wrappers` during generation or assembly testing.
+- Verification:
+  - `git diff -- assets/imported data/combat/biomass_part_catalog.json scenes/wrappers` is empty after test runs.
+
