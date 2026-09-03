@@ -160,6 +160,113 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 		push_error("SHIP GENERATOR FAIL worldgen layout export was not a Dictionary")
 		return null
 	var layout: Dictionary = (layout_variant as Dictionary).duplicate(true)
+	# Worldgen v2 (DerelictGenerator.export_layout_json) tags the layout
+	# with `prototype: "worldgen"` rather than a start_room/goal_room
+	# object. The downstream consumers (GameplaySliceBuilder.build,
+	# GeneratedShipLoader.load_from_documents) both require a Dictionary
+	# prototype — they refuse or silently swallow non-Dictionary values
+	# and the travel/save lifecycle then fails with "no objectives".
+	# Promote the worldgen tag into a real prototype object so the
+	# downstream code keeps working unchanged. Mirrors the pattern used
+	# in scripts/validation/worldgen_live_preview.gd.
+	if not (layout.get("prototype", {}) is Dictionary):
+		layout["prototype"] = {
+			"start_room": "",
+			"goal_room": "",
+		}
+	# Worldgen v2 also emits `critical_path` as a list of edge objects
+	# `[{from: <room>, to: <room>}, ...]` while every downstream consumer
+	# (StructuralPlanValidator._validate_critical_path_reachability,
+	# EncounterInjector, PlayableGeneratedShip.get_layout_copy consumers,
+	# GameplaySliceBuilder._build_arc_zones) expects a flat list of room
+	# id strings. Feed it through as a flat list of distinct room ids so
+	# the validator's reachability check and the injector's critical-set
+	# both work without per-consumer changes.
+	var raw_critical: Variant = layout.get("critical_path", null)
+	if raw_critical is Array:
+		var flat_critical: Array = []
+		var seen_cp: Dictionary = {}
+		for entry in (raw_critical as Array):
+			if entry is Dictionary:
+				var from_room: String = str((entry as Dictionary).get("from", ""))
+				var to_room: String = str((entry as Dictionary).get("to", ""))
+				for rid in [from_room, to_room]:
+					if not rid.is_empty() and not seen_cp.has(rid):
+						seen_cp[rid] = true
+						flat_critical.append(rid)
+			elif typeof(entry) == TYPE_STRING:
+				var rid_str: String = str(entry)
+				if not rid_str.is_empty() and not seen_cp.has(rid_str):
+					seen_cp[rid_str] = true
+					flat_critical.append(rid_str)
+		layout["critical_path"] = flat_critical
+	# Worldgen v2 stores per-room structural placements under
+	# layout.structural_plan.placements (each row keyed by owner_room),
+	# not inside layout.rooms[i].structural_placements. Several consumers
+	# (DockPortsScript._room_floor_center, GameplaySliceBuilder._all_floor_cells,
+	# the room-cell/reserved-cell readers) iterate rooms[i].structural_placements
+	# directly. Project those global placements back onto each room so
+	# the dock-port compatibility check can find the airlock/dock floor
+	# and other room-keyed consumers keep working.
+	var plan_variant: Variant = layout.get("structural_plan", null)
+	if plan_variant is Dictionary:
+		var plan: Dictionary = plan_variant
+		# Worldgen v2 emits per-cell floor placements in
+		# structural_plan.floor_placements keyed by `room_id` (not
+		# `owner_room`). DockPortsScript._room_floor_center walks
+		# rooms[i].structural_placements looking for module_id in
+		# {"floor_1x1", "corridor_floor_1x1"}; project those floors
+		# onto each room so the dock-port center can be computed.
+		var floor_per_room: Dictionary = {}
+		var floor_placements_variant: Variant = plan.get("floor_placements", null)
+		if floor_placements_variant is Array:
+			for fp_variant in (floor_placements_variant as Array):
+				if typeof(fp_variant) != TYPE_DICTIONARY:
+					continue
+				var fp: Dictionary = fp_variant
+				var room_id: String = str(fp.get("room_id", ""))
+				if room_id.is_empty():
+					continue
+				if not floor_per_room.has(room_id):
+					floor_per_room[room_id] = []
+				(floor_per_room[room_id] as Array).append(fp)
+		# Walls/edges are in structural_plan.placements keyed by
+		# owner_room. DockPortsScript uses these for slot counting and
+		# similar; project them too so room readers see a complete set.
+		var edge_per_room: Dictionary = {}
+		var edge_placements_variant: Variant = plan.get("placements", null)
+		if edge_placements_variant is Array:
+			for ep_variant in (edge_placements_variant as Array):
+				if typeof(ep_variant) != TYPE_DICTIONARY:
+					continue
+				var ep: Dictionary = ep_variant
+				var owner_room: String = str(ep.get("owner_room", ""))
+				if owner_room.is_empty():
+					continue
+				if not edge_per_room.has(owner_room):
+					edge_per_room[owner_room] = []
+				(edge_per_room[owner_room] as Array).append(ep)
+		var rooms_variant: Variant = layout.get("rooms", null)
+		if rooms_variant is Array:
+			for room_variant in (rooms_variant as Array):
+				if typeof(room_variant) != TYPE_DICTIONARY:
+					continue
+				var room: Dictionary = room_variant
+				var rid: String = str(room.get("id", ""))
+				if rid.is_empty():
+					continue
+				var existing: Variant = room.get("structural_placements", null)
+				if existing is Array and not (existing as Array).is_empty():
+					# LayoutSerializer-populated rooms already have
+					# proper placements; do not overwrite them.
+					continue
+				var combined: Array = []
+				if floor_per_room.has(rid):
+					combined.append_array((floor_per_room[rid] as Array).duplicate(true))
+				if edge_per_room.has(rid):
+					combined.append_array((edge_per_room[rid] as Array).duplicate(true))
+				if not combined.is_empty():
+					room["structural_placements"] = combined
 
 	var gameplay_text: String = str(generator.export_gameplay_slice_json(seed_value, params))
 	if gameplay_text.is_empty():
@@ -248,7 +355,13 @@ func _resolve_worldgen_loot_containers(
 		var exported_container: Dictionary = (exported_variant as Dictionary).duplicate(true)
 		var table_id: String = str(exported_container.get("loot_table", ""))
 		if not loot_tables.has(table_id):
-			if table_id != "worldgen_seeded":
+			# Worldgen v2 (DerelictGenerator.export_gameplay_slice_json) does
+			# not stamp a `loot_table` on its containers at all — the actual
+			# game table must be derived from the container's `kind` via
+			# _map_worldgen_loot_table. The literal "worldgen_seeded" string
+			# is accepted as an explicit alias for the same case so older
+			# or downstream producers that DO tag the field keep working.
+			if table_id != "worldgen_seeded" and not table_id.is_empty():
 				push_error("SHIP GENERATOR FAIL worldgen loot table missing: %s" % table_id)
 				return false
 			table_id = _map_worldgen_loot_table(str(exported_container.get("kind", "")), loot_tables)
@@ -274,7 +387,7 @@ func _map_worldgen_loot_table(container_kind: String, loot_tables: Dictionary) -
 		_:
 			if container_kind.contains("crate"):
 				candidate = "generic_crate"
-			elif container_kind.contains("locker"):
+			elif container_kind.contains("locker") or container_kind.contains("cabinet"):
 				candidate = "generic_locker"
 	if loot_tables.has(candidate):
 		return candidate
