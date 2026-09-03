@@ -302,6 +302,15 @@ func _valid_inputs(visual: Variant, parts: Variant, recipe: Variant) -> bool:
 		return false
 	if not (recipe as Object).is_valid():
 		return false
+	var recipe_document: Dictionary = (recipe as Object).to_dict()
+	if (visual as Object).recipe_document() != recipe_document:
+		return false
+	var core_value: Variant = recipe_document.get("core", null)
+	if not core_value is Dictionary:
+		return false
+	var core_part_id: String = String((core_value as Dictionary).get("part_id", ""))
+	if core_part_id.is_empty() or (parts as Object).get_part(core_part_id).is_empty():
+		return false
 	# Loader-validity proxy.
 	if (parts as Object).get_part("biomass_human_arm_v1").is_empty():
 		return false

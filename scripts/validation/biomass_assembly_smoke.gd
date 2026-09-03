@@ -1099,6 +1099,8 @@ func _gait_smoke_checks(parts: Variant, library: Variant) -> bool:
 		return false
 	if not _need(await _gait_rejection_checks(parts, library), "gait rejection checks failed"):
 		return false
+	if not _need(await _gait_recipe_identity_checks(parts, library), "gait recipe identity checks failed"):
+		return false
 	if not _need(await _gait_nan_inf_negative_checks(parts, library), "gait NaN/Inf/negative checks failed"):
 		return false
 	if not _need(await _gait_cap_and_orthonormal_checks(parts, library), "gait cap/orthonormal checks failed"):
@@ -1464,6 +1466,26 @@ func _gait_rejection_checks(parts: Variant, library: Variant) -> bool:
 	# unloaded_parts (PartCatalogScript.new()) is a RefCounted, auto-collects.
 	if visual_wrong_parts_node != null and is_instance_valid(visual_wrong_parts_node):
 		visual_wrong_parts_node.free()
+	return true
+
+func _gait_recipe_identity_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+	if not _need(visual != null, "recipe identity build null"):
+		return false
+	var recipe_document: Dictionary = library.get_recipe("biped_puppet_v1").to_dict()
+	recipe_document["recipe_id"] = "biped_puppet_alias_v1"
+	var mismatched_recipe: Variant = RecipeScript.from_dict(recipe_document, parts)
+	if not _need(mismatched_recipe != null and mismatched_recipe.is_valid(), "recipe identity alias fixture invalid"):
+		visual.free()
+		return false
+	var accepted: bool = visual.configure_gait(parts, mismatched_recipe, 7)
+	if not _need(not accepted, "configure_gait accepted mismatched visual/recipe document"):
+		visual.free()
+		return false
+	if not _need(visual.get("_gait_controller") == null, "mismatched recipe retained a controller"):
+		visual.free()
+		return false
+	visual.free()
 	return true
 
 func _gait_nan_inf_negative_checks(parts: Variant, library: Variant) -> bool:
