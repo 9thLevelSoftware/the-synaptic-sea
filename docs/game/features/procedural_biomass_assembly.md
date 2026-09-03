@@ -61,8 +61,9 @@ recipe resolution has a non-overridable external root: the exact `source/<asset_
 and `live-pilot/<asset_id>/<task_id>/` paths under `/Volumes/Untitled/SynapticSeaAssets/meshy/`.
 Only tests may inject `RecipeRoots`. The five modes are `archive-raw`, `rehydrate-raw`, `preview`,
 `approve-preview`, and `publish-cleaned`; archive works without a master, rehydrate uses neither
-master nor Blender, and Blender modes require the exact regular master. Task 14 order is archive →
-`meshy_blender_master` → preview → human inspection/approval → publish.
+master nor Blender, and Blender modes require the exact regular master. Task 10 creates the
+external archive; Task 14 order is rehydrate-raw → `meshy_blender_master` (create once) → preview
+→ human inspection/approval → publish.
 
 Preview atomically publishes the scratch GLB, five renders, and closed `biomass-part-preview.json`.
 Approval is no-Blender/no-provider and immutably binds reviewer plus preview-manifest, render, GLB,
@@ -231,6 +232,44 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m py
   --parts data/combat/biomass_part_catalog.json \
   --recipes data/combat/biomass_recipe_catalog.json
 ```
+
+## Tasks 13–15 pilot execution contract
+
+Task 13 is a paid, serial candidate stage owned exclusively by `tools/biomass_candidate_batch.py`.
+Its read-only preflight authenticates the exact Task 12 plan/audit/pricing/reference hashes and
+proves no prior journal or task directory exists; it recomputes the live plan immediately because
+`meshy_stage.py generate` has no plan-SHA argument. All commands pin
+`data/asset_generation/meshy_pricing_v1.json`. The stage is exactly eight journals × four unique
+tasks (32 candidates), cost 5, approved/max 20 per asset, aggregate max 160 and actual <=160.
+Unknown POST/SUBMITTING without an ID resumes then stops for reconciliation; known IDs/UNCERTAIN
+resume; bound FAILED with a failure record and contiguous pending suffix continues then verifies.
+Existing inventory never starts a new generate. Reconcile writes the canonical batch manifest.
+Pillow renders deterministic 2x2 1024px contact sheets; tracked JSON binds four task IDs and all
+input/output hashes, while PNGs remain ignored. All eight sheets are built before selection, and
+each selection immediately archives raw evidence externally before commit.
+
+Task 14 starts each selected asset with `rehydrate-raw`, never `archive-raw`, and uses a fail-fast
+variable-pinned loop with fixed reviewer and pricing/catalog hashes. The Blender master is immutable
+and create-once; an existing bound master is verified and never rerun. The order is rehydrate,
+master, preview, human inspection, approve-preview, publish-cleaned. Fresh checkouts explicitly
+restore fixed evidence permissions (directory 0700, 18 PNGs and review JSON 0600). Runtime review
+transitions to `promotion_ready`; the candidate-review `verify` command is verify-only. The exact
+commit inventory is eight selected records and eight fixed 18-PNG runtime leaves, with no binaries,
+unselected tasks, contact sheets, or temporary files.
+
+Task 15 is exclusively written by `tools/biomass_pilot_promote.py` (`plan`, `apply`, `verify`,
+`rollback`, `finalize`). Plan preflights all eight packets against one pre-mutation catalog and a
+protected prestate digest. Apply stages all GLBs, deterministic thin wrappers, catalog bytes and
+import targets in a restrictive transaction journal; wrappers are Node3D + one imported GLB child
+plus direct plain Node3D catalog sockets, with no collision/physics/animation. Publication accepts
+only absent or byte-identical targets. Two Godot 4.7.1 imports must yield eight stable descriptors
+and no `.godot/imported` staging. Every import/validation failure rolls back only newly created
+hash-matching leaves and catalog bytes; interruption blocks until rollback or exact recovery.
+Final review uses `--visual-stage final` at `artifacts/validation-previews/biomass-assembly-final`
+and requires exactly 30 cases, caps, collision/LOS/readability, and visual approval. The executable
+playable smoke proves eight wrappers, six archetypes, five gaits, kill/travel, and exact save/load
+recipe/seed/graph/transform/collision fingerprints, printing the canonical pilot marker. Only
+`finalize` may set this feature to Implemented; ADR-0059 remains Accepted.
 
 ## Open questions
 

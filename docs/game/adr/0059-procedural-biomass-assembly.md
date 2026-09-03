@@ -213,6 +213,29 @@ under the validated evidence directory as the atomic-write root, mode `0600`, wi
 injected failure. The generic Blender report remains `meshy_blender_validation` with
 `master_provenance: null`.
 
+### Pilot execution and promotion boundary
+
+Tasks 13–15 are governed execution stages, not a relaxation of this ADR. Task 13's sole batch tool
+must preflight the exact Task 12 plans, reference audit, pricing SHA, and project-owned references
+without writing or posting; it creates exactly 32 candidates (eight groups of four) within the
+aggregate 160-credit cap. It reconciles all eight journals before contact-sheet review, builds all
+eight deterministic Pillow 2x2/1024px sheets, and archives each selected raw source externally
+before commit. Ambiguous provider states route to resume/reconciliation and never to a blind POST.
+
+Task 14 begins with no-provider `rehydrate-raw`, uses one pinned fail-fast loop, and treats the
+canonical Blender master as create-once immutable. The order is preview, human approval, and
+publish-cleaned; fresh-checkout evidence permissions are restored before verification. Runtime
+review, not a second bind claim, transitions selected records to `promotion_ready`.
+
+Task 15 has one writer, `biomass_pilot_promote.py`, with plan/apply/verify/rollback/finalize
+subcommands and a durable restrictive transaction journal. It stages and validates all eight
+assets before publication, permits only absent or byte-identical idempotent targets, and rolls back
+new hash-matching leaves on any import, validation, composite, or playable-smoke failure. Thin
+wrappers contain only one imported visual and direct plain catalog sockets; collision and gameplay
+authority remain in the repository assembler. Finalization requires the approved 30-case `final`
+manifest and the canonical playable marker; only then may the feature status become Implemented.
+ADR-0059 remains Accepted throughout and is not staged merely because Task 15 runs.
+
 ## Consequences
 
 - The catalog and recipes are machine-checkable, deterministic, and suitable for exact save/load.

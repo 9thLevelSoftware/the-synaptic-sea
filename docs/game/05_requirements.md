@@ -2083,7 +2083,11 @@ runtime source, and promotion is always a separate reviewed task.
   - The exact IDs are `biomass_human_arm_v1`, `biomass_insect_leg_v1`, `biomass_cephalopod_tentacle_v1`,
     `biomass_animal_skull_v1`, `biomass_humanoid_torso_v1`, `biomass_gunk_connector_v1`,
     `biomass_claw_v1`, and `biomass_maw_v1`.
-  - Meshy remains candidate-only; no provider call, asset mutation, or automatic promotion occurs in this contract task.
+  - Task 13 produces exactly 32 candidates in eight four-task journals, with cost 5 and approved/max
+    20 per asset, aggregate max 160 and actual <=160; all eight contact sheets are built before
+    one candidate per part is selected and its raw source is archived externally.
+  - Meshy remains candidate-only until the separately reviewed Task 15 promotion transaction; no
+    provider call is permitted during preflight, reconciliation, validation, or catalog checks.
 - Verification:
   - Part catalog validator and ADR-0058 candidate-only gate review.
 
@@ -2099,6 +2103,8 @@ runtime source, and promotion is always a separate reviewed task.
   - All six 3D archetype pools remain covered during the singular-threat migration.
   - `biomass_visual_review.gd` uses production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, `SliceAtmosphereApplier`, and the exact validation seam; it does not create a neutral standalone camera/floor/environment.
   - `--visual-stage` is exactly `placeholder|final`, with separate fixed evidence roots; Task 8 runs placeholder only and Task 15 runs final. Each case records exact recipe node/triangle oracles, nodes `<=160`, triangles `<=24000`, finite AABB extents `0.05–20m`, collision/ray metrics, and frozen paired-camera readability values (RGB delta `>=8/255`, changed pixels `>=64`, changed bbox width/height `>=8px`).
+  - Task 14 runtime review owns the transition to `promotion_ready`; Task 15 uses `--visual-stage final`
+    at `artifacts/validation-previews/biomass-assembly-final` and cannot finalize without visual approval.
   - Unexpected Godot `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks acceptance.
 - Verification:
   - Canonical `biomass_composite_review.py` manifest `run`/`verify`, protected-surface path+SHA snapshot, and manual inspection of all 30 captures.
@@ -2116,6 +2122,10 @@ runtime source, and promotion is always a separate reviewed task.
   - Collision, navigation, sockets/connectors, integrity, and gameplay bindings remain repository/Godot-owned.
   - `meshy_blender_validate.py` rejects recursively any GLB node extras key or string value containing case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`; benign extras such as `{source:"meshy"}` and visual-only no-helper GLBs remain valid.
   - `BiomassAssembler` validates every instantiated placeholder/wrapper before accepting it and rejects/frees the whole assembly with stable diagnostics on failure.
+  - Task 15 promotion is performed only by `biomass_pilot_promote.py` under a durable restrictive
+    transaction; it publishes absent or byte-identical targets only and rolls back on any failed
+    import, validation, composite, or playable-smoke gate. Finalize alone may set the feature to
+    Implemented, and the ADR remains Accepted.
 - Verification:
   - Exact biomass validator CLI and focused tests.
   - `git diff -- assets/imported scenes/wrappers data/combat/threat_visual_catalog.json` remains empty during this task.

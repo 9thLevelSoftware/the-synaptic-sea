@@ -233,6 +233,33 @@ records; its hash matrix is generation(task/asset/contract/raw), source-raw(gene
 recipe(contract/catalog/generation/raw/archive/master/cleaned/approval), Blender(task/contract/
 cleaned, `master_provenance:null`), and runtime(task/asset/contract/cleaned/Blender-report/captures).
 
+Task 13 is validated with `biomass_candidate_batch.py` tests and a no-provider fake client. For
+each asset, read-only preflight must prove exact Task 12 plan/audit/pricing/reference hashes and
+absence of prior state before recomputing the live plan. Reconcile requires exactly eight completed
+journals, 32 globally unique task IDs, four candidates per journal, cost 5, per-asset max/approved
+20, aggregate max 160, and actual <=160. Ambiguous POST/SUBMITTING states with no ID must resume
+and stop for reconciliation; no path may blindly POST or rerun generate. All eight deterministic
+2x2/1024px Pillow contact sheets and tracked hash-binding JSON records are required before selection;
+each selected raw source is archived and verified before commit.
+
+Task 14 verification begins with no-provider `rehydrate-raw`, checks the create-once immutable
+master and fixed reviewer/hash variables, and enforces preview -> human approval -> publish. Fresh
+checkouts restore the fixed runtime evidence directory to 0700 and its 18 PNGs plus review JSON to
+0600 before inventory verification. Runtime review performs the binder transition to
+`promotion_ready`; `meshy_candidate_review.py verify` is verify-only. The commit inventory is
+programmatically checked for exactly eight selected records and eight 18-PNG runtime leaves.
+
+Task 15 is tested through failure injection after every publication/import/validation stage. The
+promotion tool alone may write, and its durable transaction must prove all-or-none rollback, stable
+double-imported descriptors, no `.godot/imported` staging, and no overwrite of mismatched targets.
+The final composite command is `--visual-stage final` with report/root
+`artifacts/validation-previews/biomass-assembly-final`; exactly 30 cases, no PrimitiveMesh, node
+<=160 and triangle <=24000, collision/LOS/readability, and visual approval are mandatory. The
+executable playable smoke must emit exactly
+`BIOMASS PLAYABLE PILOT PASS wrappers=8 archetypes=6 gaits=5 kill=true travel=true save_load=true`
+after exercising all five gaits, kill/travel, and exact save/load fingerprints. `finalize` is the
+only status transition to Implemented.
+
 Focused readiness command:
 
 ```bash
