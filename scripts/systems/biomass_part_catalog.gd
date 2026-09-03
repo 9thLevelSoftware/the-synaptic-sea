@@ -72,16 +72,18 @@ func load_path(path: String) -> bool:
 	var limits: Dictionary = limits_value
 	if not _has_exact_fields(limits, ["max_attachments", "max_depth", "max_triangles", "max_nodes"]):
 		return false
-	for limit_name in LIMITS:
-		var actual_limit: Variant = limits.get(limit_name)
-		if not _valid_positive_bounded_integer(actual_limit, int(LIMITS[limit_name])) or int(actual_limit) != int(LIMITS[limit_name]):
-			return false
 	var parts_value: Variant = document.get("parts")
 	if not parts_value is Dictionary:
 		return false
 	var parts: Dictionary = parts_value
 	if not _has_exact_keys(parts, CANONICAL_PART_IDS):
 		return false
+	if not _restore_integer_fields(document, text):
+		return false
+	for limit_name in LIMITS:
+		var actual_limit: Variant = limits.get(limit_name)
+		if not _valid_positive_bounded_integer(actual_limit, int(LIMITS[limit_name])) or int(actual_limit) != int(LIMITS[limit_name]):
+			return false
 	for part_id in CANONICAL_PART_IDS:
 		var part_value: Variant = parts.get(part_id)
 		if not _valid_part(part_value):
@@ -283,11 +285,28 @@ func _valid_vector(value: Variant, positive: bool) -> bool:
 			return false
 	return true
 
-func _valid_positive_bounded_integer(value: Variant, maximum: int) -> bool:
-	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+func _restore_integer_fields(document: Dictionary, text: String) -> bool:
+	var integer_field_pattern: RegEx = RegEx.new()
+	var regex_error: Error = integer_field_pattern.compile("\"(?:max_attachments|max_depth|max_triangles|max_nodes|triangle_budget)\"\\s*:\\s*([^,}\\s]+)")
+	if regex_error != OK:
 		return false
-	var number: float = float(value)
-	return is_finite(number) and number > 0.0 and number <= float(maximum) and number == floor(number)
+	for match in integer_field_pattern.search_all(text):
+		if not match.get_string(1).is_valid_int():
+			return false
+	var limits: Dictionary = document["limits"]
+	for limit_name in LIMITS:
+		limits[limit_name] = int(limits[limit_name])
+	var parts: Dictionary = document["parts"]
+	for part_id in CANONICAL_PART_IDS:
+		var part: Dictionary = parts[part_id]
+		part["triangle_budget"] = int(part["triangle_budget"])
+	return true
+
+func _valid_positive_bounded_integer(value: Variant, maximum: int) -> bool:
+	if typeof(value) != TYPE_INT:
+		return false
+	var number: int = int(value)
+	return number > 0 and number <= maximum
 
 func _valid_albedo(value: Variant) -> bool:
 	if not value is String or value.length() != 7 or not value.begins_with("#"):

@@ -209,6 +209,29 @@ func _loader_failure_checks(parts: Variant) -> bool:
 	if not _write_text(TEMP_PARTS_PATH, "{}"): return false
 	if not _need(not parts.load_path(TEMP_PARTS_PATH), "malformed part catalog was accepted"): return false
 	if not _need(parts.get_part("biomass_human_arm_v1").is_empty(), "part loader retained state after malformed input"): return false
+
+	var canonical_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(PARTS_PATH))
+	if not _need(canonical_variant is Dictionary, "canonical part catalog fixture did not parse"): return false
+	var canonical: Dictionary = canonical_variant
+	var float_budget: Dictionary = canonical.duplicate(true)
+	var float_budget_parts: Dictionary = float_budget["parts"]
+	var float_budget_part: Dictionary = float_budget_parts["biomass_human_arm_v1"]
+	float_budget_part["triangle_budget"] = 2500.0
+	if not _expect_part_catalog_rejected(parts, float_budget, "integral float triangle budget"): return false
+
+	var float_limit: Dictionary = canonical.duplicate(true)
+	var float_limit_values: Dictionary = float_limit["limits"]
+	float_limit_values["max_attachments"] = 8.0
+	if not _expect_part_catalog_rejected(parts, float_limit, "integral float fixed limit"): return false
+
+	if not _need(parts.load_path(PARTS_PATH), "canonical part catalog did not reload after numeric mutations"): return false
+	if not _need(not parts.get_part("biomass_human_arm_v1").is_empty() and not parts.find_by_role("locomotor").is_empty() and not parts.limits().is_empty(), "canonical part catalog state was not restored after numeric mutations"): return false
+	return true
+
+func _expect_part_catalog_rejected(parts: Variant, document: Dictionary, label: String) -> bool:
+	if not _write_text(TEMP_PARTS_PATH, JSON.stringify(document)): return false
+	if not _need(not parts.load_path(TEMP_PARTS_PATH), "%s was accepted" % label): return false
+	if not _need(parts.get_part("biomass_human_arm_v1").is_empty() and parts.find_by_role("locomotor").is_empty() and parts.limits().is_empty(), "%s retained part catalog state" % label): return false
 	return true
 
 func _recipe_loader_failure_checks(recipes: Variant, parts: Variant) -> bool:
