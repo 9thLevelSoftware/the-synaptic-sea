@@ -215,15 +215,38 @@ def _append(errors: list[str], message: str) -> None:
     errors.append(message)
 
 
+_MAX_FINITE_WALK_CONTAINERS = 100_000
+
+
 def _finite_walk(value: Any, path: str, errors: list[str]) -> None:
-    if isinstance(value, float) and not math.isfinite(value):
-        _append(errors, f"{path}: non-finite number")
-    elif isinstance(value, Mapping):
-        for key, child in value.items():
-            _finite_walk(child, f"{path}.{key}", errors)
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            _finite_walk(child, f"{path}[{index}]", errors)
+    pending: list[tuple[Any, str]] = [(value, path)]
+    visited: set[int] = set()
+    while pending:
+        current, current_path = pending.pop()
+        if isinstance(current, float):
+            if not math.isfinite(current):
+                _append(errors, f"{current_path}: non-finite number")
+            continue
+        if isinstance(current, Mapping):
+            container_id = id(current)
+            if container_id in visited:
+                continue
+            visited.add(container_id)
+            if len(visited) > _MAX_FINITE_WALK_CONTAINERS:
+                _append(errors, f"{path}: finite-number walk limit exceeded")
+                return
+            for key, child in current.items():
+                pending.append((child, f"{current_path}.{key}"))
+        elif isinstance(current, list):
+            container_id = id(current)
+            if container_id in visited:
+                continue
+            visited.add(container_id)
+            if len(visited) > _MAX_FINITE_WALK_CONTAINERS:
+                _append(errors, f"{path}: finite-number walk limit exceeded")
+                return
+            for index, child in enumerate(current):
+                pending.append((child, f"{current_path}[{index}]"))
 
 
 def _object(value: Any, expected: set[str], path: str, errors: list[str]) -> bool:
@@ -470,6 +493,33 @@ def _part_category(part: Any) -> str | None:
     return category if isinstance(category, str) else None
 
 
+def _validate_recipe_part_metadata(part: Any, label: str, errors: list[str]) -> None:
+    if not isinstance(part, Mapping):
+        _append(errors, f"{label}: referenced part must be an object")
+        return
+    category = part.get("category")
+    if not isinstance(category, str) or category not in CATEGORIES:
+        _append(errors, f"{label}.category: referenced part must have a known category")
+    roles = part.get("assembly_roles")
+    if (
+        not isinstance(roles, list)
+        or not roles
+        or any(not isinstance(role, str) or role not in ASSEMBLY_ROLES for role in roles)
+    ):
+        _append(errors, f"{label}.assembly_roles: referenced part must have known roles")
+    elif len(set(roles)) != len(roles):
+        _append(errors, f"{label}.assembly_roles: referenced part has duplicate roles")
+    budget = part.get("triangle_budget")
+    if not isinstance(budget, int) or isinstance(budget, bool) or budget <= 0 or budget > MAX_TRIANGLES:
+        _append(errors, f"{label}.triangle_budget: referenced part must have a positive bounded budget")
+    sockets = part.get("sockets")
+    if not isinstance(sockets, list) or not sockets:
+        _append(errors, f"{label}.sockets: referenced part must have a non-empty socket array")
+    collision_shapes = part.get("collision_shapes")
+    if not isinstance(collision_shapes, list) or not collision_shapes:
+        _append(errors, f"{label}.collision_shapes: referenced part must have a non-empty collision array")
+
+
 def _part_budget(part: Any) -> int:
     value = part.get("triangle_budget", 0) if isinstance(part, Mapping) else 0
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0 or value > MAX_TRIANGLES:
@@ -543,6 +593,7 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
             _append(errors, f"recipe.core.part_id: unknown part_id '{core_part_id}'")
         else:
             core_part = parts[core_part_id]
+            _validate_recipe_part_metadata(core_part, "recipe.core.part_id", errors)
             if "core" not in _part_roles(core_part):
                 _append(errors, "recipe.core.part_id: core part lacks core role")
     attachments = recipe.get("attachments")
@@ -587,11 +638,15 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
             child_part = None
         else:
             child_part = parts[part_id]
+            _validate_recipe_part_metadata(child_part, f"{path}.part_id", errors)
         if connector_id != CONNECTOR_PART_ID:
             _append(errors, f"{path}.connector_part_id: connector must be {CONNECTOR_PART_ID}")
             connector_part = parts.get(connector_id) if isinstance(connector_id, str) else None
         else:
             connector_part = parts.get(CONNECTOR_PART_ID)
+        connector_known = isinstance(connector_id, str) and connector_id in parts
+        if connector_known:
+            _validate_recipe_part_metadata(connector_part, f"{path}.connector_part_id", errors)
         if connector_part is None:
             _append(errors, f"{path}.connector_part_id: unknown connector part")
         elif _part_category(connector_part) != "biomass_connector" or "connector" not in _part_roles(connector_part):
@@ -754,7 +809,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         parts_document = _load_json(resolve_input(args.parts))
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         errors.append(f"parts: {exc}")
         parts_document = {}
     try:
@@ -764,7 +819,7 @@ def main(argv: list[str] | None = None) -> int:
     part_map = parts_document.get("parts", {}) if isinstance(parts_document, dict) else {}
     try:
         recipes_document = _load_json(resolve_input(args.recipes))
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         errors.append(f"recipes: {exc}")
         recipes_document = {}
     try:

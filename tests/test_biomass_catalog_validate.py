@@ -665,3 +665,80 @@ def test_cli_reports_oversized_integer_diagnostics_without_traceback(tmp_path: P
     assert "ERROR: parts:" in result.stdout
     assert "ERROR: recipes:" in result.stdout
     assert all(line.startswith("ERROR: ") for line in result.stdout.splitlines())
+
+
+def test_public_validators_return_stable_diagnostics_for_deep_json_values() -> None:
+    value: object = []
+    for _ in range(1100):
+        value = [value]
+
+    cases = (
+        (validate_part_catalog(value, ROOT), validate_part_catalog(value, ROOT)),
+        (validate_recipe(value, part_map()), validate_recipe(value, part_map())),
+        (validate_recipe_catalog(value, part_map()), validate_recipe_catalog(value, part_map())),
+    )
+    for errors, repeat in cases:
+        assert isinstance(errors, list)
+        assert all(isinstance(error, str) for error in errors)
+        assert errors == sorted(set(errors))
+        assert errors == repeat
+        assert errors
+
+
+def test_cli_rejects_manually_constructed_deep_json_without_traceback(tmp_path: Path) -> None:
+    deep_json = "[" * 1500 + "]" * 1500
+    part_path = tmp_path / "deep_parts.json"
+    recipe_path = tmp_path / "recipes.json"
+    part_path.write_text(deep_json, encoding="utf-8")
+    recipe_path.write_text(json.dumps(recipes()), encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--project-root",
+            str(ROOT),
+            "--parts",
+            str(part_path),
+            "--recipes",
+            str(recipe_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "ERROR:" in result.stdout + result.stderr
+    assert "Traceback" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "diagnostic"),
+    (
+        ("category", {}, "category"),
+        ("category", "bogus", "category"),
+        ("assembly_roles", {}, "assembly_roles"),
+        ("assembly_roles", ["bogus"], "assembly_roles"),
+    ),
+)
+def test_recipe_rejects_malformed_referenced_core_child_and_connector_metadata(
+    field: str, value: object, diagnostic: str,
+) -> None:
+    targets = (
+        ("core", "biomass_humanoid_torso_v1", "recipe.core.part_id"),
+        ("child", "biomass_human_arm_v1", "recipe.attachments[0].part_id"),
+        ("connector", "biomass_gunk_connector_v1", "recipe.attachments[0].connector_part_id"),
+    )
+    for _target, part_id, label in targets:
+        catalog = copy.deepcopy(part_map())
+        catalog[part_id][field] = copy.deepcopy(value)
+        errors = validate_recipe(recipe(), catalog)
+        assert_has(errors, f"{label}.{diagnostic}: referenced part")
+        assert errors == sorted(set(errors))
+
+
+def test_canonical_recipes_remain_accepted_with_valid_referenced_metadata() -> None:
+    catalog = part_map()
+    for item in recipes()["recipes"].values():
+        assert validate_recipe(item, catalog) == []
