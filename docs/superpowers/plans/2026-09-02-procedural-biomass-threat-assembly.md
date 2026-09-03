@@ -475,7 +475,7 @@ Every contract uses `image_to_3d`, Smart Topology `meshy-t2`, the listed low-pol
 
 Tests must prove:
 
-1. `stalker_v1`, `hull_tendril_kit_v1`, and `biomatter_swarm_kit_v1` stay at their original paths with fixture-recorded SHA-256 values.
+1. `stalker_v1`, `hull_tendril_kit_v1`, and `biomatter_swarm_kit_v1` stay at their original paths and remain byte-identical to the tracked `origin/main` blobs at Task 2's base. Record and assert these canonical identities: `stalker_v1.json` = SHA-256 `fb31123b77453a42372715468d97a579b6f6a2433198d3ff0f00758c8cb3f9ff`, 1,633 bytes; `hull_tendril_kit_v1.json` = SHA-256 `d5139bbbffaa0a5e2f6628efd9f62f91060fcfa9d2b2ac58d430e0d8116533f0`, 1,755 bytes; `biomatter_swarm_kit_v1.json` = SHA-256 `b50b1694a563a8521994bdcbc1b9f0e7b41d00f4df28278282607d82399da6be`, 1,782 bytes. Do not derive historical identity from uncommitted or transient working-tree copies.
 2. `meshy_stage.py plan/generate` rejects those IDs with `contract lifecycle is retired`.
 3. Historical staging manifests, candidate reviews, Blender reports, runtime reports, and promotion packets can still resolve and hash-verify the original contract path.
 4. Active loot-container, crafting-station, and biomass IDs still plan normally.
