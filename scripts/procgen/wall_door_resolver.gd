@@ -202,6 +202,7 @@ func _legacy_portal(edge: Dictionary, owner_room: String) -> Dictionary:
 	return {
 		"id": str(edge.get("id", "edge:%s" % str(edge.get("edge_key", "")))),
 		"wall": str(edge.get("direction", "")),
+		"direction": str(edge.get("direction", "")),
 		"module_id": str(edge.get("module_id", "bulkhead_portal_2x1")),
 		"position": edge.get("position", Vector3.ZERO),
 		"yaw_degrees": float(edge.get("yaw_degrees", 0.0)),

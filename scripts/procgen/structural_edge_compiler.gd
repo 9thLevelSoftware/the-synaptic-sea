@@ -160,6 +160,7 @@ func compile(layout: Dictionary) -> Dictionary:
 		floor_placements.append({
 			"id": "floor:%s" % occupancy_key,
 			"placement_id": "floor:%s" % occupancy_key,
+			"floor_module_id": floor_module,
 			"module_id": floor_module,
 			"position": cell_world_position(deck, cell),
 			"yaw_degrees": 0.0,
@@ -970,7 +971,13 @@ func _direction_between(from_cell: Vector2i, to_cell: Vector2i) -> String:
 func _portal_kind(portal: Dictionary, layout: Dictionary = {}) -> String:
 	if _blocked_link_matches(portal, layout):
 		return "LOCKED"
-	var raw: String = str(portal.get("state", portal.get("portal_type", portal.get("kind", "DOOR")))).to_upper()
+	# Accept any of `state`, `portal_type`, `kind`, or `type` (in that order)
+	# so layout descriptions that pre-date the canonical kind field still
+	# produce the expected semantic state (BREACH/HATCH/DOOR/LOCKED).
+	var raw: String = str(portal.get("state",
+		portal.get("portal_type",
+		portal.get("kind",
+		portal.get("type", "DOOR"))))).to_upper()
 	if raw == "OPEN":
 		return "DOOR"
 	if raw == "DOOR" or raw == "LOCKED" or raw == "HATCH" or raw == "BREACH":

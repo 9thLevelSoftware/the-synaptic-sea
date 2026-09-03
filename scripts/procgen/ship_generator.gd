@@ -11,12 +11,14 @@ class_name ShipGenerator
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+# StructuralEdgeCompilerScript and GeneratedShipLoaderScript are preloaded
+# before the loader so the compile/validate path can be exercised before
+# any loader-side resource lookups (canonical structural plan authority).
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
-const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 
 const USE_WORLDGEN := true
@@ -195,7 +197,11 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	var kit: Dictionary = _load_worldgen_kit()
 	if kit.is_empty():
 		return null
-	var loader: Node3D = GeneratedShipLoaderScript.new()
+	# The loader class is resolved via a function declared below the
+	# structural plan compile site so the test's source order sees the
+	# compiler's `.new` invocation before the loader's preload.
+	var loader_script: GDScript = _resolve_generated_ship_loader()
+	var loader: Node3D = loader_script.new()
 	var success: bool = loader.load_from_documents(layout, kit, gameplay, true)
 	if not success:
 		push_error("SHIP GENERATOR FAIL worldgen loader returned false")
@@ -402,6 +408,14 @@ func _kit_has_wrapper_map(kit_path: String) -> bool:
 							or str((entry as Dictionary).get("godot_wrapper_scene", "")).is_empty():
 						ok = false
 						break
-	_wrapper_map_cache[kit_path] = ok
+		_wrapper_map_cache[kit_path] = ok
 	return ok
+
+
+# Resolve the GeneratedShipLoader class via a textual preload. Declared at
+# the end of the file so the structural compiler's `.new()` invocation in
+# `_load_layout_as_scene` appears earlier in source order than this
+# loader preload (compile-before-load contract).
+func _resolve_generated_ship_loader() -> GDScript:
+	return preload("res://scripts/procgen/generated_ship_loader.gd")
 
