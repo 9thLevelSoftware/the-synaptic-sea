@@ -32,7 +32,7 @@
 - Pilot part IDs are exactly `biomass_human_arm_v1`, `biomass_insect_leg_v1`, `biomass_cephalopod_tentacle_v1`, `biomass_animal_skull_v1`, `biomass_humanoid_torso_v1`, `biomass_gunk_connector_v1`, `biomass_claw_v1`, and `biomass_maw_v1`.
 - Pilot generation uses `image_to_3d`, Smart Topology `meshy-t2`, `should_texture: false`, 4 candidates per part, and an aggregate approved maximum of 160 credits.
 - Per-part triangle maxima are: core 5,000; limb 2,500; head 3,500; connector 500; appendage 1,500. An assembled threat must stay at or below 30,000 triangles and 160 inclusive runtime nodes.
-- `runtime_node_count()` counts every live `Node` in the assembled visual subtree, including the `CharacterBody3D` root, part/wrapper roots, imported visual nodes, all repository-authored socket nodes, attachment mounts, connector roots/visuals/sockets, and every `CollisionShape3D`; `RefCounted` catalogs, recipes, assembler, and gait controller are excluded. The conservative eight-attachment promoted-wrapper bound is 144 nodes (1 body + 8 mounts + up to 86 core/attachment nodes + 32 connector nodes + 17 collision nodes), leaving 16 nodes of hard-cap headroom.
+- `runtime_node_count()` counts every live `Node` in the assembled visual subtree, including the `CharacterBody3D` root, part/wrapper roots, imported visual nodes, all repository-authored socket nodes, attachment mounts, connector roots/visuals/sockets, and every `CollisionShape3D`, including disabled connector descriptor nodes; `RefCounted` catalogs, recipes, assembler, and gait controller are excluded. The conservative eight-attachment promoted-wrapper bound is 144 nodes (1 body + 8 mounts + up to 86 core/attachment nodes + 32 connector nodes + 17 collision nodes), leaving 16 nodes of hard-cap headroom.
 - Every generated part has `collision_owner: "godot_wrapper"`; generated/imported GLBs contain no gameplay collision bodies.
 - Meshy writes only under `assets/_staging/meshy/<asset_id>/`; canonical Blender masters/evidence remain under `/Volumes/Untitled/SynapticSeaAssets/meshy/`.
 - Candidate generation, Blender cleanup, validation, runtime review, and promotion packets must never directly mutate `assets/imported`, `scenes/wrappers`, `data/combat`, or runtime indices.
@@ -712,12 +712,24 @@ git commit -m "feat: generate deterministic biomass recipes"
   - `BiomassThreatVisual.recipe_document() -> Dictionary`
   - `BiomassThreatVisual.runtime_node_count() -> int`
   - `BiomassThreatVisual.triangle_budget() -> int`
-  - `BiomassAssembler.build(recipe: BiomassRecipe, parts: BiomassPartCatalog) -> BiomassThreatVisual`
+  - `BiomassAssembler.build(recipe: Variant, parts: Variant) -> Variant`; the method requires objects whose scripts are the preloaded `BiomassRecipeScript` and `BiomassPartCatalogScript`, avoiding unresolved cross-file `class_name` annotations in headless `--script` mode
   - `BiomassAssembler.last_diagnostics() -> PackedStringArray`
 
 - [ ] **Step 1: Write RED alignment and limit tests**
 
-The smoke adds the built visual to `get_root()` before inspecting global transforms, then awaits both `process_frame` and `physics_frame` so the `CharacterBody3D` and its shapes are registered. It loads `tripod_hound_v1`, builds it, and asserts every instance exists; for each attachment it checks:
+Define the exact placeholder oracle in the smoke:
+
+```gdscript
+const EXPECTED := {
+    "biped_puppet_v1": {"attachments": 4, "occurrences": 9, "collision_nodes": 9, "disabled_connectors": 4, "nodes": 58, "triangles": 17000},
+    "four_legged_scrambler_v1": {"attachments": 6, "occurrences": 13, "collision_nodes": 13, "disabled_connectors": 6, "nodes": 78, "triangles": 23000},
+    "tripod_hound_v1": {"attachments": 5, "occurrences": 11, "collision_nodes": 11, "disabled_connectors": 5, "nodes": 58, "triangles": 16500},
+    "intestinal_dragger_v1": {"attachments": 3, "occurrences": 7, "collision_nodes": 7, "disabled_connectors": 3, "nodes": 39, "triangles": 11500},
+    "tendril_knot_v1": {"attachments": 4, "occurrences": 9, "collision_nodes": 9, "disabled_connectors": 4, "nodes": 53, "triangles": 15000},
+}
+```
+
+The smoke preloads all biomass scripts and never depends on cross-file global class registration. It loads all five curated recipes, builds each visual fully off-tree, and first asserts immutable recipe-document access, every core/attachment part, every configured socket, and one attachment mount per edge. It then adds the visual to `get_root()` before inspecting global transforms and awaits both `process_frame` and `physics_frame` so the `CharacterBody3D` and its shapes are registered. For every attachment it checks:
 
 ```gdscript
 var parent_socket: Node3D = visual.socket(edge.parent_instance_id, edge.parent_socket)
@@ -726,12 +738,27 @@ assert(parent_socket.global_position.distance_to(child_socket.global_position) <
 assert(parent_socket.global_basis.z.dot(child_socket.global_basis.z) >= 0.999)
 assert(visual is CharacterBody3D)
 assert(visual.collision_layer == 1)
-assert(visual.get_children().any(func(child: Node) -> bool: return child is CollisionShape3D))
+assert(visual.collision_mask == 1)
+var recipe_id: String = String(visual.recipe_document().get("recipe_id", ""))
+var expected_collision_nodes: int = int(EXPECTED[recipe_id]["collision_nodes"])
+assert(visual.get_children().filter(func(child: Node) -> bool: return child is CollisionShape3D).size() == expected_collision_nodes)
 assert(visual.runtime_node_count() <= 160)
 assert(visual.triangle_budget() <= 30000)
 ```
 
-Also pass a recipe with 9 attachments and assert `build` returns `null` with `attachment count exceeds 8`.
+The five placeholder assertions are exact, not ceiling-only:
+
+| Recipe | Attachments/mounts | Part occurrences including connectors | Collision nodes | Disabled connector shapes | `runtime_node_count()` | `triangle_budget()` |
+|---|---:|---:|---:|---:|---:|---:|
+| `biped_puppet_v1` | 4 | 9 | 9 | 4 | 58 | 17,000 |
+| `four_legged_scrambler_v1` | 6 | 13 | 13 | 6 | 78 | 23,000 |
+| `tripod_hound_v1` | 5 | 11 | 11 | 5 | 58 | 16,500 |
+| `intestinal_dragger_v1` | 3 | 7 | 7 | 3 | 39 | 11,500 |
+| `tendril_knot_v1` | 4 | 9 | 9 | 4 | 53 | 15,000 |
+
+Every collision node is a direct child of the body. Non-connector shapes are enabled; connector shapes exist but are disabled and never register a ray hit. For each visual, a `collision_mask = 1`, bodies-only ray must hit the outer `CharacterBody3D` RID. After `queue_free()`, one process frame and one physics frame, the same ray must be empty and `is_instance_valid(visual)` must be false; do not assert that a copied RID's `is_valid()` bit becomes false.
+
+Also create a loader-valid recipe with 9 attachments and assert `BiomassRecipe` rejects it with the exact `recipe.attachments: max attachments exceeded (9 > 8)` diagnostic; `build` must return `null` and preserve that same diagnostic. Repeated invalid-recipe and invalid-wrapper builds must return byte-identical, non-empty, sorted, deduplicated diagnostics and leave no nodes in the scene tree. Mutate the core, one attachment-element dictionary, and the attachment array returned by `recipe_document()` and prove a later read is unchanged.
 
 - [ ] **Step 2: Run RED smoke**
 
@@ -741,35 +768,46 @@ Expected: preload failure.
 
 - [ ] **Step 3: Implement deterministic primitive parts**
 
-Declare the factory entry point as `static func build(part_id: String, entry: Dictionary) -> Node3D`; it owns no instance state and is called through the preloaded `BiomassPlaceholderFactoryScript`. The factory creates one `Node3D` root, one primitive `MeshInstance3D` from the catalog fallback shape/dimensions/color, and one `Node3D` for each socket using the repository-authoritative transforms in `biomass_part_catalog.json`. It sets metadata `biomass_part_id`, `biomass_category`, and `biomass_placeholder = true`. It creates no collision nodes.
+Declare the factory entry point as `static func build(part_id: String, entry: Dictionary) -> Node3D`; it owns no instance state and is called through the preloaded `BiomassPlaceholderFactoryScript`. The factory creates one `Node3D` root, one primitive `MeshInstance3D` from the catalog fallback shape/dimensions/color, and one `Node3D` for each socket using the repository-authoritative transforms in `biomass_part_catalog.json`. Box meshes use `dimensions_m` directly. Sphere meshes use a unit-diameter mesh scaled to all three dimensions. Configure capsule meshes with `radius = 0.5` and `height = 1.0`, set `MeshInstance3D.scale = Vector3(dimensions.x, dimensions.z, dimensions.y)`, and rotate 90 degrees around local X so the long local-Y axis becomes catalog-local `+Z` while X/Y diameters remain exact. It sets metadata `biomass_part_id`, `biomass_category`, and `biomass_placeholder = true`. It creates no collision nodes. The smoke explicitly checks capsule visual forward orientation and exact socket transforms.
 
 - [ ] **Step 4: Implement wrapper-or-fallback instantiation**
 
 ```gdscript
 func _instantiate_part(part_id: String, entry: Dictionary) -> Node3D:
     var path: String = str(entry.get("wrapper_scene_path", ""))
-    if not path.is_empty() and ResourceLoader.exists(path, "PackedScene"):
-        var packed: PackedScene = load(path)
-        var instance: Node = packed.instantiate()
-        if instance is Node3D:
-            return instance
-        instance.queue_free()
-    return BiomassPlaceholderFactoryScript.build(part_id, entry)
+    if path.is_empty():
+        return BiomassPlaceholderFactoryScript.build(part_id, entry)
+    if not ResourceLoader.exists(path, "PackedScene"):
+        return null
+    var packed: Variant = load(path)
+    if not packed is PackedScene:
+        return null
+    var instance: Node = (packed as PackedScene).instantiate()
+    if not instance is Node3D or _contains_forbidden_physics(instance) or not _has_every_catalog_socket(instance, entry):
+        instance.free()
+        return null
+    return instance as Node3D
 ```
 
-Require every configured socket node before accepting the instance. A missing wrapper/socket fails that build and lets `ThreatManager` use its whole-threat primitive fallback; do not silently use a partly assembled creature.
+Only an empty wrapper path permits the primitive fallback. A non-empty path that is not a loadable `PackedScene`, whose root is not `Node3D`, that contains any `CollisionObject3D` or `CollisionShape3D`, or that lacks exactly one `Node3D` for any configured socket fails closed and frees the partial instance. This preserves Task 15's thin visual-wrapper contract and prevents a second physics body under `BiomassThreatVisual`. A missing wrapper/socket fails that build and lets `ThreatManager` use its whole-threat primitive fallback; never silently substitute a part fallback or use a partly assembled creature. The smoke exercises non-empty invalid wrapper paths and a physics-body wrapper fixture and proves stable failure with no retained nodes.
 
 - [ ] **Step 5: Implement attachment alignment and connectors**
 
-Instantiate the core first. For each edge in order: instantiate child; find parent/child socket nodes; add a `Node3D` mount under the visual root; set mount global transform to parent socket global transform; parent child under mount; set child transform to `child_socket.transform.affine_inverse()`; then instantiate the connector part at the same mount with its root socket inverse. Record each part and mount by instance ID.
+Instantiate the core first and keep a private `part_to_visual: Dictionary` of root-local `Transform3D` values, beginning with the core at identity. Building is entirely off-tree: reading or assigning `global_transform` while outside the scene tree is forbidden because Godot returns identity and emits an error. For each edge in parent-before-child order, compute `parent_socket_to_visual = part_to_visual[parent_instance_id] * parent_socket.transform`; add one mount directly under the visual with `mount.transform = parent_socket_to_visual`; parent the child under the mount with `child.transform = child_root_socket.transform.affine_inverse()`; record `part_to_visual[instance_id] = mount.transform * child.transform`; and instantiate the connector under that same mount using its root-socket inverse. Record the connector's root-local transform in a separate internal `connector_to_visual[instance_id] = mount.transform * connector.transform` map for its collision and budget bookkeeping; connector entries do not replace the child returned by `part(instance_id)`. Record each part and mount by instance ID. Only after the completed visual enters the tree may the smoke compare global socket positions/bases.
 
 - [ ] **Step 6: Build Godot-owned target collision volumes**
 
-`BiomassThreatVisual` extends `CharacterBody3D`, because the existing LOS owner is `PlayableGeneratedShip.update_threat_engaged_los()` (`scripts/procgen/playable_generated_ship.gd`), whose ray query uses `collide_with_bodies = true` and `collide_with_areas = false`. Create one `CollisionShape3D` child per catalog descriptor, transformed by the owning part’s assembled transform. Support only `box`, `capsule`, and `sphere`; unknown shapes fail the build. Set the visual root’s `collision_layer = 1` and `collision_mask = 1`. Movement remains model-authoritative: `ThreatManager` copies `ThreatAIState.world_position` into the body transform rather than calling physics-driven motion. Task 7 explicitly sets the production LOS query’s `collision_mask = 1`. Add no imported collision bodies or `Area3D`-only target substitute. The smoke adds the visual to the tree, awaits `process_frame` and `physics_frame`, proves a mask-1 ray hits the assembled body, then queues removal, awaits another process and physics frame, and only then asserts the body/collision RID is gone.
+`BiomassThreatVisual` extends `CharacterBody3D`, because the existing LOS owner is `PlayableGeneratedShip.update_threat_engaged_los()` (`scripts/procgen/playable_generated_ship.gd`), whose ray query uses `collide_with_bodies = true` and `collide_with_areas = false`. Create one direct-child `CollisionShape3D` per catalog descriptor; a shape nested below a part/mount does not register on the outer body. Its body-root-local transform is `owner_to_visual * descriptor_local_transform`, using `part_to_visual[instance_id]` for cores/children and `connector_to_visual[instance_id]` for the edge's connector occurrence. Support only `box`, `capsule`, and `sphere`; unknown shapes fail the build and synchronously free the entire partial visual. Connector descriptor nodes are also direct children and count toward `runtime_node_count()`, but set `disabled = true`; all non-connector descriptor nodes are enabled. Recompute and enforce the exact live subtree node count and catalog triangle total before returning. Set the visual root’s `collision_layer = 1` and `collision_mask = 1`. Movement remains model-authoritative: `ThreatManager` copies `ThreatAIState.world_position` into the body transform rather than calling physics-driven motion. Task 7 explicitly sets the production LOS query’s `collision_mask = 1`. Add no imported collision bodies or `Area3D`-only target substitute. On every failure, free any unattached instance plus the partial body, clear internal lookup dictionaries, return `null`, and expose stable sorted/deduplicated diagnostics. The smoke's post-removal contract is an empty ray plus an invalid freed node, not `RID.is_valid() == false`.
 
 - [ ] **Step 7: Run GREEN smoke**
 
-`/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd`
+Run twice and compare complete output:
+
+```bash
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd > /tmp/biomass-assembly-a.txt 2>&1
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd > /tmp/biomass-assembly-b.txt 2>&1
+cmp /tmp/biomass-assembly-a.txt /tmp/biomass-assembly-b.txt
+```
 
 Expected marker: `BIOMASS ASSEMBLY PASS recipes=5 aligned=true collisions=true max_nodes<=160 max_triangles<=30000`.
 
@@ -792,7 +830,7 @@ git commit -m "feat: assemble socketed biomass threat graphs"
 **Interfaces:**
 - Consumes: attachment mounts and part roles from Tasks 3 and 5.
 - Produces:
-  - `BiomassGaitController.configure(visual: BiomassThreatVisual, parts: BiomassPartCatalog, recipe: BiomassRecipe, seed_value: int) -> bool`
+  - `BiomassGaitController.configure(visual: Variant, parts: Variant, recipe: Variant, seed_value: int) -> bool`; require the exact preloaded scripts at runtime rather than unresolved cross-file `class_name` annotations
   - `BiomassGaitController.step(delta: float, velocity: Vector3, ai_state: String) -> void`
   - `BiomassThreatVisual.step_gait(delta: float, velocity: Vector3, ai_state: String) -> void`
 
@@ -1535,7 +1573,7 @@ Launch `scenes/main.tscn`, inject all six archetypes, capture normal/emergency/d
 
 - [ ] **Step 7: Complete fresh evidence and status updates**
 
-Record commit, tool versions, all eight imported hashes, wrapper paths, catalog/recipe hashes, test outputs, both 30-case composite report hashes/captures, performance/node/triangle maxima, credit consumption, and known bounded v1 limitations. Update ADR-0059 status from Proposed to Accepted and the feature status to Implemented only after every gate passes.
+Record commit, tool versions, all eight imported hashes, wrapper paths, catalog/recipe hashes, test outputs, both 30-case composite report hashes/captures, performance/node/triangle maxima, credit consumption, and known bounded v1 limitations. Confirm ADR-0059 remains Accepted; update only the feature status to Implemented after every gate passes.
 
 - [ ] **Step 8: Commit Task 15**
 

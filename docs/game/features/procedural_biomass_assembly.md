@@ -117,7 +117,9 @@ instance, part, parent, socket, child root, connector, and locomotion hint.
 Use a locked-isometric, low-poly, placeholder-first flow. Primitive fallbacks establish scale,
 composition, and readability before any optional candidate asset is reviewed. No exported GLB may
 carry a socket marker or helper node. Connectors are preauthored, non-deforming, visual-only parts;
-they are not skinned at runtime to bridge arbitrary gaps.
+they are not skinned at runtime to bridge arbitrary gaps. Their catalog collision descriptors are
+materialized only as disabled `CollisionShape3D` nodes for uniform deterministic node accounting and
+must never participate in gameplay collision or physics queries.
 
 The review matrix is five recipes × seeds `42` and `777` × `normal`, `emergency`, and `dark`
 lighting: exactly 30 composite captures. All six 3D archetype pools remain covered during the

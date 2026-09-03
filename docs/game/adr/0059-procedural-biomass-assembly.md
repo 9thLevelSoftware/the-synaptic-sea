@@ -87,7 +87,9 @@ The graph rules are:
 - every child uses socket reference `root_0` (the catalog socket is `socket_root_0`) and every edge uses the canonical
   `biomass_gunk_connector_v1` connector;
 - connectors are non-deforming, preauthored visual parts. They do not own gameplay collision or
-  physics and are not procedurally skinned to bridge arbitrary gaps.
+  physics and are not procedurally skinned to bridge arbitrary gaps. Their required catalog
+  collision descriptors are instantiated only as disabled `CollisionShape3D` nodes so deterministic
+  node accounting still includes every descriptor; connector shapes must never register a hit.
 
 The validator's deterministic conservative runtime-node estimate is derived only from the recipe
 and catalog: one assembler-root node plus two wrapper/visual nodes and one node per authored socket
