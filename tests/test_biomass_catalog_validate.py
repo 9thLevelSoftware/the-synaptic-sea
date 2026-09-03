@@ -23,6 +23,34 @@ ROOT = Path(__file__).parents[1]
 PARTS_PATH = ROOT / "data/combat/biomass_part_catalog.json"
 RECIPES_PATH = ROOT / "data/combat/biomass_recipe_catalog.json"
 SCRIPT = ROOT / "tools/biomass_catalog_validate.py"
+INTEGER_DIGIT_LIMIT = 4096
+AVAILABLE_PYTHONS = tuple(
+    path
+    for path in (Path("/usr/bin/python3"), Path("/opt/homebrew/bin/python3.11"))
+    if path.is_file()
+)
+
+
+def run_cli_with_python(
+    python_bin: Path,
+    parts_path: Path,
+    recipes_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            str(python_bin),
+            str(SCRIPT),
+            "--project-root",
+            str(ROOT),
+            "--parts",
+            str(parts_path),
+            "--recipes",
+            str(recipes_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def load(path: Path):
@@ -615,56 +643,215 @@ def test_oversized_integer_reference_and_budget_diagnostics_are_stable() -> None
     assert_has(cases[5], "triangle limit exceeded")
 
 
-def test_cli_reports_oversized_integer_diagnostics_without_traceback(tmp_path: Path) -> None:
-    huge_digits = "9" * 10000
+def _write_oversized_catalog_pair(tmp_path: Path, digits: str) -> tuple[Path, Path]:
     parts_text = json.dumps(parts()).replace(
         '"triangle_budget": 2500',
-        f'"triangle_budget": {huge_digits}',
+        f'"triangle_budget": {digits}',
         1,
     )
     recipes_text = json.dumps(recipes())
     recipes_text = recipes_text.replace(
         '"core": {"instance_id": "core", "part_id": "biomass_humanoid_torso_v1"}',
-        f'"core": {{"instance_id": "core", "part_id": {huge_digits}}}',
+        f'"core": {{"instance_id": "core", "part_id": {digits}}}',
         1,
     )
     recipes_text = recipes_text.replace(
         '"part_id": "biomass_human_arm_v1"',
-        f'"part_id": {huge_digits}',
+        f'"part_id": {digits}',
         1,
     )
     recipes_text = recipes_text.replace(
         '"stalker": ["biped_puppet_v1", "four_legged_scrambler_v1"]',
-        f'"stalker": [{huge_digits}, "four_legged_scrambler_v1"]',
+        f'"stalker": [{digits}, "four_legged_scrambler_v1"]',
+        1,
+    )
+    assert digits in parts_text
+    assert digits in recipes_text
+    part_path = tmp_path / "parts.json"
+    recipe_path = tmp_path / "recipes.json"
+    part_path.write_text(parts_text, encoding="utf-8")
+    recipe_path.write_text(recipes_text, encoding="utf-8")
+    return part_path, recipe_path
+
+
+@pytest.mark.parametrize("python_bin", AVAILABLE_PYTHONS, ids=lambda path: path.name)
+def test_cli_reports_oversized_integer_diagnostics_without_traceback(
+    python_bin: Path, tmp_path: Path
+) -> None:
+    part_path, recipe_path = _write_oversized_catalog_pair(tmp_path, "9" * 10000)
+    result = run_cli_with_python(python_bin, part_path, recipe_path)
+    assert result.returncode != 0
+    assert result.stderr == ""
+    assert "Traceback" not in result.stdout
+    assert "PASS" not in result.stdout
+    assert "ERROR: parts:" in result.stdout
+    assert "ERROR: recipes:" in result.stdout
+    assert f"integer exceeds {INTEGER_DIGIT_LIMIT} decimal digits" in result.stdout
+    assert "set_int_max_str_digits" not in result.stdout
+    assert all(line.startswith("ERROR: ") for line in result.stdout.splitlines())
+
+
+@pytest.mark.parametrize("python_bin", AVAILABLE_PYTHONS, ids=lambda path: path.name)
+@pytest.mark.parametrize(
+    ("digits", "must_reject_at_load"),
+    (("9" * INTEGER_DIGIT_LIMIT, False), ("9" * (INTEGER_DIGIT_LIMIT + 1), True)),
+    ids=("4096-digits", "4097-digits"),
+)
+def test_cli_integer_digit_boundaries_are_runtime_independent(
+    python_bin: Path, tmp_path: Path, digits: str, must_reject_at_load: bool
+) -> None:
+    parts_text = json.dumps(parts()).replace(
+        '"triangle_budget": 2500',
+        f'"triangle_budget": {digits}',
         1,
     )
     part_path = tmp_path / "parts.json"
     recipe_path = tmp_path / "recipes.json"
     part_path.write_text(parts_text, encoding="utf-8")
-    recipe_path.write_text(recipes_text, encoding="utf-8")
+    recipe_path.write_text(json.dumps(recipes()), encoding="utf-8")
+    result = run_cli_with_python(python_bin, part_path, recipe_path)
+    assert result.returncode != 0
+    assert result.stderr == ""
+    assert "Traceback" not in result.stdout + result.stderr
+    assert "PASS" not in result.stdout
+    if must_reject_at_load:
+        assert f"ERROR: parts: integer exceeds {INTEGER_DIGIT_LIMIT} decimal digits" in result.stdout
+    else:
+        assert "integer exceeds" not in result.stdout
+        assert "triangle_budget: value does not match canonical contract" in result.stdout
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--project-root",
-            str(ROOT),
-            "--parts",
-            str(part_path),
-            "--recipes",
-            str(recipe_path),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
+
+@pytest.mark.parametrize("python_bin", AVAILABLE_PYTHONS, ids=lambda path: path.name)
+def test_cli_rejects_negative_oversized_integer_without_traceback(
+    python_bin: Path, tmp_path: Path
+) -> None:
+    digits = "-" + "9" * (INTEGER_DIGIT_LIMIT + 1)
+    parts_text = json.dumps(parts()).replace(
+        '"triangle_budget": 2500',
+        f'"triangle_budget": {digits}',
+        1,
     )
-
+    part_path = tmp_path / "parts.json"
+    recipe_path = tmp_path / "recipes.json"
+    part_path.write_text(parts_text, encoding="utf-8")
+    recipe_path.write_text(json.dumps(recipes()), encoding="utf-8")
+    result = run_cli_with_python(python_bin, part_path, recipe_path)
     assert result.returncode != 0
     assert result.stderr == ""
     assert "Traceback" not in result.stdout
-    assert "ERROR: parts:" in result.stdout
-    assert "ERROR: recipes:" in result.stdout
-    assert all(line.startswith("ERROR: ") for line in result.stdout.splitlines())
+    assert f"ERROR: parts: integer exceeds {INTEGER_DIGIT_LIMIT} decimal digits" in result.stdout
+
+
+@pytest.mark.parametrize("python_bin", AVAILABLE_PYTHONS, ids=lambda path: path.name)
+def test_cli_canonical_pass_marker_is_stable_on_available_interpreters(python_bin: Path) -> None:
+    result = run_cli_with_python(python_bin, PARTS_PATH, RECIPES_PATH)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stderr == ""
+    assert result.stdout == "BIOMASS CATALOG VALIDATION PASS parts=8 recipes=5 archetypes=6\n"
+
+
+def test_in_process_integer_digit_boundaries_do_not_stringify() -> None:
+    allowed = 10 ** (INTEGER_DIGIT_LIMIT - 1)
+    rejected = 10 ** INTEGER_DIGIT_LIMIT
+
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["triangle_budget"] = allowed
+    allowed_errors = validate_part_catalog(document, ROOT)
+    assert_has(allowed_errors, "triangle_budget: value does not match canonical contract")
+    assert all("must be a positive integer" not in error for error in allowed_errors)
+
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["triangle_budget"] = rejected
+    rejected_errors = validate_part_catalog(document, ROOT)
+    assert rejected_errors == sorted(set(rejected_errors))
+    assert_has(rejected_errors, "triangle_budget: must be a positive integer")
+
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["triangle_budget"] = -rejected
+    negative_errors = validate_part_catalog(document, ROOT)
+    assert negative_errors == sorted(set(negative_errors))
+    assert_has(negative_errors, "triangle_budget: must be a positive integer")
+
+
+def test_bool_is_rejected_where_integer_is_required() -> None:
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["triangle_budget"] = True
+    errors = validate_part_catalog(document, ROOT)
+    assert_has(errors, "triangle_budget: must be a positive integer")
+    document = parts()
+    document["limits"]["max_attachments"] = True
+    errors = validate_part_catalog(document, ROOT)
+    assert_has(errors, "document.limits: values do not match canonical limits")
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda document: document["limits"].__setitem__("max_attachments", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["limits"].__setitem__("max_depth", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["limits"].__setitem__("max_triangles", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["limits"].__setitem__("max_nodes", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"].__setitem__("triangle_budget", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["fallback"]["dimensions_m"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["sockets"][0]["position_m"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["sockets"][0]["rotation_deg"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["collision_shapes"][0].__setitem__("radius_m", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["collision_shapes"][0].__setitem__("height_m", 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["collision_shapes"][0]["position_m"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_claw_v1"]["collision_shapes"][0]["rotation_deg"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_animal_skull_v1"]["collision_shapes"][0]["dimensions_m"].__setitem__(0, 10 ** INTEGER_DIGIT_LIMIT),
+        lambda document: document["parts"]["biomass_gunk_connector_v1"]["collision_shapes"][0].__setitem__("radius_m", 10 ** INTEGER_DIGIT_LIMIT),
+    ),
+    ids=(
+        "limits.max_attachments",
+        "limits.max_depth",
+        "limits.max_triangles",
+        "limits.max_nodes",
+        "triangle_budget",
+        "fallback.dimensions_m",
+        "socket.position_m",
+        "socket.rotation_deg",
+        "capsule.radius_m",
+        "capsule.height_m",
+        "collision.position_m",
+        "collision.rotation_deg",
+        "box.dimensions_m",
+        "sphere.radius_m",
+    ),
+)
+def test_all_numeric_fields_reject_oversized_ints_without_exception(mutate) -> None:
+    document = parts()
+    mutate(document)
+    errors = validate_part_catalog(document, ROOT)
+    assert isinstance(errors, list)
+    assert errors
+    assert errors == sorted(set(errors))
+    assert all(isinstance(error, str) for error in errors)
+
+
+def test_recipe_numeric_and_reference_fields_reject_oversized_ints_without_exception() -> None:
+    huge = 10 ** INTEGER_DIGIT_LIMIT
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_humanoid_torso_v1"]["triangle_budget"] = huge
+    catalog["biomass_humanoid_torso_v1"]["sockets"][0]["position_m"][0] = huge
+    catalog["biomass_human_arm_v1"]["collision_shapes"][0]["radius_m"] = huge
+    errors = validate_recipe(recipe(), catalog)
+    assert errors == sorted(set(errors))
+    assert all(isinstance(error, str) for error in errors)
+    assert errors
+
+    malformed = recipe()
+    malformed["core"]["part_id"] = huge
+    errors = validate_recipe(malformed, part_map())
+    assert_has(errors, "recipe.core.part_id")
+    assert errors == sorted(set(errors))
+
+
+def test_validator_bounds_integers_without_global_digit_mutation() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "MAX_INTEGER_DECIMAL_DIGITS = 4096" in source
+    assert "set_int_max_str_digits" not in source
+    assert "parse_int" in source
 
 
 def test_public_validators_return_stable_diagnostics_for_deep_json_values() -> None:

@@ -16,6 +16,9 @@ MAX_ATTACHMENTS = 8
 MAX_DEPTH = 3
 MAX_TRIANGLES = 30000
 MAX_NODES = 160
+MAX_INTEGER_DECIMAL_DIGITS = 4096
+_MAX_INTEGER_ABS = 10 ** MAX_INTEGER_DECIMAL_DIGITS
+_MAX_INTEGER_BITS = _MAX_INTEGER_ABS.bit_length()
 
 CATEGORIES = {
     "biomass_core",
@@ -261,13 +264,31 @@ def _object(value: Any, expected: set[str], path: str, errors: list[str]) -> boo
     return True
 
 
+def _is_oversized_int(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return False
+    if value.bit_length() > _MAX_INTEGER_BITS:
+        return True
+    return abs(value) >= _MAX_INTEGER_ABS
+
+
+def _bounded_positive_int(value: Any) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and not _is_oversized_int(value)
+        and value > 0
+    )
+
+
 def _number(value: Any) -> bool:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool):
         return False
-    try:
+    if isinstance(value, int):
+        return not _is_oversized_int(value)
+    if isinstance(value, float):
         return math.isfinite(value)
-    except (OverflowError, ValueError):
-        return False
+    return False
 
 
 def _vector(value: Any, path: str, errors: list[str]) -> bool:
@@ -410,7 +431,7 @@ def _validate_part(part: Any, part_id: str, project_root: Path, errors: list[str
     elif len(set(roles)) != len(roles):
         _append(errors, f"{path}.assembly_roles: duplicate assembly role")
     budget = part.get("triangle_budget")
-    if not isinstance(budget, int) or isinstance(budget, bool) or budget <= 0:
+    if not _bounded_positive_int(budget):
         _append(errors, f"{path}.triangle_budget: must be a positive integer")
     _validate_wrapper(part.get("wrapper_scene_path"), part_id, project_root, errors)
     fallback = part.get("fallback")
@@ -519,7 +540,13 @@ def _validate_recipe_part_metadata(part: Any, label: str, errors: list[str]) -> 
     elif len(set(roles)) != len(roles):
         _append(errors, f"{label}.assembly_roles: referenced part has duplicate roles")
     budget = part.get("triangle_budget")
-    if not isinstance(budget, int) or isinstance(budget, bool) or budget <= 0 or budget > MAX_TRIANGLES:
+    if (
+        not isinstance(budget, int)
+        or isinstance(budget, bool)
+        or _is_oversized_int(budget)
+        or budget <= 0
+        or budget > MAX_TRIANGLES
+    ):
         _append(errors, f"{label}.triangle_budget: referenced part must have a positive bounded budget")
     sockets = part.get("sockets")
     if not isinstance(sockets, list) or not sockets:
@@ -547,7 +574,13 @@ def _validate_recipe_part_metadata(part: Any, label: str, errors: list[str]) -> 
 
 def _part_budget(part: Any) -> int:
     value = part.get("triangle_budget", 0) if isinstance(part, Mapping) else 0
-    if not isinstance(value, int) or isinstance(value, bool) or value <= 0 or value > MAX_TRIANGLES:
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or _is_oversized_int(value)
+        or value <= 0
+        or value > MAX_TRIANGLES
+    ):
         return MAX_TRIANGLES + 1
     return value
 
@@ -816,8 +849,24 @@ def _reject_constant(value: str) -> Any:
     raise ValueError(f"non-finite JSON constant: {value}")
 
 
+def _parse_int(lexeme: str) -> int:
+    if not isinstance(lexeme, str) or not lexeme:
+        raise ValueError(f"integer exceeds {MAX_INTEGER_DECIMAL_DIGITS} decimal digits")
+    signless = lexeme[1:] if lexeme[0] in "+-" else lexeme
+    if not signless.isdigit():
+        raise ValueError("invalid integer literal")
+    if len(signless) > MAX_INTEGER_DECIMAL_DIGITS:
+        raise ValueError(f"integer exceeds {MAX_INTEGER_DECIMAL_DIGITS} decimal digits")
+    return int(lexeme)
+
+
 def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys, parse_constant=_reject_constant)
+    return json.loads(
+        path.read_text(encoding="utf-8"),
+        object_pairs_hook=_reject_duplicate_keys,
+        parse_constant=_reject_constant,
+        parse_int=_parse_int,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
