@@ -153,8 +153,12 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 		if not _need(int(role_counts.get(role, 0)) == int(required[role]), "%s count was %d, expected %d" % [role, int(role_counts.get(role, 0)), int(required[role])]): return false
 	if not _need(triangle_total <= int(parts.limits().get("max_triangles", 0)), "triangle budget exceeded %d" % triangle_total): return false
 	if not _need(runtime_nodes <= int(parts.limits().get("max_nodes", 0)), "node budget exceeded %d" % runtime_nodes): return false
+	var pre_mutation_document: Dictionary = recipe.to_dict()
+	var baseline_canonical_json: String = JSON.stringify(pre_mutation_document, "", true)
+	var baseline_value: Variant = JSON.parse_string(baseline_canonical_json)
+	if not _need(baseline_value is Dictionary, "defensive copy baseline could not be parsed"): return false
+	var baseline: Dictionary = baseline_value
 	var defensive: Dictionary = recipe.to_dict()
-	var baseline: Dictionary = recipe.to_dict()
 	defensive["recipe_id"] = "mutated"
 	(defensive["core"] as Dictionary)["part_id"] = "mutated"
 	var defensive_attachments_value: Variant = defensive.get("attachments")
@@ -166,7 +170,9 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 	if not _need(first_edge.get("part_id") is String and not String(first_edge.get("part_id")).is_empty(), "defensive copy first attachment part_id is invalid"): return false
 	first_edge["part_id"] = "mutated"
 	defensive_attachments.clear()
-	if not _need(recipe.to_dict() == baseline, "valid recipe leaked mutable state"): return false
+	var post_mutation_canonical_json: String = JSON.stringify(recipe.to_dict(), "", true)
+	if not _need(post_mutation_canonical_json == baseline_canonical_json, "defensive copy leaked mutable state: canonical JSON changed"): return false
+	if not _need(recipe.to_dict() == baseline, "defensive copy leaked mutable state: document changed"): return false
 	return true
 
 func _determinism_checks(parts: Variant) -> bool:
