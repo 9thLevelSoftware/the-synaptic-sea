@@ -481,7 +481,7 @@ Tests must prove:
 4. Active loot-container, crafting-station, and biomass IDs still plan normally.
 5. The lifecycle parser rejects duplicate IDs, unknown states, path traversal, and malformed/unknown fields.
 6. A portable valid GLB fixture is exactly `94_588_220` bytes—the measured size of historical `stalker_v1/01a063a4-6158-7363-8f43-f6773a041de4/raw.glb`, above 64 MiB and below 128 MiB. Construct it in a pytest temp directory from a minimal aligned JSON chunk plus a padded BIN chunk; never depend on the ignored local Stalker file at test runtime.
-7. Name the regression `test_historical_94588220_byte_glb_survives_generate_and_verify`. A one-candidate fake-client `generate_batch()` stores that fixture, and `load_generation_record()` re-reads, validates, hashes, and accepts it through the real `_verify_generation_adjacent_artifacts()` path. Assert the fake download received a 128 MiB GLB ceiling, `_DOWNLOAD_TOTAL_MAX_BYTES` is 256 MiB, and a GLB larger than 128 MiB is rejected. No network or provider credits are used.
+7. Name the regression `test_historical_94588220_byte_glb_survives_generate_and_verify`. A normal four-candidate fake-client `generate_batch()` stores that fixture for exactly one candidate and small valid GLBs for the three companions, preserving the production `candidate_count` range of 3–6. `load_generation_record()` then re-reads, validates, hashes, and accepts the large fixture through the real `_verify_generation_adjacent_artifacts()` path. Assert every fake GLB download received a 128 MiB ceiling, `_DOWNLOAD_TOTAL_MAX_BYTES` is 256 MiB, and a GLB larger than 128 MiB is rejected. No network or provider credits are used.
 
 - [ ] **Step 6: Implement committed artifact limits and additive lifecycle enforcement**
 
