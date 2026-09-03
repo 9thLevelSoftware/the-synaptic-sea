@@ -41,8 +41,18 @@ and cleans failed/stale outputs. `biomass_composite_review.py` is the sole canon
 the manifest owns all 30 case IDs, commands/output, commit, Godot version, stage, input/output hashes,
 metrics, and protected digests; verify recomputes them. Proof stores only manifest path+SHA.
 
-Task 9 adds `docs/game/06_validation_plan.md`, `tools/meshy_blender_validate.py`, and `scripts/threats/biomass_assembler.gd` to its exact
-file scope. RED tests first prove current acceptance of mesh-node extras `{"biomass_socket":true}`.
+Task 9 owns exactly ten implementation files: `docs/game/06_validation_plan.md`,
+`scripts/systems/biomass_wrapper_validator.gd`, `scripts/validation/biomass_wrapper_authority_smoke.gd`,
+`tools/meshy_blender_validate.py`, `scripts/threats/biomass_assembler.gd`,
+`tests/test_meshy_blender_tools.py`, and the existing fixtures
+`tests/fixtures/biomass_valid_core_wrapper.tscn`,
+`tests/fixtures/biomass_valid_nested_wrapper.tscn`,
+`tests/fixtures/biomass_node_overflow_wrapper.tscn`, and
+`tests/fixtures/biomass_forbidden_physics_wrapper.tscn`. The four fixture root metadata mappings are
+respectively `biomass_part_id=biomass_humanoid_torso_v1`, `biomass_part_id=biomass_claw_v1`,
+`biomass_part_id=biomass_cephalopod_tentacle_v1`, and `biomass_part_id=biomass_maw_v1`;
+the two intentionally invalid fixtures retain correct identity metadata. RED tests first prove current
+acceptance of mesh-node extras `{"biomass_socket":true}`.
 Production validation then recursively rejects every GLB node extras key or string value containing
 case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`, including hidden/mesh nodes;
 benign `{source:"meshy"}` and visual-only no-helper fixtures pass. Godot signatures remain
@@ -54,6 +64,25 @@ alongside the closed catalog entry; the catalog schema is unchanged. `validate_p
 a stable diagnostic. `validate_assembly` derives authoritative expected part IDs from the recipe/catalog
 contract, never from instance metadata alone. The assembler validates every placeholder/wrapper before
 accepting it and frees the whole assembly on diagnostics; ADR-0058 remains authoritative.
+Task 9 RED/GREEN coverage explicitly exercises absent, matching, and mismatched identity metadata while
+preserving the explicit three-argument APIs and closed catalog schema. Task 8 may document its command and
+marker in its owned section but does not register Task 9's seven canonical commands. Task 9 adds exactly
+seven `run_clean` entries after Task 8 evidence: `biomass_catalog_smoke.gd` with
+`BIOMASS CATALOG SMOKE PASS parts=8 recipes=5 archetypes=6`; `biomass_recipe_generator_smoke.gd` with
+`BIOMASS GENERATOR PASS seeds=100 distinct=100 hints=5`; `biomass_assembly_smoke.gd`, which must emit
+the Task 5 assembly marker and then `BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false`;
+`biomass_threat_manager_smoke.gd` with
+`BIOMASS THREAT MANAGER PASS archetypes=6 persisted=true exact_rebuild=true fallback_supported=true fallback_used_valid=0`;
+`biomass_revisit_persistence_smoke.gd` with
+`BIOMASS REVISIT PERSISTENCE PASS marker_revisit=true world_save_load=true`;
+`/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py verify --project-root . --report artifacts/validation-previews/biomass-assembly-placeholder/review.json`
+with `BIOMASS COMPOSITE REVIEW PASS stage=placeholder gaits=5 seeds=2 lighting=3 captures=30`; and
+`biomass_wrapper_authority_smoke.gd` with
+`BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=forbidden`.
+The final marker is exactly `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true`.
+Before execution, mechanically count only lines whose trimmed text starts with `run_clean ` and compare
+that count to the marker's numeric value, for example:
+`/opt/homebrew/bin/python3.11 -c 'import re; from pathlib import Path; s=Path("docs/game/06_validation_plan.md").read_text(); n=sum(line.strip().startswith("run_clean ") for line in s.splitlines()); m=re.search(r"REGRESSION PASS commands=(\\d+)", s); assert m and n == int(m.group(1)), (n, m.group(1) if m else None)'`.
 
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
@@ -1215,7 +1244,15 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=633 clean_output=true'
+# --- Task 9 canonical biomass registrations (after Task 8 evidence) ---
+run_clean 'biomass catalog smoke' 'BIOMASS CATALOG SMOKE PASS parts=8 recipes=5 archetypes=6' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_catalog_smoke.gd
+run_clean 'biomass recipe generator smoke' 'BIOMASS GENERATOR PASS seeds=100 distinct=100 hints=5' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_recipe_generator_smoke.gd
+run_clean 'biomass assembly and gait smoke' 'BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_assembly_smoke.gd
+run_clean 'biomass threat manager smoke' 'BIOMASS THREAT MANAGER PASS archetypes=6 persisted=true exact_rebuild=true fallback_supported=true fallback_used_valid=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_threat_manager_smoke.gd
+run_clean 'biomass revisit persistence smoke' 'BIOMASS REVISIT PERSISTENCE PASS marker_revisit=true world_save_load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_revisit_persistence_smoke.gd
+run_clean 'biomass placeholder composite review verify' 'BIOMASS COMPOSITE REVIEW PASS stage=placeholder gaits=5 seeds=2 lighting=3 captures=30' /opt/homebrew/bin/python3.11 tools/biomass_composite_review.py verify --project-root . --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
+run_clean 'biomass wrapper authority smoke' 'BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=forbidden' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biomass_wrapper_authority_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
