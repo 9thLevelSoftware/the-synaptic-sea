@@ -120,12 +120,17 @@ collision, navigation, connectors, and gameplay bindings.
 
 ### Runtime visual and gait boundary
 
-Task 5 records immutable root-local assembly-rest `Transform3D` value copies as each part and
-attachment mount is registered. The copies are data, not scene nodes, and therefore do not change
-part, triangle, collision, or runtime-node accounting. `BiomassThreatVisual` exposes
+Task 5 records immutable assembly-rest `Transform3D` value copies as each part and attachment mount
+is registered. A part rest is the part node's immediate-parent-local `.transform`: visual-local for
+the directly parented core and mount-local for an attachment child. A mount rest is visual-root-local
+because every attachment mount is a direct visual child. The separate `part_to_visual` composition
+remains collision/assembly bookkeeping and must never be assigned to a mount-parented child's
+`.transform`. The copies are data, not scene nodes, and therefore do not change part, triangle,
+collision, or runtime-node accounting. `BiomassThreatVisual` exposes
 `part_rest_transform(instance_id: String) -> Variant` and
 `attachment_rest_transform(instance_id: String) -> Variant`; each returns the corresponding
-`Transform3D` for a known ID and `null` for an unknown ID.
+`Transform3D` for a known ID and `null` for an unknown ID. Reset restores mount values directly,
+then part values directly, and never captures a current animated pose.
 
 Each `BiomassThreatVisual` owns exactly one private `RefCounted` `BiomassGaitController`. There is
 no manager-owned, shared, autoload, or scene-tree gait controller. The controller preloads the exact
