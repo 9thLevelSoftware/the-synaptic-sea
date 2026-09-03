@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synaptic-sea.invalid/schemas/biomass_composite_review_v1.schema.json",
+  "title": "Synaptic Sea biomass composite review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_kind", "visual_stage", "commit", "godot_version", "catalogs", "recipes", "cases", "protected_digests", "pass"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "document_kind": {"const": "biomass_composite_review_v1"},
+    "visual_stage": {"enum": ["placeholder", "final"]},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "godot_version": {"type": "string", "minLength": 1},
+    "catalogs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["parts", "recipes"],
+      "properties": {
+        "parts": {"$ref": "#/$defs/catalogRecord"},
+        "recipes": {"$ref": "#/$defs/catalogRecord"}
+      }
+    },
+    "recipes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["biped_puppet_v1", "four_legged_scrambler_v1", "intestinal_dragger_v1", "tendril_knot_v1", "tripod_hound_v1"],
+      "properties": {
+        "biped_puppet_v1": {"$ref": "#/$defs/recipeRecord"},
+        "four_legged_scrambler_v1": {"$ref": "#/$defs/recipeRecord"},
+        "intestinal_dragger_v1": {"$ref": "#/$defs/recipeRecord"},
+        "tendril_knot_v1": {"$ref": "#/$defs/recipeRecord"},
+        "tripod_hound_v1": {"$ref": "#/$defs/recipeRecord"}
+      }
+    },
+    "cases": {
+      "type": "array", "minItems": 30, "maxItems": 30,
+      "items": {"$ref": "#/$defs/case"}
+    },
+    "protected_digests": {
+      "type": "object", "additionalProperties": false,
+      "required": ["before", "after"],
+      "properties": {
+        "before": {"$ref": "#/$defs/digestMap"},
+        "after": {"$ref": "#/$defs/digestMap"}
+      }
+    },
+    "pass": {"const": true}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "catalogRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "byte_size"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^(data/combat/biomass_(part|recipe)_catalog\\.json)$"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "byte_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "digestMap": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/hash"}
+    },
+    "recipeRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["recipe_document", "sha256", "oracle"],
+      "properties": {
+        "recipe_document": {"type": "object"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "oracle": {
+          "type": "object", "additionalProperties": false,
+          "required": ["attachments", "occurrences", "nodes", "triangles"],
+          "properties": {
+            "attachments": {"type": "integer", "minimum": 0},
+            "occurrences": {"type": "integer", "minimum": 1},
+            "nodes": {"type": "integer", "minimum": 1, "maximum": 160},
+            "triangles": {"type": "integer", "minimum": 1, "maximum": 24000}
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["case_id", "recipe_id", "seed", "lighting", "visual_stage", "archetype_id", "pool_membership", "recipe_sha256", "recipe_document", "command", "exit_code", "stdout", "stderr", "output", "runtime", "pass"],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^(placeholder|final)/[a-z0-9_]+/seed-(42|777)/(normal|emergency|dark)$"},
+        "recipe_id": {"enum": ["biped_puppet_v1", "four_legged_scrambler_v1", "intestinal_dragger_v1", "tendril_knot_v1", "tripod_hound_v1"]},
+        "seed": {"enum": [42, 777]},
+        "lighting": {"enum": ["normal", "emergency", "dark"]},
+        "visual_stage": {"enum": ["placeholder", "final"]},
+        "archetype_id": {"enum": ["biomatter_swarm", "drone_swarm", "hull_tendril", "mimic", "puppet_corpse", "stalker"]},
+        "pool_membership": {"const": true},
+        "recipe_sha256": {"$ref": "#/$defs/hash"},
+        "recipe_document": {"type": "object"},
+        "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "exit_code": {"const": 0},
+        "stdout": {"type": "string", "minLength": 1},
+        "stderr": {"type": "string"},
+        "output": {"$ref": "#/$defs/output"},
+        "runtime": {"$ref": "#/$defs/runtime"},
+        "pass": {"const": true}
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "byte_size", "width", "height"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^artifacts/validation-previews/biomass-assembly-(placeholder|final)/[a-z0-9_]+__seed-(42|777)__(normal|emergency|dark)\\.png$"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "byte_size": {"type": "integer", "minimum": 1},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attachments", "occurrences", "nodes", "triangles", "max_nodes", "max_triangles", "aabb_extents_m", "collision_count", "enabled_collision_count", "disabled_connector_collision_count", "direct_body_collision_children", "body_collision_layer", "body_collision_mask", "ray_hit", "ray_miss_after_free", "gait_frames", "gait_delta_seconds", "wrapper_paths_empty", "primitive_mesh_parts", "lighting", "paired_visibility"],
+      "properties": {
+        "attachments": {"type": "integer", "minimum": 0},
+        "occurrences": {"type": "integer", "minimum": 1},
+        "nodes": {"type": "integer", "minimum": 1, "maximum": 160},
+        "triangles": {"type": "integer", "minimum": 1, "maximum": 24000},
+        "max_nodes": {"const": 160},
+        "max_triangles": {"const": 24000},
+        "aabb_extents_m": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "minimum": 0.05, "maximum": 20}},
+        "collision_count": {"type": "integer", "minimum": 1},
+        "enabled_collision_count": {"type": "integer", "minimum": 1},
+        "disabled_connector_collision_count": {"type": "integer", "minimum": 0},
+        "direct_body_collision_children": {"type": "integer", "minimum": 1},
+        "body_collision_layer": {"const": 1},
+        "body_collision_mask": {"const": 1},
+        "ray_hit": {"const": true},
+        "ray_miss_after_free": {"const": true},
+        "gait_frames": {"const": 120},
+        "gait_delta_seconds": {"const": 0.016666666666666666},
+        "wrapper_paths_empty": {"const": true},
+        "primitive_mesh_parts": {"const": true},
+        "lighting": {"$ref": "#/$defs/lighting"},
+        "paired_visibility": {"$ref": "#/$defs/paired"}
+      }
+    },
+    "lighting": {
+      "type": "object", "additionalProperties": false,
+      "required": ["applied", "key_light_applied", "is_away", "ambient_color", "ambient_energy", "key_light_color", "key_light_energy", "fog_enabled", "fog_density", "emergency_accent_present", "emergency_accent_applied", "emergency_accent_energy"],
+      "properties": {
+        "applied": {"const": true},
+        "key_light_applied": {"const": true},
+        "is_away": {"const": true},
+        "ambient_color": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+        "ambient_energy": {"type": "number", "minimum": 0},
+        "key_light_color": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+        "key_light_energy": {"type": "number", "minimum": 0},
+        "fog_enabled": {"const": true},
+        "fog_density": {"type": "number", "minimum": 0},
+        "emergency_accent_present": {"type": "boolean"},
+        "emergency_accent_applied": {"type": "boolean"},
+        "emergency_accent_energy": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "paired": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rgb_delta", "changed_pixels", "changed_bbox_width", "changed_bbox_height"],
+      "properties": {
+        "rgb_delta": {"type": "number", "minimum": 0.03137254901960784},
+        "changed_pixels": {"type": "integer", "minimum": 64},
+        "changed_bbox_width": {"type": "integer", "minimum": 8},
+        "changed_bbox_height": {"type": "integer", "minimum": 8}
+      }
+    }
+  }
+}

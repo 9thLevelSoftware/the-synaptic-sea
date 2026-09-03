@@ -82,6 +82,20 @@ for `emergency`. Task 8's canonical inventory is exactly 30 case PNGs plus `revi
 manually inspected rendered evidence. Contact-sheet production is outside Task 8 and remains owned
 by later visual-selection/promotion stages; no contact-sheet path, schema field, or test is added.
 
+Task 8 focused execution (run from the repository root) is:
+
+```bash
+if git check-ignore --no-index artifacts/validation-previews/biomass-assembly-placeholder/review.json >/dev/null 2>&1; then echo "stable biomass evidence path is ignored" >&2; exit 1; fi
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q tests/test_biomass_composite_review.py
+/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py plan --project-root . --visual-stage placeholder --godot-version 4.7.1
+/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py run --project-root . --godot /opt/homebrew/bin/godot --visual-stage placeholder --output-root artifacts/validation-previews/biomass-assembly-placeholder --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
+/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py verify --project-root . --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
+```
+
+The required marker is exactly `BIOMASS COMPOSITE REVIEW PASS stage=placeholder gaits=5 seeds=2 lighting=3 captures=30`.
+The renderer's production one-case marker is `BIOMASS COMPOSITE CASE PASS`; the host runner owns
+the canonical manifest and performs the final count, hash, protected-surface, and diagnostics gates.
+
 Task 9 owns exactly ten implementation files: `docs/game/06_validation_plan.md`,
 `scripts/systems/biomass_wrapper_validator.gd`, `scripts/validation/biomass_wrapper_authority_smoke.gd`,
 `tools/meshy_blender_validate.py`, `scripts/threats/biomass_assembler.gd`,
