@@ -82,7 +82,7 @@ with `BIOMASS COMPOSITE REVIEW PASS stage=placeholder gaits=5 seeds=2 lighting=3
 The final marker is exactly `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true`.
 Before execution, mechanically count only lines whose trimmed text starts with `run_clean ` and compare
 that count to the marker's numeric value, for example:
-`/opt/homebrew/bin/python3.11 -c 'import re; from pathlib import Path; s=Path("docs/game/06_validation_plan.md").read_text(); n=sum(line.strip().startswith("run_clean ") for line in s.splitlines()); m=re.search(r"REGRESSION PASS commands=(\\d+)", s); assert m and n == int(m.group(1)), (n, m.group(1) if m else None)'`.
+`/opt/homebrew/bin/python3.11 -c 'import re; from pathlib import Path; s=Path("docs/game/06_validation_plan.md").read_text(); n=sum(line.strip().startswith("run_clean ") for line in s.splitlines()); m=re.search(r"REGRESSION PASS commands=(\d+)", s); assert m and n == int(m.group(1)), (n, m.group(1) if m else None)'`.
 
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
