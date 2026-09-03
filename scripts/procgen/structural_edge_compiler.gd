@@ -10,11 +10,13 @@ class_name StructuralEdgeCompiler
 ## No scene or wrapper lookup belongs in this layer.
 
 const ModularSocketCatalogScript: GDScript = preload("res://scripts/procgen/modular_socket_catalog.gd")
+const StructuralEdgePlanScript: GDScript = preload("res://scripts/procgen/structural_edge_plan.gd")
 
 const CELL_SIZE: float = 4.0
 const DECK_HEIGHT: float = 4.0
 const FLOOR_MODULE: String = "floor_1x1"
 const CORRIDOR_FLOOR_MODULE: String = "corridor_floor_1x1"
+const FLOOR_KIND: String = "FLOOR"
 const CEILING_MODULE: String = "ceiling_cap_1x1"
 const WALL_MODULE: String = "wall_straight_1x1"
 const WALL_END_CAP_MODULE: String = "wall_end_cap"
@@ -164,6 +166,7 @@ func compile(layout: Dictionary) -> Dictionary:
 			"deck": deck,
 			"cell": cell,
 			"cell_key": occupancy_key,
+			"kind": FLOOR_KIND,
 			"room_id": room_id,
 			"room_ids": [room_id],
 		})
@@ -198,15 +201,29 @@ func compile(layout: Dictionary) -> Dictionary:
 			if portal_present and edge_other_room.is_empty():
 				edge_other_room = str(portal.get("edge_other_room", ""))
 			var wrapper_required: bool = true
+			var placement_required: bool = true
 			if not edge_other_room.is_empty() and edge_other_room == room_id and not portal_present:
 				edge_state = "OPEN"
 				module_id = ""
 				wrapper_required = false
+				placement_required = false
 			elif portal_present:
 				edge_state = _portal_kind(portal, layout)
 				module_id = _portal_module_from_catalog(catalog, portal, edge_state)
-				wrapper_required = edge_state != "BREACH" or not module_id.is_empty()
-				if edge_other_room.is_empty() and not bool(portal.get("exterior", false)):
+				if edge_state == "BREACH":
+					# BREACH is a non-wrapper exterior state — no module, no placement.
+					module_id = ""
+					wrapper_required = false
+					placement_required = false
+				elif edge_state == "LOCKED":
+					if module_id.is_empty():
+						module_id = LOCKED_MODULE
+					wrapper_required = true
+					placement_required = true
+				else:
+					wrapper_required = true
+					placement_required = true
+				if edge_other_room.is_empty() and not bool(portal.get("exterior", false)) and edge_state != "BREACH" and edge_state != "HATCH":
 					errors.append("portal endpoint is exterior without explicit exterior flag: %s" % edge_key_value)
 			elif not edge_other_room.is_empty() and edge_other_room != room_id:
 				edge_state = "SOLID"
@@ -241,7 +258,7 @@ func compile(layout: Dictionary) -> Dictionary:
 				"yaw_degrees": float(YAW_DEGREES[direction]),
 				"portal": portal_present,
 				"exterior": edge_other_room.is_empty(),
-				"placement_required": wrapper_required,
+				"placement_required": placement_required,
 				"wrapper_required": wrapper_required,
 			}
 			if portal_present:
@@ -296,6 +313,13 @@ func compile(layout: Dictionary) -> Dictionary:
 	_attach_bindings_to_records(ceiling_placements, socket_bindings)
 	_attach_bindings_to_records(edge_placements, socket_bindings)
 
+	# Build the deterministic emitted_edge_keys diagnostic so validators and
+	# callers can detect duplicate canonical edges without re-walking edge_map.
+	var emitted_edge_keys: Array = []
+	for ek in edge_map.keys():
+		emitted_edge_keys.append(str(ek))
+	emitted_edge_keys.sort()
+
 	return {
 		"occupancy": occupancy,
 		"edges": edge_map,
@@ -303,21 +327,17 @@ func compile(layout: Dictionary) -> Dictionary:
 		"floor_placements": floor_placements,
 		"ceiling_placements": ceiling_placements,
 		"socket_bindings": socket_bindings,
+		"emitted_edge_keys": emitted_edge_keys,
 		"errors": errors,
 	}
 
 
 static func cell_key(deck: int, cell: Vector2i) -> String:
-	return "%d|%d|%d" % [deck, cell.x, cell.y]
+	return StructuralEdgePlanScript.cell_key(deck, cell)
 
 
 static func edge_key(deck: int, cell: Vector2i, direction: String) -> String:
-	if not DIRECTIONS.has(direction):
-		return ""
-	var neighbor: Vector2i = cell + (DIRECTIONS[direction] as Vector2i)
-	if direction == "north" or direction == "south":
-		return "%d|h|%d|%d" % [deck, mini(cell.y, neighbor.y), cell.x]
-	return "%d|v|%d|%d" % [deck, cell.y, mini(cell.x, neighbor.x)]
+	return StructuralEdgePlanScript.edge_key(deck, cell, direction)
 
 
 static func cell_world_position(deck: int, cell: Vector2i) -> Vector3:
@@ -577,7 +597,7 @@ func _refine_wall_modules(edge_map: Dictionary, edge_placements: Array) -> void:
 				edge_map[ek]["module_id"] = new_module
 
 
-func _parse_edge_key(ek: String) -> Dictionary:
+static func _parse_edge_key(ek: String) -> Dictionary:
 	## Parse edge key into structured data.
 	## Horizontal: "{deck}|h|{y}|{x}" — edge between rows y and y+1, at column x
 	## Vertical:   "{deck}|v|{y}|{x}" — edge between columns x and x+1, at row y
@@ -734,6 +754,7 @@ func _pick_corner_type(mask: int, parsed: Dictionary, edge_map: Dictionary, plac
 
 func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Dictionary, errors: Array[String]) -> Dictionary:
 	var indexed: Dictionary = {}
+	var emitted_edge_keys: Array = []
 	var portals_variant: Variant = layout.get("portals", null)
 	if typeof(portals_variant) != TYPE_ARRAY:
 		errors.append("layout missing canonical portals array")
@@ -745,42 +766,129 @@ func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Di
 		var portal: Dictionary = portal_variant
 		var from_room: String = str(portal.get("from_room", ""))
 		var to_room: String = str(portal.get("to_room", ""))
-		if not room_by_id.has(from_room) or not room_by_id.has(to_room) or from_room == to_room:
+		var portal_kind: String = _portal_kind(portal, layout)
+		var is_exterior_kind: bool = portal_kind == "BREACH" or portal_kind == "HATCH"
+
+		# Door/Locked portals must declare both rooms.
+		if not is_exterior_kind and (from_room.is_empty() or to_room.is_empty()):
+			errors.append("portal endpoints are invalid: %s" % str(portal.get("id", "")))
+			continue
+		# Exterior BREACH/HATCH require from_room.
+		if is_exterior_kind and from_room.is_empty():
+			errors.append("portal endpoints are invalid: %s" % str(portal.get("id", "")))
+			continue
+		# Exterior BREACH/HATCH may have empty to_room but never point to a non-empty room.
+		if is_exterior_kind and not to_room.is_empty():
+			to_room = ""
+		if not from_room.is_empty() and not room_by_id.has(from_room):
 			errors.append("portal room endpoints are invalid: %s" % str(portal.get("id", "")))
 			continue
-		var from_deck: int = int(room_by_id[from_room].get("deck", -1))
-		var to_deck: int = int(room_by_id[to_room].get("deck", -1))
-		var from_info: Dictionary = _read_cell(portal.get("from_cell", null), from_deck)
-		var to_info: Dictionary = _read_cell(portal.get("to_cell", null), to_deck)
-		if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
-			errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
+		if not to_room.is_empty() and not room_by_id.has(to_room):
+			errors.append("portal room endpoints are invalid: %s" % str(portal.get("id", "")))
 			continue
-		if int(from_info["deck"]) != from_deck or int(to_info["deck"]) != to_deck:
-			errors.append("portal endpoint deck mismatch: %s" % str(portal.get("id", "")))
+		if not from_room.is_empty() and not to_room.is_empty() and from_room == to_room:
+			errors.append("portal room endpoints are invalid: %s" % str(portal.get("id", "")))
 			continue
-		if from_deck != to_deck:
-			errors.append("cross-deck portal must remain a vertical connection: %s" % str(portal.get("id", "")))
-			continue
-		var from_cell: Vector2i = from_info["cell"]
-		var to_cell: Vector2i = to_info["cell"]
-		var from_key: String = cell_key(from_deck, from_cell)
-		var to_key: String = cell_key(to_deck, to_cell)
-		if str(room_by_cell.get(from_key, "")) != from_room or str(room_by_cell.get(to_key, "")) != to_room:
-			errors.append("portal endpoints are not owned by declared rooms: %s" % str(portal.get("id", "")))
-			continue
-		var edge_cell: Vector2i = from_cell
-		var direction: String = _direction_between(from_cell, to_cell)
+
+		var from_deck: int = int(room_by_id[from_room].get("deck", -1)) if not from_room.is_empty() else 0
+		var to_deck: int = int(room_by_id[to_room].get("deck", -1)) if not to_room.is_empty() else from_deck
+
+		# Resolve edge geometry. Either the portal has an explicit edge_key,
+		# or we derive one from from_cell/to_cell adjacency (legacy schema).
+		var explicit_edge_key: String = str(portal.get("edge_key", ""))
+		var direction: String = ""
+		var edge_cell: Vector2i = Vector2i.ZERO
+		var from_cell: Vector2i = Vector2i.ZERO
+		var to_cell: Vector2i = Vector2i.ZERO
+		var from_key: String = ""
+		var to_key: String = ""
 		var logical_boundary: bool = false
-		if direction.is_empty() and typeof(portal.get("edge_cell", null)) != TYPE_NIL:
-			var edge_info: Dictionary = _read_cell(portal.get("edge_cell", null), from_deck)
-			var declared_direction: String = str(portal.get("edge_direction", ""))
-			if bool(edge_info.get("ok", false)) and DIRECTIONS.has(declared_direction) and str(room_by_cell.get(cell_key(from_deck, edge_info["cell"]), "")) == from_room:
-				edge_cell = edge_info["cell"]
-				direction = declared_direction
-				logical_boundary = true
-		if direction.is_empty():
-			errors.append("portal endpoints are not adjacent: %s" % str(portal.get("id", "")))
-			continue
+
+		if not explicit_edge_key.is_empty():
+			# Validate declared edge_key resolves to a direction in the deck.
+			var parsed: Dictionary = _parse_edge_key(explicit_edge_key)
+			if not bool(parsed.get("ok", false)) or int(parsed.get("deck", -1)) != from_deck:
+				errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
+				continue
+			# Identify which cell the from_room owns that touches the edge.
+			var resolved_cell: Dictionary = _cell_for_edge_in_room(from_room, room_by_cell, from_deck, parsed)
+			if bool(resolved_cell.get("ok", false)):
+				edge_cell = resolved_cell["cell"]
+				direction = str(resolved_cell["direction"])
+				# For doors/locks, derive neighbor cell from direction.
+				var delta: Vector2i = DIRECTIONS[direction]
+				var neighbor_cell: Vector2i = edge_cell + delta
+				to_cell = neighbor_cell
+				from_cell = edge_cell
+				from_key = cell_key(from_deck, from_cell)
+				to_key = cell_key(from_deck, to_cell)
+				# Determine to_room from occupancy when missing (interior).
+				if to_room.is_empty() and not is_exterior_kind:
+					var inferred: String = str(room_by_cell.get(to_key, ""))
+					if not inferred.is_empty() and inferred != from_room:
+						to_room = inferred
+					elif is_exterior_kind:
+						pass
+					else:
+						errors.append("portal endpoints are invalid: %s" % str(portal.get("id", "")))
+						continue
+				# Skip the legacy adjacency path; fall through to key/index.
+			else:
+				# Fallback: trust the legacy from_cell/to_cell fields and
+				# derive the canonical edge_key from them. This keeps the
+				# compiler honest with portals produced by older layout code
+				# whose from_room doesn't strictly border the declared edge.
+				var from_info: Dictionary = _read_cell(portal.get("from_cell", null), from_deck)
+				var to_info: Dictionary = _read_cell(portal.get("to_cell", null), to_deck)
+				if bool(from_info.get("ok", false)) and bool(to_info.get("ok", false)) and int(from_info["deck"]) == from_deck and int(to_info["deck"]) == from_deck:
+					from_cell = from_info["cell"]
+					to_cell = to_info["cell"]
+					direction = _direction_between(from_cell, to_cell)
+					if not direction.is_empty():
+						edge_cell = from_cell
+						from_key = cell_key(from_deck, from_cell)
+						to_key = cell_key(from_deck, to_cell)
+						if not to_room.is_empty() and str(room_by_cell.get(to_key, "")) != to_room:
+							errors.append("portal endpoints are not owned by declared rooms: %s" % str(portal.get("id", "")))
+							continue
+					else:
+						errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
+						continue
+				else:
+					errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
+					continue
+		else:
+			# Legacy path: portal declares from_cell/to_cell adjacency.
+			var from_info: Dictionary = _read_cell(portal.get("from_cell", null), from_deck)
+			var to_info: Dictionary = _read_cell(portal.get("to_cell", null), to_deck)
+			if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
+				errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
+				continue
+			if int(from_info["deck"]) != from_deck or int(to_info["deck"]) != to_deck:
+				errors.append("portal endpoint deck mismatch: %s" % str(portal.get("id", "")))
+				continue
+			if from_deck != to_deck:
+				errors.append("cross-deck portal must remain a vertical connection: %s" % str(portal.get("id", "")))
+				continue
+			from_cell = from_info["cell"]
+			to_cell = to_info["cell"]
+			from_key = cell_key(from_deck, from_cell)
+			to_key = cell_key(to_deck, to_cell)
+			if str(room_by_cell.get(from_key, "")) != from_room or (not to_room.is_empty() and str(room_by_cell.get(to_key, "")) != to_room):
+				errors.append("portal endpoints are not owned by declared rooms: %s" % str(portal.get("id", "")))
+				continue
+			direction = _direction_between(from_cell, to_cell)
+			edge_cell = from_cell
+			if direction.is_empty() and typeof(portal.get("edge_cell", null)) != TYPE_NIL:
+				var edge_info: Dictionary = _read_cell(portal.get("edge_cell", null), from_deck)
+				var declared_direction: String = str(portal.get("edge_direction", ""))
+				if bool(edge_info.get("ok", false)) and DIRECTIONS.has(declared_direction) and str(room_by_cell.get(cell_key(from_deck, edge_info["cell"]), "")) == from_room:
+					edge_cell = edge_info["cell"]
+					direction = declared_direction
+					logical_boundary = true
+			if direction.is_empty():
+				errors.append("portal endpoints are not adjacent: %s" % str(portal.get("id", "")))
+				continue
 		var key: String = edge_key(from_deck, edge_cell, direction)
 		if indexed.has(key):
 			errors.append("duplicate portal edge: %s" % key)
@@ -795,8 +903,60 @@ func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Di
 		indexed_portal["logical_boundary"] = logical_boundary
 		indexed_portal["from_cell_key"] = from_key
 		indexed_portal["to_cell_key"] = to_key
+		indexed_portal["portal_kind"] = portal_kind
 		indexed[key] = indexed_portal
+		emitted_edge_keys.append(key)
 	return indexed
+
+
+# Resolve the integer (cell, direction) pair for an explicit edge_key whose
+# endpoint owner is `room_id`. Returns ok=false if the room does not border
+# the edge or the edge is mis-oriented for the canonical scheme.
+func _cell_for_edge_in_room(room_id: String, room_by_cell: Dictionary, deck: int, parsed: Dictionary) -> Dictionary:
+	var x: int = int(parsed.get("x", -1))
+	var y: int = int(parsed.get("y", -1))
+	if x < 0 or y < 0:
+		return {"ok": false}
+	var direction: String = ""
+	var primary: Vector2i = Vector2i.ZERO
+	var secondary: Vector2i = Vector2i.ZERO
+	if parsed.get("axis", "") == "h":
+		# Horizontal edge sits between rows y and y+1 at column x.
+		var cell_high: Vector2i = Vector2i(x, y + 1)
+		var cell_low: Vector2i = Vector2i(x, y)
+		var has_high: bool = str(room_by_cell.get(cell_key(deck, cell_high), "")) == room_id
+		var has_low: bool = str(room_by_cell.get(cell_key(deck, cell_low), "")) == room_id
+		if has_high and has_low:
+			return {"ok": false}
+		if has_high:
+			primary = cell_high
+			secondary = cell_low
+			direction = "north"
+		elif has_low:
+			primary = cell_low
+			secondary = cell_high
+			direction = "south"
+		else:
+			return {"ok": false}
+	else:
+		# Vertical edge sits between columns x and x+1 at row y.
+		var cell_high: Vector2i = Vector2i(x + 1, y)
+		var cell_low: Vector2i = Vector2i(x, y)
+		var has_high: bool = str(room_by_cell.get(cell_key(deck, cell_high), "")) == room_id
+		var has_low: bool = str(room_by_cell.get(cell_key(deck, cell_low), "")) == room_id
+		if has_high and has_low:
+			return {"ok": false}
+		if has_high:
+			primary = cell_high
+			secondary = cell_low
+			direction = "west"
+		elif has_low:
+			primary = cell_low
+			secondary = cell_high
+			direction = "east"
+		else:
+			return {"ok": false}
+	return {"ok": true, "cell": primary, "direction": direction, "secondary": secondary}
 
 
 func _direction_between(from_cell: Vector2i, to_cell: Vector2i) -> String:
