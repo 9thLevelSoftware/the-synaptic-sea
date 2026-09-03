@@ -146,7 +146,7 @@ def test_pressure_door_overlay_validates_with_godot_smoke(
 
     def fake_run(command: list[str], **kwargs: object) -> object:
         calls.append(command)
-        return type("Completed", (), {"returncode": 0, "stdout": "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=4 collision=true\n", "stderr": ""})()
+        return type("Completed", (), {"returncode": 0, "stdout": "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=5 collision=true\n", "stderr": ""})()
 
     monkeypatch.setattr(validator.subprocess, "run", fake_run)
     assert validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot")) == []
@@ -232,8 +232,32 @@ def test_wrapper_uses_only_overlay_canonical_import_paths_and_contract_anchors()
         "Anchor_SOCK_portal_edge_west_01",
         "Anchor_SOCK_portal_edge_east_01",
         "Anchor_SOCK_portal_center_internal_01",
+        "Anchor_SOCK_wall_base_01",
     ):
         assert f'name="{anchor}"' in scene
+
+
+def test_wall_base_anchor_is_required_for_pressure_door(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    staged_scene = package / f"{ASSET_ID}.tscn"
+    lines = staged_scene.read_text(encoding="utf-8").splitlines()
+    lines = [line for line in lines if "Anchor_SOCK_wall_base_01" not in line]
+    staged_scene.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for a missing wall_base anchor")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert any("anchor" in error for error in errors)
+    assert calls == []
 
 
 def test_landmark_pressure_wrapper_defaults_to_exact_intact_role_visibility() -> None:
@@ -613,7 +637,7 @@ def test_smoke_source_has_exact_marker_and_runtime_contract_assertions() -> None
         PROJECT_ROOT / "scripts/validation/focused_nine_staged_structural_smoke.gd"
     ).read_text(encoding="utf-8")
 
-    assert 'FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=4 collision=true' in smoke
+    assert 'FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=5 collision=true' in smoke
     assert "VisualInstance_Intact" in smoke
     assert "VisualInstance_Damaged" in smoke
     assert "VisualInstance_Breached" in smoke
