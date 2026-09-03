@@ -73,7 +73,7 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	_validate_walkable_reachability(plan, topology, errors)
 	_validate_occupancy_key_body_reconciliation(occupancy, room_registry, errors)
 	_validate_edge_kind_state(edges, errors)
-	_validate_placement_reconciliation(plan, errors)
+	_validate_placement_reconciliation(plan, topology, errors)
 
 	return _verdict(errors, stats)
 
@@ -882,7 +882,7 @@ func _validate_placement_grid_pose(plan: Dictionary, errors: Array[String]) -> v
 		var expected_position: Vector3 = CompilerScript.edge_world_position(deck, cell, direction)
 		var position: Dictionary = _read_position(placement.get("position", null))
 		if not bool(position.get("ok", false)) or not (position["value"] as Vector3).is_equal_approx(expected_position):
-			errors.append("edge placement position mismatch: %s" % edge_key_value)
+			errors.append("edge placement drifted from canonical cell edge: %s" % edge_key_value)
 
 
 # Footprint-overlap guard. Floors and ceilings must declare unique cell_keys;
@@ -1094,7 +1094,7 @@ func _validate_edge_kind_state(edges: Dictionary, errors: Array[String]) -> void
 #   * DOOR portals that lost their materialized placement
 #   * DOOR portals that lost their wrapper_required/placement_required flags
 #   * source_cells and edge_endpoints that leave the occupancy registry
-func _validate_placement_reconciliation(plan: Dictionary, errors: Array[String]) -> void:
+func _validate_placement_reconciliation(plan: Dictionary, topology: Dictionary, errors: Array[String]) -> void:
 	var edges_variant: Variant = plan.get("edges", null)
 	var placements_variant: Variant = plan.get("placements", null)
 	if typeof(edges_variant) != TYPE_DICTIONARY or typeof(placements_variant) != TYPE_ARRAY:
@@ -1162,6 +1162,24 @@ func _validate_placement_reconciliation(plan: Dictionary, errors: Array[String])
 					errors.append("edge endpoint leaves occupancy: %s" % edge_key_value)
 				elif is_exterior and not occupancy.has(first_key):
 					errors.append("edge endpoint leaves occupancy: %s" % edge_key_value)
+		# Detect SOLID edges that override a topology-connected portal
+		# contract. The validator never silently downgrades a required
+		# portal to a wall — it must surface the topology mismatch.
+		if canonical_kind == "SOLID" and placement_kind == "SOLID":
+			var room_ids_variant: Variant = canonical.get("room_ids", [])
+			if typeof(room_ids_variant) == TYPE_ARRAY and (room_ids_variant as Array).size() == 2:
+				var owner_room_id: String = str((room_ids_variant as Array)[0])
+				var other_room_id: String = str((room_ids_variant as Array)[1])
+				if not owner_room_id.is_empty() and not other_room_id.is_empty():
+					var topology_portal: Variant = topology.get("portals", [])
+					if typeof(topology_portal) == TYPE_ARRAY:
+						for tp in (topology_portal as Array):
+							if typeof(tp) != TYPE_DICTIONARY:
+								continue
+							var tp_dict: Dictionary = tp
+							if str(tp_dict.get("from_room", "")) == owner_room_id and str(tp_dict.get("to_room", "")) == other_room_id:
+								errors.append("topology-connected rooms blocked by SOLID edge: %s" % edge_key_value)
+								break
 		# room_ids must remain a known room (non-empty) and the other_room must
 		# not be a ghost room.
 		var room_ids_variant: Variant = placement.get("room_ids", canonical.get("room_ids", []))
