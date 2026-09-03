@@ -1284,8 +1284,8 @@ Expected marker: `BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=f
 - [ ] **Step 5: Commit Task 9**
 
 ```bash
-git add docs/superpowers/plans/2026-09-02-procedural-biomass-threat-assembly.md docs/game/06_validation_plan.md scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py
-git commit -m "docs: close biomass wrapper identity contract"
+git add docs/game/06_validation_plan.md scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py
+git commit -m "feat: enforce Godot-owned biomass sockets"
 ```
 
 ---
