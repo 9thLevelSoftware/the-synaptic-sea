@@ -1040,6 +1040,9 @@ git commit -m "feat: animate biomass threats with socket-space gaits"
 - [ ] **Step 1: Write RED all-archetype, restore-matrix, and persistence smoke**
 
 ```gdscript
+const BiomassThreatVisualScript: GDScript = preload("res://scripts/threats/biomass_threat_visual.gd")
+const BiomassGaitControllerScript: GDScript = preload("res://scripts/threats/biomass_gait_controller.gd")
+
 var manager = ThreatManagerScript.new()
 get_root().add_child(manager)
 await process_frame
@@ -1050,8 +1053,9 @@ assert(manager.threats.size() == 6)
 for threat in manager.threats:
     assert(not threat.biomass_recipe.is_empty())
     assert(threat.biomass_seed != 0)
-    var visual: BiomassThreatVisual = manager.placeholder_nodes[threat.instance_id]
-    assert(visual is BiomassThreatVisual)
+    var visual: Variant = manager.placeholder_nodes[threat.instance_id]
+    assert(visual != null and visual is Object)
+    assert(visual.get_script() == BiomassThreatVisualScript)
     for child in visual.get_children():
         assert(child.get_script() != BiomassGaitControllerScript)
     var gait_before: String = canonical_attachment_transforms(visual)
@@ -1141,9 +1145,9 @@ In `PlayableGeneratedShip.update_threat_engaged_los()`, retain `collide_with_are
 
 - [ ] **Step 7: Prove ship-cell revisit persistence, not only manager round-trip**
 
-`biomass_revisit_persistence_smoke.gd` follows the proven `world_save_anywhere_smoke.gd` bootstrap: preload and instantiate `res://scenes/main.tscn`; add it to the root; wait until `PlayableGeneratedShip.loader.has_loaded_ship()`; repair the travel-critical systems; select one in-range marker ID; and call `travel_to_marker_id(marker_id)`. Capture the live `threat_manager.get_summary()`, each assembled visual’s canonical recipe, transforms, node count, and AABB. Call `travel_home()`—which invokes `_sync_current_ship_combat_summary()`—and assert `visited_ships[marker_id].combat_summary` contains the exact threat recipe/seed documents. Call `travel_to_marker_id(marker_id)` again, await process/physics frames, and compare the rebuilt manager/visual fingerprints within `0.001`. `_build_run_snapshot(use_home_ship_summary=false)` must use `home_ship.combat_summary` when true/away, while retaining existing home arc behavior. `_build_world_snapshot()` syncs active derelict combat once into its visited `ShipInstance`. Load restores the home manager once from the home snapshot and the active derelict once from visited `combat`; assert distinct home-vs-active fingerprints to prove no cross-copy or double restore.
+`biomass_revisit_persistence_smoke.gd` follows the proven `world_save_anywhere_smoke.gd` bootstrap: preload and instantiate `res://scenes/main.tscn`; add it to the root; wait until `PlayableGeneratedShip.loader.has_loaded_ship()`; repair the travel-critical systems; select one in-range marker ID; and call `travel_to_marker_id(marker_id)`. Capture the live `threat_manager.get_summary()`, each assembled visual’s canonical recipe, transforms, node count, and AABB. Call `travel_home()`—which invokes `_sync_current_ship_combat_summary()`—and assert `visited_ships[marker_id].combat_summary` contains the exact threat recipe/seed documents. Call `travel_to_marker_id(marker_id)` again, await process/physics frames, and compare the rebuilt manager/visual fingerprints within `0.001`. In the Task 7 implementation, rename the real function and every caller to `_build_run_snapshot(use_home_ship_summary: bool = false)`: `use_home_ship_summary == true` selects both the home combat summary and the existing home arc summaries while away; the default `false` uses the live current-ship manager/arc. `_build_world_snapshot()` syncs active derelict combat once into its visited `ShipInstance`. Load restores the home manager once from the home snapshot and the active derelict once from visited `combat`; assert distinct home-vs-active fingerprints to prove no cross-copy or double restore.
 
-Then call `save_world_for_validation()`, require `get_last_saved_snapshot()` to be non-null only after `save_load_service.save_world(ws)` succeeds, and assert failed saves leave it unchanged/null. On success set legacy `last_saved_snapshot = _build_run_snapshot(away_from_start)`; the saved `WorldSnapshot` remains authoritative. Mutate/free the active threat visuals, and call `load_world_for_validation()` through the same bootstrapped coordinator. Assert `get_current_ship().marker_id`, `get_current_ship().combat_summary`, the restored `ThreatManager` summary, and every visual fingerprint match the pre-save values. Use only these real world/travel seams; ship-level dictionary round-trip authority remains `ShipInstance.get_summary()`/`apply_summary()` and the real world-save path.
+Then call `save_world_for_validation()`, require `get_last_saved_snapshot()` to be non-null only after `save_load_service.save_world(ws)` succeeds, and assert failed saves leave it unchanged/null. On success set legacy `last_saved_snapshot = _build_run_snapshot(away_from_start)` using the renamed function; the saved `WorldSnapshot` remains authoritative. Mutate/free the active threat visuals, and call `load_world_for_validation()` through the same bootstrapped coordinator. Assert `get_current_ship().marker_id`, `get_current_ship().combat_summary`, the restored `ThreatManager` summary, and every visual fingerprint match the pre-save values. Use only these real world/travel seams; ship-level dictionary round-trip authority remains `ShipInstance.get_summary()`/`apply_summary()` and the real world-save path.
 
 - [ ] **Step 8: Run GREEN and adjacent threat regressions**
 
@@ -1207,9 +1211,11 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m py
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_threat_manager_smoke.gd
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_revisit_persistence_smoke.gd
-/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py run --project-root . --godot /opt/homebrew/bin/godot --output-root artifacts/validation-previews/biomass-assembly-placeholder --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
+/opt/homebrew/bin/python3.11 tools/biomass_composite_review.py run --project-root . --godot /opt/homebrew/bin/godot --visual-stage placeholder --output-root artifacts/validation-previews/biomass-assembly-placeholder --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
 /opt/homebrew/bin/python3.11 tools/biomass_composite_review.py verify --project-root . --report artifacts/validation-previews/biomass-assembly-placeholder/review.json
 ```
+
+The `verify` command derives `visual_stage` from the manifest and does not accept a `--visual-stage` option.
 
 Expected final marker: `BIOMASS COMPOSITE REVIEW PASS stage=placeholder gaits=5 seeds=2 lighting=3 captures=30`.
 
@@ -1221,7 +1227,7 @@ For every case, assert the exact recipe node/triangle oracle and caps `nodes<=16
 
 - [ ] **Step 5: Register only fresh validation truth**
 
-After the runner and marker exist, add the exact commands/markers to `docs/game/06_validation_plan.md`. Start the proof document with commit, Godot version, catalog/recipe hashes, report hash, all 30 image hashes, measured maximum nodes/triangles, and a statement that all visuals are deterministic primitive fallbacks and no paid generation occurred.
+After the runner and marker exist, add the exact commands/markers to `docs/game/06_validation_plan.md`. Start the proof document with only the canonical manifest project-relative path `artifacts/validation-previews/biomass-assembly-placeholder/review.json` and its SHA-256, the exact qualitative manual-visual verdict `approved — all 30 placeholder assemblies are coherent`, reviewer, commit, Godot version, and the statement `no paid generation occurred; no promotion occurred`. The manifest alone owns per-case image hashes, runtime metrics (including maximum nodes/triangles), and input/output hashes; do not copy those values into the proof document.
 
 - [ ] **Step 6: Commit Task 8**
 
