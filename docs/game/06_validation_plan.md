@@ -4,6 +4,53 @@
 
 No completion claim without fresh validation evidence.
 
+## Procedural biomass assembly Tasks 7–9 — execution contracts
+
+Task 7 must load the valid production part/recipe catalogs and inject malformed or incompatible
+restored `biomass_recipe` dictionaries to exercise `BiomassRecipe.from_dict` →
+`BiomassAssembler.build`; an invalid catalog fixture is not valid evidence because the library rejects
+it before assembly. The restore matrix proves new records may generate, restored records never
+regenerate, missing/invalid recipe or seed yields stable diagnostics plus whole-threat fallback, dead
+records remain dead with no visual/fallback, malformed records are deterministically rejected, and
+`ThreatManager.get_restore_diagnostics()` is defensive, sorted, and deduplicated. Fallback metadata is
+exactly `biomass_whole_threat_fallback=true` and `biomass_fallback_reason=<stable diagnostic key>`.
+The smoke preloads and exact-script-compares Task 5/6 dependencies (PartCatalog, Recipe,
+RecipeLibrary, Generator, PlaceholderFactory, BiomassThreatVisual, BiomassAssembler, GaitController).
+`_build_run_snapshot(use_home_ship_summary=false)` distinguishes home-ship combat from the active
+derelict; world sync/load restore each once and assert distinct fingerprints. `last_saved_snapshot`
+is non-null only after successful `save_load_service.save_world(ws)`; the saved WorldSnapshot is the
+authority. The public seam is
+`PlayableGeneratedShip.inject_biomass_validation_encounter(archetype_id, recipe_id, seed,
+world_position)`.
+
+Task 8 uses `biomass_visual_review.gd` against production `scenes/main.tscn`, waits for
+`PlayableGeneratedShip`, uses its `IsoCameraRig`, injects the exact recipe/seed through the seam,
+and applies `breach_field` through `SliceAtmosphereApplier`; no neutral standalone floor/camera/
+environment is permitted. Lighting is exactly `normal`, `emergency`, `dark`, matrix 5×2×3=30.
+`--visual-stage` is exactly `{placeholder,final}` with fixed roots
+`artifacts/validation-previews/biomass-assembly-placeholder/` and
+`artifacts/validation-previews/biomass-assembly-final/`; Task 8 runs placeholder only and Task 15
+runs final. Placeholder requires empty wrapper paths and PrimitiveMesh part meshes; final requires
+nonempty wrapper paths and no PrimitiveMesh. Each case records exact recipe node/triangle oracles,
+nodes <=160, triangles <=24000, finite AABB extents 0.05–20m, collision/connector/direct-child/layer-
+mask=1 counts, and mask-1 ray-hit/miss after queue_free+frames. Frozen paired-camera readability
+uses RGB delta >=8/255, changed_pixels >=64, changed bbox width/height >=8px. The runner rejects
+all unallowlisted WARNING/ERROR/SCRIPT ERROR output (only named teardown diagnostics allowed),
+snapshots protected regular-file paths+SHA before/after, writes privately then atomically publishes,
+and cleans failed/stale outputs. `biomass_composite_review.py` is the sole canonical manifest writer;
+the manifest owns all 30 case IDs, commands/output, commit, Godot version, stage, input/output hashes,
+metrics, and protected digests; verify recomputes them. Proof stores only manifest path+SHA.
+
+Task 9 adds `tools/meshy_blender_validate.py` and `scripts/threats/biomass_assembler.gd` to its exact
+file scope. RED tests first prove current acceptance of mesh-node extras `{"biomass_socket":true}`.
+Production validation then recursively rejects every GLB node extras key or string value containing
+case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`, including hidden/mesh nodes;
+benign `{source:"meshy"}` and visual-only no-helper fixtures pass. Godot signatures remain
+headless-safe (`validate_part(instance:Node3D, entry:Dictionary)` and
+`validate_assembly(visual:Variant, recipe:Variant, parts:Variant)`), with exact preloaded script
+identity checks. The assembler validates every placeholder/wrapper before accepting it and frees the
+whole assembly on diagnostics; ADR-0058 remains authoritative.
+
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
 Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.

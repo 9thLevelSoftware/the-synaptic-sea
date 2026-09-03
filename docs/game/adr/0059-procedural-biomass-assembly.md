@@ -108,11 +108,28 @@ same graph and locomotion checks as curated recipes, and serialize the complete 
 locomotion hint, core instance/part, every attachment instance/part, parent and child sockets, and
 connector part ID. Save/load restores that exact graph rather than regenerating a replacement.
 
+For restored records, the saved recipe and nonzero seed are authoritative: they are never regenerated.
+Missing or invalid recipe/seed data produces a stable diagnostic and whole-threat fallback; malformed
+records are deterministically omitted/rejected, and dead records remain dead with no visual or fallback.
+`ThreatManager.get_restore_diagnostics() -> PackedStringArray` returns a defensive sorted/deduplicated
+diagnostic set. Whole-threat fallback uses the existing plain placeholder metadata
+`biomass_whole_threat_fallback=true` and `biomass_fallback_reason=<stable diagnostic key>`.
+
 ### Runtime ownership and movement
 
 The assembler is a per-manager `RefCounted` service/model, not an autoload and not a scene-tree
 god-object. It consumes the repository catalogs and creates wrapper-owned runtime nodes under the
 calling threat manager. It does not mutate the catalogs or exported assets.
+
+The production review seam is `PlayableGeneratedShip.inject_biomass_validation_encounter(
+archetype_id: String, recipe_id: String, seed: int, world_position: Vector3) -> Variant`.
+It delegates to the manager with valid loaded catalogs and exact recipe/seed semantics; it is not a
+second production spawn path. Run snapshots distinguish home ship combat from active derelict combat:
+`_build_run_snapshot(use_home_ship_summary=false)` uses `home_ship.combat_summary` when away, while
+`_build_world_snapshot()` syncs the active derelict once. Load restores each once and tests distinct
+home-vs-active fingerprints. After successful `save_load_service.save_world(ws)` only, legacy
+`last_saved_snapshot` is set from `_build_run_snapshot(away_from_start)`; failed saves never set it,
+and the saved `WorldSnapshot` remains authoritative.
 
 Locomotion uses five rigid socket-space gait profiles (`biped`, `quadruped`, `crawl`, `drag`, and
 `slither`). These are authored rigid-part gaits, not skeleton or IK contracts. Runtime wrappers own
@@ -169,6 +186,13 @@ cohesion are reviewed in all 30 planned captures: five recipes × seeds `42` and
 `emergency`, and `dark` lighting. The six archetype pools remain data-compatible during the
 singular-threat migration; replacing `threat_visual_catalog.json` is a later, separately reviewed
 runtime migration, not an implicit side effect of this catalog task.
+
+The visual review uses production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, and
+`SliceAtmosphereApplier`, never a neutral standalone floor/camera/environment. Its placeholder/final
+stage is explicit; final wrapper promotion is deferred to Task 15. Each case records exact node and
+triangle oracles, caps of 160 nodes/24,000 triangles, finite AABB extents 0.05–20 m, collision and
+ray-layer metrics, and frozen paired-camera readability deltas (RGB threshold 8/255, at least 64
+changed pixels and an 8×8 changed bounding box).
 
 ## Consequences
 

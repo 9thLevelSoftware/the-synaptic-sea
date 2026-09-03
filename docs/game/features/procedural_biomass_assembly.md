@@ -27,6 +27,25 @@ are visual-only and contain no socket markers, marker empties, collision shapes,
   assembly-graph persistence shape.
 - Placeholder-first, locked-isometric review planning for all 30 composite captures.
 
+### Runtime restoration and validation seam (Tasks 7–9)
+
+New records may select or generate a recipe. Restored biomass records never regenerate: the saved
+recipe and nonzero seed are authoritative. Missing/invalid recipe or seed yields a stable diagnostic
+and whole-threat fallback; malformed records are deterministically omitted/rejected; dead restored
+records remain dead and create neither visual nor fallback. `ThreatManager.get_restore_diagnostics()`
+returns a defensive sorted/deduplicated `PackedStringArray`. Fallback uses the existing plain
+placeholder metadata `biomass_whole_threat_fallback=true` and
+`biomass_fallback_reason=<stable diagnostic key>`.
+
+`PlayableGeneratedShip.inject_biomass_validation_encounter(archetype_id: String, recipe_id: String,
+seed: int, world_position: Vector3) -> Variant` is the public validation seam. It delegates to the
+manager, uses valid loaded catalogs and exact recipe ID/seed, and returns the exact assembled/fallback
+visual or `null`; production spawn semantics remain unchanged. `_build_run_snapshot(use_home_ship_summary=false)`
+uses home-ship combat when away, while `_build_world_snapshot()` syncs active derelict combat once.
+Load restores home and active combat once each, proven by distinct fingerprints. Legacy
+`last_saved_snapshot` is assigned only after successful `save_load_service.save_world(ws)` and is not
+authoritative over the saved `WorldSnapshot`.
+
 ### Out of scope for this contract task
 
 - Meshy/provider calls, candidate generation, Blender authoring, or asset promotion.
@@ -158,7 +177,13 @@ materialized only as disabled `CollisionShape3D` nodes for uniform deterministic
 must never participate in gameplay collision or physics queries.
 
 The review matrix is five recipes × seeds `42` and `777` × `normal`, `emergency`, and `dark`
-lighting: exactly 30 composite captures. All six 3D archetype pools remain covered during the
+lighting: exactly 30 composite captures. The runner has explicit `--visual-stage {placeholder,final}`
+and fixed placeholder/final roots; Task 8 runs placeholder only, while Task 15 runs final. Captures
+use production `scenes/main.tscn`, `IsoCameraRig`, `breach_field`, and `SliceAtmosphereApplier`, not
+a standalone floor/camera/environment. Every case records exact recipe node/triangle oracles, caps
+of 160 nodes and 24,000 triangles, finite 0.05–20 m AABB extents, collision counts and mask-1 ray
+proof, plus frozen paired-camera readability values (RGB delta threshold 8/255, at least 64 changed
+pixels and an 8×8 changed bounding box). All six 3D archetype pools remain covered during the
 singular-threat migration. The migration from `threat_visual_catalog.json` is a separate reviewed
 runtime task.
 
