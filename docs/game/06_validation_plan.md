@@ -41,6 +41,47 @@ and cleans failed/stale outputs. `biomass_composite_review.py` is the sole canon
 the manifest owns all 30 case IDs, commands/output, commit, Godot version, stage, input/output hashes,
 metrics, and protected digests; verify recomputes them. Proof stores only manifest path+SHA.
 
+Task 8 production-capture authority is closed as follows. `normal`, `emergency`, and `dark` are
+validation stress conditions, not gameplay states or production configuration. The renderer loads
+`breach_field.json`'s `atmosphere`, duplicates it, applies validation-owned overrides, and passes the
+result to the existing production `SliceAtmosphereApplier.apply(main_root, atmosphere, true)`; every
+case uses `is_away=true`. It never loads `meshy_asset_review_harness.tscn` or
+`meshy_asset_review_capture.gd`, and never creates a custom viewer, fill light, standalone
+floor/camera/environment, or alternate applier. Base fog fields and `away_fog_density_mult=1.6`
+remain unchanged, yielding `fog_density=0.032`. `normal` erases `emergency_accent` and
+`emergency_accent_energy` and uses ambient `Color(0.12,0.20,0.40)`/`0.72` and key
+`Color(0.72,0.84,1.0)`/`1.5`; `emergency` uses ambient `Color(0.22,0.035,0.02)`/`0.38` and key
+`Color(1.0,0.22,0.10)`/`0.65`, retains base `emergency_accent=#ff6a3d`, and sets
+`emergency_accent_energy=0.16`; `dark` erases both emergency keys and uses ambient
+`Color(0.025,0.045,0.10)`/`0.16` and key `Color(0.18,0.28,0.55)`/`0.18`.
+
+The renderer requires `--archetype-id` and calls
+`inject_biomass_validation_encounter(archetype_id, recipe_id, seed, world_position)`. The exact
+recipe/seed mapping is: `biped_puppet_v1` 42→`stalker`, 777→`puppet_corpse`;
+`four_legged_scrambler_v1` 42→`stalker`, 777→`mimic`; `tripod_hound_v1` 42→`biomatter_swarm`,
+777→`drone_swarm`; `intestinal_dragger_v1` 42→`biomatter_swarm`, 777→`hull_tendril`;
+`tendril_knot_v1` 42→`hull_tendril`, 777→`drone_swarm`. Each pair runs all three profiles:
+exactly 5×2×3=30 cases, compatible catalog memberships only, and all six pool IDs. Host tests
+reject missing/unknown/incompatible IDs, altered mapping, or incomplete coverage. Each manifest case
+records `archetype_id` and verified pool membership.
+
+Readiness is fail-closed with `TIMEOUT_FRAMES=600`: instantiate exact `res://scenes/main.tscn`,
+locate its real `playable_instance`, observe `playable_ready`, require `playable_started=true`, a
+non-null loader with `has_loaded_ship()=true`, a non-null `camera_rig` whose script identity is
+exactly `res://scripts/camera/iso_camera_rig.gd`, a non-null `camera_rig.camera`, and the viewport
+current Camera3D exactly equal to that camera. Only then inject/capture. Hard-fail on timeout,
+`playable_failed`, any missing/mismatched readiness/camera condition, failed injection, or inability
+to inspect production environment/lights; no synthetic/API-only, Task 7 soft fallback, standalone
+lifecycle, custom camera/floor/environment, or alternate viewer is allowed. Manifest provenance
+records `main_scene_path`, `playable_ready_seen`, `playable_started`, `loader_loaded`,
+`camera_script_path`, `camera_current`, and `standalone_nodes_created=false`.
+
+For every case assert production WorldEnvironment and DirectionalLight ambient/key/fog values within
+`1e-6`, result `applied=true`, key applied, and `is_away=true`; emergency accent exists/applied only
+for `emergency`. Task 8's canonical inventory is exactly 30 case PNGs plus `review.json`, all 30
+manually inspected rendered evidence. Contact-sheet production is outside Task 8 and remains owned
+by later visual-selection/promotion stages; no contact-sheet path, schema field, or test is added.
+
 Task 9 owns exactly ten implementation files: `docs/game/06_validation_plan.md`,
 `scripts/systems/biomass_wrapper_validator.gd`, `scripts/validation/biomass_wrapper_authority_smoke.gd`,
 `tools/meshy_blender_validate.py`, `scripts/threats/biomass_assembler.gd`,
