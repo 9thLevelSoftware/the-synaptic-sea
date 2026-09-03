@@ -764,6 +764,17 @@ def test_biomass_policy_rejects_runtime_authority_and_non_visual_variants(
     assert message in errors
 
 
+def test_biomass_policy_rejects_non_none_rigging_target_independently() -> None:
+    document = _biomass_document("biomass_test_part_v1", "biomass_limb")
+    document["animation"]["rigging_target"] = "humanoid_biped"
+
+    assert document["animation"]["kind"] == "static_mesh"
+    assert document["animation"]["meshy_rigging_allowed"] is False
+    assert validate_contract(document) == [
+        "biomass assets require animation.rigging_target=none"
+    ]
+
+
 def test_biomass_policy_rejects_texturing_and_torso_attachment_pivot() -> None:
     document = _biomass_document("biomass_test_part_v1", "biomass_limb")
     document["generation"]["should_texture"] = True

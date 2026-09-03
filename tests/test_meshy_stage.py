@@ -1951,6 +1951,28 @@ def test_contract_lifecycle_rejects_duplicate_unknown_traversal_and_unknown_fiel
         stage_module.load_contract_lifecycle(path)
 
 
+@pytest.mark.parametrize("state_value", [{}, []], ids=["object", "list"])
+def test_contract_lifecycle_rejects_unhashable_states_fail_closed(
+    tmp_path: Path, state_value: object
+) -> None:
+    source = json.loads(
+        (ROOT / "data/asset_generation/contract_lifecycle_v1.json").read_text(encoding="utf-8")
+    )
+    source["entries"][0]["state"] = state_value
+    expected = ["contract lifecycle entry[0] state is invalid"]
+
+    assert stage_module.validate_contract_lifecycle(source) == expected
+    assert stage_module.validate_contract_lifecycle(source) == expected
+
+    path = tmp_path / "lifecycle.json"
+    path.write_bytes(canonical_json_bytes(source))
+    with pytest.raises(
+        ValueError, match="contract lifecycle entry\\[0\\] state is invalid"
+    ) as exc_info:
+        stage_module.load_contract_lifecycle(path)
+    assert type(exc_info.value) is ValueError
+
+
 @pytest.mark.parametrize("asset_id", sorted(LEGACY_CONTRACT_IDENTITIES))
 def test_new_plan_work_rejects_retired_contracts(asset_id: str, tmp_path: Path) -> None:
     contract = load_contract(ROOT / "data/asset_generation/contracts" / (asset_id + ".json"))

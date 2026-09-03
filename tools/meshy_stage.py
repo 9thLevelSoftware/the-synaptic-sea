@@ -595,7 +595,8 @@ def validate_contract_lifecycle(document: object) -> List[str]:
             errors.append("contract lifecycle contains duplicate asset_id")
         else:
             seen_ids.add(asset_id)
-        if entry.get("state") not in states:
+        state = entry.get("state")
+        if not isinstance(state, str) or state not in states:
             errors.append(label + " state is invalid")
         reason = entry.get("reason")
         if not isinstance(reason, str) or not reason.strip():
