@@ -1959,102 +1959,147 @@ runtime source, and promotion is always a separate reviewed task.
 
 # Procedural biomass assembly
 
-## REQ-BIO-001: Body-part contract schema
+## REQ-BIO-001: Canonical part catalog and schema
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
 - Type: technical / asset
 - Priority: must
-- Status: Proposed
-- Rationale: Each body part needs a governed contract with category, species, socket definitions, and budget to participate in the assembly system.
+- Status: Validated (Task 1 contract)
+- Rationale: Every assembled threat must draw from one strict, deterministic eight-part catalog.
 - Acceptance criteria:
-  - Contract loads, validates, and produces a deterministic prompt packet.
-  - Socket definitions are required for all non-connector categories.
+  - `data/combat/biomass_part_catalog.json` validates against `data/combat/schemas/biomass_part_catalog_v1.schema.json`.
+  - The document contains exactly the eight canonical `biomass_*` IDs, exact categories, roles, budgets, sockets, collision descriptors, fallbacks, and limits.
+  - Empty wrapper paths are valid fallback authority; non-empty paths are existing project-relative `res://` paths.
 - Verification:
-  - `PYTHONPATH=. python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/biomass_*.json`
+  - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q tests/test_biomass_catalog_validate.py`
+  - `tools/biomass_catalog_validate.py --project-root . --parts data/combat/biomass_part_catalog.json --recipes data/combat/biomass_recipe_catalog.json`
 
-## REQ-BIO-002: Socket marker authoring
+## REQ-BIO-002: Repository-owned socket contract
 
-- Source: `features/procedural_biomass_assembly.md`, ADR-0059
-- Type: technical / asset
+- Source: `features/procedural_biomass_assembly.md`, ADR-0058, ADR-0059
+- Type: technical / asset boundary
 - Priority: must
-- Status: Proposed
-- Rationale: Body parts must expose standardized socket markers in the GLB scene tree for the assembler to attach them at runtime.
+- Status: Validated (Task 1 contract)
+- Rationale: Socket and connector behavior must remain in repository data and Godot wrappers, not in exported visual assets.
 - Acceptance criteria:
-  - Every Blender master exposes sockets as empty `Node3D` markers with `extras` metadata.
-  - `meshy_blender_validate.py` rejects parts missing required sockets or with mismatched metadata.
+  - Socket names, kinds, accepted categories, local positions, rotations, and `root_0` (`socket_root_0` in the part catalog) child alignment are data-defined.
+  - Local `+Y` is up and `+Z` is forward/outward; alignment uses `parent_socket.global_transform * child_socket.transform.affine_inverse()`.
+  - Exported Meshy/Blender GLBs are visual-only and contain no socket markers, marker empties, collision shapes, or helper nodes.
 - Verification:
-  - `PYTHONPATH=. python3 tools/meshy_blender_validate.py --project-root . --contract <part_contract> --task-dir <task_dir> --glb <glb> --report <report>`
+  - Part-catalog validator and schema tests.
+  - ADR-0058 authority review.
 
-## REQ-BIO-003: BiomassRecipe resource
-
-- Source: `features/procedural_biomass_assembly.md`, ADR-0059
-- Type: technical / gameplay
-- Priority: must
-- Status: Proposed
-- Rationale: Assembled threats need a lightweight resource format that defines which parts to use and how to assemble them.
-- Acceptance criteria:
-  - Recipe loads, references only parts in the catalog, and the assembler produces a valid `Node3D` tree.
-- Verification:
-  - `PYTHONPATH=. python3 tools/validate_biomass_recipe.py --project-root . --recipe <recipe.json>`
-
-## REQ-BIO-004: Runtime assembly
+## REQ-BIO-003: Canonical BiomassRecipe resource
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
 - Type: technical / gameplay
 - Priority: must
-- Status: Proposed
-- Rationale: The assembler must instantiate parts, attach them at socket positions, fill gaps with connectors, and configure locomotion.
+- Status: Validated (Task 1 contract)
+- Rationale: An explicit attachment graph is the stable boundary between recipe generation, runtime assembly, and save/load.
 - Acceptance criteria:
-  - Assembled threat renders in `breach_field` at seeds 42/777 without Godot errors.
-  - Composite collision shape is generated from assembled parts.
+  - `data/combat/biomass_recipe_catalog.json` validates against `data/combat/schemas/biomass_recipe_catalog_v1.schema.json`.
+  - Recipe records have exactly `recipe_id`, `locomotion_hint`, `core`, and `attachments`; edges have exactly the six canonical fields.
+  - Unknown/missing fields, duplicate keys, non-finite numbers, unknown IDs, incompatible categories, missing child roots, duplicate IDs/occupancy, forward references, cycles, and limit violations fail closed with sorted diagnostics.
 - Verification:
-  - `/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd`
+  - `tools/biomass_catalog_validate.py --project-root . --parts data/combat/biomass_part_catalog.json --recipes data/combat/biomass_recipe_catalog.json`
+  - Focused biomass catalog test suite.
 
-## REQ-BIO-005: Random recipe generation
+## REQ-BIO-004: Runtime assembly ownership
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0058, ADR-0059
+- Type: technical / gameplay
+- Priority: must
+- Status: Proposed
+- Rationale: The runtime assembler must apply repository socket-space graphs without moving gameplay authority into visual assets.
+- Acceptance criteria:
+  - A per-manager `RefCounted` assembler creates wrapper-owned runtime nodes under the calling threat manager; no autoload is introduced.
+  - Godot wrappers own collision, navigation, connectors, and gameplay bindings.
+  - A core may be a skull; a torso is not mandatory.
+- Verification:
+  - Future focused Godot assembly smoke in the locked-isometric `breach_field`.
+
+## REQ-BIO-005: Deterministic random recipes
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
 - Type: technical / gameplay
 - Priority: should
-- Status: Proposed
-- Rationale: Runtime random assembly creates emergent horror from the part library.
+- Status: Approved
+- Rationale: Seeded random assembly creates emergent forms while preserving reproducibility and graph safety.
 - Acceptance criteria:
-  - Generated recipe is valid, references only catalog parts, and locomotion hint matches limb count.
+  - Random recipes draw only from the canonical catalog, pass the same graph and locomotion checks as curated recipes, and are byte-deterministic for a fixed seed.
+  - The six archetype pools remain deterministic and contain only the five curated recipe IDs.
 - Verification:
-  - Assembly smoke test with random seed produces valid threats.
+  - Future seeded recipe-generation smoke and repeated canonical serialization comparison.
 
-## REQ-BIO-008: Pilot part set
+## REQ-BIO-006: Five locomotion gait profiles
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
-- Type: technical / asset
+- Type: gameplay / technical
 - Priority: must
-- Status: Proposed
-- Rationale: Eight parts prove the assembly pipeline before scaling: human_arm, insect_leg, tentacle, animal_skull, humanoid_torso, biomass_gunk, claw, maw.
+- Status: Approved
+- Rationale: Five explicit hints cover the intended assembled-threat movement families without requiring a skeleton or IK contract.
 - Acceptance criteria:
-  - All 8 parts pass the full Meshy pipeline (contract → generation → selection → Blender master → validation → runtime review → promotion).
+  - `biped` has exactly two locomotor parts and a head.
+  - `quadruped` has exactly four locomotor parts and a head.
+  - `crawl` has at least one locomotor part; `drag` has at least one puller; `slither` has at least one slither part.
+  - Gaits are rigid socket-space profiles, not skeleton/IK behavior.
 - Verification:
-  - Each part's GLB contains correct socket markers and passes Blender validation.
+  - Future Godot gait smoke for all five hints in `breach_field`.
 
-## REQ-BIO-009: Runtime review of assembled threats
+## REQ-BIO-007: Exact assembly save/load persistence
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
-- Type: technical / gameplay
+- Type: technical / persistence
 - Priority: must
-- Status: Proposed
-- Rationale: Assembled threats must be visually reviewed in the production environment before promotion.
+- Status: Approved
+- Rationale: Reloading an assembled threat must restore its authored graph rather than silently generating a different threat.
 - Acceptance criteria:
-  - 18 review images (6 cases × 3 assemblies: biped, quadruped, crawl) pass without Godot errors.
+  - Save/load preserves recipe ID, locomotion hint, core instance/part, every attachment instance/part, parent instance, parent socket, child root socket, and connector part ID exactly.
+  - The restored graph revalidates without regeneration or catalog mutation.
 - Verification:
-  - `PYTHONPATH=. python3 tools/meshy_runtime_review.py --project-root . --contract <recipe> --task-dir <dir> --preview-dir <dir>`
+  - Future recipe persistence round-trip smoke with canonical recipe bytes.
 
-## REQ-BIO-010: No auto-promotion for body parts
+## REQ-BIO-008: Exact eight-part candidate set
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0058, ADR-0059
+- Type: technical / asset governance
+- Priority: must
+- Status: Approved
+- Rationale: The pilot set establishes a bounded contract before any candidate asset scale-up.
+- Acceptance criteria:
+  - The exact IDs are `biomass_human_arm_v1`, `biomass_insect_leg_v1`, `biomass_cephalopod_tentacle_v1`,
+    `biomass_animal_skull_v1`, `biomass_humanoid_torso_v1`, `biomass_gunk_connector_v1`,
+    `biomass_claw_v1`, and `biomass_maw_v1`.
+  - Meshy remains candidate-only; no provider call, asset mutation, or automatic promotion occurs in this contract task.
+- Verification:
+  - Part catalog validator and ADR-0058 candidate-only gate review.
+
+## REQ-BIO-009: Thirty composite runtime review captures
 
 - Source: `features/procedural_biomass_assembly.md`, ADR-0059
+- Type: technical / gameplay / visual review
+- Priority: must
+- Status: Approved
+- Rationale: Composite low-poly cohesion and readability need coverage across all five movement families and all production lighting modes.
+- Acceptance criteria:
+  - Five recipes are reviewed at seeds `42` and `777` under `normal`, `emergency`, and `dark` lighting: exactly 30 composite captures.
+  - All six 3D archetype pools remain covered during the singular-threat migration.
+  - Unexpected Godot `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` output blocks acceptance.
+- Verification:
+  - Future locked-isometric runtime review and capture manifest.
+
+## REQ-BIO-010: No auto-promotion or gameplay duplication
+
+- Source: `features/procedural_biomass_assembly.md`, ADR-0058, ADR-0059
 - Type: technical / governance
 - Priority: must
-- Status: Proposed
-- Rationale: Body parts follow the same promotion gate as all Meshy assets.
+- Status: Validated (Task 1 contract)
+- Rationale: Visual candidates and catalog contracts must not bypass review or take ownership from Godot/runtime data.
 - Acceptance criteria:
-  - No writes to `assets/imported`, `data/combat/biomass_part_catalog.json`, or `scenes/wrappers` during generation or assembly testing.
+  - No provider calls or writes to `assets/imported`, exported GLBs, `scenes/wrappers`, or unrelated threat catalogs occur during catalog validation.
+  - Promotion remains a separate human-reviewed action.
+  - Collision, navigation, sockets/connectors, integrity, and gameplay bindings remain repository/Godot-owned.
 - Verification:
-  - `git diff -- assets/imported data/combat/biomass_part_catalog.json scenes/wrappers` is empty after test runs.
+  - Exact biomass validator CLI and focused tests.
+  - `git diff -- assets/imported scenes/wrappers data/combat/threat_visual_catalog.json` remains empty during this task.
 

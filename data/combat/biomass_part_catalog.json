@@ -1,0 +1,778 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "biomass_part_catalog",
+  "limits": {
+    "max_attachments": 8,
+    "max_depth": 3,
+    "max_triangles": 30000,
+    "max_nodes": 160
+  },
+  "parts": {
+    "biomass_human_arm_v1": {
+      "category": "biomass_limb",
+      "species_tags": [
+        "human"
+      ],
+      "assembly_roles": [
+        "locomotor",
+        "manipulator",
+        "puller"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 2500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_distal_0",
+          "kind": "distal",
+          "accepts_categories": [
+            "biomass_appendage",
+            "biomass_limb"
+          ],
+          "position_m": [
+            0,
+            0,
+            1.0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "capsule",
+          "position_m": [
+            0,
+            0,
+            0.45
+          ],
+          "rotation_deg": [
+            90,
+            0,
+            0
+          ],
+          "radius_m": 0.12,
+          "height_m": 0.9
+        }
+      ],
+      "fallback": {
+        "primitive": "capsule",
+        "dimensions_m": [
+          0.24,
+          0.24,
+          1.0
+        ],
+        "albedo": "#8b5252"
+      }
+    },
+    "biomass_insect_leg_v1": {
+      "category": "biomass_limb",
+      "species_tags": [
+        "insectoid"
+      ],
+      "assembly_roles": [
+        "locomotor"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 2500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_distal_0",
+          "kind": "distal",
+          "accepts_categories": [
+            "biomass_appendage",
+            "biomass_limb"
+          ],
+          "position_m": [
+            0,
+            0,
+            0.9
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "capsule",
+          "position_m": [
+            0,
+            0,
+            0.42
+          ],
+          "rotation_deg": [
+            90,
+            0,
+            0
+          ],
+          "radius_m": 0.1,
+          "height_m": 0.84
+        }
+      ],
+      "fallback": {
+        "primitive": "capsule",
+        "dimensions_m": [
+          0.22,
+          0.22,
+          0.9
+        ],
+        "albedo": "#6f7046"
+      }
+    },
+    "biomass_cephalopod_tentacle_v1": {
+      "category": "biomass_limb",
+      "species_tags": [
+        "cephalopodic"
+      ],
+      "assembly_roles": [
+        "locomotor",
+        "puller",
+        "slither"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 2500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_distal_0",
+          "kind": "distal",
+          "accepts_categories": [
+            "biomass_appendage",
+            "biomass_limb"
+          ],
+          "position_m": [
+            0,
+            0,
+            1.2
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "capsule",
+          "position_m": [
+            0,
+            0,
+            0.55
+          ],
+          "rotation_deg": [
+            90,
+            0,
+            0
+          ],
+          "radius_m": 0.11,
+          "height_m": 1.1
+        }
+      ],
+      "fallback": {
+        "primitive": "capsule",
+        "dimensions_m": [
+          0.24,
+          0.24,
+          1.2
+        ],
+        "albedo": "#765070"
+      }
+    },
+    "biomass_animal_skull_v1": {
+      "category": "biomass_head",
+      "species_tags": [
+        "animal"
+      ],
+      "assembly_roles": [
+        "core",
+        "detail"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 3500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_0",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_limb",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            -0.2,
+            0.05,
+            0.2
+          ],
+          "rotation_deg": [
+            0,
+            -65,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_1",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_limb",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0.2,
+            0.05,
+            0.2
+          ],
+          "rotation_deg": [
+            0,
+            65,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_2",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_limb",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            -0.18,
+            -0.1,
+            0.35
+          ],
+          "rotation_deg": [
+            25,
+            -40,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_3",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_limb",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0.18,
+            -0.1,
+            0.35
+          ],
+          "rotation_deg": [
+            25,
+            40,
+            0
+          ]
+        },
+        {
+          "name": "socket_jaw_0",
+          "kind": "jaw",
+          "accepts_categories": [
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0,
+            -0.18,
+            0.5
+          ],
+          "rotation_deg": [
+            15,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "box",
+          "position_m": [
+            0,
+            0,
+            0.3
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "dimensions_m": [
+            0.45,
+            0.4,
+            0.6
+          ]
+        }
+      ],
+      "fallback": {
+        "primitive": "box",
+        "dimensions_m": [
+          0.45,
+          0.4,
+          0.6
+        ],
+        "albedo": "#8a806b"
+      }
+    },
+    "biomass_humanoid_torso_v1": {
+      "category": "biomass_core",
+      "species_tags": [
+        "human"
+      ],
+      "assembly_roles": [
+        "core"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 5000,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_head_0",
+          "kind": "head",
+          "accepts_categories": [
+            "biomass_head",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0,
+            0.45,
+            0.05
+          ],
+          "rotation_deg": [
+            -90,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_0",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            -0.34,
+            0.28,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            -90,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_1",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            0.34,
+            0.28,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            90,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_2",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            -0.34,
+            -0.05,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            -90,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_3",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            0.34,
+            -0.05,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            90,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_4",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            -0.2,
+            -0.45,
+            0
+          ],
+          "rotation_deg": [
+            90,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_limb_5",
+          "kind": "limb",
+          "accepts_categories": [
+            "biomass_limb"
+          ],
+          "position_m": [
+            0.2,
+            -0.45,
+            0
+          ],
+          "rotation_deg": [
+            90,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_0",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_head",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0,
+            0.15,
+            -0.2
+          ],
+          "rotation_deg": [
+            0,
+            180,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_1",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_head",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            -0.22,
+            0.15,
+            -0.18
+          ],
+          "rotation_deg": [
+            0,
+            -135,
+            0
+          ]
+        },
+        {
+          "name": "socket_appendage_2",
+          "kind": "appendage",
+          "accepts_categories": [
+            "biomass_head",
+            "biomass_appendage"
+          ],
+          "position_m": [
+            0.22,
+            0.15,
+            -0.18
+          ],
+          "rotation_deg": [
+            0,
+            135,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "box",
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "dimensions_m": [
+            0.65,
+            0.9,
+            0.4
+          ]
+        }
+      ],
+      "fallback": {
+        "primitive": "box",
+        "dimensions_m": [
+          0.65,
+          0.9,
+          0.4
+        ],
+        "albedo": "#80585d"
+      }
+    },
+    "biomass_gunk_connector_v1": {
+      "category": "biomass_connector",
+      "species_tags": [
+        "biomass"
+      ],
+      "assembly_roles": [
+        "connector"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "sphere",
+          "position_m": [
+            0,
+            0,
+            0.1
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "radius_m": 0.18
+        }
+      ],
+      "fallback": {
+        "primitive": "sphere",
+        "dimensions_m": [
+          0.35,
+          0.35,
+          0.25
+        ],
+        "albedo": "#704b63"
+      }
+    },
+    "biomass_claw_v1": {
+      "category": "biomass_appendage",
+      "species_tags": [
+        "alien"
+      ],
+      "assembly_roles": [
+        "detail",
+        "manipulator"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 1500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "box",
+          "position_m": [
+            0,
+            0,
+            0.1
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "dimensions_m": [
+            0.35,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "fallback": {
+        "primitive": "box",
+        "dimensions_m": [
+          0.35,
+          0.2,
+          0.2
+        ],
+        "albedo": "#6d6148"
+      }
+    },
+    "biomass_maw_v1": {
+      "category": "biomass_appendage",
+      "species_tags": [
+        "alien"
+      ],
+      "assembly_roles": [
+        "detail"
+      ],
+      "wrapper_scene_path": "",
+      "triangle_budget": 1500,
+      "sockets": [
+        {
+          "name": "socket_root_0",
+          "kind": "root",
+          "accepts_categories": [],
+          "position_m": [
+            0,
+            0,
+            0
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "collision_shapes": [
+        {
+          "shape": "box",
+          "position_m": [
+            0,
+            0,
+            0.175
+          ],
+          "rotation_deg": [
+            0,
+            0,
+            0
+          ],
+          "dimensions_m": [
+            0.4,
+            0.3,
+            0.35
+          ]
+        }
+      ],
+      "fallback": {
+        "primitive": "box",
+        "dimensions_m": [
+          0.4,
+          0.3,
+          0.35
+        ],
+        "albedo": "#8c4851"
+      }
+    }
+  }
+}

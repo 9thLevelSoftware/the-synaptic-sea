@@ -1,204 +1,150 @@
-# Procedural Biomass Assembly — Feature Specification
+# Procedural Biomass Assembly — Canonical Feature Specification
 
-> **ADR:** 0059-procedural-biomass-assembly.md
-> **Status:** Draft
+> **ADR:** `docs/game/adr/0059-procedural-biomass-assembly.md`
+> **Status:** Accepted contract; runtime assembly remains a follow-on implementation
 > **Created:** 2026-09-02
 
 ## Summary
 
-Replace singular threat character models with a modular body-part system. Enemies are assembled
-at runtime from a library of limbs, heads, torsos, connectors, and appendages sourced from
-multiple species (human, alien, insectoid, cephalopod). Assembly is procedural — the same part
-library produces unlimited unique threat forms.
+Procedural biomass threats are assembled from a strict repository-owned catalog of modular parts
+rather than singular character meshes. A seeded recipe defines one explicit attachment graph. The
+same graph validates, renders through Godot-owned wrappers, and persists without regeneration drift.
 
-## Gameplay motivation
-
-The Synaptic Sea's horror comes from biological contamination. Pre-modeled creatures are
-predictable; a thing made of three human legs and a dog's head dragging itself via intestines is
-not. Procedural assembly creates emergent horror that players cannot memorize or anticipate.
+The contract is subordinate to ADR-0058: Meshy is candidate-only. Repository data and Godot
+wrappers own sockets, connectors, collision, navigation, and runtime behavior. Meshy/Blender GLBs
+are visual-only and contain no socket markers, marker empties, collision shapes, or helper nodes.
 
 ## Scope
 
-### In scope
+### In scope for the canonical contract
 
-- Body-part asset contracts and Meshy generation for 8 pilot parts
-- Blender socket authoring and validation for each part category
-- `BiomassRecipe` resource format and JSON storage
-- `BiomassAssemblerService` autoload for runtime assembly
-- Locomotion hints (biped, quadruped, crawl, drag, slither) with IK
-- `biomass_part_catalog.json` replacing `threat_visual_catalog.json` archetypes
-- Locked-isometric runtime review for assembled threats at seeds 42/777
-- Random recipe generation from available parts
+- Strict part and recipe JSON schemas and catalogs.
+- Eight exact `biomass_*` part IDs and five curated recipes.
+- Six archetype pools: `biomatter_swarm`, `stalker`, `hull_tendril`, `puppet_corpse`, `mimic`,
+  and `drone_swarm`.
+- Stable, sorted diagnostics with duplicate-key and non-finite-number rejection.
+- Repository-owned socket-space attachment validation, conservative node budgeting, and exact
+  assembly-graph persistence shape.
+- Placeholder-first, locked-isometric review planning for all 30 composite captures.
 
-### Out of scope
+### Out of scope for this contract task
 
-- Procedural animation blending (use predefined gaits per locomotion hint)
-- Part degradation/damage visuals (future feature)
-- Player-facing bestiary or part identification UI
-- Networked assembly synchronization (single-player only)
-- Audio design for assembled threats (future feature)
+- Meshy/provider calls, candidate generation, Blender authoring, or asset promotion.
+- Runtime Godot assembly, five gait implementations, and scene integration.
+- Procedural deformation or skeletal/IK animation.
+- Real-time part swapping, part physics interaction, player-created threats, and damage visuals.
+- Any mutation of `threat_visual_catalog.json`, exported assets, or wrapper scenes.
 
-## Requirements
+## Canonical data contract
 
-### REQ-BIO-001: Part contract schema
+### Part catalog
 
-Each body part has an `ai_asset_contract` with category-specific fields:
+`data/combat/biomass_part_catalog.json` has exactly `schema_version`, `document_kind`, `limits`,
+and `parts`. The exact limits are:
 
 ```json
-{
-  "schema_version": "1.0.0",
-  "document_kind": "ai_asset_contract",
-  "asset_id": "human_arm_v1",
-  "category": "biomass_limb",
-  "species": "human",
-  "gameplay_role": "locomotion_or_manipulation",
-  "dimensions_m": [0.12, 0.65, 0.12],
-  "pivot": "proximal_center",
-  "forward_axis": "+Z",
-  "required_states": ["default"],
-  "collision_owner": "godot_assembler",
-  "sockets": [
-    {"id": "proximal_0", "category": "biomass_torso", "compatible": ["limb_anchor"]},
-    {"id": "distal_0", "category": "biomass_appendage", "compatible": ["distal", "jaw"]}
-  ],
-  "budget": {"triangles": {"min": 800, "max": 2000}},
-  "generation": {
-    "provider": "meshy",
-    "mode": "image_to_3d",
-    "model_type": "smart-topology",
-    "ai_model": "meshy-t2",
-    "should_texture": false,
-    "candidate_count": 4
-  }
-}
+{"max_attachments":8,"max_depth":3,"max_triangles":30000,"max_nodes":160}
 ```
 
-**Acceptance:** Contract loads, validates, and produces a deterministic prompt packet. Socket
-definitions are required for all non-connector categories.
+The exact eight IDs are:
 
-### REQ-BIO-002: Socket marker authoring
+1. `biomass_human_arm_v1` — `biomass_limb`, `human`, roles `locomotor`, `manipulator`, `puller`, budget 2500
+2. `biomass_insect_leg_v1` — `biomass_limb`, `insectoid`, role `locomotor`, budget 2500
+3. `biomass_cephalopod_tentacle_v1` — `biomass_limb`, `cephalopodic`, roles `locomotor`, `puller`, `slither`, budget 2500
+4. `biomass_animal_skull_v1` — `biomass_head`, `animal`, roles `core`, `detail`, budget 3500
+5. `biomass_humanoid_torso_v1` — `biomass_core`, `human`, role `core`, budget 5000
+6. `biomass_gunk_connector_v1` — `biomass_connector`, `biomass`, role `connector`, budget 500
+7. `biomass_claw_v1` — `biomass_appendage`, `alien`, roles `detail`, `manipulator`, budget 1500
+8. `biomass_maw_v1` — `biomass_appendage`, `alien`, role `detail`, budget 1500
 
-Every Blender master exposes sockets as empty `Node3D` markers in the GLB scene tree with
-`extras` metadata containing `socket_id`, `category`, `compatible_categories`,
-`orientation_hint`, and `max_parts`.
+The only categories are `biomass_core`, `biomass_limb`, `biomass_head`, `biomass_connector`, and
+`biomass_appendage`. The only roles are `core`, `locomotor`, `manipulator`, `detail`, `puller`,
+`slither`, and `connector`. Every part has a repository `socket_root_0`; non-root socket names
+match `^socket_(root|head|limb|appendage|jaw|distal)_[0-9]+$`. Coordinates use local `+Y` up
+and `+Z` forward/outward. Child alignment is:
 
-**Acceptance:** `meshy_blender_validate.py` rejects any part GLB that is missing required sockets
-or has socket metadata that does not match the contract.
+```text
+parent_socket.global_transform * child_socket.transform.affine_inverse()
+```
 
-### REQ-BIO-003: BiomassRecipe resource
+Collision shapes are exactly `box`, `capsule`, or `sphere`, and collision ownership stays in the
+Godot wrapper. `wrapper_scene_path: ""` is a valid fallback authority. A non-empty wrapper path
+must be an existing project-relative `res://` path. Fallback dimensions bound socket positions by
+at most 0.05 m of tolerance.
 
-A `BiomassRecipe` resource defines one assembled threat: torso, head, limb IDs, appendage IDs,
-connector style, and locomotion hint. Recipes are stored as JSON in `data/combat/biomass_recipes/`.
+### Recipe catalog and graph rules
 
-**Acceptance:** Recipe loads, references only parts that exist in the catalog, and the assembler
-produces a valid `Node3D` tree from it.
+`data/combat/biomass_recipe_catalog.json` has exactly `schema_version`, `document_kind`, `recipes`,
+and `archetype_pools`. Recipe records have exactly `recipe_id`, `locomotion_hint`, `core`, and
+`attachments`; attachment records have exactly `instance_id`, `part_id`, `parent_instance_id`,
+`parent_socket`, `child_socket`, and `connector_part_id`.
 
-### REQ-BIO-004: Runtime assembly
+The five recipes are `biped_puppet_v1`, `four_legged_scrambler_v1`, `tripod_hound_v1`,
+`intestinal_dragger_v1`, and `tendril_knot_v1`. Records are parent-before-child. Every edge uses
+`child_socket: "root_0"` (the catalog socket is `socket_root_0`) and
+`connector_part_id: "biomass_gunk_connector_v1"`.
 
-`BiomassAssemblerService.assemble(recipe)` instantiates parts, attaches them at socket positions,
-fills gaps with connectors, and returns a `Node3D` with a `ThreatMovementController` configured
-for the recipe's locomotion hint.
+The strict graph limits are one core, at most 8 non-core attachments, depth 3, 30,000 triangles,
+and 160 inclusive runtime nodes. Instance IDs are unique; each parent socket has one child; cycles,
+forward references, unknown IDs, incompatible categories, missing child roots, and invalid role
+requirements fail closed. A core may be a skull; a torso is not mandatory.
 
-**Acceptance:** Assembled threat renders correctly in the `breach_field` at seeds 42/777. No
-`ERROR:`, `WARNING:`, or `SCRIPT ERROR:` in Godot headless output. Composite collision shape is
-generated from assembled parts.
+The runtime-node estimate is intentionally a deterministic conservative host-contract formula:
+one assembler root plus two wrapper/visual nodes and one node per catalog socket or collision
+descriptor for each part occurrence, including one connector occurrence per attachment. It does not
+inspect future wrapper scene trees.
 
-### REQ-BIO-005: Random recipe generation
+## Locomotion and runtime ownership
 
-`BiomassAssemblerService.random_recipe(difficulty)` selects a torso, attaches 1–6 limbs from
-available parts, adds 0–2 appendages, picks a head (optional for non-biped), and assigns a
-locomotion hint compatible with the assembled limb count.
+The only locomotion hints are:
 
-**Acceptance:** Generated recipe is valid, references only catalog parts, and the locomotion hint
-matches the limb count (fallback to `crawl` when under-provisioned).
+| Hint | Contract requirement |
+|---|---|
+| `biped` | exactly two locomotor parts and a head |
+| `quadruped` | exactly four locomotor parts and a head |
+| `crawl` | at least one locomotor part |
+| `drag` | at least one puller part |
+| `slither` | at least one slither part |
 
-### REQ-BIO-006: Locomotion hints
+These are rigid socket-space gait profiles, not skeleton or IK contracts. A per-manager `RefCounted`
+assembler owns pure graph planning and is called by the threat manager; there is no
+`BiomassAssemblerService` autoload. Godot wrapper scenes apply collision, navigation, connector,
+and gameplay consequences. The complete recipe is serialized and loaded exactly, including every
+instance, part, parent, socket, child root, connector, and locomotion hint.
 
-| Hint | Min limbs | Max limbs | Head required | Behavior |
-|---|---|---|---|---|
-| `biped` | 2 | 2 | Yes | A* pathfollow, 2-leg IK |
-| `quadruped` | 4 | 6 | Yes | A* pathfollow, 4-leg IK |
-| `crawl` | 1 | 3 | No | Ground-hugging waypoint crawl |
-| `drag` | 0 | 4 | No | Torso drags, limbs pull |
-| `slither` | 0 | 0 | No | Sine-wave ground motion |
+## Visual and review policy
 
-**Acceptance:** Each locomotion hint produces correct movement in the `breach_field`. Assemblies
-with insufficient limbs for the requested hint fall back to `crawl`.
+Use a locked-isometric, low-poly, placeholder-first flow. Primitive fallbacks establish scale,
+composition, and readability before any optional candidate asset is reviewed. No exported GLB may
+carry a socket marker or helper node. Connectors are preauthored, non-deforming, visual-only parts;
+they are not skinned at runtime to bridge arbitrary gaps.
 
-### REQ-BIO-007: Part catalog
+The review matrix is five recipes × seeds `42` and `777` × `normal`, `emergency`, and `dark`
+lighting: exactly 30 composite captures. All six 3D archetype pools remain covered during the
+singular-threat migration. The migration from `threat_visual_catalog.json` is a separate reviewed
+runtime task.
 
-`data/combat/biomass_part_catalog.json` indexes all promoted parts by category, species, socket
-vocabulary, locomotion compatibility, and mesh path. Replaces the archetype entries in
-`threat_visual_catalog.json`.
+## Requirements and acceptance
 
-**Acceptance:** Catalog loads, all referenced mesh paths exist, and the assembler can query parts
-by category and compatibility.
-
-### REQ-BIO-008: Pilot part set
-
-Eight parts are generated, validated, and promoted before the assembly system is considered
-complete:
-
-1. `human_arm_v1` (limb, human)
-2. `insect_leg_v1` (limb, insectoid)
-3. `tentacle_v1` (limb, cephalopod)
-4. `animal_skull_v1` (head, canid)
-5. `humanoid_torso_v1` (torso, human)
-6. `biomass_gunk_v1` (connector)
-7. `claw_v1` (appendage, insectoid)
-8. `maw_v1` (appendage, alien)
-
-**Acceptance:** All 8 parts pass the full Meshy pipeline (contract → generation → selection →
-Blender master → validation → runtime review → promotion). Each part's GLB contains correct
-socket markers.
-
-### REQ-BIO-009: Runtime review
-
-Assembled threats are reviewed in the `breach_field` at seeds 42 and 777 with normal, emergency,
-and dark lighting (6 cases per assembly). At least 3 representative assemblies (biped, quadruped,
-crawl) must pass before the system is considered promotion-ready.
-
-**Acceptance:** 18 review images (6 cases × 3 assemblies) pass without unexpected Godot errors.
-
-### REQ-BIO-010: No auto-promotion
-
-Body parts follow the same promotion gate as all Meshy assets: candidate selection → Blender
-cleanup → validation → runtime review → promotion proposal → separate human-approved promotion.
-No part bypasses this chain.
-
-**Acceptance:** No writes to `assets/imported`, `data/combat/biomass_part_catalog.json`, or
-`scenes/wrappers` during generation or assembly testing.
-
-## Non-goals
-
-- Real-time part swapping during gameplay (assemblies are fixed at spawn time)
-- Part-to-part physics interaction (connectors are visual only)
-- Player crafting of custom threats
-- Part degradation or damage states (future feature)
+- Part and recipe documents validate with no diagnostics through the exact CLI below.
+- Repeated CLI runs emit byte-identical output and the marker
+  `BIOMASS CATALOG VALIDATION PASS parts=8 recipes=5 archetypes=6`.
+- Unknown/missing fields, duplicate keys, non-finite numbers, bad paths, malformed sockets/shapes,
+  and malformed graphs are rejected with stable sorted diagnostics.
+- All 30 review captures are required before visual promotion; Meshy candidate output never
+  auto-promotes or mutates repository catalogs, wrappers, or imported assets.
 
 ## Verification commands
 
 ```bash
-# Contract validation
-PYTHONPATH=. python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/biomass_*.json
-
-# Part catalog validation
-PYTHONPATH=. python3 tools/validate_biomass_catalog.py --project-root .
-
-# Assembly smoke test
-/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd
-
-# Runtime review (after assembly)
-PYTHONPATH=. python3 tools/meshy_runtime_review.py --project-root . \
-  --contract data/asset_generation/contracts/<part_id>.json \
-  --task-dir assets/_staging/meshy/<part_id>/<task_id> \
-  --preview-dir artifacts/validation-previews/biomass/<part_id>
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m pytest -q tests/test_biomass_catalog_validate.py
+/opt/homebrew/bin/python3.11 tools/biomass_catalog_validate.py \
+  --project-root . \
+  --parts data/combat/biomass_part_catalog.json \
+  --recipes data/combat/biomass_recipe_catalog.json
 ```
 
 ## Open questions
 
-1. Should connectors be procedurally deformed (skinned mesh) to bridge arbitrary socket
-   positions, or should we pre-author a fixed set of connector shapes for common gap sizes?
-2. How many curated recipes should ship alongside the random generation system?
-3. Should the assembler support recursive attachment (e.g., a tentacle that itself has a maw
-   attached to its distal end)?
+None for the canonical contract. Runtime implementation and visual promotion remain separate,
+scoped tasks governed by ADR-0058 and this accepted contract.

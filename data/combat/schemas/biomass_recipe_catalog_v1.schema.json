@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "biomass_recipe_catalog_v1.schema.json",
+  "title": "Canonical Biomass Recipe Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_kind", "recipes", "archetype_pools"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "document_kind": {"const": "biomass_recipe_catalog"},
+    "recipes": {
+      "type": "object",
+      "minProperties": 5,
+      "maxProperties": 5,
+      "propertyNames": {
+        "enum": ["biped_puppet_v1", "four_legged_scrambler_v1", "tripod_hound_v1", "intestinal_dragger_v1", "tendril_knot_v1"]
+      },
+      "additionalProperties": {"$ref": "#/$defs/recipe"}
+    },
+    "archetype_pools": {
+      "type": "object",
+      "minProperties": 6,
+      "maxProperties": 6,
+      "propertyNames": {
+        "enum": ["biomatter_swarm", "stalker", "hull_tendril", "puppet_corpse", "mimic", "drone_swarm"]
+      },
+      "additionalProperties": {"type": "array", "items": {"type": "string"}}
+    }
+  },
+  "$defs": {
+    "core": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance_id", "part_id"],
+      "properties": {
+        "instance_id": {"type": "string", "minLength": 1},
+        "part_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance_id", "part_id", "parent_instance_id", "parent_socket", "child_socket", "connector_part_id"],
+      "properties": {
+        "instance_id": {"type": "string", "minLength": 1},
+        "part_id": {"type": "string", "minLength": 1},
+        "parent_instance_id": {"type": "string", "minLength": 1},
+        "parent_socket": {"type": "string", "pattern": "^(root|head|limb|appendage|jaw|distal)_[0-9]+$"},
+        "child_socket": {"const": "root_0"},
+        "connector_part_id": {"const": "biomass_gunk_connector_v1"}
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipe_id", "locomotion_hint", "core", "attachments"],
+      "properties": {
+        "recipe_id": {"type": "string", "minLength": 1},
+        "locomotion_hint": {"enum": ["biped", "quadruped", "crawl", "drag", "slither"]},
+        "core": {"$ref": "#/$defs/core"},
+        "attachments": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/attachment"}}
+      }
+    }
+  }
+}

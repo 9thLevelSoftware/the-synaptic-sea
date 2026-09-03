@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "biomass_part_catalog_v1.schema.json",
+  "title": "Canonical Biomass Part Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "document_kind", "limits", "parts"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "document_kind": {"const": "biomass_part_catalog"},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attachments", "max_depth", "max_triangles", "max_nodes"],
+      "properties": {
+        "max_attachments": {"const": 8},
+        "max_depth": {"const": 3},
+        "max_triangles": {"const": 30000},
+        "max_nodes": {"const": 160}
+      }
+    },
+    "parts": {
+      "type": "object",
+      "minProperties": 8,
+      "maxProperties": 8,
+      "propertyNames": {
+        "enum": [
+          "biomass_human_arm_v1", "biomass_insect_leg_v1",
+          "biomass_cephalopod_tentacle_v1", "biomass_animal_skull_v1",
+          "biomass_humanoid_torso_v1", "biomass_gunk_connector_v1",
+          "biomass_claw_v1", "biomass_maw_v1"
+        ]
+      },
+      "additionalProperties": {"$ref": "#/$defs/part"}
+    }
+  },
+  "$defs": {
+    "category": {"enum": ["biomass_core", "biomass_limb", "biomass_head", "biomass_connector", "biomass_appendage"]},
+    "socket_kind": {"enum": ["root", "head", "limb", "appendage", "jaw", "distal"]},
+    "vector3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "socket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "accepts_categories", "position_m", "rotation_deg"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^socket_(root|head|limb|appendage|jaw|distal)_[0-9]+$"},
+        "kind": {"$ref": "#/$defs/socket_kind"},
+        "accepts_categories": {"type": "array", "items": {"$ref": "#/$defs/category"}, "uniqueItems": true},
+        "position_m": {"$ref": "#/$defs/vector3"},
+        "rotation_deg": {"$ref": "#/$defs/vector3"}
+      }
+    },
+    "box_collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "position_m", "rotation_deg", "dimensions_m"],
+      "properties": {
+        "shape": {"const": "box"},
+        "position_m": {"$ref": "#/$defs/vector3"},
+        "rotation_deg": {"$ref": "#/$defs/vector3"},
+        "dimensions_m": {"$ref": "#/$defs/vector3"}
+      }
+    },
+    "capsule_collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "position_m", "rotation_deg", "radius_m", "height_m"],
+      "properties": {
+        "shape": {"const": "capsule"},
+        "position_m": {"$ref": "#/$defs/vector3"},
+        "rotation_deg": {"$ref": "#/$defs/vector3"},
+        "radius_m": {"type": "number", "exclusiveMinimum": 0},
+        "height_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "sphere_collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "position_m", "rotation_deg", "radius_m"],
+      "properties": {
+        "shape": {"const": "sphere"},
+        "position_m": {"$ref": "#/$defs/vector3"},
+        "rotation_deg": {"$ref": "#/$defs/vector3"},
+        "radius_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primitive", "dimensions_m", "albedo"],
+      "properties": {
+        "primitive": {"enum": ["box", "capsule", "sphere"]},
+        "dimensions_m": {"$ref": "#/$defs/vector3"},
+        "albedo": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}
+      }
+    },
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "species_tags", "assembly_roles", "wrapper_scene_path", "triangle_budget", "sockets", "collision_shapes", "fallback"],
+      "properties": {
+        "category": {"$ref": "#/$defs/category"},
+        "species_tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "assembly_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["core", "locomotor", "manipulator", "detail", "puller", "slither", "connector"]}},
+        "wrapper_scene_path": {"type": "string"},
+        "triangle_budget": {"type": "integer", "exclusiveMinimum": 0},
+        "sockets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/socket"}},
+        "collision_shapes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"oneOf": [{"$ref": "#/$defs/box_collision"}, {"$ref": "#/$defs/capsule_collision"}, {"$ref": "#/$defs/sphere_collision"}]}
+        },
+        "fallback": {"$ref": "#/$defs/fallback"}
+      }
+    }
+  }
+}

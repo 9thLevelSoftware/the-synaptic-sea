@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "biomass_recipe_catalog",
+  "recipes": {
+    "biped_puppet_v1": {
+      "recipe_id": "biped_puppet_v1",
+      "locomotion_hint": "biped",
+      "core": {
+        "instance_id": "core",
+        "part_id": "biomass_humanoid_torso_v1"
+      },
+      "attachments": [
+        {
+          "instance_id": "leg_left",
+          "part_id": "biomass_human_arm_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_right",
+          "part_id": "biomass_human_arm_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_1",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "head",
+          "part_id": "biomass_animal_skull_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "head_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "left_claw",
+          "part_id": "biomass_claw_v1",
+          "parent_instance_id": "leg_left",
+          "parent_socket": "distal_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        }
+      ]
+    },
+    "four_legged_scrambler_v1": {
+      "recipe_id": "four_legged_scrambler_v1",
+      "locomotion_hint": "quadruped",
+      "core": {
+        "instance_id": "core",
+        "part_id": "biomass_humanoid_torso_v1"
+      },
+      "attachments": [
+        {
+          "instance_id": "leg_0",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_1",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_1",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_2",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_2",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_3",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_3",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "head",
+          "part_id": "biomass_animal_skull_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "head_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "maw",
+          "part_id": "biomass_maw_v1",
+          "parent_instance_id": "head",
+          "parent_socket": "jaw_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        }
+      ]
+    },
+    "tripod_hound_v1": {
+      "recipe_id": "tripod_hound_v1",
+      "locomotion_hint": "crawl",
+      "core": {
+        "instance_id": "core",
+        "part_id": "biomass_animal_skull_v1"
+      },
+      "attachments": [
+        {
+          "instance_id": "leg_0",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "appendage_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_1",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "appendage_1",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "leg_2",
+          "part_id": "biomass_insect_leg_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "appendage_2",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "maw",
+          "part_id": "biomass_maw_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "jaw_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "claw",
+          "part_id": "biomass_claw_v1",
+          "parent_instance_id": "leg_0",
+          "parent_socket": "distal_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        }
+      ]
+    },
+    "intestinal_dragger_v1": {
+      "recipe_id": "intestinal_dragger_v1",
+      "locomotion_hint": "drag",
+      "core": {
+        "instance_id": "core",
+        "part_id": "biomass_animal_skull_v1"
+      },
+      "attachments": [
+        {
+          "instance_id": "puller",
+          "part_id": "biomass_cephalopod_tentacle_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "appendage_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "arm",
+          "part_id": "biomass_human_arm_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "appendage_1",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "maw",
+          "part_id": "biomass_maw_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "jaw_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        }
+      ]
+    },
+    "tendril_knot_v1": {
+      "recipe_id": "tendril_knot_v1",
+      "locomotion_hint": "slither",
+      "core": {
+        "instance_id": "core",
+        "part_id": "biomass_humanoid_torso_v1"
+      },
+      "attachments": [
+        {
+          "instance_id": "tendril_0",
+          "part_id": "biomass_cephalopod_tentacle_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "tendril_1",
+          "part_id": "biomass_cephalopod_tentacle_v1",
+          "parent_instance_id": "core",
+          "parent_socket": "limb_1",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "maw",
+          "part_id": "biomass_maw_v1",
+          "parent_instance_id": "tendril_0",
+          "parent_socket": "distal_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        },
+        {
+          "instance_id": "claw",
+          "part_id": "biomass_claw_v1",
+          "parent_instance_id": "tendril_1",
+          "parent_socket": "distal_0",
+          "child_socket": "root_0",
+          "connector_part_id": "biomass_gunk_connector_v1"
+        }
+      ]
+    }
+  },
+  "archetype_pools": {
+    "biomatter_swarm": [
+      "tripod_hound_v1",
+      "intestinal_dragger_v1"
+    ],
+    "stalker": [
+      "biped_puppet_v1",
+      "four_legged_scrambler_v1"
+    ],
+    "hull_tendril": [
+      "tendril_knot_v1",
+      "intestinal_dragger_v1"
+    ],
+    "puppet_corpse": [
+      "biped_puppet_v1",
+      "tripod_hound_v1"
+    ],
+    "mimic": [
+      "four_legged_scrambler_v1",
+      "tripod_hound_v1"
+    ],
+    "drone_swarm": [
+      "tendril_knot_v1",
+      "tripod_hound_v1"
+    ]
+  }
+}
