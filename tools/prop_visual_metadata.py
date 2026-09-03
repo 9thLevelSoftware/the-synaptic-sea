@@ -216,9 +216,319 @@ def _validate_position_accessor(accessor: dict[str, Any]) -> None:
         raise ValueError("POSITION accessor byteOffset requires a bufferView")
 
 
+_SCENE_BOUND_MAGNITUDE_LIMIT = 1.0e4
+
+
 def _round_bound(value: float) -> float:
     rounded = round(value, 6)
     return 0.0 if rounded == 0 else rounded
+
+
+def _validate_finite_vector(values: Any, label: str) -> None:
+    vector = _finite_vector(values)
+    if vector is None:
+        raise ValueError(f"{label} must be a finite 3-vector")
+    if any(abs(component) > _SCENE_BOUND_MAGNITUDE_LIMIT for component in vector):
+        raise ValueError(f"{label} out of range: {vector}")
+
+
+def _validate_finite_quaternion(values: Any, label: str) -> None:
+    if not isinstance(values, (list, tuple)) or len(values) != 4:
+        raise ValueError(f"{label} must be a finite 4-vector quaternion")
+    for index, value in enumerate(values):
+        converted = _finite_number(value)
+        if converted is None:
+            raise ValueError(f"{label}[{index}] must be finite")
+        if abs(converted) > 1.0 + 1.0e-6:
+            raise ValueError(f"{label}[{index}] out of quaternion range: {converted}")
+
+
+def _validate_finite_matrix(values: Any, label: str) -> None:
+    if not isinstance(values, (list, tuple)) or len(values) != 16:
+        raise ValueError(f"{label} must contain 16 finite numbers")
+    for index, value in enumerate(values):
+        converted = _finite_number(value)
+        if converted is None:
+            raise ValueError(f"{label}[{index}] must be finite")
+        if abs(converted) > _SCENE_BOUND_MAGNITUDE_LIMIT:
+            raise ValueError(f"{label}[{index}] out of range: {converted}")
+
+
+def _compose_node_transform(node: dict[str, Any]) -> list[float]:
+    """Return a flat 4x4 column-major matrix for a glTF node, or raise ValueError."""
+
+    if "matrix" in node:
+        matrix = node["matrix"]
+        if isinstance(matrix, bool) or not isinstance(matrix, list):
+            raise ValueError("node.matrix must be an array of 16 floats")
+        _validate_finite_matrix(matrix, "node.matrix")
+        return [float(value) for value in matrix]
+    translation = node.get("translation", [0.0, 0.0, 0.0])
+    _validate_finite_vector(translation, "node.translation")
+    rotation = node.get("rotation", [0.0, 0.0, 0.0, 1.0])
+    _validate_finite_quaternion(rotation, "node.rotation")
+    scale = node.get("scale", [1.0, 1.0, 1.0])
+    _validate_finite_vector(scale, "node.scale")
+    if any(component == 0 for component in scale):
+        raise ValueError("node.scale must not contain zero")
+    tx, ty, tz = translation
+    sx, sy, sz = scale
+    qx, qy, qz, qw = rotation
+    return _trs_matrix(tx, ty, tz, qx, qy, qz, qw, sx, sy, sz)
+
+
+def _trs_matrix(
+    tx: float,
+    ty: float,
+    tz: float,
+    qx: float,
+    qy: float,
+    qz: float,
+    qw: float,
+    sx: float,
+    sy: float,
+    sz: float,
+) -> list[float]:
+    """Return a flat 4x4 column-major matrix from TRS components."""
+
+    # glTF stores quaternions as (x, y, z, w).
+    xx = qx * qx
+    yy = qy * qy
+    zz = qz * qz
+    xy = qx * qy
+    xz = qx * qz
+    yz = qy * qz
+    wx = qw * qx
+    wy = qw * qy
+    wz = qw * qz
+    return [
+        (1.0 - 2.0 * (yy + zz)) * sx,
+        (2.0 * (xy + wz)) * sx,
+        (2.0 * (xz - wy)) * sx,
+        0.0,
+        (2.0 * (xy - wz)) * sy,
+        (1.0 - 2.0 * (xx + zz)) * sy,
+        (2.0 * (yz + wx)) * sy,
+        0.0,
+        (2.0 * (xz + wy)) * sz,
+        (2.0 * (yz - wx)) * sz,
+        (1.0 - 2.0 * (xx + yy)) * sz,
+        0.0,
+        tx,
+        ty,
+        tz,
+        1.0,
+    ]
+
+
+def _multiply_matrix(left: list[float], right: list[float]) -> list[float]:
+    """Multiply two 4x4 column-major matrices and return a new flat matrix."""
+
+    out: list[float] = [0.0] * 16
+    for column in range(4):
+        for row in range(4):
+            accumulator = 0.0
+            for index in range(4):
+                accumulator += left[index * 4 + row] * right[column * 4 + index]
+            out[column * 4 + row] = accumulator
+    return out
+
+
+def _identity_matrix() -> list[float]:
+    return [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    ]
+
+
+def _transform_point(matrix: list[float], point: tuple[float, float, float]) -> tuple[float, float, float]:
+    x, y, z = point
+    return (
+        matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+        matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+        matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
+    )
+
+
+def _walk_scene_for_bounds(
+    node_index: int,
+    parent_matrix: list[float],
+    nodes: list[Any],
+    meshes: list[Any],
+    accessors: list[Any],
+    buffer_views: list[Any],
+    buffers: list[Any],
+    binary_chunk: Optional[bytes],
+    in_progress: set[int],
+    visited: set[int],
+) -> tuple[list[float], list[float]]:
+    """Recursively walk reachable nodes under the default scene, fail-closed.
+
+    Returns a tuple ``(scene_min_m, scene_max_m)`` for the union of every POSITION
+    accessor reachable from the default scene at this node, with cycle and
+    non-finite/out-of-range transforms rejected by raising ``ValueError``.
+    """
+
+    if not isinstance(node_index, int) or isinstance(node_index, bool):
+        raise ValueError(f"GLB scene references a non-integer node index: {node_index!r}")
+    if node_index < 0 or node_index >= len(nodes) or not isinstance(nodes[node_index], dict):
+        raise ValueError(f"GLB scene node index is out of range: {node_index}")
+    if node_index in in_progress:
+        raise ValueError(f"GLB scene contains a cyclic node hierarchy at index {node_index}")
+    if node_index in visited:
+        return [math.inf, math.inf, math.inf], [-math.inf, -math.inf, -math.inf]
+    in_progress.add(node_index)
+    try:
+        node = nodes[node_index]
+        local_matrix = _compose_node_transform(node)
+        world_matrix = _multiply_matrix(parent_matrix, local_matrix)
+
+        scene_minimum = [math.inf, math.inf, math.inf]
+        scene_maximum = [-math.inf, -math.inf, -math.inf]
+
+        mesh_index = node.get("mesh")
+        if mesh_index is not None:
+            if isinstance(mesh_index, bool) or not isinstance(mesh_index, int):
+                raise ValueError(f"node[{node_index}].mesh must be an integer or absent")
+            if mesh_index < 0 or mesh_index >= len(meshes) or not isinstance(meshes[mesh_index], dict):
+                raise ValueError(f"node[{node_index}].mesh index is out of range: {mesh_index}")
+            mesh = meshes[mesh_index]
+            primitives = mesh.get("primitives")
+            if not isinstance(primitives, list):
+                raise ValueError(f"mesh[{mesh_index}] has invalid primitives")
+            for primitive in primitives:
+                if not isinstance(primitive, dict):
+                    raise ValueError(f"mesh[{mesh_index}] has an invalid primitive")
+                attributes = primitive.get("attributes")
+                if not isinstance(attributes, dict) or "POSITION" not in attributes:
+                    continue
+                accessor_index = attributes["POSITION"]
+                if isinstance(accessor_index, bool) or not isinstance(accessor_index, int):
+                    raise ValueError("GLB POSITION accessor index is invalid")
+                if accessor_index < 0 or accessor_index >= len(accessors) or not isinstance(accessors[accessor_index], dict):
+                    raise ValueError("GLB POSITION accessor index is out of range")
+                accessor = accessors[accessor_index]
+                _validate_position_accessor(accessor)
+                if "min" in accessor and "max" in accessor:
+                    _position_data_range(accessor, buffer_views, buffers, binary_chunk)
+                    lower = _accessor_vector(accessor["min"], "POSITION min")
+                    upper = _accessor_vector(accessor["max"], "POSITION max")
+                else:
+                    lower, upper = _scan_position_accessor(accessor, buffer_views, buffers, binary_chunk)
+                for axis in range(3):
+                    if lower[axis] > upper[axis]:
+                        raise ValueError("POSITION accessor has inverted bounds")
+                # Transform all 8 corners of the accessor's local AABB to world space
+                # and fold them into the scene bound union at this node.
+                for corner_x in (lower[0], upper[0]):
+                    for corner_y in (lower[1], upper[1]):
+                        for corner_z in (lower[2], upper[2]):
+                            x, y, z = _transform_point(
+                                world_matrix,
+                                (corner_x, corner_y, corner_z),
+                            )
+                            if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
+                                raise ValueError("scene transform produced non-finite bounds")
+                            if (
+                                abs(x) > _SCENE_BOUND_MAGNITUDE_LIMIT
+                                or abs(y) > _SCENE_BOUND_MAGNITUDE_LIMIT
+                                or abs(z) > _SCENE_BOUND_MAGNITUDE_LIMIT
+                            ):
+                                raise ValueError("scene transform produced out-of-range bounds")
+                            scene_minimum[0] = min(scene_minimum[0], x)
+                            scene_minimum[1] = min(scene_minimum[1], y)
+                            scene_minimum[2] = min(scene_minimum[2], z)
+                            scene_maximum[0] = max(scene_maximum[0], x)
+                            scene_maximum[1] = max(scene_maximum[1], y)
+                            scene_maximum[2] = max(scene_maximum[2], z)
+
+        children = node.get("children", [])
+        if not isinstance(children, list):
+            raise ValueError(f"node[{node_index}].children must be an array")
+        for child_index in children:
+            child_min, child_max = _walk_scene_for_bounds(
+                child_index,
+                world_matrix,
+                nodes,
+                meshes,
+                accessors,
+                buffer_views,
+                buffers,
+                binary_chunk,
+                in_progress,
+                visited,
+            )
+            for axis in range(3):
+                scene_minimum[axis] = min(scene_minimum[axis], child_min[axis])
+                scene_maximum[axis] = max(scene_maximum[axis], child_max[axis])
+
+        visited.add(node_index)
+        return scene_minimum, scene_maximum
+    finally:
+        in_progress.discard(node_index)
+
+
+def _extract_scene_min_max(
+    document: dict[str, Any],
+    buffer_views: list[Any],
+    buffers: list[Any],
+    binary_chunk: Optional[bytes],
+    local_minimum: list[float],
+    local_maximum: list[float],
+) -> tuple[list[float], list[float]]:
+    """Compute the union of all reachable node-AABB corners under the default scene.
+
+    If the GLB has no scene/nodes table, the scene root is taken to be identity so
+    the scene bounds equal the local accessor's union.  This keeps synthetic
+    fixtures that exercise primitive-level bounds valid while still returning a
+    deterministic scene-min/scene-max for any GLB the producer accepts.
+    """
+
+    nodes = document.get("nodes")
+    meshes = document.get("meshes", [])
+    accessors = document.get("accessors", [])
+    scenes = document.get("scenes", [])
+    if not isinstance(meshes, list) or not isinstance(accessors, list) or not isinstance(scenes, list):
+        raise ValueError("GLB JSON has invalid scene or mesh tables")
+    if isinstance(nodes, list) and nodes and scenes:
+        scene_index = document.get("scene", 0)
+        if isinstance(scene_index, bool) or not isinstance(scene_index, int):
+            raise ValueError("GLB default scene index must be an integer")
+        if scene_index < 0 or scene_index >= len(scenes) or not isinstance(scenes[scene_index], dict):
+            raise ValueError("GLB default scene index is out of range")
+        root_node_indices = scenes[scene_index].get("nodes", [])
+        if not isinstance(root_node_indices, list):
+            raise ValueError("GLB default scene nodes must be an array")
+        if root_node_indices:
+            in_progress: set[int] = set()
+            visited: set[int] = set()
+            scene_minimum = [math.inf, math.inf, math.inf]
+            scene_maximum = [-math.inf, -math.inf, -math.inf]
+            identity = _identity_matrix()
+            for root_index in root_node_indices:
+                subtree_min, subtree_max = _walk_scene_for_bounds(
+                    int(root_index),
+                    identity,
+                    nodes,
+                    meshes,
+                    accessors,
+                    buffer_views,
+                    buffers,
+                    binary_chunk,
+                    in_progress,
+                    visited,
+                )
+                for axis in range(3):
+                    scene_minimum[axis] = min(scene_minimum[axis], subtree_min[axis])
+                    scene_maximum[axis] = max(scene_maximum[axis], subtree_max[axis])
+            if all(math.isfinite(value) for value in scene_minimum + scene_maximum):
+                return scene_minimum, scene_maximum
+    # Either the GLB has no scene graph, or all reachable primitives produced no
+    # transformable bounds.  Fall back to the local accessor union, which the
+    # caller already validated.
+    return list(local_minimum), list(local_maximum)
 
 
 def _position_data_range(
@@ -367,6 +677,17 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
     minimum = [_round_bound(value) for value in minimum]
     maximum = [_round_bound(value) for value in maximum]
 
+    scene_minimum, scene_maximum = _extract_scene_min_max(
+        document,
+        buffer_views,
+        buffers,
+        binary_chunk,
+        list(minimum),
+        list(maximum),
+    )
+    scene_minimum = [_round_bound(value) for value in scene_minimum]
+    scene_maximum = [_round_bound(value) for value in scene_maximum]
+
     return {
         "sha256": hashlib.sha256(data).hexdigest(),
         "byte_size": len(data),
@@ -374,6 +695,8 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
         "mesh_count": len(meshes),
         "local_min_m": minimum,
         "local_max_m": maximum,
+        "scene_min_m": scene_minimum,
+        "scene_max_m": scene_maximum,
     }
 
 
