@@ -96,10 +96,15 @@ const PlayerVitalsPanelScript := preload("res://scripts/ui/player_vitals_panel.g
 const HotbarPanelScript := preload("res://scripts/ui/hotbar_panel.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 const ThreatManagerScript := preload("res://scripts/systems/threat_manager.gd")
+const BiomassPartCatalogScript := preload("res://scripts/systems/biomass_part_catalog.gd")
+const BiomassRecipeLibraryScript := preload("res://scripts/systems/biomass_recipe_library.gd")
 const TrainingEventBusScript := preload("res://scripts/systems/training_event_bus.gd")
 const SkillTreeStateScript := preload("res://scripts/systems/skill_tree_state.gd")
 const HubUpgradeStateScript := preload("res://scripts/systems/hub_upgrade_state.gd")
 const MetaProgressionStateScript := preload("res://scripts/systems/meta_progression_state.gd")
+const BIOMASS_PART_CATALOG_PATH: String = "res://data/combat/biomass_part_catalog.json"
+const BIOMASS_RECIPE_CATALOG_PATH: String = "res://data/combat/biomass_recipe_catalog.json"
+const BIOMASS_VISUAL_CATALOG_PATH: String = "res://data/combat/threat_visual_catalog.json"
 const UnlockRegistryScript := preload("res://scripts/systems/unlock_registry.gd")
 const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
@@ -1363,6 +1368,7 @@ func _build_runtime_nodes() -> void:
 	utility_item_state.configure({})
 	threat_manager = ThreatManagerScript.new()
 	threat_manager.name = "ThreatManager"
+	_configure_biomass_sources_for_threat_manager()
 	add_child(threat_manager)
 	# REQ-WA-003: after _ready configures the pipeline, hook combat → work interrupt.
 	if threat_manager.damage_pipeline != null:
@@ -1546,6 +1552,24 @@ func _load_json_dict(path: String) -> Dictionary:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	return parsed as Dictionary
+
+## Wires the production biomass sources before ThreatManager enters the scene
+## tree. The manager owns the resulting RefCounted assembler for its full
+## lifetime; no post-_ready replacement is allowed.
+func _configure_biomass_sources_for_threat_manager() -> void:
+	if threat_manager == null or not threat_manager.has_method("configure_biomass_sources"):
+		return
+	var parts: Variant = BiomassPartCatalogScript.new()
+	var parts_ready: bool = bool(parts.load_path(BIOMASS_PART_CATALOG_PATH))
+	var library: Variant = BiomassRecipeLibraryScript.new()
+	var library_ready: bool = parts_ready and bool(library.load_path(BIOMASS_RECIPE_CATALOG_PATH, parts))
+	var visual_catalog: Dictionary = _load_json_dict(BIOMASS_VISUAL_CATALOG_PATH)
+	var visual_entries: Dictionary = visual_catalog.get("archetypes", {}) if visual_catalog.get("archetypes", {}) is Dictionary else {}
+	threat_manager.configure_biomass_sources(
+		parts if parts_ready else null,
+		library if library_ready else null,
+		visual_entries,
+	)
 
 func _configure_expanded_ship_system_models() -> void:
 	power_grid_state = PowerGridStateScript.new()
@@ -10114,6 +10138,13 @@ func _build_run_snapshot(use_home_ship_summary: bool = false) -> RunSnapshot:
 		return null
 	if save_load_service == null:
 		return null
+	# Keep the retained ship authoritative before selecting either the live
+	# current summary or the home-ship summary for this snapshot.
+	if current_ship != null:
+		_sync_current_ship_combat_summary()
+		_sync_current_ship_arc_summary()
+		_sync_current_ship_breach_environment()
+		_sync_current_ship_pillar_summaries()
 	var snapshot := RunSnapshotScript.new()
 	snapshot.layout_path = layout_path
 	snapshot.kit_path = kit_path
@@ -10146,18 +10177,22 @@ func _build_run_snapshot(use_home_ship_summary: bool = false) -> RunSnapshot:
 			snapshot.crafting_summary["field_crafting"] = field_crafting_state.get_summary().get("field_crafting", {})
 	if material_state != null:
 		snapshot.material_summary = material_state.get_summary()
-	if is_instance_valid(threat_manager):
-		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
-		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
+	snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
+	var combat_summary: Dictionary = {}
+	if use_home_ship_summary and away_from_start and home_ship != null:
+		combat_summary = home_ship.combat_summary.duplicate(true)
+	elif is_instance_valid(threat_manager):
+		combat_summary = threat_manager.get_summary()
+	elif current_ship != null:
+		combat_summary = current_ship.combat_summary.duplicate(true)
+	snapshot.inventory_summary["threat_summary"] = combat_summary
 	# M7-B Task 7: the old timer FireState is retired. Authoritative fire state
 	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
 	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
 	# field is left at its default for save-format back-compat.
-	if use_home_ship_summary:
-		if home_ship != null and not home_ship.arc_summary.is_empty():
-			snapshot.electrical_arc_summary = home_ship.arc_summary.duplicate(true)
+	if use_home_ship_summary and away_from_start and home_ship != null:
+		snapshot.electrical_arc_summary = home_ship.arc_summary.duplicate(true)
 	elif electrical_arc_state != null:
-		_sync_current_ship_arc_summary()
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
@@ -10254,7 +10289,7 @@ func _auto_save_current_run() -> bool:
 	if ws == null:
 		return false
 	if save_load_service.save_world(ws):
-		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
+		last_saved_snapshot = _build_run_snapshot(away_from_start)  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
 		return true
 	return false
 
@@ -10418,6 +10453,10 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
+		# The durable write succeeded, so publish the matching in-memory
+		# RunSnapshot only now. Failed saves intentionally leave the previous
+		# snapshot untouched.
+		last_saved_snapshot = _build_run_snapshot(away_from_start)
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
@@ -10743,7 +10782,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			snapshot.player_position[1],
 			snapshot.player_position[2],
 		)
-	last_saved_snapshot = snapshot
 	_is_reloading = false
 	print("PLAYABLE SHIP LOADED sequence=%d position=(%.2f,%.2f,%.2f)" % [
 		current_objective_sequence,
@@ -10828,10 +10866,6 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 ## retained ShipInstance contributes its own slice; current_location names the
 ## active ship.
 func _build_world_snapshot():
-	_sync_current_ship_combat_summary()
-	_sync_current_ship_arc_summary()
-	_sync_current_ship_breach_environment()
-	_sync_current_ship_pillar_summaries()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
 		ws.world_summary = synaptic_sea_world.get_summary()
@@ -10990,9 +11024,9 @@ func save_world_for_validation() -> bool:
 func load_world_for_validation() -> bool:
 	return request_load()
 
-## Task 7 validation seam: inject a biomass threat at a world position.  If
-## the manager exists it returns the live ThreatAIState; otherwise the
-## underlying method returns null.  Returns the same shape
+## Task 7 validation seam: inject a biomass threat at a world position. If
+## the manager exists it returns the assembled or fallback visual; otherwise
+## the underlying method returns null. Returns the same shape
 ## `inject_biomass_validation_encounter(archetype_id, recipe_id, seed,
 ## world_position) -> Variant` documented in the contract.
 func inject_biomass_validation_encounter(archetype_id: String, recipe_id: String = "", seed: int = 0, world_position: Vector3 = Vector3.ZERO) -> Variant:

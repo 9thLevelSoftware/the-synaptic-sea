@@ -136,24 +136,35 @@ func _try_lifecycle() -> Variant:
 	var packed: PackedScene = ResourceLoader.load(MAIN_SCENE_PATH) as PackedScene
 	if packed == null:
 		return null
-	var instance: Node = packed.instantiate()
-	if instance == null:
+	var main_instance: Node = packed.instantiate()
+	if main_instance == null:
 		return null
-	get_root().add_child(instance)
-	# The script must come up with the rename completed.
-	if not (instance is PlayableGeneratedShip):
-		instance.queue_free()
-		return null
-	if not instance.has_method("_build_run_snapshot"):
-		instance.queue_free()
-		return null
+	get_root().add_child(main_instance)
 	# Repair travel-critical systems (the smoke must NOT modify production
 	# services to inject markers; only verify they are reachable).
-	# Wait a frame so the loader can populate its subsystems.
-	for _i in range(8):
+	# Runtime bootstrap builds the generated ship synchronously across several
+	# deferred frames in headless mode; wait for the actual ready signal rather
+	# than assuming eight frames is enough on every machine.
+	var instance: Variant = null
+	for _i in range(120):
 		await process_frame
+		var candidate: Variant = main_instance.get("playable_instance")
+		if candidate is PlayableGeneratedShip:
+			instance = candidate
+			break
+	if instance == null or not (instance is PlayableGeneratedShip):
+		main_instance.queue_free()
+		return null
+	if not instance.has_method("_build_run_snapshot"):
+		main_instance.queue_free()
+		return null
 	if not instance.playable_started:
-		instance.queue_free()
+		for _i in range(120):
+			await process_frame
+			if instance.playable_started:
+				break
+	if not instance.playable_started:
+		main_instance.queue_free()
 		return null
 	# Inject a biomass encounter via the exact validation seam.
 	if not instance.has_method("inject_biomass_validation_encounter"):
@@ -161,6 +172,9 @@ func _try_lifecycle() -> Variant:
 		return null
 	var injected: Variant = instance.inject_biomass_validation_encounter("biomatter_swarm", "", 1, Vector3(2.0, 0.0, 0.0))
 	if not _need(injected != null, "inject_biomass_validation_encounter returned null"): return instance
+	if not _need(injected.has_method("recipe_document"), "injection did not return a biomass visual"): return instance
+	if not _need(injected.get_parent() != null, "assembled visual was not registered under a placeholder"): return instance
+	if not _need(not injected.recipe_document().is_empty(), "assembled visual recipe document is empty"): return instance
 	# Try a save → load → revisit round-trip.  This is best-effort: a real
 	# derelict marker must be reachable for a full cycle.
 	if instance.has_method("save_world_for_validation") and instance.has_method("load_world_for_validation") and instance.has_method("get_last_saved_snapshot"):
@@ -168,6 +182,17 @@ func _try_lifecycle() -> Variant:
 		if saved:
 			var snap_before: Variant = instance.get_last_saved_snapshot()
 			if not _need(snap_before != null, "last_saved_snapshot is null after successful save"): return instance
+			var saved_dict: Dictionary = snap_before.to_dict()
+			var saved_inventory: Dictionary = saved_dict.get("inventory_summary", {}) if saved_dict.get("inventory_summary", {}) is Dictionary else {}
+			var saved_threats: Array = saved_inventory.get("threat_summary", {}).get("threats", []) if saved_inventory.get("threat_summary", {}) is Dictionary else []
+			if not _need(saved_threats.size() >= 1, "successful world save omitted injected threat summary"): return instance
+			if not _need((saved_threats[0] as Dictionary).get("biomass_recipe", {}) is Dictionary, "saved threat omitted biomass recipe"): return instance
+			# A rejected save must not replace the last successful snapshot.
+			instance.playable_started = false
+			var rejected: bool = bool(instance.save_world_for_validation())
+			instance.playable_started = true
+			if not _need(not rejected, "invalid save precondition unexpectedly succeeded"): return instance
+			if not _need(instance.get_last_saved_snapshot().to_dict() == saved_dict, "failed save changed last_saved_snapshot"): return instance
 			# A FAILED save attempt must NOT clobber the previous snapshot.
 			if instance.has_method("get_save_load_service"):
 				var sls: Variant = instance.get_save_load_service()
@@ -176,10 +201,15 @@ func _try_lifecycle() -> Variant:
 					if not _need(loaded, "load_world_for_validation failed"): return instance
 					var snap_after: Variant = instance.get_last_saved_snapshot()
 					if not _need(snap_after != null, "last_saved_snapshot is null after load"): return instance
+					if not _need(snap_after.to_dict() == saved_dict, "load changed last_saved_snapshot authority"): return instance
 					_marker_world_save_load = true
 	# revisit / travel_home: only mark if the live cycle cooperated.
 	if instance.has_method("travel_home") and instance.has_method("revisit") and instance.has_method("travel_to_marker_id"):
 		_marker_revisit = true
+	# The load path intentionally rebuilds the generated ship. Stop the
+	# validation scene before returning so stale controller references from the
+	# old generated hierarchy cannot tick during SceneTree shutdown.
+	main_instance.process_mode = Node.PROCESS_MODE_DISABLED
 	return instance
 
 # ---------------------------------------------------------------------------
