@@ -8,6 +8,7 @@ size = Vector3(0.65, 0.9, 0.4)
 [node name="BiomassCoreWrapper" type="Node3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0.25)
 script = ExtResource("1_probe")
+metadata/biomass_part_id = "biomass_humanoid_torso_v1"
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_core")

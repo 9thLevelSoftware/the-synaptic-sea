@@ -1730,3 +1730,76 @@ def test_verify_only_rejects_forged_source_hash_before_reimport(
     )
     assert result == 1
     assert report_path.read_bytes() == report_bytes
+
+
+def test_validate_rejects_mesh_node_biomass_socket_extra(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["extras"] = {"biomass_socket": True}
+    path = tmp_path / "mesh-socket-extra.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    with pytest.raises(ValueError, match="forbidden visual authority"):
+        validate_cleaned_glb(path, contract)
+
+
+@pytest.mark.parametrize(
+    "extras",
+    [
+        pytest.param({"biomass_socket": True}, id="key"),
+        pytest.param({"role": "socket_root_0"}, id="value"),
+        pytest.param({"nested": {"socket_semantics": True}}, id="nested-key"),
+        pytest.param({"nested": [{"label": "marker_root"}]}, id="nested-value"),
+    ],
+)
+def test_validate_rejects_socket_semantics_in_mesh_node_extras(contract, tmp_path: Path, extras: dict) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["extras"] = extras
+    path = tmp_path / "forbidden-mesh-extra.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    with pytest.raises(ValueError, match="forbidden visual authority"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_rejects_hidden_mesh_node_extras(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["children"] = [1]
+    document["nodes"].append({"name": "HiddenVisual", "mesh": 0, "extras": {"label": "anchor_root"}})
+    path = tmp_path / "hidden-mesh-extra.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    with pytest.raises(ValueError, match="forbidden visual authority"):
+        validate_cleaned_glb(path, contract)
+
+
+@pytest.mark.parametrize("node_name", ["socket_root_0", "socket_limb_0", "marker_root", "HelperNode"])
+def test_validate_rejects_forbidden_visual_node_names(contract, tmp_path: Path, node_name: str) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["name"] = node_name
+    path = tmp_path / "forbidden-node-name.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    with pytest.raises(ValueError, match="forbidden helper"):
+        validate_cleaned_glb(path, contract)
+
+
+def test_validate_accepts_benign_source_extra_and_no_helper_glb(contract, tmp_path: Path) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["extras"] = {"source": "meshy", "nested": [{"revision": 1}]}
+    path = tmp_path / "benign-source-extra.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    report = validate_cleaned_glb(path, contract)
+
+    assert report["status"] == "PASS"
+
+
+@pytest.mark.parametrize("extras", [[], "helper", None, 7], ids=["array", "string", "null", "number"])
+def test_validate_rejects_invalid_node_extras(contract, tmp_path: Path, extras) -> None:
+    document, binary = _fixture_document_and_binary()
+    document["nodes"][0]["extras"] = extras
+    path = tmp_path / "invalid-node-extras.glb"
+    path.write_bytes(_pack_glb(document, binary))
+
+    with pytest.raises(ValueError, match="extras"):
+        validate_cleaned_glb(path, contract)

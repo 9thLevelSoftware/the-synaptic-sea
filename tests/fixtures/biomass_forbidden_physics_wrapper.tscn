@@ -4,6 +4,7 @@
 size = Vector3(0.45, 0.4, 0.6)
 
 [node name="ForbiddenPhysics" type="Node3D"]
+metadata/biomass_part_id = "biomass_maw_v1"
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 

@@ -15,6 +15,7 @@ const PartCatalogScript: GDScript = preload("res://scripts/systems/biomass_part_
 const RecipeScript: GDScript = preload("res://scripts/systems/biomass_recipe.gd")
 const VisualScript: GDScript = preload("res://scripts/threats/biomass_threat_visual.gd")
 const FactoryScript: GDScript = preload("res://scripts/tools/biomass_placeholder_factory.gd")
+const ValidatorScript: GDScript = preload("res://scripts/systems/biomass_wrapper_validator.gd")
 
 const CONNECTOR_PART_ID: String = "biomass_gunk_connector_v1"
 const MAX_RUNTIME_NODES: int = 160
@@ -43,6 +44,13 @@ func build(recipe: Variant, parts: Variant) -> Variant:
 	visual.collision_layer = 1
 	visual.collision_mask = 1
 	if not _assemble_visual(visual, recipe_document, parts):
+		visual.free()
+		_last_visual = null
+		return null
+	var authority_diagnostics: PackedStringArray = ValidatorScript.validate_assembly(visual, recipe, parts)
+	if not authority_diagnostics.is_empty():
+		for diagnostic in authority_diagnostics:
+			_record(String(diagnostic))
 		visual.free()
 		_last_visual = null
 		return null
@@ -299,7 +307,7 @@ func _add_connector_collision(visual: CharacterBody3D, instance_id: String) -> b
 func _instantiate_part(part_id: String, entry: Dictionary) -> Node3D:
 	var wrapper_path: String = String(entry.get("wrapper_scene_path", ""))
 	if wrapper_path.is_empty():
-		return FactoryScript.build(part_id, entry)
+		return _validate_instantiated_part(FactoryScript.build(part_id, entry), part_id, entry, "factory")
 	if not ResourceLoader.exists(wrapper_path, "PackedScene"):
 		_record("assembler.build: wrapper scene '%s' is not a PackedScene" % wrapper_path)
 		return null
@@ -322,7 +330,19 @@ func _instantiate_part(part_id: String, entry: Dictionary) -> Node3D:
 		instance.free()
 		_record("assembler.build: wrapper '%s' missing required sockets" % wrapper_path)
 		return null
-	return instance as Node3D
+	return _validate_instantiated_part(instance as Node3D, part_id, entry, wrapper_path)
+
+func _validate_instantiated_part(instance: Node3D, part_id: String, entry: Dictionary, source: String) -> Node3D:
+	if instance == null:
+		_record("assembler.build: part '%s' instantiation returned null (%s)" % [part_id, source])
+		return null
+	var diagnostics: PackedStringArray = ValidatorScript.validate_part(instance, part_id, entry)
+	if diagnostics.is_empty():
+		return instance
+	for diagnostic in diagnostics:
+		_record("assembler.build: %s" % String(diagnostic))
+	instance.free()
+	return null
 
 func _contains_forbidden_physics(node: Node) -> bool:
 	if node is CollisionObject3D or node is CollisionShape3D:

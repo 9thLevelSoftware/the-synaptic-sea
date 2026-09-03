@@ -670,6 +670,39 @@ def _state_tokens(contract_document: Dict[str, Any]) -> List[str]:
     return [value.strip().lower() for value in states]
 
 
+_FORBIDDEN_VISUAL_TOKENS = ("socket", "marker", "anchor", "helper", "collision")
+
+
+def _validate_node_extras(value: Any, label: str) -> None:
+    """Reject extras that try to smuggle gameplay/socket authority into a GLB."""
+
+    if not isinstance(value, dict):
+        raise BlenderValidationError(label + " must be an object")
+
+    def visit(child: Any, child_label: str) -> None:
+        if isinstance(child, dict):
+            for key, nested in child.items():
+                if not isinstance(key, str):
+                    raise BlenderValidationError(child_label + " contains a non-text key")
+                lowered_key = key.lower()
+                if any(token in lowered_key for token in _FORBIDDEN_VISUAL_TOKENS):
+                    raise BlenderValidationError(child_label + " contains forbidden visual authority metadata")
+                visit(nested, child_label + "." + key)
+        elif isinstance(child, list):
+            for index, nested in enumerate(child):
+                visit(nested, child_label + "[" + str(index) + "]")
+        elif isinstance(child, str):
+            lowered_value = child.lower()
+            if any(token in lowered_value for token in _FORBIDDEN_VISUAL_TOKENS):
+                raise BlenderValidationError(child_label + " contains forbidden visual authority metadata")
+        elif child is None or isinstance(child, (bool, int, float)):
+            return
+        else:
+            raise BlenderValidationError(child_label + " contains an unsupported value")
+
+    visit(value, label)
+
+
 def _scene_reachable_nodes(document: Dict[str, Any]) -> set:
     nodes = document.get("nodes")
     scenes = document.get("scenes")
@@ -745,7 +778,7 @@ def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4]
     state_tokens = _state_tokens(contract_document)
     found_states = set()
     mesh_node_count = 0
-    forbidden_tokens = ("collision", "physics", "helper", "socket", "marker")
+    forbidden_tokens = ("collision", "physics", "helper", "socket", "marker", "anchor")
     for index, node in enumerate(nodes):
         if not isinstance(node, dict):
             raise BlenderValidationError("node must be an object")
@@ -756,6 +789,8 @@ def _validate_node_policies(document: Dict[str, Any], worlds: Dict[int, Matrix4]
         extensions = node.get("extensions", {})
         if not isinstance(extensions, dict):
             raise BlenderValidationError("node extensions must be an object")
+        if "extras" in node:
+            _validate_node_extras(node["extras"], "node " + str(index) + " extras")
         if any(token in lowered for token in forbidden_tokens) or "camera" in node or "light" in node or "KHR_lights_punctual" in extensions:
             raise BlenderValidationError("visual GLB contains a forbidden helper, camera, or light node")
         for token in state_tokens:
