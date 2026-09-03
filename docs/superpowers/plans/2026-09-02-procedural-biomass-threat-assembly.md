@@ -1251,6 +1251,10 @@ git commit -m "test: prove placeholder biomass composite runtime"
 - Modify: `tools/meshy_blender_validate.py`
 - Modify: `scripts/threats/biomass_assembler.gd`
 - Modify: `docs/game/06_validation_plan.md`
+- Existing fixture: `tests/fixtures/biomass_valid_core_wrapper.tscn`
+- Existing fixture: `tests/fixtures/biomass_valid_nested_wrapper.tscn`
+- Existing fixture: `tests/fixtures/biomass_node_overflow_wrapper.tscn`
+- Existing fixture: `tests/fixtures/biomass_forbidden_physics_wrapper.tscn`
 
 **Interfaces:**
 - Consumes: one instantiated part wrapper/placeholder, its authoritative separate `part_id`, and the closed `biomass_part_catalog.json` entry for that ID. The assembler/factory passes the already-authoritative `part_id`; the catalog entry remains closed and its schema is unchanged.
@@ -1261,7 +1265,7 @@ git commit -m "test: prove placeholder biomass composite runtime"
 
 - [ ] **Step 1: Write RED wrapper-authority smoke**
 
-Build each of the eight placeholders and assert every catalog socket exists exactly once as `Node3D`, has the exact catalog-local transform within `0.001 m`/`0.1°`, carries no mesh/collision/physics child, and has no undeclared `socket_*` sibling. Then create invalid synthetic instances proving stable rejection of missing/extra/duplicate sockets, wrong node type, non-finite or scaled bases, transform drift, path duplication, and mismatched `biomass_part_id` metadata. Validate all five assembled recipes through `validate_assembly`.
+Build each of the eight placeholders and assert every catalog socket exists exactly once as `Node3D`, has the exact catalog-local transform within `0.001 m`/`0.1°`, carries no mesh/collision/physics child, and has no undeclared `socket_*` sibling. The four existing wrapper fixtures retain root metadata `biomass_part_id=biomass_humanoid_torso_v1` (valid core), `biomass_part_id=biomass_claw_v1` (valid nested), `biomass_part_id=biomass_cephalopod_tentacle_v1` (node overflow), and `biomass_part_id=biomass_maw_v1` (forbidden physics). The smoke must explicitly cover absent, matching, and mismatched identity metadata; the two intentionally invalid fixtures retain their correct identity metadata so their intended overflow/physics diagnostics are reached. Then create invalid synthetic instances proving stable rejection of missing/extra/duplicate sockets, wrong node type, non-finite or scaled bases, transform drift, and path duplication. Validate all five assembled recipes through `validate_assembly`.
 
 - [ ] **Step 2: Pin the GLB visual-only boundary in host regression tests**
 
@@ -1271,7 +1275,7 @@ First prove the current executable validator accepts a mesh node with `extras:{"
 
 Normalize expected transforms from catalog `position_m`/`rotation_deg`; reject non-finite values and scales outside `1 ± 1e-4`; require exact socket-node inventory; compare transforms in the part root’s local space; compare instance `biomass_part_id` metadata exactly against the explicit expected `part_id` (missing or mismatched metadata is a stable diagnostic); and return stable sorted diagnostics. The assembler/factory passes the already-authoritative separate `part_id` to `validate_part` for every instantiated placeholder/wrapper before accepting it; do not inject `part_id` into the closed catalog entry. The assembler preloads the validator (which may preload Visual/Recipe/PartCatalog but never assembler) and propagates stable diagnostics. Any diagnostic rejects/frees the whole assembly and routes through the existing whole-threat primitive fail-safe; never mix an invalid wrapper with valid parts silently.
 
-- [ ] **Step 4: Run focused and full regressions**
+- [ ] **Step 4: Run focused verification, then the canonical regression bundle**
 
 ```bash
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_wrapper_authority_smoke.gd
@@ -1279,12 +1283,16 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m py
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd
 ```
 
+Then execute the exact fenced bash block under `## Regression bundle` in `docs/game/06_validation_plan.md`, with `ROOT=.` and `GODOT=/opt/homebrew/bin/godot`. Require exit 0, the exact final marker `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true`, and no unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines beyond that bundle's existing exact allowlists. The implementation verification must mechanically count lines whose trimmed text starts with `run_clean ` and require equality with the numeric marker; never infer or manually maintain the count. The focused wrapper smoke, Python tests, and assembly smoke remain required, and assembly failure must exit nonzero before the gait marker.
+
 Expected marker: `BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=forbidden`.
+
+The canonical bundle owns exactly seven Task 9 `run_clean` registrations after Task 8 evidence: catalog smoke with its exact catalog marker; generator smoke with `BIOMASS GENERATOR PASS seeds=100 distinct=100 hints=5`; assembly smoke checking `BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false` while also emitting the Task 5 assembly marker; threat-manager smoke with its exact manager marker; revisit-persistence smoke with its exact true/true marker; the Task 8 composite-review verify command and exact marker; and wrapper-authority smoke with the marker above. Task 8 may document its command and marker but must not register these seven canonical lines.
 
 - [ ] **Step 5: Commit Task 9**
 
 ```bash
-git add docs/game/06_validation_plan.md scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py
+git add docs/game/06_validation_plan.md scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py tests/fixtures/biomass_valid_core_wrapper.tscn tests/fixtures/biomass_valid_nested_wrapper.tscn tests/fixtures/biomass_node_overflow_wrapper.tscn tests/fixtures/biomass_forbidden_physics_wrapper.tscn
 git commit -m "feat: enforce Godot-owned biomass sockets"
 ```
 
