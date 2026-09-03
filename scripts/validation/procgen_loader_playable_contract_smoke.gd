@@ -40,14 +40,26 @@ func _initialize() -> void:
 		push_error("loader contract smoke failed: invalid goal position")
 		quit(1)
 		return
-	if loader.get_objective_specs_copy().size() != 4:
+	var fixture_objectives_variant: Variant = loader.gameplay_doc.get("objectives", [])
+	if typeof(fixture_objectives_variant) != TYPE_ARRAY:
+		push_error("loader contract smoke failed: gameplay fixture objectives missing")
+		quit(1)
+		return
+	var fixture_objective_count: int = (fixture_objectives_variant as Array).size()
+	var loaded_objective_count: int = loader.get_objective_specs_copy().size()
+	if fixture_objective_count <= 0:
+		push_error("loader contract smoke failed: gameplay fixture objectives empty")
+		quit(1)
+		return
+	if loaded_objective_count != fixture_objective_count:
 		push_error(
-			"loader contract smoke failed: expected 4 objectives got %d"
-			% loader.get_objective_specs_copy().size()
+			"loader contract smoke failed: expected %d objectives from fixture got %d"
+			% [fixture_objective_count, loaded_objective_count]
 		)
 		quit(1)
 		return
-	if loader.count_collision_shapes() <= 0:
+	var collision_count: int = loader.count_collision_shapes()
+	if collision_count <= 0:
 		push_error("loader contract smoke failed: collision shape count is zero")
 		quit(1)
 		return
@@ -56,6 +68,10 @@ func _initialize() -> void:
 	var structural_plan: Dictionary = loader.layout_doc.get("structural_plan", {})
 	var expected_edge_count: int = (structural_plan.get("placements", []) as Array).size()
 	var expected_floor_count: int = (structural_plan.get("floor_placements", []) as Array).size()
+	if expected_edge_count <= 0:
+		push_error("loader contract smoke failed: structural fixture placements empty")
+		quit(1)
+		return
 	if edge_wrapper_count != expected_edge_count:
 		push_error("loader contract smoke failed: edge wrappers=%d expected=%d" % [edge_wrapper_count, expected_edge_count])
 		quit(1)
@@ -89,28 +105,36 @@ func _initialize() -> void:
 	# north, z=-2. These literals prove the wrapper metadata contract is
 	# stable: each edge wrapper carries both ids and the local north-cell
 	# pose is computed from the canonical cell edge (z=-2 for a 4 m cell).
-	if not loader.structural_root.has_meta("structural_placement_id") \
-			or not loader.structural_root.has_meta("structural_edge_key"):
-		push_error("loader contract smoke failed: canonical wrapper metadata missing")
-		quit(1)
-		return
 	var probe_record: Dictionary = {
 		"north": Vector3(0.0, 0.0, -2.0),
 		"z=-2": Vector3(0.0, 0.0, -2.0),
 		"structural_placement_id": "edge:0|h|-1|0",
 		"structural_edge_key": "0|h|-1|0",
 	}
-	# Suppress unused-var warnings on the probe record by reading each field.
-	var _probe_dummy: String = "%s|%s|%s|%s" % [
-		String(probe_record.get("north", Vector3.ZERO)),
-		String(probe_record.get("z=-2", Vector3.ZERO)),
-		String(probe_record.get("structural_placement_id", "")),
-		String(probe_record.get("structural_edge_key", "")),
-	]
+	var canonical_wrapper: Node = _find_node_with_meta(
+		loader.structural_root,
+		"structural_placement_id",
+		str(probe_record.get("structural_placement_id", "")),
+	)
+	if canonical_wrapper == null:
+		push_error("loader contract smoke failed: canonical wrapper metadata missing")
+		quit(1)
+		return
+	if str(canonical_wrapper.get_meta("structural_edge_key", "")) != str(probe_record.get("structural_edge_key", "")):
+		push_error("loader contract smoke failed: canonical wrapper edge key mismatch")
+		quit(1)
+		return
+	if canonical_wrapper is Node3D:
+		var wrapper_origin: Vector3 = (canonical_wrapper as Node3D).position
+		var expected_north: Vector3 = probe_record.get("north", Vector3.ZERO)
+		if not wrapper_origin.is_equal_approx(expected_north):
+			push_error("loader contract smoke failed: canonical north wrapper z!=-2")
+			quit(1)
+			return
 
 	print(
-		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=%d structural_live=true edge_wrappers=%d floor_wrappers=%d"
-		% [loader.count_collision_shapes(), edge_wrapper_count, floor_wrapper_count]
+		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=%d collision_shapes=%d structural_live=true edge_wrappers=%d floor_wrappers=%d"
+		% [loaded_objective_count, collision_count, edge_wrapper_count, floor_wrapper_count]
 	)
 	print("PROCGEN_STRUCTURAL_LOADER_PASS edge_wrappers=%d floor_wrappers=%d" % [edge_wrapper_count, floor_wrapper_count])
 	quit(0)
@@ -159,6 +183,16 @@ func _run_loader_preflight_regressions(loader: Node) -> void:
 	for _marker in _markers:
 		if not _marker in _markers:
 			pass  # each marker is referenced in source for static-text tests
+
+
+func _find_node_with_meta(node: Node, meta_name: String, expected: String) -> Node:
+	if node.has_meta(meta_name) and str(node.get_meta(meta_name)) == expected:
+		return node
+	for child in node.get_children():
+		var found: Node = _find_node_with_meta(child, meta_name, expected)
+		if found != null:
+			return found
+	return null
 
 
 func _count_wrappers_with_meta(node: Node, meta_name: String) -> int:
