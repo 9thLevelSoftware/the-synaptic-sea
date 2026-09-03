@@ -112,6 +112,37 @@ assembler owns pure graph planning and is called by the threat manager; there is
 and gameplay consequences. The complete recipe is serialized and loaded exactly, including every
 instance, part, parent, socket, child root, connector, and locomotion hint.
 
+### Runtime visual and gait boundary (Tasks 5–7)
+
+When parts and attachment mounts are registered, `BiomassThreatVisual` stores immutable
+root-local assembly-rest `Transform3D` value copies. These are dictionaries of data, not extra
+Nodes, so they do not alter assembly node, triangle, or collision counts. The visual exposes
+`part_rest_transform(instance_id: String) -> Variant` and
+`attachment_rest_transform(instance_id: String) -> Variant`; known IDs return their `Transform3D`,
+unknown IDs return `null`.
+
+Each visual owns exactly one private `RefCounted` gait controller. No manager/shared/autoload/Node
+controller is permitted. The visual dynamically loads the controller script only after restoring
+assembly rest and retains a fresh controller only when configuration succeeds. The controller
+preloads and exact-script-compares the visual, part catalog, and recipe scripts. Invalid visual,
+parts, recipe, catalog, recipe-document, core, or attachment dependencies fail closed with no
+partial controller state; the visual remains at assembly rest and `step_gait` is a no-op.
+Repeated configuration restores assembly rest, resets gait state, and replaces the controller.
+
+Profile selection is role-driven: biped/quadruped/crawl drive `locomotor` attachments, drag drives
+`puller` attachments, and slither drives `slither` attachments. Animation is rigid and socket-space,
+rebuilt from immutable rest transforms; non-driven mounts remain at exact rest. v1 core bob/yaw is a
+no-op. The core, visual/root transform, CharacterBody3D/world position, recipe, AI state, meshes,
+and bones remain under their existing authorities and are unchanged by gait.
+
+Task 7 calls `visual.configure_gait(parts, recipe, biomass_seed)` after `assembler.build(recipe,
+parts)` succeeds and before scene-tree registration or any gait step. A false result frees the
+assembled visual synchronously and selects the existing whole-threat primitive fallback; no
+partially configured biomass visual enters `placeholder_nodes`.
+
+Exact timing, phase assignment, angular bound, rest convergence, drift, and smoke-output mechanics
+are specified in the implementation plan to keep this feature contract readable.
+
 ## Visual and review policy
 
 Use a locked-isometric, low-poly, placeholder-first flow. Primitive fallbacks establish scale,

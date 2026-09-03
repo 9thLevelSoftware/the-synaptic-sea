@@ -2010,13 +2010,18 @@ runtime source, and promotion is always a separate reviewed task.
 - Type: technical / gameplay
 - Priority: must
 - Status: Proposed
-- Rationale: The runtime assembler must apply repository socket-space graphs without moving gameplay authority into visual assets.
+- Rationale: The runtime assembler must apply repository socket-space graphs without moving gameplay authority into visual assets, and gait setup must fail closed before an invalid visual becomes live.
 - Acceptance criteria:
-  - A per-manager `RefCounted` assembler creates wrapper-owned runtime nodes under the calling threat manager; no autoload is introduced.
-  - Godot wrappers own collision, navigation, connectors, and gameplay bindings.
+  - A per-manager `RefCounted` assembler creates wrapper-owned runtime nodes under the calling threat manager; no assembler or gait controller autoload, shared service, or scene-tree controller is introduced.
+  - Each assembled `BiomassThreatVisual` owns exactly one private `RefCounted` gait controller and records immutable root-local assembly-rest transforms without adding Nodes or changing node/triangle/collision counts.
+  - The visual exposes `part_rest_transform(instance_id: String) -> Variant` and `attachment_rest_transform(instance_id: String) -> Variant`, returning a `Transform3D` for a known ID and `null` otherwise.
+  - `configure_gait(parts, recipe, biomass_seed)` is called only after `assembler.build(recipe, parts)` succeeds and before scene-tree registration or gait stepping; false frees the visual synchronously and selects the existing whole-threat primitive fallback.
+  - Configuration rejects wrong scripts, unloaded catalogs, invalid recipes, recipe-document mismatches, and missing core/attachment part, mount, or rest data without retaining partial controller state; the visual remains at assembly rest and stepping is a no-op.
+  - Godot wrappers own collision, navigation, connectors, and gameplay bindings; the core, visual/root transform, world position, recipe, AI state, meshes, and bones remain under their existing authorities.
   - A core may be a skull; a torso is not mandatory.
 - Verification:
-  - Future focused Godot assembly smoke in the locked-isometric `breach_field`.
+  - `scripts/validation/biomass_assembly_smoke.gd` for rest APIs, fail-closed setup, exact assembly preservation, and the Task 6 gait marker.
+  - `scripts/validation/biomass_threat_manager_smoke.gd` for six configured archetype visuals, no controller Node child, and exactly one whole-threat fallback for the invalid fixture.
 
 ## REQ-BIO-005: Deterministic random recipes
 
@@ -2037,14 +2042,19 @@ runtime source, and promotion is always a separate reviewed task.
 - Type: gameplay / technical
 - Priority: must
 - Status: Approved
-- Rationale: Five explicit hints cover the intended assembled-threat movement families without requiring a skeleton or IK contract.
+- Rationale: Five explicit hints cover the intended assembled-threat movement families without requiring a skeleton or IK contract, while deterministic rest-based stepping prevents pose drift.
 - Acceptance criteria:
   - `biped` has exactly two locomotor parts and a head.
   - `quadruped` has exactly four locomotor parts and a head.
   - `crawl` has at least one locomotor part; `drag` has at least one puller; `slither` has at least one slither part.
+  - `BiomassThreatVisual.configure_gait(parts: Variant, recipe: Variant, seed_value: int) -> bool` owns one private `RefCounted` controller per visual and rejects invalid dependencies before retaining references.
+  - Role-driven mounts are selected from attachment part roles, sorted by instance ID, assigned deterministic profile phases, rebuilt from immutable root-local rest each step, and leave non-driven mounts exactly at rest.
+  - Active gait changes only driven mount orientations within the total angular bound; rest/near-zero states use bounded pose-weight decay, and invalid deltas are no-ops.
+  - Reconfiguration restores assembly rest, resets elapsed/weight/phase deterministically, replaces the controller, and does not alter the core, visual/root transform, world position, recipe, AI state, meshes, or bones. Core bob/yaw is a v1 no-op.
   - Gaits are rigid socket-space profiles, not skeleton/IK behavior.
 - Verification:
-  - Future Godot gait smoke for all five hints in `breach_field`.
+  - `scripts/validation/biomass_assembly_smoke.gd`, run twice with byte-identical complete output, including `BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false` and no `WARNING:`, `ERROR:`, or `SCRIPT ERROR:` lines.
+  - `scripts/validation/biomass_threat_manager_smoke.gd` proves all six valid archetype visuals have active configured gaits and the invalid fixture uses exactly one whole-threat fallback.
 
 ## REQ-BIO-007: Exact assembly save/load persistence
 

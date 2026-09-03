@@ -118,6 +118,38 @@ Locomotion uses five rigid socket-space gait profiles (`biped`, `quadruped`, `cr
 `slither`). These are authored rigid-part gaits, not skeleton or IK contracts. Runtime wrappers own
 collision, navigation, connectors, and gameplay bindings.
 
+### Runtime visual and gait boundary
+
+Task 5 records immutable root-local assembly-rest `Transform3D` value copies as each part and
+attachment mount is registered. The copies are data, not scene nodes, and therefore do not change
+part, triangle, collision, or runtime-node accounting. `BiomassThreatVisual` exposes
+`part_rest_transform(instance_id: String) -> Variant` and
+`attachment_rest_transform(instance_id: String) -> Variant`; each returns the corresponding
+`Transform3D` for a known ID and `null` for an unknown ID.
+
+Each `BiomassThreatVisual` owns exactly one private `RefCounted` `BiomassGaitController`. There is
+no manager-owned, shared, autoload, or scene-tree gait controller. The controller preloads the exact
+visual, part-catalog, and recipe scripts and compares object scripts exactly. The visual dynamically
+loads the controller script, restores all parts and mounts from the assembly-rest dictionaries, and
+retains a fresh controller only after `configure` succeeds. Configuration is fail-closed; an
+invalid dependency or incomplete assembly leaves no controller and leaves the visual at assembly
+rest. Reconfiguration replaces rather than shares or stacks controllers.
+
+Gait roles are derived from the validated attachment part roles: `biped`, `quadruped`, and `crawl`
+drive `locomotor` edges, `drag` drives `puller` edges, and `slither` drives `slither` edges. Driven
+mounts are animated rigidly in socket space from their saved rest transforms; non-driven mounts stay
+at exact rest. The core part, `BiomassThreatVisual`/`CharacterBody3D` root transform, recipe, AI
+state, meshes, bones, and world position remain authoritative elsewhere and unchanged by v1 gait;
+core bob and yaw are explicitly no-ops.
+
+Task 7 must call `visual.configure_gait(parts, recipe, biomass_seed)` after a successful assembly
+build and before scene-tree registration or any gait step. A false result synchronously frees the
+assembled visual and uses the existing whole-threat primitive fallback; no partially configured
+biomass visual may enter `placeholder_nodes`.
+
+The exact timing, phase, bounded-motion, rest, drift, and smoke assertions are governed by the
+implementation plan rather than duplicated here.
+
 ### Visual pipeline and review
 
 The locked-isometric, low-poly, placeholder-first flow is:

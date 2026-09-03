@@ -710,6 +710,9 @@ git commit -m "feat: generate deterministic biomass recipes"
   - `BiomassThreatVisual.socket(instance_id: String, socket_name: String) -> Node3D`
   - `BiomassThreatVisual.attachment_mount(instance_id: String) -> Node3D`
   - `BiomassThreatVisual.recipe_document() -> Dictionary`
+  - `BiomassThreatVisual.part_rest_transform(instance_id: String) -> Variant`; known IDs return an immutable root-local `Transform3D` value copy and unknown IDs return `null`
+  - `BiomassThreatVisual.attachment_rest_transform(instance_id: String) -> Variant`; known IDs return an immutable root-local mount `Transform3D` value copy and unknown IDs return `null`
+  - Internal `BiomassThreatVisual._reset_to_assembly_rest() -> void`; restores every registered part and attachment mount from the private assembly-rest dictionaries and captures no current animated transform
   - `BiomassThreatVisual.runtime_node_count() -> int`
   - `BiomassThreatVisual.triangle_budget() -> int`
   - `BiomassAssembler.build(recipe: Variant, parts: Variant) -> Variant`; the method requires objects whose scripts are the preloaded `BiomassRecipeScript` and `BiomassPartCatalogScript`, avoiding unresolved cross-file `class_name` annotations in headless `--script` mode
@@ -729,7 +732,7 @@ const EXPECTED := {
 }
 ```
 
-The smoke preloads all biomass scripts and never depends on cross-file global class registration. It loads all five curated recipes, builds each visual fully off-tree, and first asserts immutable recipe-document access, every core/attachment part, every configured socket, and one attachment mount per edge. It then adds the visual to `get_root()` before inspecting global transforms and awaits both `process_frame` and `physics_frame` so the `CharacterBody3D` and its shapes are registered. For every attachment it checks:
+The smoke preloads all biomass scripts and never depends on cross-file global class registration. It loads all five curated recipes, builds each visual fully off-tree, and first asserts immutable recipe-document access, every core/attachment part, every configured socket, one attachment mount per edge, and the Task 5 rest API. For each known part and attachment instance, `part_rest_transform(instance_id)` and `attachment_rest_transform(instance_id)` must return the expected root-local `Transform3D`; an unknown ID must return `null`. The returned value copies and the private rest dictionaries must not add Nodes or change the exact node, triangle, collision, or connector counts. It then adds the visual to `get_root()` before inspecting global transforms and awaits both `process_frame` and `physics_frame` so the `CharacterBody3D` and its shapes are registered. For every attachment it checks:
 
 ```gdscript
 var parent_socket: Node3D = visual.socket(edge.parent_instance_id, edge.parent_socket)
@@ -793,7 +796,7 @@ Only an empty wrapper path permits the primitive fallback. A non-empty path that
 
 - [ ] **Step 5: Implement attachment alignment and connectors**
 
-Instantiate the core first and keep a private `part_to_visual: Dictionary` of root-local `Transform3D` values, beginning with the core at identity. Building is entirely off-tree: reading or assigning `global_transform` while outside the scene tree is forbidden because Godot returns identity and emits an error. For each edge in parent-before-child order, compute `parent_socket_to_visual = part_to_visual[parent_instance_id] * parent_socket.transform`; add one mount directly under the visual with `mount.transform = parent_socket_to_visual`; parent the child under the mount with `child.transform = child_root_socket.transform.affine_inverse()`; record `part_to_visual[instance_id] = mount.transform * child.transform`; and instantiate the connector under that same mount using its root-socket inverse. Record the connector's root-local transform in a separate internal `connector_to_visual[instance_id] = mount.transform * connector.transform` map for its collision and budget bookkeeping; connector entries do not replace the child returned by `part(instance_id)`. Record each part and mount by instance ID. Only after the completed visual enters the tree may the smoke compare global socket positions/bases.
+Instantiate the core first and keep private root-local `part_to_visual` and `connector_to_visual` maps of `Transform3D` values, beginning with the core at identity. Also keep private `part_assembly_rest` and `attachment_assembly_rest` dictionaries. Building is entirely off-tree using root-local `Transform3D` values; defer world-space socket checks until the completed visual is tree-attached. For each edge in parent-before-child order, compute `parent_socket_to_visual = part_to_visual[parent_instance_id] * parent_socket.transform`; add one mount directly under the visual with `mount.transform = parent_socket_to_visual`; parent the child under the mount with `child.transform = child_root_socket.transform.affine_inverse()`; record `part_to_visual[instance_id] = mount.transform * child.transform`; and instantiate the connector under that same mount using its root-socket inverse. Record the connector's root-local transform in `connector_to_visual[instance_id] = mount.transform * connector.transform` for its collision and budget bookkeeping; connector entries do not replace the child returned by `part(instance_id)`. Record each part and mount by instance ID, and at that registration point copy the root-local part transform into `part_assembly_rest` or the mount transform into `attachment_assembly_rest`. These are value copies held in private dictionaries, not Nodes; return copies through the two rest-transform APIs so callers cannot mutate the saved authority. Every later pose reset reads only these dictionaries, never an animated current transform. Only after the completed visual enters the tree may the smoke compare global socket positions/bases.
 
 - [ ] **Step 6: Build Godot-owned target collision volumes**
 
@@ -828,25 +831,94 @@ git commit -m "feat: assemble socketed biomass threat graphs"
 - Modify: `scripts/validation/biomass_assembly_smoke.gd`
 
 **Interfaces:**
-- Consumes: attachment mounts and part roles from Tasks 3 and 5.
+- Consumes: the validated `BiomassRecipe`, the loaded `BiomassPartCatalog`, `BiomassThreatVisual` attachment mounts, and Task 5 immutable root-local assembly-rest transforms.
 - Produces:
-  - `BiomassGaitController.configure(visual: Variant, parts: Variant, recipe: Variant, seed_value: int) -> bool`; require the exact preloaded scripts at runtime rather than unresolved cross-file `class_name` annotations
+  - `BiomassGaitController.configure(visual: Variant, parts: Variant, recipe: Variant, seed_value: int) -> bool`
   - `BiomassGaitController.step(delta: float, velocity: Vector3, ai_state: String) -> void`
+  - `BiomassThreatVisual.configure_gait(parts: Variant, recipe: Variant, seed_value: int) -> bool`
   - `BiomassThreatVisual.step_gait(delta: float, velocity: Vector3, ai_state: String) -> void`
 
-- [ ] **Step 1: Extend RED smoke across five gaits**
+- [ ] **Step 1: Extend RED smoke across five gaits and fail-closed setup**
 
-For each curated recipe, capture every mount basis, call `step_gait(0.1, Vector3(1, 0, 0), "hunt")` ten times, and assert: all basis components are finite; at least one locomotor/slither mount changed; rotations remain within 35 degrees from rest; `idle`, `stun`, and `dead` converge to rest; same recipe/seed/delta sequence yields the same transforms.
+Use the five curated recipes and the exact matching seed matrix `SEEDS := [42, 777]`. The smoke
+must cover all five hints and all eight current state strings
+`idle`, `investigate`, `hunt`, `attack`, `telegraph`, `flee`, `stun`, and `dead`, plus one unknown
+state string. For each recipe/seed, assemble two independent visuals, configure both with the same
+loaded parts and recipe, and capture every part, mount, root, recipe-document, and world-position
+transform before any step.
+
+The smoke computes the expected driven set from the role contract: `locomotor` for
+`biped`/`quadruped`/`crawl`, `puller` for `drag`, and `slither` for `slither`. Across multiple
+nonzero-velocity active samples, every expected driven mount must change from its saved rest at
+least once; every non-driven mount must remain exactly at its saved rest. Rest-state samples use a
+nonzero velocity too, proving state gating rather than velocity zeroing. Every sample checks finite
+basis components, orthonormal basis columns within `1e-5`, total quaternion angular distance from
+rest no greater than 35 degrees, unchanged root/core/world/recipe/AI/mesh/bone state, and identical
+canonical transforms on the two independent visuals.
+
+Explicitly attempt every rejection case with a null or wrong-script visual, null or wrong-script
+parts, null or wrong-script recipe, an unloaded exact-script part catalog, an invalid recipe, a
+visual whose `recipe_document()` differs from `recipe.to_dict()`, a missing core part or core rest
+transform, and a missing attachment mount or attachment rest transform. Each call to
+`configure_gait` must return `false`, retain no controller or dependency references, leave the
+visual at assembly rest, make `step_gait` a no-op, and leave input catalog/recipe documents
+unchanged. The smoke must prove dependencies are validated before any reference is retained.
+
+For invalid, negative, and NaN/non-finite deltas, capture the complete canonical transform output
+and assert the entire step is a no-op. After driving an active pose to maximum weight, drive every
+rest state and the unknown state with nonzero velocity. With `REST_DECAY_PER_SECOND = 4.0`, require
+weight zero and exact rest no later than 15 steps of `1.0 / 60.0` seconds (`0.25 s`), then continue
+for at least 30 total steps and require position distance `<= 1e-6 m` and quaternion angular
+distance `<= 1e-5 rad`. Reconfigure the same visual and assert assembly rest, elapsed `0`, weight
+`0`, deterministic phase, and a replacement controller rather than a shared or stacked controller.
+Run 10,000 active fixed-delta steps, checking finite/orthonormal bases and the 35-degree cap
+throughout, then drive rest and require the same exact-rest bounds.
+
+Serialize transforms canonically as a JSON array/string in sorted instance-ID order. For each
+attachment mount, serialize its origin followed by all nine 3x3 basis components, each value
+passed through `snappedf(value, 0.000001)`. Compare these bytes for both independent visuals and
+for complete smoke runs. Preserve the Task 5 marker and add the exact Task 6 marker:
+`BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false`.
 
 - [ ] **Step 2: Run RED gait slice**
 
 `/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd`
 
-Expected: gait assertions fail.
+Expected: the Task 5 assembly marker may pass, but the gait marker and gait assertions fail until
+`configure_gait`, the controller, and the rest-based motion contract exist.
 
-- [ ] **Step 3: Implement bounded gait profiles**
+- [ ] **Step 3: Implement the private controller and bounded gait profiles**
 
-Use fixed frequencies and phase sets:
+`BiomassGaitController` extends `RefCounted` and is owned exactly once, privately, by each
+`BiomassThreatVisual`. No manager/shared/autoload/scene-tree controller is allowed. To avoid a
+circular compile-time preload, the controller preloads and exact-script-compares the three
+runtime dependencies:
+
+```gdscript
+const VisualScript: GDScript = preload("res://scripts/threats/biomass_threat_visual.gd")
+const PartCatalogScript: GDScript = preload("res://scripts/systems/biomass_part_catalog.gd")
+const RecipeScript: GDScript = preload("res://scripts/systems/biomass_recipe.gd")
+```
+
+`BiomassThreatVisual.configure_gait` dynamically loads
+`res://scripts/threats/biomass_gait_controller.gd`, calls the internal
+`_reset_to_assembly_rest() -> void` helper to restore every part and attachment mount from its
+private assembly-rest dictionaries, then creates a fresh controller candidate. It retains that
+candidate only when `candidate.configure(self, parts, recipe, seed_value)` returns `true`.
+Every failure clears the private controller, leaves the visual at assembly rest, and makes
+`step_gait` a no-op. Reconfiguration follows the same sequence, so an animated current transform
+is never captured as rest and no controller is shared, stacked, or retained after failed setup.
+
+`configure` must validate all inputs before retaining any references: visual is non-null and has
+exact `VisualScript`; parts is non-null and has exact `PartCatalogScript`; recipe is non-null and
+has exact `RecipeScript`; `parts.get_part` succeeds for the core and every attachment part, proving
+the catalog is loaded; `recipe.is_valid()` is true; `visual.recipe_document() == recipe.to_dict()`;
+the core part and its rest transform exist; and every attachment has both an
+`attachment_mount(instance_id)` and an `attachment_rest_transform(instance_id)` returning a
+`Transform3D`. Reject null/wrong-script objects, unloaded catalogs, invalid or mismatched recipes,
+and any missing part/mount/rest without partial controller state or input mutation.
+
+Use these fixed profiles:
 
 ```gdscript
 const GAIT := {
@@ -858,11 +930,75 @@ const GAIT := {
 }
 ```
 
-Copy rest transforms at configure time. Apply sinusoidal rotation around the mount-local X/Y axes, using sorted instance IDs and seed-derived phase offset. Scale amplitude by horizontal speed, clamp to 35 degrees, and return to rest with `lerp` when velocity is near zero or state is `idle`, `stun`, or `dead`. The core may receive at most `0.08 m` body bob and `6 degrees` yaw. Do not modify meshes, bones, recipes, AI state, or world positions.
+Read roles from `parts.get_part(edge.part_id)` while iterating `recipe.attachments`. For the
+selected hint, include only edges with the mapped role (`locomotor` for biped/quadruped/crawl,
+`puller` for drag, `slither` for slither), pair each with its mount and immutable rest transform,
+and sort driven instance IDs lexicographically. Assign
+`GAIT[hint].phases[index % phases.size()]` in that order; the modulo is intentional and covers
+two pullers with one drag phase and two slither mounts with four phases. Set the seed phase exactly
+to `deg_to_rad(float(posmod(seed_value, 360)))`.
 
-- [ ] **Step 4: Run GREEN and no-drift checks**
+Use these exact motion constants and formulas:
 
-Run the assembly smoke twice; both complete outputs and final sampled transforms must match.
+```gdscript
+const REFERENCE_SPEED_MPS: float = 2.5
+const NEAR_ZERO_SPEED_MPS: float = 0.01
+const REST_DECAY_PER_SECOND: float = 4.0
+
+var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+var active_amplitude: float = clampf(horizontal_speed / REFERENCE_SPEED_MPS, 0.0, 1.0)
+```
+
+Active states are exactly `investigate`, `hunt`, `attack`, `telegraph`, and `flee`. Rest states
+are exactly `idle`, `stun`, and `dead`; an unknown state is fail-safe rest. If `delta` is
+non-finite or negative, return before changing any state or transform. Elapsed seconds starts at
+`0` at configure/reconfigure and advances only on a valid active step with
+`horizontal_speed > NEAR_ZERO_SPEED_MPS`, before computing the angle. It never advances during a
+rest or near-zero step. Active motion sets pose weight to `active_amplitude`; rest and near-zero
+motion subtracts `REST_DECAY_PER_SECOND * delta` and clamps the result at zero.
+
+For each driven mount, compute the angle exactly as:
+
+```gdscript
+var angle: float = deg_to_rad(swing_deg) * pose_weight * sin(
+    TAU * frequency * elapsed_seconds + assigned_phase + seed_phase
+)
+```
+
+Rebuild every driven mount from its saved rest on every step, never by incrementally rotating the
+current transform:
+
+```gdscript
+var rotated_basis: Basis = (
+    rest.basis
+    * Basis(Vector3.RIGHT, angle)
+    * Basis(Vector3.UP, angle * 0.25)
+)
+mount.transform = Transform3D(rotated_basis, rest.origin)
+```
+
+Write every non-driven mount from its exact rest transform on every step. The 35-degree cap applies
+to total quaternion angular distance from the rest basis, not to either component rotation alone.
+If a candidate exceeds `deg_to_rad(35.0)`, reduce its shortest-arc rest-to-candidate quaternion to
+that distance before rebuilding the basis. Assert every resulting basis is finite and orthonormal
+within `1e-5`. Do not modify the core part, `CharacterBody3D`/root transform, recipe, AI state,
+meshes, bones, or world position; v1 core bob and yaw are explicit no-ops.
+
+- [ ] **Step 4: Run GREEN, deterministic, rest, and no-drift checks**
+
+Run the assembly smoke twice and compare complete outputs, not only the final marker:
+
+```bash
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd > /tmp/biomass-assembly-a.txt 2>&1
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd > /tmp/biomass-assembly-b.txt 2>&1
+cmp /tmp/biomass-assembly-a.txt /tmp/biomass-assembly-b.txt
+for output in /tmp/biomass-assembly-a.txt /tmp/biomass-assembly-b.txt; do
+    if grep -E 'WARNING:|ERROR:|SCRIPT ERROR:' "$output"; then exit 1; fi
+done
+```
+
+Require both the preserved Task 5 marker and
+`BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false`.
 
 - [ ] **Step 5: Commit Task 6**
 
@@ -885,7 +1021,7 @@ git commit -m "feat: animate biomass threats with socket-space gaits"
 - Create: `data/combat/fixtures/biomass_invalid_recipe_catalog.json` — deliberately incompatible attachment used only to prove whole-threat fallback.
 
 **Interfaces:**
-- Consumes: assembler, catalog, library, generator, and gait APIs.
+- Consumes: assembler, catalog, library, generator, gait APIs, and `BiomassThreatVisual.configure_gait(parts, recipe, biomass_seed)`.
 - Produces:
   - `ThreatAIState.biomass_recipe: Dictionary`
   - `ThreatAIState.biomass_seed: int`
@@ -909,7 +1045,14 @@ assert(manager.threats.size() == 6)
 for threat in manager.threats:
     assert(not threat.biomass_recipe.is_empty())
     assert(threat.biomass_seed != 0)
-    assert(manager.placeholder_nodes[threat.instance_id] is BiomassThreatVisual)
+    var visual: BiomassThreatVisual = manager.placeholder_nodes[threat.instance_id]
+    assert(visual is BiomassThreatVisual)
+    for child in visual.get_children():
+        assert(child.get_script() != BiomassGaitControllerScript)
+    var gait_before: String = canonical_attachment_transforms(visual)
+    for sample_index in range(120):
+        visual.step_gait(1.0 / 60.0, Vector3(1, 0, 0), "hunt")
+    assert(all_expected_driven_mounts_changed(visual, gait_before))
 var before: Dictionary = manager.get_summary()
 var restored = ThreatManagerScript.new()
 get_root().add_child(restored)
@@ -921,6 +1064,14 @@ assert(restored.get_summary()["threats"] == before["threats"])
 for threat in restored.threats:
     assert(restored.placeholder_nodes[threat.instance_id].recipe_document() == threat.biomass_recipe)
 ```
+
+The `all_expected_driven_mounts_changed` check must enumerate the role-derived driven IDs for each
+of all six valid archetype visuals and require every one to differ from its saved rest after the
+120 `hunt` samples; it must also assert every non-driven ID is still exactly at rest. Because
+`step_gait` is a no-op when configuration failed, this active behavioral assertion proves each
+valid visual has a configured gait. Preload the controller script only for the child-inventory
+assertion and require that no child has that script; the gait controller remains a private
+`RefCounted`, never a Node child.
 
 After the valid six-archetype path, assert none of its visuals has `biomass_whole_threat_fallback = true`. Then create the invalid manager in this exact order:
 
@@ -937,7 +1088,7 @@ await process_frame
 await physics_frame
 ```
 
-The invalid fixture has the same closed top-level shape as the production recipe catalog but one curated edge is deliberately socket-incompatible. Assert assembly fails closed and exactly one whole-threat primitive visual is created with `biomass_whole_threat_fallback = true`. Assert a second `configure_biomass_sources()` call after `add_child` returns `false` and does not reload or mutate sources. Await `process_frame` and `physics_frame` after each spawn/rebuild and after each `queue_free()`-based removal before asserting scene-tree or collision disappearance. The valid-path and fallback-case counters remain separate.
+The invalid fixture has the same closed top-level shape as the production recipe catalog but one curated edge is deliberately socket-incompatible. Assert assembly fails closed, no `BiomassThreatVisual` is placed in `placeholder_nodes`, and exactly one whole-threat primitive visual is created with `biomass_whole_threat_fallback = true`; the fallback-case count must be exactly one. Assert a second `configure_biomass_sources()` call after `add_child` returns `false` and does not reload or mutate sources. Await `process_frame` and `physics_frame` after each spawn/rebuild and after each `queue_free()`-based removal before asserting scene-tree or collision disappearance. The valid-path and fallback-case counters remain separate.
 
 Also construct a standalone `ThreatAIState` through the existing top-down-shaped `configure(config)` path, snapshot every pre-biomass summary field, call `set_biomass_recipe()`, round-trip its full summary through a fresh `ThreatAIState.configure(summary)`, and assert every old field is unchanged while the new recipe and seed survive exactly.
 
@@ -972,7 +1123,7 @@ Each `threat_visual_catalog.json` entry retains `primitive`, `scale`, `albedo`, 
 
 - [ ] **Step 5: Own assembler state inside ThreatManager**
 
-`scripts/threats/biomass_assembler.gd` extends `RefCounted`, not `Node`; it owns no scene-tree children. Add constants `DEFAULT_BIOMASS_PART_CATALOG_PATH` and `DEFAULT_BIOMASS_RECIPE_CATALOG_PATH`, matching mutable path fields initialized to those defaults. Implement `configure_biomass_sources(part_catalog_path, recipe_catalog_path)` to reject empty/non-`res://` paths and return `false` whenever `is_inside_tree()` is true; on success it only stores the two paths. In `_ready()`, load `BiomassPartCatalog.load_path(stored_part_path)` first, then `BiomassRecipeLibrary.load_path(stored_recipe_path, parts)`, then load `ThreatPlaceholderRenderer.load_catalog()` and retain its `archetypes` dictionary, then create one non-tree assembler field. A load failure leaves biomass unavailable and routes later spawns to whole-threat fallback; never reload implicitly after `_ready()`. Derive a nonzero seed from `instance_id`, cell, and archetype. For curated selection use only `BiomassRecipeLibrary.pool_for(archetype_id)`; use the visual entry only for `visual_mode`, `generated_recipe_weight`, and `allowed_locomotion_hints`. If a restored threat already has a recipe, validate and use it unchanged. Otherwise use the seed to select curated versus generated and then store the entire recipe document before building. Keep `placeholder_nodes` as the compatibility dictionary used by existing tests and callers. Add regressions proving production defaults load, pre-tree fixture injection loads exactly once, post-tree injection fails without mutation, every visual archetype’s allowed hints are nonempty and known, `configure_for_layout()` can run twice, and `apply_summary()` after `_ready()` rebuilds visuals while `_clear_runtime_nodes()` preserves the same valid non-tree assembler/catalog objects.
+`scripts/threats/biomass_assembler.gd` extends `RefCounted`, not `Node`; it owns no scene-tree children. Add constants `DEFAULT_BIOMASS_PART_CATALOG_PATH` and `DEFAULT_BIOMASS_RECIPE_CATALOG_PATH`, matching mutable path fields initialized to those defaults. Implement `configure_biomass_sources(part_catalog_path, recipe_catalog_path)` to reject empty/non-`res://` paths and return `false` whenever `is_inside_tree()` is true; on success it only stores the two paths. In `_ready()`, load `BiomassPartCatalog.load_path(stored_part_path)` first, then `BiomassRecipeLibrary.load_path(stored_recipe_path, parts)`, then load `ThreatPlaceholderRenderer.load_catalog()` and retain its `archetypes` dictionary, then create one non-tree assembler field. A load failure leaves biomass unavailable and routes later spawns to whole-threat fallback; never reload implicitly after `_ready()`. Derive a nonzero seed from `instance_id`, cell, and archetype. For curated selection use only `BiomassRecipeLibrary.pool_for(archetype_id)`; use the visual entry only for `visual_mode`, `generated_recipe_weight`, and `allowed_locomotion_hints`. If a restored threat already has a recipe, validate and use it unchanged. Otherwise use the seed to select curated versus generated and then store the entire recipe document before building. Keep `placeholder_nodes` as the compatibility dictionary used by existing tests and callers. After `assembler.build(recipe, parts)` succeeds, call `visual.configure_gait(parts, recipe, biomass_seed)` before adding the visual to the scene tree, `placeholder_nodes`, or any gait step. If it returns `false`, synchronously free the assembled visual and use the existing whole-threat primitive fallback; no partially configured biomass visual enters `placeholder_nodes`. Add regressions proving production defaults load, pre-tree fixture injection loads exactly once, post-tree injection fails without mutation, every visual archetype’s allowed hints are nonempty and known, `configure_for_layout()` can run twice, and `apply_summary()` after `_ready()` rebuilds visuals while `_clear_runtime_nodes()` preserves the same valid non-tree assembler/catalog objects.
 
 - [ ] **Step 6: Feed movement into gait without changing path authority**
 
