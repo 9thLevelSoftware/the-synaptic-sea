@@ -152,6 +152,17 @@ instance, part, parent, socket, child root, connector, and locomotion hint.
 
 ### Runtime visual and gait boundary (Tasks 5–7)
 
+Task 5 acceptance uses the final assembly smoke rather than intermediate preload-failure evidence.
+Its fixture inventory includes the closed invalid-wrapper catalog, valid core/nested wrappers,
+non-PackedScene and forbidden-physics wrappers, a node-overflow wrapper, and a predelete probe.
+The factory validates before allocation; wrapper validation occurs before cache/retention; and every
+off-tree rejection synchronously frees partial and unattached nodes. Recursive socket lookup is
+unique and independent of child ordering, with ancestor transform composition. Complete core/child
+transform and collision maps include connector occurrences. Loader-valid node and triangle overflow
+fixtures must exceed 160 and exactly 30000 respectively before rejection, with exact diagnostics;
+failure diagnostics are sorted, deduplicated, and byte-identical on repetition. The smoke proves
+behavioral free/tree-removal evidence, not a copied RID validity bit.
+
 When parts and attachment mounts are registered, `BiomassThreatVisual` stores immutable
 assembly-rest `Transform3D` value copies. Part rests are immediate-parent-local `.transform` values:
 visual-local for the core and mount-local for attachment children. Mount rests are visual-root-local

@@ -137,6 +137,19 @@ collision, navigation, connectors, and gameplay bindings.
 
 ### Runtime visual and gait boundary
 
+Task 5 quality hardening is part of this contract, not optional test detail. The assembly smoke owns
+an explicit fixture inventory: closed invalid-wrapper catalog, valid core and nested wrappers,
+non-PackedScene and forbidden-physics wrappers, a node-overflow wrapper, and a predelete probe.
+Wrapper validation is fail-closed and occurs before caching or retaining a loaded result; the
+primitive factory validates before allocating. Off-tree failures synchronously free both unattached
+instances and the partial visual, with behavioral evidence from the predelete probe and post-tree
+removal ray checks. Socket resolution recursively requires exactly one order-independent match and
+composes transforms through all ancestors. Assembly bookkeeping contains complete core/child
+transform and collision maps, including connector occurrences. Node and triangle overflow probes
+must be loader-valid and non-vacuous, exceeding the exact caps of 160 nodes and 30000 triangles;
+the canonical visual oracle/cap remains 30000 triangles. Repeated failures expose sorted,
+deduplicated, byte-identical diagnostics.
+
 Task 5 records immutable assembly-rest `Transform3D` value copies as each part and attachment mount
 is registered. A part rest is the part node's immediate-parent-local `.transform`: visual-local for
 the directly parented core and mount-local for an attachment child. A mount rest is visual-root-local

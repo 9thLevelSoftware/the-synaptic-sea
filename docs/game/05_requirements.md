@@ -2013,6 +2013,9 @@ runtime source, and promotion is always a separate reviewed task.
 - Rationale: The runtime assembler must apply repository socket-space graphs without moving gameplay authority into visual assets, and gait setup must fail closed before an invalid visual becomes live.
 - Acceptance criteria:
   - A per-manager `RefCounted` assembler creates wrapper-owned runtime nodes under the calling threat manager; no assembler or gait controller autoload, shared service, or scene-tree controller is introduced.
+  - The final Task 5 fixture inventory includes the closed invalid-wrapper catalog, valid core/nested wrappers, non-PackedScene and forbidden-physics wrappers, a node-overflow wrapper, and a predelete probe. The primitive factory validates before allocation; wrapper validation occurs before caching/retention; every off-tree failure synchronously frees partial and unattached nodes.
+  - Socket lookup recursively requires exactly one order-independent match and composes transforms through all ancestors. Complete core/child transform and collision maps include connector occurrences; repeated failures emit sorted, deduplicated, byte-identical diagnostics.
+  - Loader-valid node- and triangle-overflow fixtures are non-vacuous: measured counts exceed the exact 160-node and 30000-triangle caps before rejection, with exact overflow diagnostics. The factory and assembler do not leak nodes on rejection.
   - Each assembled `BiomassThreatVisual` owns exactly one private `RefCounted` gait controller and records immutable assembly-rest transforms without adding Nodes or changing node/triangle/collision counts: each part rest is immediate-parent-local (visual-local core or mount-local child), while each direct-child mount rest is visual-root-local.
   - The visual exposes `part_rest_transform(instance_id: String) -> Variant` and `attachment_rest_transform(instance_id: String) -> Variant`, returning the corresponding local `Transform3D` for a known ID and `null` otherwise; reset restores mounts then parts directly and never assigns visual-root-local `part_to_visual` to a mount-parented child.
   - `configure_gait(parts, recipe, biomass_seed)` is called only after `assembler.build(recipe, parts)` succeeds and before scene-tree registration or gait stepping; false frees the visual synchronously and selects the existing whole-threat primitive fallback.
@@ -2020,7 +2023,7 @@ runtime source, and promotion is always a separate reviewed task.
   - Godot wrappers own collision, navigation, connectors, and gameplay bindings; the core, visual/root transform, world position, recipe, AI state, meshes, and bones remain under their existing authorities.
   - A core may be a skull; a torso is not mandatory.
 - Verification:
-  - `scripts/validation/biomass_assembly_smoke.gd` for rest APIs, fail-closed setup, exact assembly preservation, and the Task 6 gait marker.
+  - `scripts/validation/biomass_assembly_smoke.gd` for the final five-recipe oracles, rest APIs, fail-closed setup, recursive/order-independent sockets, behavioral synchronous-free evidence, non-vacuous overflow probes, exact assembly preservation, and the Task 6 gait marker.
   - `scripts/validation/biomass_threat_manager_smoke.gd` for six configured archetype visuals, no controller Node child, and exactly one whole-threat fallback for the invalid fixture.
 
 ## REQ-BIO-005: Deterministic random recipes
