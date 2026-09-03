@@ -46,6 +46,12 @@
           "kind": "attachment",
           "socket_id": "portal_center_internal_01",
           "surface": "custom"
+        },
+        {
+          "name": "Anchor_SOCK_wall_base_01",
+          "kind": "attachment",
+          "socket_id": "wall_base_01",
+          "surface": "custom"
         }
       ]
     },

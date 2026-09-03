@@ -20,6 +20,8 @@ position = Vector3(2, 0, 0)
 
 [node name="Anchor_SOCK_portal_center_internal_01" type="Marker3D" parent="."]
 
+[node name="Anchor_SOCK_wall_base_01" type="Marker3D" parent="."]
+
 [node name="CollisionRoot" type="StaticBody3D" parent="."]
 collision_layer = 1
 collision_mask = 1

@@ -8,7 +8,7 @@ const LEGACY_DEBUG_SMOKE_NAMES: Array[String] = [
 	"structural_placer_smoke.gd",
 	"main_playable_lifeboat_biome_skin_smoke.gd",
 ]
-const DEPRECATION_DIAGNOSTIC: String = "STRUCTURAL PLACER DEPRECATED: legacy/debug-only path; use StructuralEdgeCompiler"
+const DEPRECATION_DIAGNOSTIC: String = "STRUCTURAL_PLACER DEPRECATED: legacy/debug-only path; use StructuralEdgeCompiler"
 
 # Builds the physical "shell" of a ship from a RoomGraph using 2D
 # grid placement with spatial rules.
@@ -111,13 +111,13 @@ var kit_catalog = null
 var biome: String = ""
 
 
-func _emit_deprecation_diagnostic() -> void:
+func _emit_deprecation_diagnostic(legacy_debug_context: String = "") -> void:
 	for argument_variant in OS.get_cmdline_args():
 		var argument: String = str(argument_variant)
 		for smoke_name in LEGACY_DEBUG_SMOKE_NAMES:
 			if argument.ends_with(smoke_name):
 				return
-	push_warning(DEPRECATION_DIAGNOSTIC)
+	push_warning(DEPRECATION_DIAGNOSTIC + " context=" + legacy_debug_context)
 
 
 func place_structure(graph: RoomGraphScript, seed_value: int = 0, p_biome: String = "") -> Node3D:

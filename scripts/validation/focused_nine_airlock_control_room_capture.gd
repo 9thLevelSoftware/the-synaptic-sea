@@ -31,6 +31,19 @@ const CEILING_GLB_PATH := "res://assets/_staging/focused_nine/structural/ceiling
 const PRESSURE_DOOR_GLB_PATH := "res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
 const HULL_BREACH_GLB_PATH := "res://assets/_staging/focused_nine/props/hull_breach_seal_point.glb"
 const FIRE_SUPPRESSION_GLB_PATH := "res://assets/_staging/focused_nine/props/fire_suppression_station.glb"
+const COMPARISON_REPORT_RES := "res://assets/_staging/focused_nine/focused-nine-comparison.json"
+
+const STAGED_GLBS: Array[String] = [
+	FLOOR_GLB_PATH,
+	WALL_GLB_PATH,
+	DOORWAY_GLB_PATH,
+	PILLAR_GLB_PATH,
+	RAMP_GLB_PATH,
+	CEILING_GLB_PATH,
+	PRESSURE_DOOR_GLB_PATH,
+	HULL_BREACH_GLB_PATH,
+	FIRE_SUPPRESSION_GLB_PATH,
+]
 
 const FLOOR_LAYOUT: Array[Vector3] = [
 	Vector3(-4.0, 0.0, -4.0), Vector3(0.0, 0.0, -4.0), Vector3(4.0, 0.0, -4.0),
@@ -270,26 +283,33 @@ func _populate_room(room: Node3D) -> bool:
 
 
 func _bounds_in_ancestor(node: Node3D, ancestor: Node3D) -> AABB:
-	var found: bool = false
-	var combined := AABB()
-	var node_transform: Transform3D = _transform_to_ancestor(node, ancestor)
+	# Iterate every transformed AABB corner across all mesh nodes reachable under
+	# ``node``.  The combined AABB is initialised from the first transformed corner
+	# rather than a zero-origin seed so positive-only scene envelopes (such as the
+	# ceiling bounds 3.6..4.0 m) cannot collapse against a stray degenerate point.
+	var corners: Array[Vector3] = []
 	for mesh_node: Node in node.find_children("*", "MeshInstance3D", true, false):
 		var instance: MeshInstance3D = mesh_node as MeshInstance3D
 		if instance == null or instance.mesh == null:
 			continue
-		var mesh_transform: Transform3D = node_transform * _transform_to_ancestor(instance, node)
+		var mesh_transform: Transform3D = _transform_to_ancestor(instance, ancestor)
 		var local_bounds: AABB = instance.mesh.get_aabb()
-		for x in [local_bounds.position.x, local_bounds.end.x]:
-			for y in [local_bounds.position.y, local_bounds.end.y]:
-				for z in [local_bounds.position.z, local_bounds.end.z]:
-					var point: Vector3 = mesh_transform * Vector3(x, y, z)
-					if not found:
-						combined = AABB(point, Vector3.ZERO)
-						found = true
-					else:
-						combined = combined.expand(point)
-	if not found:
-			_fail("GLTF asset has no mesh bounds")
+		var low: Vector3 = local_bounds.position
+		var high: Vector3 = local_bounds.end
+		corners.append(mesh_transform * Vector3(low.x, low.y, low.z))
+		corners.append(mesh_transform * Vector3(low.x, low.y, high.z))
+		corners.append(mesh_transform * Vector3(low.x, high.y, low.z))
+		corners.append(mesh_transform * Vector3(low.x, high.y, high.z))
+		corners.append(mesh_transform * Vector3(high.x, low.y, low.z))
+		corners.append(mesh_transform * Vector3(high.x, low.y, high.z))
+		corners.append(mesh_transform * Vector3(high.x, high.y, low.z))
+		corners.append(mesh_transform * Vector3(high.x, high.y, high.z))
+	if corners.is_empty():
+		_fail("GLTF asset has no mesh bounds")
+		return AABB()
+	var combined: AABB = AABB(corners[0], Vector3.ZERO)
+	for index in range(1, corners.size()):
+		combined = combined.expand(corners[index])
 	return combined
 
 
@@ -310,18 +330,92 @@ func _transform_to_ancestor(node: Node3D, ancestor: Node3D) -> Transform3D:
 
 
 func _transform_aabb(bounds: AABB, transform: Transform3D) -> AABB:
-	var found: bool = false
-	var transformed := AABB()
-	for x in [bounds.position.x, bounds.end.x]:
-		for y in [bounds.position.y, bounds.end.y]:
-			for z in [bounds.position.z, bounds.end.z]:
-				var point: Vector3 = transform * Vector3(x, y, z)
-				if not found:
-					transformed = AABB(point, Vector3.ZERO)
-					found = true
-				else:
-					transformed = transformed.expand(point)
+	# Iterate the eight AABB corners through the transform without seeding the
+	# result from a zero-origin AABB.  An empty source AABB becomes an empty
+	# transformed AABB (a single zero point), which matches Godot's AABB
+	# semantics for degenerate geometry.
+	var corners: Array[Vector3] = []
+	var low: Vector3 = bounds.position
+	var high: Vector3 = bounds.end
+	corners.append(transform * Vector3(low.x, low.y, low.z))
+	corners.append(transform * Vector3(low.x, low.y, high.z))
+	corners.append(transform * Vector3(low.x, high.y, low.z))
+	corners.append(transform * Vector3(low.x, high.y, high.z))
+	corners.append(transform * Vector3(high.x, low.y, low.z))
+	corners.append(transform * Vector3(high.x, low.y, high.z))
+	corners.append(transform * Vector3(high.x, high.y, low.z))
+	corners.append(transform * Vector3(high.x, high.y, high.z))
+	var transformed: AABB = AABB(corners[0], Vector3.ZERO)
+	for index in range(1, corners.size()):
+		transformed = transformed.expand(corners[index])
 	return transformed
+
+
+func _load_scene_bounds_for_glb(glb_path: String) -> AABB:
+	# Read the deterministic scene bounds for one staged GLB from the canonical
+	# comparison JSON so room placements can be checked against evidence.
+	if not glb_path.begins_with("res://"):
+		_fail("scene bounds lookup requires a res:// path: %s" % glb_path)
+		return AABB()
+	var report_path: String = ProjectSettings.globalize_path(COMPARISON_REPORT_RES)
+	if not FileAccess.file_exists(report_path):
+		_fail("missing focused-nine comparison report: %s" % COMPARISON_REPORT_RES)
+		return AABB()
+	var file: FileAccess = FileAccess.open(report_path, FileAccess.READ)
+	if file == null:
+		_fail("could not open focused-nine comparison report")
+		return AABB()
+	var text: String = file.get_as_text()
+	file = null
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_fail("focused-nine comparison report is not a JSON object")
+		return AABB()
+	var improved: Variant = parsed.get("improved", {})
+	if typeof(improved) != TYPE_DICTIONARY:
+		_fail("focused-nine comparison report is missing the improved section")
+		return AABB()
+	var role_metrics: Variant = improved.get("asset_role_metrics", {})
+	if typeof(role_metrics) != TYPE_DICTIONARY:
+		_fail("focused-nine comparison report is missing asset_role_metrics")
+		return AABB()
+	var scene_min: Variant = null
+	var scene_max: Variant = null
+	for asset_id in role_metrics.keys():
+		var roles: Variant = role_metrics[asset_id]
+		if typeof(roles) != TYPE_DICTIONARY:
+			continue
+		for role in roles.keys():
+			if String(role) == "sidecar":
+				continue
+			var payload: Variant = roles[role]
+			if typeof(payload) != TYPE_DICTIONARY:
+				continue
+			var payload_path: Variant = payload.get("path", null)
+			if typeof(payload_path) != TYPE_STRING or payload_path != glb_path:
+				continue
+			var bound_record: Variant = payload.get("scene_bounds", null)
+			if typeof(bound_record) != TYPE_DICTIONARY:
+				continue
+			scene_min = bound_record.get("scene_min_m", null)
+			scene_max = bound_record.get("scene_max_m", null)
+			break
+		if scene_min != null:
+			break
+	if typeof(scene_min) != TYPE_ARRAY or typeof(scene_max) != TYPE_ARRAY:
+		_fail("focused-nine comparison report has no scene_bounds for %s" % glb_path)
+		return AABB()
+	if scene_min.size() != 3 or scene_max.size() != 3:
+		_fail("focused-nine comparison report scene_bounds must be a 3-vector")
+		return AABB()
+	return AABB(
+		Vector3(float(scene_min[0]), float(scene_min[1]), float(scene_min[2])),
+		Vector3(
+			float(scene_max[0]) - float(scene_min[0]),
+			float(scene_max[1]) - float(scene_min[1]),
+			float(scene_max[2]) - float(scene_min[2]),
+		),
+	)
 
 
 func _add_room_asset(room: Node3D, path: String, node_name: String, position: Vector3, rotation_y: float) -> bool:

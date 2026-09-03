@@ -7,6 +7,7 @@ class_name WallDoorResolver
 
 const StructuralEdgeCompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript: GDScript = preload("res://scripts/procgen/structural_plan_validator.gd")
+const StructuralEdgePlanScript: GDScript = preload("res://scripts/procgen/structural_edge_plan.gd")
 
 
 func resolve(cell_grid: Dictionary, room_plan: Array[Dictionary]) -> Dictionary:
@@ -93,9 +94,104 @@ func _legacy_cell_grid_to_layout(cell_grid: Dictionary, room_plan: Array[Diction
 	return {
 		"cell_size": 4.0,
 		"rooms": canonical_rooms,
-		"portals": portals,
+		"portals": _expand_portals_to_cell_pair_boundaries(portals, rooms),
 		"vertical_connections": vertical_connections,
 	}
+
+
+func _expand_portals_to_cell_pair_boundaries(portals: Array, rooms: Dictionary) -> Array:
+	# Build a deck-aware cell->room lookup from the room registry so we can
+	# discover every shared cell-pair boundary between two portal-connected
+	# rooms and emit additional portal records for each. The compiler emits
+	# one structural edge per shared cell-pair; without this expansion the
+	# un-recorded cell-pairs would compile as SOLID walls and fail the
+	# validator's topology-portal-replacement gate.
+	var CARDINAL_OFFSETS: Array = [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1),
+	]
+	var cell_to_room: Dictionary = {}
+	for room_id_variant in rooms.keys():
+		var room: Dictionary = rooms[room_id_variant]
+		var deck: int = int(room.get("deck", 0))
+		for cell_variant in room.get("cells", []):
+			if cell_variant is Vector2i:
+				var key: String = "%d_%d_%d" % [deck, (cell_variant as Vector2i).x, (cell_variant as Vector2i).y]
+				cell_to_room[key] = str(room_id_variant)
+	var known_edge_keys: Dictionary = {}
+	for portal in portals:
+		var from_cell_v: Variant = portal.get("from_cell", null)
+		var to_cell_v: Variant = portal.get("to_cell", null)
+		if from_cell_v is Vector2i and to_cell_v is Vector2i:
+			var fc: Vector2i = from_cell_v
+			var tc: Vector2i = to_cell_v
+			var delta: Vector2i = tc - fc
+			var direction: String = ""
+			for d in ["east", "west", "south", "north"]:
+				if StructuralEdgePlanScript.DIRECTIONS[d] == delta:
+					direction = d
+					break
+			if not direction.is_empty():
+				known_edge_keys[StructuralEdgePlanScript.edge_key(int(portal.get("deck", 0)), fc, direction)] = true
+	var added: Array = []
+	var seen: Dictionary = {}
+	for portal in portals:
+		var from_room: String = str(portal.get("from_room", ""))
+		var to_room: String = str(portal.get("to_room", ""))
+		if from_room.is_empty() or to_room.is_empty():
+			continue
+		if not rooms.has(from_room) or not rooms.has(to_room):
+			continue
+		var from_room_data: Dictionary = rooms[from_room]
+		var deck: int = int(from_room_data.get("deck", 0))
+		var cells: Array = from_room_data.get("cells", [])
+		for cell_variant in cells:
+			if not (cell_variant is Vector2i):
+				continue
+			var cell: Vector2i = cell_variant
+			for delta in CARDINAL_OFFSETS:
+				var neighbor: Vector2i = cell + delta
+				var neighbor_key: String = "%d_%d_%d" % [deck, neighbor.x, neighbor.y]
+				var neighbor_room: String = str(cell_to_room.get(neighbor_key, ""))
+				if neighbor_room != to_room:
+					continue
+				var direction: String = ""
+				for d in ["east", "west", "south", "north"]:
+					if StructuralEdgePlanScript.DIRECTIONS[d] == delta:
+						direction = d
+						break
+				if direction.is_empty():
+					continue
+				var ek: String = StructuralEdgePlanScript.edge_key(deck, cell, direction)
+				if known_edge_keys.has(ek) or seen.has(ek):
+					continue
+				seen[ek] = true
+				var intent_state: String = str(portal.get("state", portal.get("portal_type", "DOOR"))).to_upper()
+				var intent_module: String = str(portal.get("module_id", "doorway_frame_open_1x1"))
+				var intent_required: Variant = portal.get("required", true)
+				added.append({
+					"id": "portal:%s" % ek,
+					"from_room": from_room,
+					"to_room": to_room,
+					"from_cell": cell,
+					"to_cell": neighbor,
+					"module_id": intent_module,
+					"state": intent_state,
+					"portal_type": intent_state,
+					"required": intent_required,
+					"deck": deck,
+					"edge_key": ek,
+					"direction": direction,
+					"opposite_direction": str(StructuralEdgePlanScript.OPPOSITE[direction]),
+				})
+	if added.is_empty():
+		return portals
+	var merged: Array = portals.duplicate(true)
+	for entry in added:
+		merged.append(entry)
+	return merged
 
 
 func _adapt_validated_plan_to_legacy_geometry(plan: Dictionary, layout: Dictionary) -> Dictionary:
@@ -202,6 +298,7 @@ func _legacy_portal(edge: Dictionary, owner_room: String) -> Dictionary:
 	return {
 		"id": str(edge.get("id", "edge:%s" % str(edge.get("edge_key", "")))),
 		"wall": str(edge.get("direction", "")),
+		"direction": str(edge.get("direction", "")),
 		"module_id": str(edge.get("module_id", "bulkhead_portal_2x1")),
 		"position": edge.get("position", Vector3.ZERO),
 		"yaw_degrees": float(edge.get("yaw_degrees", 0.0)),

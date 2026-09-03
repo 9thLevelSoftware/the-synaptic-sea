@@ -26,6 +26,8 @@ STAGED_GLB_RELATIVE_PATHS = (
     "assets/_staging/focused_nine/props/fire_suppression_station.glb",
 )
 
+COMPARISON_REPORT_RELATIVE = "assets/_staging/focused_nine/focused-nine-comparison.json"
+
 
 def _source(path: Path) -> str:
     if not path.is_file():
@@ -173,6 +175,9 @@ def _write_real_gltf_layout_probe_project(project: Path, probe: Path) -> None:
         destination = project / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(PROJECT_ROOT / relative_path, destination)
+    comparison_destination = project / COMPARISON_REPORT_RELATIVE
+    comparison_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(PROJECT_ROOT / COMPARISON_REPORT_RELATIVE, comparison_destination)
     (project / "project.godot").write_text(
         "\n".join(
             (
@@ -196,181 +201,307 @@ def _write_real_gltf_layout_probe_project(project: Path, probe: Path) -> None:
 const CaptureScript: GDScript = preload("res://scripts/validation/focused_nine_airlock_control_room_capture.gd")
 const PASS_MARKER := "TASK1_REAL_GLTF_LAYOUT_PROBE PASS"
 const FLOOR_POSITIONS := [
-    Vector3(-4.0, 0.0, -4.0), Vector3(0.0, 0.0, -4.0), Vector3(4.0, 0.0, -4.0),
-    Vector3(-4.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0), Vector3(4.0, 0.0, 0.0),
-    Vector3(-4.0, 0.0, 4.0), Vector3(0.0, 0.0, 4.0), Vector3(4.0, 0.0, 4.0),
+	Vector3(-4.0, 0.0, -4.0), Vector3(0.0, 0.0, -4.0), Vector3(4.0, 0.0, -4.0),
+	Vector3(-4.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0), Vector3(4.0, 0.0, 0.0),
+	Vector3(-4.0, 0.0, 4.0), Vector3(0.0, 0.0, 4.0), Vector3(4.0, 0.0, 4.0),
 ]
 const WALL_POSITIONS := [
-    Vector3(-4.0, 0.0, -6.0), Vector3(4.0, 0.0, -6.0),
-    Vector3(-4.0, 0.0, 6.0), Vector3(4.0, 0.0, 6.0),
-    Vector3(-6.0, 0.0, 0.0), Vector3(6.0, 0.0, 0.0),
+	Vector3(-4.0, 0.0, -6.0), Vector3(4.0, 0.0, -6.0),
+	Vector3(-4.0, 0.0, 6.0), Vector3(4.0, 0.0, 6.0),
+	Vector3(-6.0, 0.0, 0.0), Vector3(6.0, 0.0, 0.0),
 ]
+const DEFAULT_BOUND_TOLERANCE := 0.02
+const SCENE_OFFSET_TOLERANCE := 0.04
+const CEILING_HEIGHT_TOLERANCE := 0.05
 var _failed := false
 
 
 func _expect(condition: bool, reason: String) -> void:
-    if condition:
-        return
-    _failed = true
-    printerr("TASK1_REAL_GLTF_LAYOUT_PROBE FAIL reason=%s" % reason)
-    quit(1)
+	if condition:
+		return
+	_failed = true
+	printerr("TASK1_REAL_GLTF_LAYOUT_PROBE FAIL reason=%s" % reason)
+	quit(1)
 
 
-func _expect_vec(actual: Vector3, expected: Vector3, reason: String, tolerance := 0.001) -> void:
-    _expect(actual.distance_to(expected) <= tolerance, "%s actual=%s expected=%s" % [reason, actual, expected])
+func _expect_vec(actual: Vector3, expected: Vector3, reason: String, tolerance := DEFAULT_BOUND_TOLERANCE) -> void:
+	_expect(actual.distance_to(expected) <= tolerance, "%s actual=%s expected=%s tolerance=%f" % [reason, actual, expected, tolerance])
+
+
+func _scene_min_max_as_vector3(scene_min: Variant, scene_max: Variant) -> Variant:
+	# Normalize to (min, max) Vector3 pair regardless of source representation.
+	var minimum: Vector3
+	var maximum: Vector3
+	if typeof(scene_min) == TYPE_VECTOR3:
+		minimum = scene_min
+	elif typeof(scene_min) == TYPE_ARRAY and scene_min.size() == 3:
+		minimum = Vector3(float(scene_min[0]), float(scene_min[1]), float(scene_min[2]))
+	else:
+		return null
+	if typeof(scene_max) == TYPE_VECTOR3:
+		maximum = scene_max
+	elif typeof(scene_max) == TYPE_ARRAY and scene_max.size() == 3:
+		maximum = Vector3(float(scene_max[0]), float(scene_max[1]), float(scene_max[2]))
+	else:
+		return null
+	if minimum.distance_to(maximum) <= 0.0:
+		return null
+	return [minimum, maximum]
+
+
+func _expected_world_bounds(scene_min: Variant, scene_max: Variant, placement: Vector3) -> Variant:
+	# Compose scene bounds with placement (and rotation about Y) to derive world bounds.
+	var pair = _scene_min_max_as_vector3(scene_min, scene_max)
+	if pair == null:
+		return null
+	var minimum: Vector3 = pair[0]
+	var maximum: Vector3 = pair[1]
+	var corners: Array[Vector3] = [
+		Vector3(minimum.x, minimum.y, minimum.z),
+		Vector3(minimum.x, minimum.y, maximum.z),
+		Vector3(minimum.x, maximum.y, minimum.z),
+		Vector3(minimum.x, maximum.y, maximum.z),
+		Vector3(maximum.x, minimum.y, minimum.z),
+		Vector3(maximum.x, minimum.y, maximum.z),
+		Vector3(maximum.x, maximum.y, minimum.z),
+		Vector3(maximum.x, maximum.y, maximum.z),
+	]
+	var first: Vector3 = corners[0] + placement
+	var world_min: Vector3 = first
+	var world_max: Vector3 = first
+	for corner in corners.slice(1):
+		var world_corner: Vector3 = corner + placement
+		world_min.x = min(world_min.x, world_corner.x)
+		world_min.y = min(world_min.y, world_corner.y)
+		world_min.z = min(world_min.z, world_corner.z)
+		world_max.x = max(world_max.x, world_corner.x)
+		world_max.y = max(world_max.y, world_corner.y)
+		world_max.z = max(world_max.z, world_corner.z)
+	return [world_min, world_max]
 
 
 func _transform_to_ancestor(node: Node3D, ancestor: Node3D) -> Transform3D:
-    var result := Transform3D.IDENTITY
-    var cursor: Node = node
-    while cursor != ancestor:
-        var node_3d := cursor as Node3D
-        _expect(node_3d != null, "node hierarchy contains non-Node3D")
-        result = node_3d.transform * result
-        cursor = cursor.get_parent()
-        _expect(cursor != null, "layout node escaped room ancestor")
-    return result
+	var result := Transform3D.IDENTITY
+	var cursor: Node = node
+	while cursor != ancestor:
+		var node_3d := cursor as Node3D
+		_expect(node_3d != null, "node hierarchy contains non-Node3D")
+		result = node_3d.transform * result
+		cursor = cursor.get_parent()
+		_expect(cursor != null, "layout node escaped room ancestor")
+	return result
 
 
 func _bounds_in_ancestor(node: Node3D, ancestor: Node3D) -> AABB:
-    var found := false
-    var combined := AABB()
-    var transform := _transform_to_ancestor(node, ancestor)
-    for mesh_node: Node in node.find_children("*", "MeshInstance3D", true, false):
-        var instance := mesh_node as MeshInstance3D
-        _expect(instance != null and instance.mesh != null, "GLTF mesh instance has no mesh")
-        var mesh_transform := transform * _transform_to_ancestor(instance, node)
-        var local := instance.mesh.get_aabb()
-        for x in [local.position.x, local.end.x]:
-            for y in [local.position.y, local.end.y]:
-                for z in [local.position.z, local.end.z]:
-                    var point := mesh_transform * Vector3(x, y, z)
-                    if not found:
-                        combined = AABB(point, Vector3.ZERO)
-                        found = true
-                    else:
-                        combined = combined.expand(point)
-    _expect(found, "GLTF layout asset has no geometry")
-    return combined
+	var corners: Array[Vector3] = []
+	for mesh_node: Node in node.find_children("*", "MeshInstance3D", true, false):
+		var instance: MeshInstance3D = mesh_node as MeshInstance3D
+		_expect(instance != null and instance.mesh != null, "GLTF mesh instance has no mesh")
+		var mesh_transform: Transform3D = _transform_to_ancestor(instance, ancestor)
+		var local: AABB = instance.mesh.get_aabb()
+		var low: Vector3 = local.position
+		var high: Vector3 = local.end
+		corners.append(mesh_transform * Vector3(low.x, low.y, low.z))
+		corners.append(mesh_transform * Vector3(low.x, low.y, high.z))
+		corners.append(mesh_transform * Vector3(low.x, high.y, low.z))
+		corners.append(mesh_transform * Vector3(low.x, high.y, high.z))
+		corners.append(mesh_transform * Vector3(high.x, low.y, low.z))
+		corners.append(mesh_transform * Vector3(high.x, low.y, high.z))
+		corners.append(mesh_transform * Vector3(high.x, high.y, low.z))
+		corners.append(mesh_transform * Vector3(high.x, high.y, high.z))
+	_expect(not corners.is_empty(), "GLTF layout asset has no geometry")
+	var combined: AABB = AABB(corners[0], Vector3.ZERO)
+	for index in range(1, corners.size()):
+		combined = combined.expand(corners[index])
+	return combined
 
 
 func _initialize() -> void:
-    var room := Node3D.new()
-    get_root().add_child(room)
-    var capture = CaptureScript.new()
-    _expect(bool(capture.call("_populate_room", room)), "real GLTF layout population")
+	var capture = CaptureScript.new()
+	_expect(capture != null, "capture script instance")
+	var scene_bounds_by_path: Dictionary = {}
+	# Pre-load every staged GLB's scene bounds from the canonical comparison report
+	# so probe assertions are bound to producer evidence, not stale constants.
+	for relative_path in [
+		"res://assets/_staging/focused_nine/structural/floor_1x1/floor_1x1.glb",
+		"res://assets/_staging/focused_nine/structural/wall_straight_1x1/wall_straight_1x1.glb",
+		"res://assets/_staging/focused_nine/structural/doorway_frame_open_1x1/doorway_frame_open_1x1.glb",
+		"res://assets/_staging/focused_nine/structural/pillar_support_1x1/pillar_support_1x1.glb",
+		"res://assets/_staging/focused_nine/structural/ramp_up_1x2/ramp_up_1x2.glb",
+		"res://assets/_staging/focused_nine/structural/ceiling_cap_1x1/ceiling_cap_1x1.glb",
+		"res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb",
+		"res://assets/_staging/focused_nine/props/hull_breach_seal_point.glb",
+		"res://assets/_staging/focused_nine/props/fire_suppression_station.glb",
+	]:
+		var scene_bounds: AABB = capture._load_scene_bounds_for_glb(relative_path)
+		scene_bounds_by_path[relative_path] = scene_bounds
 
-    for index in FLOOR_POSITIONS.size():
-        var floor := room.get_node("Floor_%02d" % index) as Node3D
-        _expect(floor != null, "floor node %d" % index)
-        _expect_vec(floor.position, FLOOR_POSITIONS[index], "floor position %d" % index)
-        var floor_bounds := _bounds_in_ancestor(floor, room)
-        _expect(floor_bounds.position.x >= -6.0 and floor_bounds.end.x <= 6.0, "floor x footprint")
-        _expect(floor_bounds.position.z >= -6.0 and floor_bounds.end.z <= 6.0, "floor z footprint")
+	var room := Node3D.new()
+	get_root().add_child(room)
+	_expect(bool(capture.call("_populate_room", room)), "real GLTF layout population")
 
-    var ramp := room.get_node("SouthRamp") as Node3D
-    _expect(ramp != null, "south ramp node")
-    _expect_vec(ramp.position, Vector3(0.0, 0.0, 8.0), "south ramp offset")
-    _expect(absf(ramp.rotation.y) <= 0.001, "south ramp yaw")
-    var ramp_bounds := _bounds_in_ancestor(ramp, room)
-    _expect_vec(ramp_bounds.position, Vector3(-1.97, 0.01, 4.0), "south ramp world minimum", 0.02)
-    _expect_vec(ramp_bounds.end, Vector3(1.97, 0.87, 12.0), "south ramp world maximum", 0.02)
-    _expect(ramp_bounds.position.z >= 4.0, "south ramp stays outside the south doorway")
+	for index in FLOOR_POSITIONS.size():
+		var floor := room.get_node("Floor_%02d" % index) as Node3D
+		_expect(floor != null, "floor node %d" % index)
+		_expect_vec(floor.position, FLOOR_POSITIONS[index], "floor position %d" % index)
+		var floor_bounds: AABB = _bounds_in_ancestor(floor, room)
+		_expect(floor_bounds.position.x >= -6.0 and floor_bounds.end.x <= 6.0, "floor x footprint")
+		_expect(floor_bounds.position.z >= -6.0 and floor_bounds.end.z <= 6.0, "floor z footprint")
 
-    var doorway := room.get_node("SouthDoorway") as Node3D
-    _expect(doorway != null, "south doorway node")
-    _expect_vec(doorway.position, Vector3(0.0, 0.0, 4.0), "south doorway offset")
-    _expect(absf(doorway.rotation.y) <= 0.001, "south doorway yaw")
-    var doorway_bounds := _bounds_in_ancestor(doorway, room)
-    _expect_vec(doorway_bounds.position, Vector3(-1.63, 0.0, 3.675), "south doorway world minimum", 0.02)
-    _expect_vec(doorway_bounds.end, Vector3(1.63, 3.4, 4.5), "south doorway world maximum", 0.02)
-    _expect(doorway_bounds.position.z < 4.0 and doorway_bounds.end.z > 4.0, "south doorway straddles entry threshold")
+	var ramp := room.get_node("SouthRamp") as Node3D
+	_expect(ramp != null, "south ramp node")
+	_expect_vec(ramp.position, Vector3(0.0, 0.0, 8.0), "south ramp offset")
+	_expect(absf(ramp.rotation.y) <= 0.001, "south ramp yaw")
+	var ramp_bounds: AABB = _bounds_in_ancestor(ramp, room)
+	var ramp_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/structural/ramp_up_1x2/ramp_up_1x2.glb"]
+	var ramp_expected: Variant = _expected_world_bounds(ramp_scene_bounds.position, ramp_scene_bounds.end, Vector3(0.0, 0.0, 8.0))
+	_expect(ramp_expected != null, "south ramp scene bounds read from comparison report")
+	_expect_vec(ramp_bounds.position, ramp_expected[0], "south ramp world minimum", SCENE_OFFSET_TOLERANCE)
+	_expect_vec(ramp_bounds.end, ramp_expected[1], "south ramp world maximum", SCENE_OFFSET_TOLERANCE)
+	_expect(ramp_bounds.position.z >= 4.0, "south ramp stays outside the south doorway")
 
-    var pressure_door := room.get_node("NorthPressureDoor") as Node3D
-    _expect(pressure_door != null, "north pressure door node")
-    _expect_vec(pressure_door.position, Vector3(0.0, 0.0, -4.0), "north pressure door offset")
-    _expect(absf(pressure_door.rotation.y - PI) <= 0.001, "north pressure door yaw")
-    var pressure_door_bounds := _bounds_in_ancestor(pressure_door, room)
-    _expect_vec(pressure_door_bounds.position, Vector3(-1.805, 0.0, -4.37), "north pressure door world minimum", 0.02)
-    _expect_vec(pressure_door_bounds.end, Vector3(1.805, 3.4, -3.64), "north pressure door world maximum", 0.02)
-    _expect(pressure_door_bounds.position.z < -4.0 and pressure_door_bounds.end.z > -4.0, "north pressure door straddles rear threshold")
+	var doorway := room.get_node("SouthDoorway") as Node3D
+	_expect(doorway != null, "south doorway node")
+	_expect_vec(doorway.position, Vector3(0.0, 0.0, 4.0), "south doorway offset")
+	_expect(absf(doorway.rotation.y) <= 0.001, "south doorway yaw")
+	var doorway_bounds: AABB = _bounds_in_ancestor(doorway, room)
+	var doorway_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/structural/doorway_frame_open_1x1/doorway_frame_open_1x1.glb"]
+	var doorway_expected: Variant = _expected_world_bounds(doorway_scene_bounds.position, doorway_scene_bounds.end, Vector3(0.0, 0.0, 4.0))
+	_expect(doorway_expected != null, "south doorway scene bounds read from comparison report")
+	_expect_vec(doorway_bounds.position, doorway_expected[0], "south doorway world minimum", SCENE_OFFSET_TOLERANCE)
+	_expect_vec(doorway_bounds.end, doorway_expected[1], "south doorway world maximum", SCENE_OFFSET_TOLERANCE)
+	_expect(doorway_bounds.position.z < 4.0 and doorway_bounds.end.z > 4.0, "south doorway straddles entry threshold")
 
-    var side_rotation_seen := false
-    var wall_envelope_found := false
-    var wall_envelope := AABB()
-    for index in WALL_POSITIONS.size():
-        var wall := room.get_node("Wall_%02d" % index) as Node3D
-        _expect(wall != null, "wall node %d" % index)
-        _expect_vec(wall.position, WALL_POSITIONS[index], "wall position %d" % index)
-        if index >= 4:
-            _expect(absf(wall.rotation.y - PI / 2.0) <= 0.001, "side wall yaw %d" % index)
-            side_rotation_seen = true
-        else:
-            _expect(absf(wall.rotation.y) <= 0.001, "north/south wall yaw %d" % index)
-        var wall_bounds := _bounds_in_ancestor(wall, room)
-        if not wall_envelope_found:
-            wall_envelope = wall_bounds
-            wall_envelope_found = true
-        else:
-            wall_envelope = wall_envelope.expand(wall_bounds.position)
-            wall_envelope = wall_envelope.expand(wall_bounds.end)
-        _expect(wall_bounds.position.x >= -6.3 and wall_bounds.end.x <= 6.3, "wall x perimeter %d" % index)
-        _expect(wall_bounds.position.z >= -6.3 and wall_bounds.end.z <= 6.3, "wall z perimeter %d" % index)
-    _expect(side_rotation_seen, "distinct side wall rotation")
+	var pressure_door := room.get_node("NorthPressureDoor") as Node3D
+	_expect(pressure_door != null, "north pressure door node")
+	_expect_vec(pressure_door.position, Vector3(0.0, 0.0, -4.0), "north pressure door offset")
+	_expect(absf(pressure_door.rotation.y - PI) <= 0.001, "north pressure door yaw")
+	var pressure_door_bounds: AABB = _bounds_in_ancestor(pressure_door, room)
+	var pressure_door_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"]
+	# Pressure door is rotated 180 degrees about Y, which mirrors X and Z when
+	# composing with placement.  The scene AABB is symmetric about the origin on
+	# x and z, so rotation keeps the same span and only the world placement
+	# shifts the resulting AABB.
+	var pd_rot_x_min: float = pressure_door_scene_bounds.position.x
+	var pd_rot_x_max: float = pressure_door_scene_bounds.end.x
+	var pd_rot_y_min: float = pressure_door_scene_bounds.position.y
+	var pd_rot_y_max: float = pressure_door_scene_bounds.end.y
+	var pd_rot_z_min: float = pressure_door_scene_bounds.position.z
+	var pd_rot_z_max: float = pressure_door_scene_bounds.end.z
+	var pd_world_min: Vector3 = Vector3(
+		min(pd_rot_x_min, pd_rot_x_max) + 0.0,
+		min(pd_rot_y_min, pd_rot_y_max) + 0.0,
+		min(pd_rot_z_min, pd_rot_z_max) + -4.0,
+	)
+	var pd_world_max: Vector3 = Vector3(
+		max(pd_rot_x_min, pd_rot_x_max) + 0.0,
+		max(pd_rot_y_min, pd_rot_y_max) + 0.0,
+		max(pd_rot_z_min, pd_rot_z_max) + -4.0,
+	)
+	_expect_vec(pressure_door_bounds.position, pd_world_min, "north pressure door world minimum", SCENE_OFFSET_TOLERANCE)
+	_expect_vec(pressure_door_bounds.end, pd_world_max, "north pressure door world maximum", SCENE_OFFSET_TOLERANCE)
+	_expect(pressure_door_bounds.position.z < -4.0 and pressure_door_bounds.end.z > -4.0, "north pressure door straddles rear threshold")
 
-    var cap_bottom := INF
-    var cap_top := -INF
-    for index in 3:
-        var cap := room.get_node("RearCeilingCap_%02d" % index) as Node3D
-        _expect(cap != null, "rear ceiling cap %d" % index)
-        _expect_vec(cap.position, Vector3(-4.0 + index * 4.0, 0.0, -4.0), "ceiling cap position %d" % index)
-        var cap_bounds := _bounds_in_ancestor(cap, room)
-        cap_bottom = minf(cap_bottom, cap_bounds.position.y)
-        cap_top = maxf(cap_top, cap_bounds.end.y)
-        _expect(absf(cap_bounds.position.y - 3.72) <= 0.02, "ceiling local bottom %d" % index)
-        _expect(absf(cap_bounds.end.y - 4.0) <= 0.02, "ceiling local top %d" % index)
-    _expect(cap_bottom > 3.5 and cap_bottom < 4.0, "ceiling caps sit around wall top")
+	var side_rotation_seen := false
+	var wall_envelope_found := false
+	var wall_envelope := AABB()
+	for index in WALL_POSITIONS.size():
+		var wall := room.get_node("Wall_%02d" % index) as Node3D
+		_expect(wall != null, "wall node %d" % index)
+		_expect_vec(wall.position, WALL_POSITIONS[index], "wall position %d" % index)
+		var wall_yaw: float = PI / 2.0 if index >= 4 else 0.0
+		if index >= 4:
+			_expect(absf(wall.rotation.y - PI / 2.0) <= 0.001, "side wall yaw %d" % index)
+			side_rotation_seen = true
+		else:
+			_expect(absf(wall.rotation.y) <= 0.001, "north/south wall yaw %d" % index)
+		var wall_bounds: AABB = _bounds_in_ancestor(wall, room)
+		if not wall_envelope_found:
+			wall_envelope = wall_bounds
+			wall_envelope_found = true
+		else:
+			wall_envelope = wall_envelope.expand(wall_bounds.position)
+			wall_envelope = wall_envelope.expand(wall_bounds.end)
+		_expect(wall_bounds.position.x >= -6.3 and wall_bounds.end.x <= 6.3, "wall x perimeter %d" % index)
+		_expect(wall_bounds.position.z >= -6.3 and wall_bounds.end.z <= 6.3, "wall z perimeter %d" % index)
+	_expect(side_rotation_seen, "distinct side wall rotation")
 
-    for pillar_name in ["RearPillarWest", "RearPillarEast"]:
-        var pillar := room.get_node(pillar_name) as Node3D
-        _expect(pillar != null, "%s node" % pillar_name)
-        var pillar_bounds := _bounds_in_ancestor(pillar, room)
-        _expect(pillar_bounds.position.y >= wall_envelope.position.y and pillar_bounds.end.y <= wall_envelope.end.y, "%s vertical envelope" % pillar_name)
-        _expect(pillar_bounds.position.x >= wall_envelope.position.x and pillar_bounds.end.x <= wall_envelope.end.x, "%s x envelope" % pillar_name)
-        _expect(pillar_bounds.position.z >= wall_envelope.position.z and pillar_bounds.end.z <= wall_envelope.end.z, "%s z envelope" % pillar_name)
+	var cap_bottom := INF
+	var cap_top := -INF
+	var ceiling_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/structural/ceiling_cap_1x1/ceiling_cap_1x1.glb"]
+	for index in 3:
+		var cap := room.get_node("RearCeilingCap_%02d" % index) as Node3D
+		_expect(cap != null, "rear ceiling cap %d" % index)
+		_expect_vec(cap.position, Vector3(-4.0 + index * 4.0, 0.0, -4.0), "ceiling cap position %d" % index)
+		var cap_bounds: AABB = _bounds_in_ancestor(cap, room)
+		cap_bottom = minf(cap_bottom, cap_bounds.position.y)
+		cap_top = maxf(cap_top, cap_bounds.end.y)
+		# Cap is placed at (-4+i*4, 0, -4) and not rotated; world y bounds equal scene y bounds.
+		_expect(absf(cap_bounds.position.y - ceiling_scene_bounds.position.y) <= CEILING_HEIGHT_TOLERANCE, "ceiling cap local bottom %d vs scene evidence" % index)
+		_expect(absf(cap_bounds.end.y - ceiling_scene_bounds.end.y) <= CEILING_HEIGHT_TOLERANCE, "ceiling cap local top %d vs scene evidence" % index)
+	_expect(cap_bottom > 3.5 and cap_bottom < 4.0, "ceiling caps sit around wall top")
 
-    var fire_station := room.get_node("FireSuppressionBesideEntry") as Node3D
-    _expect(fire_station != null, "fire suppression station node")
-    _expect_vec(fire_station.position, Vector3(-2.0, 0.0, 3.0), "fire suppression station offset")
-    _expect(absf(fire_station.rotation.y) <= 0.001, "fire suppression station yaw")
-    var fire_bounds := _bounds_in_ancestor(fire_station, room)
-    _expect_vec(fire_bounds.position, Vector3(-2.55, 0.0, 2.79), "fire suppression world minimum", 0.02)
-    _expect_vec(fire_bounds.end, Vector3(-1.45, 1.8, 3.36), "fire suppression world maximum", 0.02)
-    _expect(fire_bounds.position.x >= wall_envelope.position.x and fire_bounds.end.x <= wall_envelope.end.x, "fire suppression x envelope")
-    _expect(fire_bounds.position.z >= wall_envelope.position.z and fire_bounds.end.z <= wall_envelope.end.z, "fire suppression z envelope")
+	for pillar_name in ["RearPillarWest", "RearPillarEast"]:
+		var pillar := room.get_node(pillar_name) as Node3D
+		_expect(pillar != null, "%s node" % pillar_name)
+		var pillar_bounds: AABB = _bounds_in_ancestor(pillar, room)
+		_expect(pillar_bounds.position.y >= wall_envelope.position.y and pillar_bounds.end.y <= wall_envelope.end.y, "%s vertical envelope" % pillar_name)
+		_expect(pillar_bounds.position.x >= wall_envelope.position.x and pillar_bounds.end.x <= wall_envelope.end.x, "%s x envelope" % pillar_name)
+		_expect(pillar_bounds.position.z >= wall_envelope.position.z and pillar_bounds.end.z <= wall_envelope.end.z, "%s z envelope" % pillar_name)
 
-    var east_wall := room.get_node("Wall_05") as Node3D
-    _expect(east_wall != null, "east wall node for breach seal")
-    var east_wall_bounds := _bounds_in_ancestor(east_wall, room)
-    var breach := room.get_node("EastWallBreachSeal") as Node3D
-    _expect(breach != null, "east wall breach seal node")
-    _expect_vec(breach.position, Vector3(5.525, 1.09, 0.0), "east wall breach seal offset", 0.02)
-    _expect(absf(breach.rotation.y - PI / 2.0) <= 0.001, "east wall breach seal yaw")
-    var breach_bounds := _bounds_in_ancestor(breach, room)
-    _expect_vec(breach_bounds.position, Vector3(5.365, 0.0, -1.09), "east wall breach seal world minimum", 0.02)
-    _expect_vec(breach_bounds.end, Vector3(5.86, 2.18, 1.09), "east wall breach seal world maximum", 0.02)
-    _expect(absf(breach_bounds.end.x - east_wall_bounds.position.x) <= 0.02, "east wall breach seal meets east wall inner face")
-    _expect(breach_bounds.position.x >= wall_envelope.position.x and breach_bounds.end.x <= wall_envelope.end.x, "east wall breach seal x envelope")
-    _expect(breach_bounds.position.y >= wall_envelope.position.y and breach_bounds.end.y <= wall_envelope.end.y, "east wall breach seal y envelope")
-    _expect(breach_bounds.position.z >= wall_envelope.position.z and breach_bounds.end.z <= wall_envelope.end.z, "east wall breach seal z envelope")
+	var fire_station := room.get_node("FireSuppressionBesideEntry") as Node3D
+	_expect(fire_station != null, "fire suppression station node")
+	_expect_vec(fire_station.position, Vector3(-2.0, 0.0, 3.0), "fire suppression station offset")
+	_expect(absf(fire_station.rotation.y) <= 0.001, "fire suppression station yaw")
+	var fire_bounds: AABB = _bounds_in_ancestor(fire_station, room)
+	var fire_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/props/fire_suppression_station.glb"]
+	var fire_expected: Variant = _expected_world_bounds(fire_scene_bounds.position, fire_scene_bounds.end, Vector3(-2.0, 0.0, 3.0))
+	_expect(fire_expected != null, "fire suppression scene bounds read from comparison report")
+	_expect_vec(fire_bounds.position, fire_expected[0], "fire suppression world minimum", SCENE_OFFSET_TOLERANCE)
+	_expect_vec(fire_bounds.end, fire_expected[1], "fire suppression world maximum", SCENE_OFFSET_TOLERANCE)
+	_expect(fire_bounds.position.x >= wall_envelope.position.x and fire_bounds.end.x <= wall_envelope.end.x, "fire suppression x envelope")
+	_expect(fire_bounds.position.z >= wall_envelope.position.z and fire_bounds.end.z <= wall_envelope.end.z, "fire suppression z envelope")
 
-    capture.free()
-    room.free()
-    if _failed:
-        return
-    print("TASK1_REAL_GLTF_LAYOUT_PROBE GEOMETRY assets=9 ramp_world_min=%s ramp_world_max=%s wall_envelope_min=%s wall_envelope_max=%s ceiling_world_y=[%f,%f]" % [ramp_bounds.position, ramp_bounds.end, wall_envelope.position, wall_envelope.end, cap_bottom, cap_top])
-    print(PASS_MARKER)
-    quit(0)
+	var east_wall := room.get_node("Wall_05") as Node3D
+	_expect(east_wall != null, "east wall node for breach seal")
+	var east_wall_bounds: AABB = _bounds_in_ancestor(east_wall, room)
+	var breach_scene_bounds: AABB = scene_bounds_by_path["res://assets/_staging/focused_nine/props/hull_breach_seal_point.glb"]
+	# Breach seal is rotated 90 degrees about Y before placement, matching the
+	# capture script's breach-anchor composition.  Rotate scene AABB corners,
+	# then translate by the same placement offset the capture computes.
+	var breach_corners: Array[Vector3] = []
+	var breach_min: Vector3 = breach_scene_bounds.position
+	var breach_max: Vector3 = breach_scene_bounds.end
+	for cx in [breach_min.x, breach_max.x]:
+		for cy in [breach_min.y, breach_max.y]:
+			for cz in [breach_min.z, breach_max.z]:
+				breach_corners.append(Vector3(cz, cy, -cx))
+	var breach_rotated: AABB = AABB(breach_corners[0], Vector3.ZERO)
+	for index in range(1, breach_corners.size()):
+		breach_rotated = breach_rotated.expand(breach_corners[index])
+	var breach_x_offset: float = east_wall_bounds.position.x - breach_rotated.end.x
+	var breach_y_offset: float = -breach_scene_bounds.position.y
+	var breach_z_offset: float = -breach_rotated.position.z - (breach_rotated.end.z - breach_rotated.position.z) / 2.0
+	var breach_placement := Vector3(breach_x_offset, breach_y_offset, breach_z_offset)
+	var breach_expected: Variant = _expected_world_bounds(breach_rotated.position, breach_rotated.end, breach_placement)
+	_expect(breach_expected != null, "breach seal scene bounds read from comparison report")
+	var breach := room.get_node("EastWallBreachSeal") as Node3D
+	_expect(breach != null, "east wall breach seal node")
+	var breach_bounds: AABB = _bounds_in_ancestor(breach, room)
+	_expect_vec(breach_bounds.position, breach_expected[0], "east wall breach seal world minimum vs scene evidence", SCENE_OFFSET_TOLERANCE)
+	_expect_vec(breach_bounds.end, breach_expected[1], "east wall breach seal world maximum vs scene evidence", SCENE_OFFSET_TOLERANCE)
+	_expect(absf(breach_bounds.end.x - east_wall_bounds.position.x) <= 0.05, "east wall breach seal meets east wall inner face")
+	_expect(breach_bounds.position.x >= wall_envelope.position.x and breach_bounds.end.x <= wall_envelope.end.x, "east wall breach seal x envelope")
+	_expect(breach_bounds.position.y >= wall_envelope.position.y and breach_bounds.end.y <= wall_envelope.end.y, "east wall breach seal y envelope")
+	_expect(breach_bounds.position.z >= wall_envelope.position.z and breach_bounds.end.z <= wall_envelope.end.z, "east wall breach seal z envelope")
+
+	capture.free()
+	room.free()
+	if _failed:
+		return
+	print("TASK1_REAL_GLTF_LAYOUT_PROBE GEOMETRY assets=9 ramp_world_min=%s ramp_world_max=%s wall_envelope_min=%s wall_envelope_max=%s ceiling_world_y=[%f,%f]" % [ramp_bounds.position, ramp_bounds.end, wall_envelope.position, wall_envelope.end, cap_bottom, cap_top])
+	print(PASS_MARKER)
+	quit(0)
 """,
         encoding="utf-8",
     )

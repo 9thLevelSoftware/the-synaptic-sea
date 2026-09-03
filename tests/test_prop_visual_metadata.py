@@ -648,5 +648,249 @@ class PropVisualMetadataTests(unittest.TestCase):
         )
 
 
+def scene_test_document(
+    *,
+    primitive_min: tuple[float, float, float] = (-1.0, -2.0, -3.0),
+    primitive_max: tuple[float, float, float] = (4.0, 5.0, 6.0),
+    nodes: list[dict] | None = None,
+    scene_indices: list[int] | None = None,
+    default_scene: int = 0,
+) -> dict:
+    positions = b""
+    for _ in range(1):
+        for value in primitive_min:
+            positions += struct.pack("<f", value)
+        for value in primitive_max:
+            positions += struct.pack("<f", value)
+    buffer_length = len(positions)
+    document: dict = {
+        "asset": {"version": "2.0"},
+        "buffers": [{"byteLength": buffer_length}],
+        "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": buffer_length}],
+        "accessors": [
+            {
+                "bufferView": 0,
+                "componentType": 5126,
+                "count": 2,
+                "type": "VEC3",
+                "min": list(primitive_min),
+                "max": list(primitive_max),
+            }
+        ],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        "nodes": nodes or [],
+        "scenes": [
+            {"nodes": scene_indices if scene_indices is not None else []}
+        ],
+        "scene": default_scene,
+    }
+    return document
+
+
+class SceneTransformTests(unittest.TestCase):
+    def test_scene_bounds_equal_local_bounds_when_node_uses_identity_transform(self) -> None:
+        document = scene_test_document(
+            nodes=[
+                {"name": "root", "mesh": 0, "translation": [0.0, 0.0, 0.0]},
+            ],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "identity_node.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["local_max_m"], [4.0, 5.0, 6.0])
+        self.assertEqual(record["scene_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["scene_max_m"], [4.0, 5.0, 6.0])
+
+    def test_scene_bounds_apply_translated_node_transform(self) -> None:
+        document = scene_test_document(
+            nodes=[
+                {"name": "root", "mesh": 0, "translation": [10.0, 20.0, 30.0]},
+            ],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "translated.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["scene_min_m"], [9.0, 18.0, 27.0])
+        self.assertEqual(record["scene_max_m"], [14.0, 25.0, 36.0])
+
+    def test_scene_bounds_compose_parent_and_child_node_transforms(self) -> None:
+        document = scene_test_document(
+            nodes=[
+                {"name": "parent", "translation": [1.0, 0.0, 0.0], "children": [1]},
+                {"name": "child", "mesh": 0, "translation": [0.0, 2.0, 0.0]},
+            ],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["scene_min_m"], [0.0, 0.0, -3.0])
+        self.assertEqual(record["scene_max_m"], [5.0, 7.0, 6.0])
+
+    def test_scene_bounds_apply_rotation_via_quaternion(self) -> None:
+        # 90 degree yaw: quaternion (0, 0, sin(45), cos(45)).
+        half = math.sqrt(2.0) / 2.0
+        document = scene_test_document(
+            nodes=[
+                {"name": "root", "mesh": 0, "rotation": [0.0, 0.0, half, half]},
+            ],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rotated.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            record = read_glb_metadata(path)
+        # Local mesh: x in [-1, 4], y in [-2, 5], z in [-3, 6].
+        # 90 degree yaw about z: (x, y) -> (-y, x). So world corners:
+        # (-1,-2,-3) -> (2, -1, -3); (4,-2,-3) -> (2, 4, -3);
+        # (-1, 5, -3) -> (-5, -1, -3); (4,5,-3) -> (-5, 4, -3); z extremes unchanged.
+        self.assertEqual(record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["scene_min_m"][:2], [-5.0, -1.0])
+        self.assertEqual(record["scene_max_m"][:2], [2.0, 4.0])
+        self.assertEqual(record["scene_min_m"][2], -3.0)
+        self.assertEqual(record["scene_max_m"][2], 6.0)
+
+    def test_scene_bounds_apply_matrix_node_transform(self) -> None:
+        # Translation-only matrix (column-major): scale 2 on x then translate by +5 on y.
+        # Column 0: [2, 0, 0, 0]; column 1: [0, 1, 0, 0]; column 2: [0, 0, 1, 0]; column 3: [0, 5, 0, 1].
+        matrix = [
+            2.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 5.0, 0.0, 1.0,
+        ]
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0, "matrix": matrix}],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "matrix.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            record = read_glb_metadata(path)
+        # Local x in [-1,4] scaled by 2 -> [-2, 8]; y range [-2,5] shifted by +5 -> [3, 10].
+        self.assertEqual(record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(record["scene_min_m"][0], -2.0)
+        self.assertEqual(record["scene_max_m"][0], 8.0)
+        self.assertEqual(record["scene_min_m"][1], 3.0)
+        self.assertEqual(record["scene_max_m"][1], 10.0)
+        self.assertEqual(record["scene_min_m"][2], -3.0)
+        self.assertEqual(record["scene_max_m"][2], 6.0)
+
+    def test_scene_bounds_fall_back_to_local_when_no_scene_or_nodes(self) -> None:
+        # Build a GLB with only meshes and no nodes/scenes; scene bounds equal local.
+        positions = struct.pack("<6f", -1.0, -2.0, -3.0, 4.0, 5.0, 6.0)
+        document = {
+            "asset": {"version": "2.0"},
+            "buffers": [{"byteLength": len(positions)}],
+            "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(positions)}],
+            "accessors": [
+                {
+                    "bufferView": 0,
+                    "componentType": 5126,
+                    "count": 2,
+                    "type": "VEC3",
+                    "min": [-1.0, -2.0, -3.0],
+                    "max": [4.0, 5.0, 6.0],
+                }
+            ],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "no_nodes.glb"
+            path.write_bytes(make_glb(document, positions))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["scene_min_m"], record["local_min_m"])
+        self.assertEqual(record["scene_max_m"], record["local_max_m"])
+
+    def test_scene_bounds_fail_closed_on_nonfinite_translation(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0, "translation": [0.0, math.nan, 0.0]}],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nan.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_fail_closed_on_out_of_range_translation(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0, "translation": [1e9, 0.0, 0.0]}],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "huge.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_fail_closed_on_zero_scale(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0, "scale": [1.0, 0.0, 1.0]}],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "zero_scale.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_fail_closed_on_cyclic_node_hierarchy(self) -> None:
+        document = scene_test_document(
+            nodes=[
+                {"name": "a", "children": [1]},
+                {"name": "b", "children": [0]},
+            ],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cycle.glb"
+            path.write_bytes(make_glb(document))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_fail_closed_on_invalid_default_scene_index(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0}],
+            scene_indices=[0],
+            default_scene=2,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad_scene.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_rejects_invalid_out_of_range_node_index_in_scene(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0}],
+            scene_indices=[5],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad_node.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_scene_bounds_rejects_invalid_quaternion_out_of_unit_range(self) -> None:
+        document = scene_test_document(
+            nodes=[{"name": "root", "mesh": 0, "rotation": [0.0, 0.0, 0.0, 2.0]}],
+            scene_indices=[0],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad_quat.glb"
+            path.write_bytes(make_glb(document, b"\0" * 24))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+
 if __name__ == "__main__":
     unittest.main()

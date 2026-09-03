@@ -44,6 +44,7 @@ try:
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
+    from tools import prop_visual_metadata as prop_metadata
     from tools import structural_source_contract as source_contract
     from tools import validate_structural_sources as structural_validator
     from tools.focused_nine_blender_recipes import (
@@ -55,6 +56,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
+    from tools import prop_visual_metadata as prop_metadata
     from tools import structural_source_contract as source_contract
     from tools import validate_structural_sources as structural_validator
     from tools.focused_nine_blender_recipes import (
@@ -980,6 +982,42 @@ def _empty_metrics() -> dict[str, Any]:
     }
 
 
+def _scene_bounds_for_path(glb_path: Path | None) -> dict[str, list[float] | str | int | None]:
+    """Return scene-transformed bounds for one staged GLB.
+
+    When ``glb_path`` is missing or unreadable, returns the same shape populated
+    with zero bounds so callers can rely on a flat dict with no fallible nested
+    reads.
+    """
+
+    if glb_path is None:
+        return {
+            "scene_min_m": [0.0, 0.0, 0.0],
+            "scene_max_m": [0.0, 0.0, 0.0],
+            "source_glb": None,
+            "byte_size": 0,
+            "sha256": "0" * 64,
+        }
+    try:
+        metadata = prop_metadata.read_glb_metadata(glb_path)
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        return {
+            "scene_min_m": [0.0, 0.0, 0.0],
+            "scene_max_m": [0.0, 0.0, 0.0],
+            "source_glb": str(glb_path),
+            "byte_size": 0,
+            "sha256": "0" * 64,
+            "source_error": str(exc),
+        }
+    return {
+        "scene_min_m": [float(value) for value in metadata["scene_min_m"]],
+        "scene_max_m": [float(value) for value in metadata["scene_max_m"]],
+        "source_glb": str(glb_path),
+        "byte_size": int(metadata["byte_size"]),
+        "sha256": str(metadata["sha256"]),
+    }
+
+
 def _asset_record(
     project_root: Path,
     args: argparse.Namespace,
@@ -1341,6 +1379,7 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
         role_metrics["sidecar"] = sidecar
 
     evidence_records: dict[str, dict[str, Any]] = {}
+    scene_bounds: dict[str, dict[str, Any]] = {}
     for path in staged:
         _validate_staged_glb_input(path)
         record = evidence.inspect_staged_glb(path, BLENDER)
@@ -1352,6 +1391,7 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
             raise ValueError(f"evidence validation failed for {asset_id}: {'; '.join(errors)}")
         role = "intact" if path.name == f"{asset_id}.glb" else path.stem.removeprefix(f"{asset_id}_")
         evidence_records[role] = record
+        scene_bounds[role] = _scene_bounds_for_path(path)
     if kind == "structural" and asset_id == "pressure_door_1x1":
         _write_structural_source_record(args, asset_id, source, candidate_glb=staged[0])
     if kind == "structural" and asset_id == "pressure_door_1x1":
@@ -1362,6 +1402,7 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
             **_metrics_from_evidence(record),
             "path": f"res://{contract.asset_stage_glb(args.project_root, asset_id, role).relative_to(args.project_root.resolve()).as_posix()}",
             "validation": "PASS",
+            "scene_bounds": dict(scene_bounds[role]),
         }
     return (
         _asset_record(args.project_root, args, asset_id, source, staged, _metrics_from_evidence(intact), (), True, None, role_metrics),

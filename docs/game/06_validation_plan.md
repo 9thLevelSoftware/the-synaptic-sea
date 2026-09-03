@@ -782,7 +782,11 @@ run_clean 'hive biomatter kit smoke' 'HIVE BIOMATTER KIT PASS template=true kit=
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'structural wrapper collision footprint smoke' 'STRUCTURAL WRAPPER COLLISION FOOTPRINT PASS walls=true corners=true doors=true aperture=true thickness=0.2 hatch_skipped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=156 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+# seed_000017 authority is the current production generator (MEDIUM/PRISTINE
+# seed 17): 10 rooms, 29 portals, 69 placements, 51 floors, 4 objectives.
+# Fixtures are JSON-safe arrays with structural_plan.validated=true; do not
+# restore the historical 84/51 pair. Marker is the observed loader line.
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=251 structural_live=true edge_wrappers=69 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd

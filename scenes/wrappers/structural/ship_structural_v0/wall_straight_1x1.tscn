@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3]
 [ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1.glb" id="1_visual"]
-[ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1.glb" id="2_visual_damaged"]
-[ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1.glb" id="3_visual_breached"]
+[ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1_damaged.glb" id="2_visual_damaged"]
+[ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1_breached.glb" id="3_visual_breached"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(4, 3, 0.2)
