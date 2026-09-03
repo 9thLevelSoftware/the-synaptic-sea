@@ -22,6 +22,10 @@ const RecipeLibraryScript: GDScript = preload("res://scripts/systems/biomass_rec
 const PARTS_PATH: String = "res://data/combat/biomass_part_catalog.json"
 const RECIPES_PATH: String = "res://data/combat/biomass_recipe_catalog.json"
 const INVALID_PARTS_PATH: String = "res://tests/fixtures/biomass_invalid_wrapper_catalog.json"
+const FIXTURE_TORSO: String = "res://tests/fixtures/biomass_valid_core_wrapper.tscn"
+const FIXTURE_CLAW: String = "res://tests/fixtures/biomass_valid_nested_wrapper.tscn"
+const FIXTURE_TENTACLE: String = "res://tests/fixtures/biomass_node_overflow_wrapper.tscn"
+const PREDELETE_MARKER: String = "user://biomass_predelete_probe.marker"
 
 const EXPECTED: Dictionary = {
 	"biped_puppet_v1": {"attachments": 4, "occurrences": 9, "collision_nodes": 9, "disabled_connectors": 4, "nodes": 58, "triangles": 17000},
@@ -51,7 +55,13 @@ func _run() -> void:
 	var library: Variant = RecipeLibraryScript.new()
 	if not _need(library.load_path(RECIPES_PATH, parts), "recipe library did not load"):
 		return
+	if not _need(_fixture_loader_checks(), "fixture loader checks failed"):
+		return
+	if not _need(_fixture_catalog_checks(), "fixture catalog checks failed"):
+		return
 	if not _need(_factory_direct_checks(parts), "factory direct checks failed"):
+		return
+	if not _need(_factory_malformed_socket_probe(), "factory malformed-socket probe failed"):
 		return
 	if not _need(_recipe_acceptance_checks(parts, library), "recipe acceptance checks failed"):
 		return
@@ -63,7 +73,17 @@ func _run() -> void:
 		return
 	if not _need(_invalid_wrapper_fixture_checks(parts), "invalid wrapper fixture failed"):
 		return
+	if not _need(_fixture_scene_contract_checks(), "fixture scene contracts failed"):
+		return
+	if not _need(_node_overflow_fixture_probe(parts), "node overflow fixture probe failed"):
+		return
+	if not _need(_triangle_overflow_fixture_probe(parts, library), "triangle overflow fixture probe failed"):
+		return
 	if not _need(await _rest_accessors_and_oracle_checks(parts, library), "rest accessor / oracle checks failed"):
+		return
+	if not _need(await _reset_to_assembly_rest_probe(parts, library), "reset-to-assembly-rest probe failed"):
+		return
+	if not _need(_wrong_script_parts_probe(parts, library), "wrong-script parts probe failed"):
 		return
 	if not _need(await _physics_collision_checks(parts, library), "physics collision checks failed"):
 		return
@@ -271,8 +291,8 @@ func _invalid_wrapper_fixture_checks(parts: Variant) -> bool:
 	var insect_entry: Dictionary = fixture_parts.get_part("biomass_insect_leg_v1")
 	if not _need(insect_entry.get("wrapper_scene_path", "") == "res://project.godot", "fixture catalog did not redirect insect leg wrapper"):
 		return false
-	var skull_entry: Dictionary = fixture_parts.get_part("biomass_animal_skull_v1")
-	if not _need(skull_entry.get("wrapper_scene_path", "") == "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn", "fixture catalog did not redirect skull wrapper"):
+	var maw_entry: Dictionary = fixture_parts.get_part("biomass_maw_v1")
+	if not _need(maw_entry.get("wrapper_scene_path", "") == "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn", "fixture catalog did not redirect maw wrapper"):
 		return false
 	var assembler: Variant = AssemblerScript.new()
 	# Non-PackedScene probe: torso (empty wrapper, core role) + insect_leg
@@ -286,9 +306,13 @@ func _invalid_wrapper_fixture_checks(parts: Variant) -> bool:
 	var non_packed_recipe: Variant = RecipeScript.from_dict(non_packed_doc, fixture_parts)
 	if not _need(non_packed_recipe != null and non_packed_recipe.is_valid(), "non-PackedScene probe recipe was invalid: %s" % non_packed_recipe.diagnostics()):
 		return false
+	_clear_predelete_marker()
 	var first_a: Variant = assembler.build(non_packed_recipe, fixture_parts)
 	if not _need(first_a == null, "non-PackedScene wrapper was accepted"):
 		return false
+	if not _need(_predelete_marker_exists(), "non-PackedScene outer visual was not freed synchronously"):
+		return false
+	_clear_predelete_marker()
 	var first_diag: PackedStringArray = assembler.last_diagnostics()
 	var second_a: Variant = assembler.build(non_packed_recipe, fixture_parts)
 	if not _need(second_a == null, "second non-PackedScene wrapper build was non-null"):
@@ -299,21 +323,24 @@ func _invalid_wrapper_fixture_checks(parts: Variant) -> bool:
 	sorted_a.sort()
 	if not _need(first_diag == sorted_a, "non-PackedScene diagnostics not sorted"):
 		return false
-	# Forbidden-physics probe: torso (empty wrapper, core role) + arm
-	# (locomotor, empty wrapper) + skull (head, forbidden-physics wrapper).
+	# Forbidden-physics probe: torso core + arm + maw on appendage_2.
 	var physics_doc: Dictionary = _attachment_recipe(
 		"wrapper_probe_physics",
 		"biomass_humanoid_torso_v1",
 		"limb_0",
 		"biomass_human_arm_v1",
-		"biomass_animal_skull_v1",
+		"biomass_maw_v1",
 	)
 	var physics_recipe: Variant = RecipeScript.from_dict(physics_doc, fixture_parts)
 	if not _need(physics_recipe != null and physics_recipe.is_valid(), "forbidden-physics probe recipe was invalid: %s" % physics_recipe.diagnostics()):
 		return false
+	_clear_predelete_marker()
 	var first_p: Variant = assembler.build(physics_recipe, fixture_parts)
 	if not _need(first_p == null, "forbidden-physics wrapper was accepted"):
 		return false
+	if not _need(_predelete_marker_exists(), "forbidden-physics outer visual was not freed synchronously"):
+		return false
+	_clear_predelete_marker()
 	var physics_diag: PackedStringArray = assembler.last_diagnostics()
 	var second_p: Variant = assembler.build(physics_recipe, fixture_parts)
 	if not _need(second_p == null, "second forbidden-physics build was non-null"):
@@ -347,7 +374,7 @@ func _attachment_recipe(recipe_id: String, core_part_id: String, parent_socket: 
 				"instance_id": "second",
 				"part_id": second_part_id,
 				"parent_instance_id": "core",
-				"parent_socket": "head_0" if second_part_id == "biomass_animal_skull_v1" else "limb_2",
+				"parent_socket": "head_0" if second_part_id == "biomass_animal_skull_v1" else ("appendage_2" if second_part_id == "biomass_maw_v1" else "limb_2"),
 				"child_socket": "root_0",
 				"connector_part_id": "biomass_gunk_connector_v1",
 			}
@@ -617,12 +644,410 @@ func _free_lifecycle_checks(parts: Variant, library: Variant) -> bool:
 	var second: Variant = AssemblerScript.new().build(recipe, parts)
 	if not _need(second != null, "post-free rebuild returned null"):
 		return false
-	second.queue_free()
+	second.free()
 	return true
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Fixture loader / catalog probes (R4-R7 setup, run before all other probes).
 # ---------------------------------------------------------------------------
+
+func _fixture_loader_checks() -> bool:
+	for path in [FIXTURE_TORSO, FIXTURE_CLAW, FIXTURE_TENTACLE, "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn"]:
+		if not ResourceLoader.exists(path, "PackedScene"):
+			return _fail_with("ResourceLoader.exists failed: " + path)
+		var resource: Resource = load(path)
+		if not resource is PackedScene:
+			return _fail_with("load() did not return PackedScene: " + path)
+		var inst: Node = (resource as PackedScene).instantiate()
+		if not inst is Node3D:
+			inst.free()
+			return _fail_with("instantiate root is not Node3D: " + path)
+		inst.free()
+	return true
+
+func _fixture_catalog_checks() -> bool:
+	var fixture_parts: Variant = PartCatalogScript.new()
+	if not fixture_parts.load_path(INVALID_PARTS_PATH):
+		return _fail_with("invalid-wrapper fixture catalog did not load")
+	var expected: Dictionary = {
+		"biomass_insect_leg_v1": "res://project.godot",
+		"biomass_animal_skull_v1": "",
+		"biomass_maw_v1": "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn",
+		"biomass_humanoid_torso_v1": FIXTURE_TORSO,
+		"biomass_claw_v1": FIXTURE_CLAW,
+		"biomass_cephalopod_tentacle_v1": FIXTURE_TENTACLE,
+	}
+	for part_id in expected.keys():
+		var entry: Dictionary = fixture_parts.get_part(part_id)
+		if entry.is_empty():
+			return _fail_with("fixture catalog missing entry: " + part_id)
+		if String(entry.get("wrapper_scene_path", "")) != expected[part_id]:
+			return _fail_with("fixture catalog wrapper path wrong for: " + part_id)
+	return true
+
+func _fixture_scene_contract_checks() -> bool:
+	var fixture_parts: Variant = PartCatalogScript.new()
+	if not fixture_parts.load_path(INVALID_PARTS_PATH):
+		return _fail_with("fixture catalog did not load for scene contract checks")
+	for part_id in ["biomass_humanoid_torso_v1", "biomass_claw_v1", "biomass_cephalopod_tentacle_v1"]:
+		var entry: Dictionary = fixture_parts.get_part(part_id)
+		var resource: Resource = load(String(entry.get("wrapper_scene_path", "")))
+		if not _need(resource is PackedScene, "fixture is not PackedScene for %s" % part_id):
+			return false
+		var root_value: Node = (resource as PackedScene).instantiate()
+		if not _need(root_value is Node3D, "fixture root is not Node3D for %s" % part_id):
+			if root_value != null:
+				root_value.free()
+			return false
+		var root: Node3D = root_value as Node3D
+		var visible_meshes: int = 0
+		for mesh_value in root.find_children("*", "MeshInstance3D", true, false):
+			if mesh_value is MeshInstance3D and (mesh_value as MeshInstance3D).mesh != null:
+				visible_meshes += 1
+		if not _need(visible_meshes >= 1, "fixture has no real mesh for %s" % part_id):
+			root.free()
+			_clear_predelete_marker()
+			return false
+		for socket_value in entry.get("sockets", []) as Array:
+			var socket_entry: Dictionary = socket_value
+			var socket_name: String = String(socket_entry.get("name", ""))
+			var matches: Array[Node3D] = []
+			_collect_named_node3d(root, socket_name, matches)
+			if not _need(matches.size() == 1, "fixture socket count != 1 for %s.%s" % [part_id, socket_name]):
+				root.free()
+				_clear_predelete_marker()
+				return false
+			var actual: Transform3D = _transform_to_ancestor(matches[0], root)
+			var position_value: Array = socket_entry.get("position_m", []) as Array
+			var rotation_value: Array = socket_entry.get("rotation_deg", []) as Array
+			var expected_transform := Transform3D(
+				Basis.from_euler(Vector3(deg_to_rad(float(rotation_value[0])), deg_to_rad(float(rotation_value[1])), deg_to_rad(float(rotation_value[2])))),
+				Vector3(float(position_value[0]), float(position_value[1]), float(position_value[2]))
+			)
+			if not _need(actual.origin.distance_to(expected_transform.origin) <= 0.001, "fixture socket position drift for %s.%s" % [part_id, socket_name]):
+				root.free()
+				_clear_predelete_marker()
+				return false
+			var angle: float = actual.basis.get_rotation_quaternion().angle_to(expected_transform.basis.get_rotation_quaternion())
+			if not _need(angle <= deg_to_rad(0.1), "fixture socket rotation drift for %s.%s" % [part_id, socket_name]):
+				root.free()
+				_clear_predelete_marker()
+				return false
+		root.free()
+		_clear_predelete_marker()
+	return true
+
+func _collect_named_node3d(node: Node, target_name: String, matches: Array[Node3D]) -> void:
+	if node is Node3D and String(node.name) == target_name:
+		matches.append(node as Node3D)
+	for child in node.get_children():
+		_collect_named_node3d(child, target_name, matches)
+
+func _transform_to_ancestor(node: Node3D, ancestor: Node3D) -> Transform3D:
+	var result := Transform3D.IDENTITY
+	var cursor: Node = node
+	while cursor != ancestor:
+		if cursor == null or not cursor is Node3D:
+			return Transform3D.IDENTITY
+		result = (cursor as Node3D).transform * result
+		cursor = cursor.get_parent()
+	return result
+
+func _diagnostics_contain(diagnostics: PackedStringArray, needle: String) -> bool:
+	for diagnostic in diagnostics:
+		if String(diagnostic).contains(needle):
+			return true
+	return false
+
+func _clear_predelete_marker() -> void:
+	for path in [PREDELETE_MARKER, PREDELETE_MARKER + ".tmp"]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+func _predelete_marker_exists() -> bool:
+	return FileAccess.file_exists(PREDELETE_MARKER)
+
+# ---------------------------------------------------------------------------
+# Factory malformed-socket probe (R9). Build a part entry whose sockets list
+# contains a malformed entry (non-array position_m); factory must return
+# null and leave immediate OBJECT_NODE_COUNT unchanged.
+# ---------------------------------------------------------------------------
+
+func _factory_malformed_socket_probe() -> bool:
+	var entry: Dictionary = {
+		"category": "biomass_limb",
+		"species_tags": ["human"],
+		"assembly_roles": ["locomotor"],
+		"wrapper_scene_path": "",
+		"triangle_budget": 2500,
+		"sockets": [
+			{
+				"name": "socket_root_0",
+				"kind": "root",
+				"accepts_categories": [],
+				"position_m": "not-an-array",
+				"rotation_deg": [0, 0, 0],
+			},
+		],
+		"collision_shapes": [],
+		"fallback": {
+			"primitive": "capsule",
+			"dimensions_m": [0.24, 0.24, 1.0],
+			"albedo": "#8b5252",
+		},
+	}
+	var before: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var node: Variant = FactoryScript.build("biomass_malformed_v1", entry)
+	if not _need(node == null, "factory accepted malformed socket"):
+		return false
+	var after: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	if not _need(after == before, "factory leaked nodes for malformed socket: %d -> %d" % [before, after]):
+		return false
+	return true
+
+# ---------------------------------------------------------------------------
+# Wrong-script parts probe (R2). Pass valid recipe + a wrong-script Object
+# (BiomassThreatVisualScript.new()) as parts. The current code calls
+# parts.get_part() before script validation, producing SCRIPT ERROR.
+# Required: build returns null, stable sorted diagnostics, zero SCRIPT ERROR.
+# ---------------------------------------------------------------------------
+
+func _wrong_script_parts_probe(parts: Variant, library: Variant) -> bool:
+	var wrong_parts: Object = VisualScript.new()
+	var assembler: Variant = AssemblerScript.new()
+	var first: Variant = assembler.build(library.get_recipe("biped_puppet_v1"), wrong_parts)
+	if not _need(first == null, "wrong-script parts was accepted"):
+		return false
+	var first_diag: PackedStringArray = assembler.last_diagnostics()
+	if not _need(not first_diag.is_empty(), "wrong-script parts produced empty diagnostics"):
+		return false
+	var second: Variant = assembler.build(library.get_recipe("biped_puppet_v1"), wrong_parts)
+	if not _need(second == null, "wrong-script parts second build was non-null"):
+		return false
+	if not _need(first_diag == assembler.last_diagnostics(), "wrong-script parts diagnostics not stable"):
+		return false
+	var sorted: PackedStringArray = first_diag.duplicate()
+	sorted.sort()
+	if not _need(first_diag == sorted, "wrong-script parts diagnostics not sorted"):
+		return false
+	var seen: Dictionary = {}
+	for d in first_diag:
+		if seen.has(d):
+			wrong_parts.free()
+			return _fail_with("wrong-script parts diagnostics not deduplicated")
+		seen[d] = true
+	wrong_parts.free()
+	return true
+
+# ---------------------------------------------------------------------------
+# Node-overflow fixture probe (R7). Fixture catalog's cephalopod_tentacle has
+# a wrapper with many benign descendants so a small BiomassRecipe-valid
+# recipe's actual subtree exceeds 160 nodes. Build must return null with
+# stable node-limit diagnostic and immediate OBJECT_NODE_COUNT equality.
+# ---------------------------------------------------------------------------
+
+func _node_overflow_fixture_probe(parts: Variant) -> bool:
+	var fixture_parts: Variant = PartCatalogScript.new()
+	if not fixture_parts.load_path(INVALID_PARTS_PATH):
+		return _fail_with("fixture catalog did not load for node overflow probe")
+	var recipe_doc: Dictionary = {
+		"recipe_id": "node_overflow_probe_v1",
+		"locomotion_hint": "drag",
+		"core": {"instance_id": "core", "part_id": "biomass_humanoid_torso_v1"},
+		"attachments": [
+			{
+				"instance_id": "tentacle",
+				"part_id": "biomass_cephalopod_tentacle_v1",
+				"parent_instance_id": "core",
+				"parent_socket": "limb_0",
+				"child_socket": "root_0",
+				"connector_part_id": "biomass_gunk_connector_v1",
+			},
+		],
+	}
+	var recipe: Variant = RecipeScript.from_dict(recipe_doc, fixture_parts)
+	if not _need(recipe != null and recipe.is_valid(), "node-overflow probe recipe was invalid: " + str(recipe.diagnostics())):
+		return false
+	var assembler: Variant = AssemblerScript.new()
+	_clear_predelete_marker()
+	var before: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var visual: Variant = assembler.build(recipe, fixture_parts)
+	var after: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	if not _need(visual == null, "node-overflow build returned non-null"):
+		return false
+	if not _need(after == before, "node-overflow build left nodes: %d -> %d" % [before, after]):
+		return false
+	var diag: PackedStringArray = assembler.last_diagnostics()
+	if not _need(_diagnostics_contain(diag, "runtime node limit exceeded"), "node-overflow did not reach node limit: %s" % diag):
+		return false
+	if not _need(_predelete_marker_exists(), "node-overflow outer visual was not freed synchronously"):
+		return false
+	_clear_predelete_marker()
+	var second: Variant = assembler.build(recipe, fixture_parts)
+	if not _need(second == null, "node-overflow second build was non-null"):
+		return false
+	if not _need(assembler.last_diagnostics() == diag, "node-overflow diagnostics not stable"):
+		return false
+	return true
+
+# ---------------------------------------------------------------------------
+# Triangle overflow fixture probe (R8). Canonical biped recipe from canonical
+# library + fixture parts (arms=9000) recompute >30000. Build must return
+# null with stable diagnostics and immediate OBJECT_NODE_COUNT equality.
+# ---------------------------------------------------------------------------
+
+func _triangle_overflow_fixture_probe(parts: Variant, library: Variant) -> bool:
+	var fixture_parts: Variant = PartCatalogScript.new()
+	if not fixture_parts.load_path(INVALID_PARTS_PATH):
+		return _fail_with("fixture catalog did not load for triangle overflow probe")
+	var recipe_doc: Dictionary = {
+		"recipe_id": "triangle_overflow_probe_v1",
+		"locomotion_hint": "crawl",
+		"core": {"instance_id": "core", "part_id": "biomass_humanoid_torso_v1"},
+		"attachments": [
+			{"instance_id": "arm_0", "part_id": "biomass_human_arm_v1", "parent_instance_id": "core", "parent_socket": "limb_0", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+			{"instance_id": "arm_1", "part_id": "biomass_human_arm_v1", "parent_instance_id": "core", "parent_socket": "limb_1", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+			{"instance_id": "arm_2", "part_id": "biomass_human_arm_v1", "parent_instance_id": "core", "parent_socket": "limb_2", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+		],
+	}
+	var canonical_recipe: Variant = RecipeScript.from_dict(recipe_doc, parts)
+	if not _need(canonical_recipe != null and canonical_recipe.is_valid(), "canonical triangle-overflow recipe was invalid: %s" % canonical_recipe.diagnostics()):
+		return false
+	var assembler: Variant = AssemblerScript.new()
+	_clear_predelete_marker()
+	var before: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var visual: Variant = assembler.build(canonical_recipe, fixture_parts)
+	var after: int = int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	if not _need(visual == null, "triangle-overflow build returned non-null"):
+		return false
+	if not _need(after == before, "triangle-overflow build left nodes: %d -> %d" % [before, after]):
+		return false
+	var diag: PackedStringArray = assembler.last_diagnostics()
+	if not _need(_diagnostics_contain(diag, "triangle limit exceeded"), "triangle-overflow did not reach triangle limit: %s" % diag):
+		return false
+	if not _need(_predelete_marker_exists(), "triangle-overflow outer visual was not freed synchronously"):
+		return false
+	_clear_predelete_marker()
+	var sorted: PackedStringArray = diag.duplicate()
+	sorted.sort()
+	if not _need(diag == sorted, "triangle-overflow diagnostics not sorted"):
+		return false
+	var seen: Dictionary = {}
+	for d in diag:
+		if seen.has(d):
+			return _fail_with("triangle-overflow diagnostics not deduplicated")
+		seen[d] = true
+	var second: Variant = assembler.build(canonical_recipe, fixture_parts)
+	if not _need(second == null, "triangle-overflow second build was non-null"):
+		return false
+	if not _need(assembler.last_diagnostics() == diag, "triangle-overflow diagnostics not stable"):
+		return false
+	return true
+
+# ---------------------------------------------------------------------------
+# Reset-to-assembly-rest probe (R1). Build a canonical recipe, attach to the
+# scene tree, deliberately mutate every mount and part transform, then call
+# visual._reset_to_assembly_rest(). Assert exact stored mount visual-local
+# and part immediate-parent-local restoration. Includes a nested-wrapper
+# claw child to exercise the recursive-composition path.
+# ---------------------------------------------------------------------------
+
+func _reset_to_assembly_rest_probe(parts: Variant, library: Variant) -> bool:
+	var fixture_parts: Variant = PartCatalogScript.new()
+	if not fixture_parts.load_path(INVALID_PARTS_PATH):
+		return _fail_with("fixture catalog did not load for reset probe")
+	# Build a fixture-valid biped recipe that exercises the nonidentity torso
+	# root and a nested claw child under an arm's distal socket.
+	var recipe_doc: Dictionary = {
+		"recipe_id": "fixture_reset_probe_v1",
+		"locomotion_hint": "biped",
+		"core": {"instance_id": "core", "part_id": "biomass_humanoid_torso_v1"},
+		"attachments": [
+			{"instance_id": "arm_left", "part_id": "biomass_human_arm_v1", "parent_instance_id": "core", "parent_socket": "limb_0", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+			{"instance_id": "arm_right", "part_id": "biomass_human_arm_v1", "parent_instance_id": "core", "parent_socket": "limb_1", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+			{"instance_id": "head", "part_id": "biomass_animal_skull_v1", "parent_instance_id": "core", "parent_socket": "head_0", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+			{"instance_id": "claw", "part_id": "biomass_claw_v1", "parent_instance_id": "arm_left", "parent_socket": "distal_0", "child_socket": "root_0", "connector_part_id": "biomass_gunk_connector_v1"},
+		],
+	}
+	var recipe: Variant = RecipeScript.from_dict(recipe_doc, fixture_parts)
+	if not _need(recipe != null and recipe.is_valid(), "reset probe recipe was invalid: " + str(recipe.diagnostics())):
+		return false
+	var assembler: Variant = AssemblerScript.new()
+	var visual: Variant = assembler.build(recipe, fixture_parts)
+	if not _need(visual != null, "reset probe build returned null"):
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	if not visual.has_method("_reset_to_assembly_rest"):
+		visual.queue_free()
+		await process_frame
+		await physics_frame
+		return _fail_with("BiomassThreatVisual is missing _reset_to_assembly_rest()")
+	# Capture every mount's visual-local rest and every part's immediate-parent-local rest.
+	var mount_baseline: Dictionary = {}
+	for edge_value in recipe.to_dict().get("attachments", []) as Array:
+		var edge: Dictionary = edge_value
+		var instance_id: String = String(edge.get("instance_id", ""))
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount != null:
+			mount_baseline[instance_id] = mount.transform
+		var part_node: Node3D = visual.part(instance_id)
+		if part_node != null:
+			mount_baseline["part_" + instance_id] = part_node.transform
+	var core_doc: Variant = recipe.to_dict().get("core")
+	if core_doc is Dictionary:
+		var core_id: String = String((core_doc as Dictionary).get("instance_id", ""))
+		var core_part: Node3D = visual.part(core_id)
+		if core_part != null:
+			mount_baseline["part_" + core_id] = core_part.transform
+	# Deliberately mutate every mount and part transform off rest.
+	var mutated: int = 0
+	for instance_id in mount_baseline.keys():
+		if String(instance_id).begins_with("part_"):
+			continue
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount != null:
+			mount.transform = Transform3D.IDENTITY.translated(Vector3(99.0, 99.0, 99.0))
+			mutated += 1
+	for instance_id in mount_baseline.keys():
+		if not String(instance_id).begins_with("part_"):
+			continue
+		var part_id_short: String = instance_id.substr(5)
+		var part_node: Node3D = visual.part(part_id_short)
+		if part_node != null:
+			part_node.transform = Transform3D.IDENTITY.translated(Vector3(-99.0, -99.0, -99.0))
+			mutated += 1
+	if not _need(mutated > 0, "reset probe did not find any mounts/parts to mutate"):
+		visual.queue_free()
+		await process_frame
+		await physics_frame
+		return false
+	visual._reset_to_assembly_rest()
+	# Assert exact restored baselines.
+	for instance_id in mount_baseline.keys():
+		var baseline: Transform3D = mount_baseline[instance_id]
+		if String(instance_id).begins_with("part_"):
+			var part_id_short: String = instance_id.substr(5)
+			var part_node: Node3D = visual.part(part_id_short)
+			if not _need(part_node != null and part_node.transform == baseline, "reset did not restore part %s (got %s expected %s)" % [part_id_short, part_node.transform, baseline]):
+				visual.queue_free()
+				await process_frame
+				await physics_frame
+				return false
+		else:
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if not _need(mount != null and mount.transform == baseline, "reset did not restore mount %s (got %s expected %s)" % [instance_id, mount.transform, baseline]):
+				visual.queue_free()
+				await process_frame
+				await physics_frame
+				return false
+	visual.queue_free()
+	await process_frame
+	await physics_frame
+	_clear_predelete_marker()
+	return true
 
 func _count_scene_nodes(node: Node) -> int:
 	var total: int = 0

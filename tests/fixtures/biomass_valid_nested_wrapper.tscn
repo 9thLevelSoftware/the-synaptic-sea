@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_claw"]
+size = Vector3(0.35, 0.2, 0.2)
+
+[node name="BiomassNestedWrapper" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_claw")
+
+[node name="Pivot" type="Node3D" parent="."]
+rotation = Vector3(0.52359878, 0, 0)
+
+[node name="Inner" type="Node3D" parent="Pivot"]
+rotation = Vector3(-0.52359878, 0, 0)
+
+[node name="socket_root_0" type="Node3D" parent="Pivot/Inner"]

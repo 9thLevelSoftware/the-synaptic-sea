@@ -19,7 +19,7 @@
         "puller"
       ],
       "wrapper_scene_path": "",
-      "triangle_budget": 2500,
+      "triangle_budget": 9000,
       "sockets": [
         {
           "name": "socket_root_0",
@@ -164,7 +164,7 @@
         "puller",
         "slither"
       ],
-      "wrapper_scene_path": "",
+      "wrapper_scene_path": "res://tests/fixtures/biomass_node_overflow_wrapper.tscn",
       "triangle_budget": 2500,
       "sockets": [
         {
@@ -237,7 +237,7 @@
         "core",
         "detail"
       ],
-      "wrapper_scene_path": "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn",
+      "wrapper_scene_path": "",
       "triangle_budget": 3500,
       "sockets": [
         {
@@ -383,7 +383,7 @@
       "assembly_roles": [
         "core"
       ],
-      "wrapper_scene_path": "",
+      "wrapper_scene_path": "res://tests/fixtures/biomass_valid_core_wrapper.tscn",
       "triangle_budget": 5000,
       "sockets": [
         {
@@ -668,7 +668,7 @@
         "detail",
         "manipulator"
       ],
-      "wrapper_scene_path": "",
+      "wrapper_scene_path": "res://tests/fixtures/biomass_valid_nested_wrapper.tscn",
       "triangle_budget": 1500,
       "sockets": [
         {
@@ -725,7 +725,7 @@
       "assembly_roles": [
         "detail"
       ],
-      "wrapper_scene_path": "",
+      "wrapper_scene_path": "res://tests/fixtures/biomass_forbidden_physics_wrapper.tscn",
       "triangle_budget": 1500,
       "sockets": [
         {

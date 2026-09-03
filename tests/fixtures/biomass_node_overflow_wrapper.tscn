@@ -1,0 +1,304 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_tentacle"]
+size = Vector3(0.24, 0.24, 1.2)
+
+[node name="BiomassOverflowWrapper" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_tentacle")
+
+[node name="socket_root_0" type="Node3D" parent="."]
+
+[node name="socket_distal_0" type="Node3D" parent="."]
+position = Vector3(0, 0, 1.2)
+
+[node name="BenignNode_000" type="Node3D" parent="."]
+
+[node name="BenignNode_001" type="Node3D" parent="."]
+
+[node name="BenignNode_002" type="Node3D" parent="."]
+
+[node name="BenignNode_003" type="Node3D" parent="."]
+
+[node name="BenignNode_004" type="Node3D" parent="."]
+
+[node name="BenignNode_005" type="Node3D" parent="."]
+
+[node name="BenignNode_006" type="Node3D" parent="."]
+
+[node name="BenignNode_007" type="Node3D" parent="."]
+
+[node name="BenignNode_008" type="Node3D" parent="."]
+
+[node name="BenignNode_009" type="Node3D" parent="."]
+
+[node name="BenignNode_010" type="Node3D" parent="."]
+
+[node name="BenignNode_011" type="Node3D" parent="."]
+
+[node name="BenignNode_012" type="Node3D" parent="."]
+
+[node name="BenignNode_013" type="Node3D" parent="."]
+
+[node name="BenignNode_014" type="Node3D" parent="."]
+
+[node name="BenignNode_015" type="Node3D" parent="."]
+
+[node name="BenignNode_016" type="Node3D" parent="."]
+
+[node name="BenignNode_017" type="Node3D" parent="."]
+
+[node name="BenignNode_018" type="Node3D" parent="."]
+
+[node name="BenignNode_019" type="Node3D" parent="."]
+
+[node name="BenignNode_020" type="Node3D" parent="."]
+
+[node name="BenignNode_021" type="Node3D" parent="."]
+
+[node name="BenignNode_022" type="Node3D" parent="."]
+
+[node name="BenignNode_023" type="Node3D" parent="."]
+
+[node name="BenignNode_024" type="Node3D" parent="."]
+
+[node name="BenignNode_025" type="Node3D" parent="."]
+
+[node name="BenignNode_026" type="Node3D" parent="."]
+
+[node name="BenignNode_027" type="Node3D" parent="."]
+
+[node name="BenignNode_028" type="Node3D" parent="."]
+
+[node name="BenignNode_029" type="Node3D" parent="."]
+
+[node name="BenignNode_030" type="Node3D" parent="."]
+
+[node name="BenignNode_031" type="Node3D" parent="."]
+
+[node name="BenignNode_032" type="Node3D" parent="."]
+
+[node name="BenignNode_033" type="Node3D" parent="."]
+
+[node name="BenignNode_034" type="Node3D" parent="."]
+
+[node name="BenignNode_035" type="Node3D" parent="."]
+
+[node name="BenignNode_036" type="Node3D" parent="."]
+
+[node name="BenignNode_037" type="Node3D" parent="."]
+
+[node name="BenignNode_038" type="Node3D" parent="."]
+
+[node name="BenignNode_039" type="Node3D" parent="."]
+
+[node name="BenignNode_040" type="Node3D" parent="."]
+
+[node name="BenignNode_041" type="Node3D" parent="."]
+
+[node name="BenignNode_042" type="Node3D" parent="."]
+
+[node name="BenignNode_043" type="Node3D" parent="."]
+
+[node name="BenignNode_044" type="Node3D" parent="."]
+
+[node name="BenignNode_045" type="Node3D" parent="."]
+
+[node name="BenignNode_046" type="Node3D" parent="."]
+
+[node name="BenignNode_047" type="Node3D" parent="."]
+
+[node name="BenignNode_048" type="Node3D" parent="."]
+
+[node name="BenignNode_049" type="Node3D" parent="."]
+
+[node name="BenignNode_050" type="Node3D" parent="."]
+
+[node name="BenignNode_051" type="Node3D" parent="."]
+
+[node name="BenignNode_052" type="Node3D" parent="."]
+
+[node name="BenignNode_053" type="Node3D" parent="."]
+
+[node name="BenignNode_054" type="Node3D" parent="."]
+
+[node name="BenignNode_055" type="Node3D" parent="."]
+
+[node name="BenignNode_056" type="Node3D" parent="."]
+
+[node name="BenignNode_057" type="Node3D" parent="."]
+
+[node name="BenignNode_058" type="Node3D" parent="."]
+
+[node name="BenignNode_059" type="Node3D" parent="."]
+
+[node name="BenignNode_060" type="Node3D" parent="."]
+
+[node name="BenignNode_061" type="Node3D" parent="."]
+
+[node name="BenignNode_062" type="Node3D" parent="."]
+
+[node name="BenignNode_063" type="Node3D" parent="."]
+
+[node name="BenignNode_064" type="Node3D" parent="."]
+
+[node name="BenignNode_065" type="Node3D" parent="."]
+
+[node name="BenignNode_066" type="Node3D" parent="."]
+
+[node name="BenignNode_067" type="Node3D" parent="."]
+
+[node name="BenignNode_068" type="Node3D" parent="."]
+
+[node name="BenignNode_069" type="Node3D" parent="."]
+
+[node name="BenignNode_070" type="Node3D" parent="."]
+
+[node name="BenignNode_071" type="Node3D" parent="."]
+
+[node name="BenignNode_072" type="Node3D" parent="."]
+
+[node name="BenignNode_073" type="Node3D" parent="."]
+
+[node name="BenignNode_074" type="Node3D" parent="."]
+
+[node name="BenignNode_075" type="Node3D" parent="."]
+
+[node name="BenignNode_076" type="Node3D" parent="."]
+
+[node name="BenignNode_077" type="Node3D" parent="."]
+
+[node name="BenignNode_078" type="Node3D" parent="."]
+
+[node name="BenignNode_079" type="Node3D" parent="."]
+
+[node name="BenignNode_080" type="Node3D" parent="."]
+
+[node name="BenignNode_081" type="Node3D" parent="."]
+
+[node name="BenignNode_082" type="Node3D" parent="."]
+
+[node name="BenignNode_083" type="Node3D" parent="."]
+
+[node name="BenignNode_084" type="Node3D" parent="."]
+
+[node name="BenignNode_085" type="Node3D" parent="."]
+
+[node name="BenignNode_086" type="Node3D" parent="."]
+
+[node name="BenignNode_087" type="Node3D" parent="."]
+
+[node name="BenignNode_088" type="Node3D" parent="."]
+
+[node name="BenignNode_089" type="Node3D" parent="."]
+
+[node name="BenignNode_090" type="Node3D" parent="."]
+
+[node name="BenignNode_091" type="Node3D" parent="."]
+
+[node name="BenignNode_092" type="Node3D" parent="."]
+
+[node name="BenignNode_093" type="Node3D" parent="."]
+
+[node name="BenignNode_094" type="Node3D" parent="."]
+
+[node name="BenignNode_095" type="Node3D" parent="."]
+
+[node name="BenignNode_096" type="Node3D" parent="."]
+
+[node name="BenignNode_097" type="Node3D" parent="."]
+
+[node name="BenignNode_098" type="Node3D" parent="."]
+
+[node name="BenignNode_099" type="Node3D" parent="."]
+
+[node name="BenignNode_100" type="Node3D" parent="."]
+
+[node name="BenignNode_101" type="Node3D" parent="."]
+
+[node name="BenignNode_102" type="Node3D" parent="."]
+
+[node name="BenignNode_103" type="Node3D" parent="."]
+
+[node name="BenignNode_104" type="Node3D" parent="."]
+
+[node name="BenignNode_105" type="Node3D" parent="."]
+
+[node name="BenignNode_106" type="Node3D" parent="."]
+
+[node name="BenignNode_107" type="Node3D" parent="."]
+
+[node name="BenignNode_108" type="Node3D" parent="."]
+
+[node name="BenignNode_109" type="Node3D" parent="."]
+
+[node name="BenignNode_110" type="Node3D" parent="."]
+
+[node name="BenignNode_111" type="Node3D" parent="."]
+
+[node name="BenignNode_112" type="Node3D" parent="."]
+
+[node name="BenignNode_113" type="Node3D" parent="."]
+
+[node name="BenignNode_114" type="Node3D" parent="."]
+
+[node name="BenignNode_115" type="Node3D" parent="."]
+
+[node name="BenignNode_116" type="Node3D" parent="."]
+
+[node name="BenignNode_117" type="Node3D" parent="."]
+
+[node name="BenignNode_118" type="Node3D" parent="."]
+
+[node name="BenignNode_119" type="Node3D" parent="."]
+
+[node name="BenignNode_120" type="Node3D" parent="."]
+
+[node name="BenignNode_121" type="Node3D" parent="."]
+
+[node name="BenignNode_122" type="Node3D" parent="."]
+
+[node name="BenignNode_123" type="Node3D" parent="."]
+
+[node name="BenignNode_124" type="Node3D" parent="."]
+
+[node name="BenignNode_125" type="Node3D" parent="."]
+
+[node name="BenignNode_126" type="Node3D" parent="."]
+
+[node name="BenignNode_127" type="Node3D" parent="."]
+
+[node name="BenignNode_128" type="Node3D" parent="."]
+
+[node name="BenignNode_129" type="Node3D" parent="."]
+
+[node name="BenignNode_130" type="Node3D" parent="."]
+
+[node name="BenignNode_131" type="Node3D" parent="."]
+
+[node name="BenignNode_132" type="Node3D" parent="."]
+
+[node name="BenignNode_133" type="Node3D" parent="."]
+
+[node name="BenignNode_134" type="Node3D" parent="."]
+
+[node name="BenignNode_135" type="Node3D" parent="."]
+
+[node name="BenignNode_136" type="Node3D" parent="."]
+
+[node name="BenignNode_137" type="Node3D" parent="."]
+
+[node name="BenignNode_138" type="Node3D" parent="."]
+
+[node name="BenignNode_139" type="Node3D" parent="."]
+
+[node name="BenignNode_140" type="Node3D" parent="."]
+
+[node name="BenignNode_141" type="Node3D" parent="."]
+
+[node name="BenignNode_142" type="Node3D" parent="."]
+
+[node name="BenignNode_143" type="Node3D" parent="."]
+
+[node name="BenignNode_144" type="Node3D" parent="."]

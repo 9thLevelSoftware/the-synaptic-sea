@@ -96,15 +96,15 @@ static func _build_mesh(primitive: String, dimensions: Array, albedo: String) ->
 	return mesh_node
 
 static func _build_socket_node(socket: Dictionary) -> Node3D:
-	var node: Node3D = Node3D.new()
-	node.name = StringName(String(socket.get("name", "")))
-	node.set_meta("biomass_socket_name", node.name)
 	var position_value: Variant = socket.get("position_m", [0, 0, 0])
 	var rotation_value: Variant = socket.get("rotation_deg", [0, 0, 0])
 	if not position_value is Array or (position_value as Array).size() != 3:
 		return null
 	if not rotation_value is Array or (rotation_value as Array).size() != 3:
 		return null
+	var node: Node3D = Node3D.new()
+	node.name = StringName(String(socket.get("name", "")))
+	node.set_meta("biomass_socket_name", node.name)
 	var position: Array = position_value
 	var rotation: Array = rotation_value
 	node.position = Vector3(float(position[0]), float(position[1]), float(position[2]))

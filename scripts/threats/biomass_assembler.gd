@@ -30,8 +30,12 @@ var _connector_entry_cache: Dictionary = {}
 func build(recipe: Variant, parts: Variant) -> Variant:
 	_diagnostics = PackedStringArray()
 	_last_visual = null
-	_connector_entry_cache = parts.get_part(CONNECTOR_PART_ID) if (parts is Object) else {}
+	_connector_entry_cache = {}
 	if not _valid_inputs(recipe, parts):
+		return null
+	_connector_entry_cache = (parts as Object).get_part(CONNECTOR_PART_ID)
+	if _connector_entry_cache.is_empty():
+		_record("assembler.build: connector catalog entry missing")
 		return null
 	var recipe_document: Dictionary = (recipe as Object).to_dict()
 	var visual: CharacterBody3D = VisualScript.new()
@@ -39,7 +43,7 @@ func build(recipe: Variant, parts: Variant) -> Variant:
 	visual.collision_layer = 1
 	visual.collision_mask = 1
 	if not _assemble_visual(visual, recipe_document, parts):
-		visual.queue_free()
+		visual.free()
 		_last_visual = null
 		return null
 	_last_visual = visual
@@ -102,15 +106,16 @@ func _assemble_visual(visual: CharacterBody3D, recipe_document: Dictionary, part
 		_record("assembler.build: core part_id '%s' missing from catalog" % core_part_id)
 		return false
 	visual._set_recipe_document(recipe_document)
-	visual._set_part_to_visual(core_instance_id, Transform3D.IDENTITY)
 	var core_root: Node3D = _instantiate_part(core_part_id, core_entry)
 	if core_root == null:
 		_record("assembler.build: core part instantiation failed for %s" % core_part_id)
 		return false
+	var core_to_visual: Transform3D = core_root.transform
+	visual._set_part_to_visual(core_instance_id, core_to_visual)
 	visual.add_child(core_root)
 	visual._register_part(core_instance_id, core_root, _socket_full_names(core_entry))
 	visual._set_part_rest(core_instance_id, core_root.transform)
-	var socket_to_visual_map: Dictionary = {core_instance_id: _compute_socket_to_visual_map(core_root, core_entry, Transform3D.IDENTITY)}
+	var socket_to_visual_map: Dictionary = {core_instance_id: _compute_socket_to_visual_map(core_root, core_entry, core_to_visual)}
 	var attachments_value: Variant = recipe_document.get("attachments")
 	if not attachments_value is Array:
 		_record("assembler.build: attachments is not an array")
@@ -152,7 +157,12 @@ func _assemble_visual(visual: CharacterBody3D, recipe_document: Dictionary, part
 		var child_socket_full: String = "socket_" + child_socket_name
 		var child_socket_node: Node3D = _find_socket_node(child_root, child_socket_full)
 		if child_socket_node == null:
-			_record("assembler.build: attachment %s missing child socket %s" % [instance_id, child_socket_full])
+			_record("assembler.build: attachment %s missing or duplicates child socket %s" % [instance_id, child_socket_full])
+			child_root.free()
+			return false
+		var child_socket_to_part_value: Variant = _transform_to_ancestor(child_socket_node, child_root)
+		if not child_socket_to_part_value is Transform3D:
+			_record("assembler.build: attachment %s child socket is outside part root" % instance_id)
 			child_root.free()
 			return false
 		var parent_socket_xform: Transform3D = parent_map[parent_socket_name]
@@ -163,7 +173,7 @@ func _assemble_visual(visual: CharacterBody3D, recipe_document: Dictionary, part
 		mount.transform = parent_socket_xform
 		visual._set_attachment_rest(instance_id, parent_socket_xform)
 		mount.add_child(child_root)
-		child_root.transform = child_socket_node.transform.affine_inverse()
+		child_root.transform = (child_socket_to_part_value as Transform3D).affine_inverse()
 		visual._register_part(instance_id, child_root, _socket_full_names(entry))
 		visual._set_part_rest(instance_id, child_root.transform)
 		# Connector under the same mount, root-socket inverse.
@@ -173,14 +183,21 @@ func _assemble_visual(visual: CharacterBody3D, recipe_document: Dictionary, part
 			return false
 		var connector_root_socket: Node3D = _find_socket_node(connector_root, "socket_root_0")
 		if connector_root_socket == null:
-			_record("assembler.build: connector missing root_0 socket")
+			_record("assembler.build: connector missing or duplicates root_0 socket")
+			connector_root.free()
+			return false
+		var connector_socket_to_part_value: Variant = _transform_to_ancestor(connector_root_socket, connector_root)
+		if not connector_socket_to_part_value is Transform3D:
+			_record("assembler.build: connector root socket is outside connector root")
 			connector_root.free()
 			return false
 		mount.add_child(connector_root)
-		connector_root.transform = connector_root_socket.transform.affine_inverse()
-		visual._set_connector_to_visual(instance_id, mount.transform * connector_root.transform)
-		visual._set_part_to_visual(instance_id, mount.transform * child_root.transform)
-		socket_to_visual_map[instance_id] = _compute_socket_to_visual_map(child_root, entry, mount.transform)
+		connector_root.transform = (connector_socket_to_part_value as Transform3D).affine_inverse()
+		var connector_to_visual: Transform3D = mount.transform * connector_root.transform
+		var child_to_visual: Transform3D = mount.transform * child_root.transform
+		visual._set_connector_to_visual(instance_id, connector_to_visual)
+		visual._set_part_to_visual(instance_id, child_to_visual)
+		socket_to_visual_map[instance_id] = _compute_socket_to_visual_map(child_root, entry, child_to_visual)
 	if not _add_collision_nodes(visual, recipe_document, parts):
 		return false
 	var node_total: int = _count_subtree(visual)
@@ -347,10 +364,25 @@ func _collect_socket_names(node: Node, expected: Dictionary) -> void:
 # ---------------------------------------------------------------------------
 
 func _find_socket_node(part_root: Node3D, full_name: String) -> Node3D:
-	for child in part_root.get_children():
-		if child is Node3D and String(child.name) == full_name:
-			return child
-	return null
+	var matches: Array[Node3D] = []
+	_collect_named_node3d(part_root, full_name, matches)
+	return matches[0] if matches.size() == 1 else null
+
+func _collect_named_node3d(node: Node, target_name: String, matches: Array[Node3D]) -> void:
+	if node is Node3D and String(node.name) == target_name:
+		matches.append(node as Node3D)
+	for child in node.get_children():
+		_collect_named_node3d(child, target_name, matches)
+
+func _transform_to_ancestor(node: Node3D, ancestor: Node3D) -> Variant:
+	var result := Transform3D.IDENTITY
+	var cursor: Node = node
+	while cursor != ancestor:
+		if cursor == null or not cursor is Node3D:
+			return null
+		result = (cursor as Node3D).transform * result
+		cursor = cursor.get_parent()
+	return result
 
 func _socket_full_names(entry: Dictionary) -> PackedStringArray:
 	var result: PackedStringArray = PackedStringArray()
@@ -365,27 +397,25 @@ func _socket_full_names(entry: Dictionary) -> PackedStringArray:
 			result.append(socket_name)
 	return result
 
-func _compute_socket_to_visual_map(part_root: Node3D, entry: Dictionary, base: Transform3D) -> Dictionary:
+func _compute_socket_to_visual_map(part_root: Node3D, entry: Dictionary, part_to_visual: Transform3D) -> Dictionary:
 	var result: Dictionary = {}
 	var sockets_value: Variant = entry.get("sockets", [])
 	if not sockets_value is Array:
 		return result
 	var sockets: Array = sockets_value
-	for index in range(sockets.size()):
-		var socket_value: Variant = sockets[index]
+	for socket_value in sockets:
 		if not socket_value is Dictionary:
 			continue
 		var socket: Dictionary = socket_value
 		var socket_name: String = String(socket.get("name", ""))
 		var short_name: String = socket_name.substr("socket_".length())
-		var child_index: int = index + 1
-		if child_index >= part_root.get_child_count():
+		var socket_node: Node3D = _find_socket_node(part_root, socket_name)
+		if socket_node == null:
 			continue
-		var socket_node_value: Variant = part_root.get_child(child_index)
-		if not socket_node_value is Node3D:
+		var socket_to_part_value: Variant = _transform_to_ancestor(socket_node, part_root)
+		if not socket_to_part_value is Transform3D:
 			continue
-		var socket_node: Node3D = socket_node_value
-		result[short_name] = base * socket_node.transform
+		result[short_name] = part_to_visual * (socket_to_part_value as Transform3D)
 	return result
 
 func _build_collision_shape(collision: Dictionary, shape_kind: String) -> Shape3D:

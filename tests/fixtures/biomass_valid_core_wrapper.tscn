@@ -1,0 +1,55 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://tests/fixtures/biomass_predelete_probe.gd" id="1_probe"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_core"]
+size = Vector3(0.65, 0.9, 0.4)
+
+[node name="BiomassCoreWrapper" type="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0.25)
+script = ExtResource("1_probe")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_core")
+
+[node name="socket_appendage_2" type="Node3D" parent="."]
+position = Vector3(0.22, 0.15, -0.18)
+rotation = Vector3(0, 2.35619449, 0)
+
+[node name="socket_head_0" type="Node3D" parent="."]
+position = Vector3(0, 0.45, 0.05)
+rotation = Vector3(-1.57079633, 0, 0)
+
+[node name="socket_root_0" type="Node3D" parent="."]
+
+[node name="socket_appendage_1" type="Node3D" parent="."]
+position = Vector3(-0.22, 0.15, -0.18)
+rotation = Vector3(0, -2.35619449, 0)
+
+[node name="socket_appendage_0" type="Node3D" parent="."]
+position = Vector3(0, 0.15, -0.2)
+rotation = Vector3(0, 3.14159265, 0)
+
+[node name="socket_limb_3" type="Node3D" parent="."]
+position = Vector3(0.34, -0.05, 0)
+rotation = Vector3(0, 1.57079633, 0)
+
+[node name="socket_limb_2" type="Node3D" parent="."]
+position = Vector3(-0.34, -0.05, 0)
+rotation = Vector3(0, -1.57079633, 0)
+
+[node name="socket_limb_1" type="Node3D" parent="."]
+position = Vector3(0.34, 0.28, 0)
+rotation = Vector3(0, 1.57079633, 0)
+
+[node name="socket_limb_0" type="Node3D" parent="."]
+position = Vector3(-0.34, 0.28, 0)
+rotation = Vector3(0, -1.57079633, 0)
+
+[node name="socket_limb_4" type="Node3D" parent="."]
+position = Vector3(-0.2, -0.45, 0)
+rotation = Vector3(1.57079633, 0, 0)
+
+[node name="socket_limb_5" type="Node3D" parent="."]
+position = Vector3(0.2, -0.45, 0)
+rotation = Vector3(1.57079633, 0, 0)

@@ -89,17 +89,19 @@ func triangle_budget() -> int:
 func _register_part(instance_id: String, part_root: Node3D, socket_names: PackedStringArray) -> void:
 	_part_nodes[instance_id] = part_root
 	for socket_name in socket_names:
-		var child_index: int = -1
-		for index in range(part_root.get_child_count()):
-			var child: Node = part_root.get_child(index)
-			if child is Node3D and String(child.name) == socket_name:
-				child_index = index
-				break
-		if child_index < 0:
+		var matches: Array[Node3D] = []
+		_collect_named_node3d(part_root, socket_name, matches)
+		if matches.size() != 1:
 			continue
 		var short_name: String = socket_name.substr("socket_".length())
 		var key: String = "%s|%s" % [instance_id, short_name]
-		_socket_nodes[key] = part_root.get_child(child_index)
+		_socket_nodes[key] = matches[0]
+
+func _collect_named_node3d(node: Node, target_name: String, matches: Array[Node3D]) -> void:
+	if node is Node3D and String(node.name) == target_name:
+		matches.append(node as Node3D)
+	for child in node.get_children():
+		_collect_named_node3d(child, target_name, matches)
 
 ## Internal: stores an attachment mount under its instance_id.
 func _register_mount(instance_id: String, mount: Node3D) -> void:
@@ -120,6 +122,18 @@ func _set_part_rest(instance_id: String, transform: Transform3D) -> void:
 ## Internal: stores the mount rest (visual-root-local).
 func _set_attachment_rest(instance_id: String, transform: Transform3D) -> void:
 	_attachment_assembly_rest[instance_id] = transform
+
+## Internal: restore the immutable assembly pose. Mounts are restored before
+## their child parts so parent-local part transforms are never double-applied.
+func _reset_to_assembly_rest() -> void:
+	for instance_id in _attachment_assembly_rest.keys():
+		var mount_value: Variant = _attachment_mounts.get(instance_id, null)
+		if mount_value is Node3D and is_instance_valid(mount_value):
+			(mount_value as Node3D).transform = _attachment_assembly_rest[instance_id]
+	for instance_id in _part_assembly_rest.keys():
+		var part_value: Variant = _part_nodes.get(instance_id, null)
+		if part_value is Node3D and is_instance_valid(part_value):
+			(part_value as Node3D).transform = _part_assembly_rest[instance_id]
 
 ## Internal: returns the visual-root-local `part_to_visual` composition.
 func _get_part_to_visual(instance_id: String) -> Transform3D:
