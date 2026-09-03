@@ -194,6 +194,25 @@ triangle oracles, caps of 160 nodes/24,000 triangles, finite AABB extents 0.05�
 ray-layer metrics, and frozen paired-camera readability deltas (RGB threshold 8/255, at least 64
 changed pixels and an 8×8 changed bounding box).
 
+### Biomass asset-pipeline contract (Tasks 10–15)
+
+The asset path boundary is non-overridable: public recipe resolution accepts only
+`/Volumes/Untitled/SynapticSeaAssets/meshy/source/<asset_id>/<asset_id>_master.blend` and
+`/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/<asset_id>/<task_id>/`; a private injected
+`RecipeRoots` seam is test-only. Modes are exactly `archive-raw`, `rehydrate-raw`, `preview`,
+`approve-preview`, and `publish-cleaned`. Archive works before a master exists; rehydrate requires
+neither master nor Blender; the other three require an exact regular external master.
+
+Preview produces five renders, `cleaned.preview.glb`, and a closed preview manifest. Human approval
+is a separate no-Blender/no-provider operation producing an immutable approval manifest that binds
+reviewer, preview-manifest SHA, every render and preview-GLB hash, and contract/catalog/generation/
+raw/archive/master hashes. Publish privately reruns Blender and must match that baseline before
+writing task-local `cleaned.glb` and the closed recipe manifest; an existing recipe is accepted only
+on an exact byte-identical idempotent rerun. All coupled external leaves are preflighted and staged
+under the validated evidence directory as the atomic-write root, mode `0600`, with rollback on
+injected failure. The generic Blender report remains `meshy_blender_validation` with
+`master_provenance: null`.
+
 ## Consequences
 
 - The catalog and recipes are machine-checkable, deterministic, and suitable for exact save/load.
@@ -203,6 +222,10 @@ changed pixels and an 8×8 changed bounding box).
 - Connector readability is predictable because connectors are preauthored and non-deforming.
 - Runtime assembly, five gait implementations, persistence wiring, and the 30-capture review remain
   follow-on work; this task does not call Meshy, Blender, or Godot asset mutation paths.
+- Task 10–12 pipeline records use closed in-tool validators; Task 11 uses the existing
+  `asset_provenance` envelope and adds no fields to the generic Blender schema. Task 12 persists
+  exactly eight plans under `assets/_staging/meshy/_plans/<asset_id>.json` plus a mode-`0600`
+  reference audit manifest before Task 13 paid generation.
 
 ## References
 

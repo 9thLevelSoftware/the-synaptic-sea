@@ -54,6 +54,24 @@ authoritative over the saved `WorldSnapshot`.
 - Real-time part swapping, part physics interaction, player-created threats, and damage visuals.
 - Any mutation of `threat_visual_catalog.json`, exported assets, or wrapper scenes.
 
+### Asset pipeline readiness boundary (Tasks 10–15)
+
+The optional Meshy-to-Blender path remains candidate-only until a human-approved preview. Public
+recipe resolution has a non-overridable external root: the exact `source/<asset_id>/<asset_id>_master.blend`
+and `live-pilot/<asset_id>/<task_id>/` paths under `/Volumes/Untitled/SynapticSeaAssets/meshy/`.
+Only tests may inject `RecipeRoots`. The five modes are `archive-raw`, `rehydrate-raw`, `preview`,
+`approve-preview`, and `publish-cleaned`; archive works without a master, rehydrate uses neither
+master nor Blender, and Blender modes require the exact regular master. Task 14 order is archive →
+`meshy_blender_master` → preview → human inspection/approval → publish.
+
+Preview atomically publishes the scratch GLB, five renders, and closed `biomass-part-preview.json`.
+Approval is no-Blender/no-provider and immutably binds reviewer plus preview-manifest, render, GLB,
+contract, catalog, generation, raw, archive, and master hashes. Publish reruns Blender privately,
+compares the exact approved baseline, and only then writes task-local `cleaned.glb` and closed
+`biomass-part-recipe.json`; an existing recipe permits only byte-identical idempotence. External
+leaves are preflighted, mode `0600`, non-symlink regular files, and staged under the validated
+external evidence directory as the atomic allowed root with rollback on injected failure.
+
 ## Canonical data contract
 
 ### Part catalog
@@ -196,6 +214,13 @@ runtime task.
   and malformed graphs are rejected with stable sorted diagnostics.
 - All 30 review captures are required before visual promotion; Meshy candidate output never
   auto-promotes or mutates repository catalogs, wrappers, or imported assets.
+- Closed in-tool validators define exact fields for source-raw, preview, preview-approval, and
+  recipe records; low-poly status is exactly `low_poly_target` with `status` `met` or
+  `review_required`, target/measured triangle counts, and hard maximum. Above hard maximum blocks.
+- Task 12 persists exactly eight canonical plans at `assets/_staging/meshy/_plans/<asset_id>.json`
+  and a mode-`0600` `biomass_reference_audit.json` with `status:"pass"`; each plan records both
+  `request_plan_file_sha256` and `provider_payload_sha256`. The audit rejects undersized,
+  transparent, duplicate, symlink, collage, or disconnected references before paid generation.
 
 ## Verification commands
 
