@@ -211,6 +211,11 @@ func _stamp_structural_plan(layout: Dictionary) -> bool:
 		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
 		layout["structural_plan_validated"] = false
 		return false
+	# Stamp `validated: true` and `errors: []` inside the structural plan so
+	# downstream loaders and audit checks can verify the plan was produced
+	# by a passing compile/validate pair without re-running validation.
+	structural_plan["validated"] = true
+	structural_plan["errors"] = []
 	layout["structural_plan"] = structural_plan
 	layout["structural_plan_validated"] = true
 	return true

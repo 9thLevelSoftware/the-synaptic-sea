@@ -761,6 +761,8 @@
     }
   ],
   "structural_plan": {
+    "validated": true,
+    "errors": [],
     "edges": {
       "0|h|-1|0": {
         "cell": [

@@ -1598,6 +1598,8 @@
   ],
   "schema_version": "1.2.0",
   "structural_plan": {
+    "validated": true,
+    "errors": [],
     "ceiling_placements": [
       {
         "cell": [

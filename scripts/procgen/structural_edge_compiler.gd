@@ -95,7 +95,16 @@ func compile(layout: Dictionary) -> Dictionary:
 		outer_corner_module = OUTER_CORNER_MODULE
 	var t_junction_module: String = T_JUNCTION_MODULE if catalog.has_module(T_JUNCTION_MODULE) else catalog.choose_module(["wall_face"], T_JUNCTION_MODULE)
 
+	# Stable ordering: iterate rooms by id (string sort) so the compiled
+	# plan's occupancy/edges/placements order is byte-stable for equivalent
+	# inputs in any room/portal declaration order.
+	var sorted_rooms: Array = []
 	for room_variant in rooms:
+		if typeof(room_variant) == TYPE_DICTIONARY:
+			sorted_rooms.append(room_variant)
+	sorted_rooms.sort_custom(func(a, b): return str(a.get("id", "")) < str(b.get("id", "")))
+
+	for room_variant in sorted_rooms:
 		if typeof(room_variant) != TYPE_DICTIONARY:
 			errors.append("room record must be an object")
 			continue
@@ -150,7 +159,25 @@ func compile(layout: Dictionary) -> Dictionary:
 	var floor_placements: Array = []
 	var ceiling_placements: Array = []
 
+	# Iterate occupancy keys in (room_id, cell_key) sorted order so the
+	# canonical room owns its edges first. Sorting purely by cell_key can
+	# invert room order (e.g. cell_key `0|-1|0` precedes `0|0|0` because
+	# the dash sorts before digits) and cause the wrong room to win edge
+	# ownership for shared boundaries.
+	var occupancy_owner_lookup: Dictionary = {}
 	for occupancy_key in occupancy.keys():
+		var record_lookup: Dictionary = occupancy[occupancy_key]
+		occupancy_owner_lookup[str(occupancy_key)] = str(record_lookup.get("room_id", ""))
+	var sorted_occupancy_keys: Array = []
+	for occupancy_key in occupancy.keys():
+		sorted_occupancy_keys.append(str(occupancy_key))
+	sorted_occupancy_keys.sort_custom(func(a, b):
+		var room_a: String = str(occupancy_owner_lookup.get(a, ""))
+		var room_b: String = str(occupancy_owner_lookup.get(b, ""))
+		if room_a == room_b:
+			return a < b
+		return room_a < room_b)
+	for occupancy_key in sorted_occupancy_keys:
 		var cell_record: Dictionary = occupancy[occupancy_key]
 		var deck: int = int(cell_record["deck"])
 		var cell: Vector2i = cell_record["cell"]
@@ -927,36 +954,35 @@ func _cell_for_edge_in_room(room_id: String, room_by_cell: Dictionary, deck: int
 		var cell_low: Vector2i = Vector2i(x, y)
 		var has_high: bool = str(room_by_cell.get(cell_key(deck, cell_high), "")) == room_id
 		var has_low: bool = str(room_by_cell.get(cell_key(deck, cell_low), "")) == room_id
-		if has_high and has_low:
+		# If neither cell belongs to the room, the room does not border
+		# the edge. Both cells can belong when the room spans both sides,
+		# in which case we pick the from-room side (cell_low).
+		if not has_high and not has_low:
 			return {"ok": false}
-		if has_high:
-			primary = cell_high
-			secondary = cell_low
-			direction = "north"
-		elif has_low:
+		if has_low:
 			primary = cell_low
 			secondary = cell_high
 			direction = "south"
 		else:
-			return {"ok": false}
+			primary = cell_high
+			secondary = cell_low
+			direction = "north"
 	else:
 		# Vertical edge sits between columns x and x+1 at row y.
 		var cell_high: Vector2i = Vector2i(x + 1, y)
 		var cell_low: Vector2i = Vector2i(x, y)
 		var has_high: bool = str(room_by_cell.get(cell_key(deck, cell_high), "")) == room_id
 		var has_low: bool = str(room_by_cell.get(cell_key(deck, cell_low), "")) == room_id
-		if has_high and has_low:
+		if not has_high and not has_low:
 			return {"ok": false}
-		if has_high:
-			primary = cell_high
-			secondary = cell_low
-			direction = "west"
-		elif has_low:
+		if has_low:
 			primary = cell_low
 			secondary = cell_high
 			direction = "east"
 		else:
-			return {"ok": false}
+			primary = cell_high
+			secondary = cell_low
+			direction = "west"
 	return {"ok": true, "cell": primary, "direction": direction, "secondary": secondary}
 
 
