@@ -7,9 +7,28 @@ const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd"
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const SpatialPerceptionStateScript := preload("res://scripts/systems/spatial_perception_state.gd")
+const BiomassPartCatalogScript := preload("res://scripts/systems/biomass_part_catalog.gd")
+const BiomassRecipeLibraryScript := preload("res://scripts/systems/biomass_recipe_library.gd")
+const BiomassRecipeGeneratorScript := preload("res://scripts/systems/biomass_recipe_generator.gd")
+const BiomassRecipeScript := preload("res://scripts/systems/biomass_recipe.gd")
+const BiomassAssemblerScript := preload("res://scripts/threats/biomass_assembler.gd")
+const BiomassThreatVisualScript := preload("res://scripts/threats/biomass_threat_visual.gd")
+const BiomassGaitControllerScript := preload("res://scripts/threats/biomass_gait_controller.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
+const BIOMASS_PART_CATALOG_PATH: String = "res://data/combat/biomass_part_catalog.json"
+const BIOMASS_RECIPE_CATALOG_PATH: String = "res://data/combat/biomass_recipe_catalog.json"
+const BIOMASS_VISUAL_CATALOG_PATH: String = "res://data/combat/threat_visual_catalog.json"
+const BIOMASS_ARCHETYPES: Array[String] = [
+	"biomatter_swarm",
+	"drone_swarm",
+	"hull_tendril",
+	"mimic",
+	"puppet_corpse",
+	"stalker",
+]
+const BIOMASS_WEIGHT: float = 0.35
 const SIGHT_RANGE: float = 12.0
 const REPATH_INTERVAL: float = 0.35
 const REPATH_TARGET_MOVE: float = 1.25
@@ -45,6 +64,25 @@ var spatial_perception = null
 var engaged_los: Dictionary = {}
 ## REQ-MI-004: Callable(threat, amount) when threat applies structure_damage (hull tendril).
 var on_structure_attack: Callable = Callable()
+## Task 7: biomass sources (PartCatalog / RecipeLibrary / visual catalog) and the
+## single RefCounted assembler.  configure_biomass_sources() must be called
+## PRE-tree and at most once.  After _ready(), any subsequent call is refused.
+var _biomass_parts: Variant = null
+var _biomass_library: Variant = null
+var _biomass_visual_catalog: Dictionary = {}
+var _biomass_assembler: Variant = null
+var _biomass_source_configured: bool = false
+var _biomass_source_locked: bool = false
+## Task 7: per-threat biomass visual lookup (instance_id -> BiomassThreatVisual)
+## so the manager can call step_gait() each tick and forward velocity.  The
+## visual is parented under the placeholder root (same lifecycle).
+var _biomass_visuals: Dictionary = {}
+## Task 7: per-threat prior world position so _update_placeholder derives the
+## horizontal velocity from world-space diff (NOT from authoritative state).
+var _biomass_prior_world_position: Dictionary = {}
+## Task 7: defensive sorted/dedup restore diagnostics.
+var _biomass_restore_diagnostics: Array[String] = []
+var _biomass_fallback_used_valid: int = 0
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -52,6 +90,22 @@ func _ready() -> void:
 	ammo_definitions = _load_json_dict(AMMO_DEFINITIONS_PATH)
 	damage_pipeline.configure({})
 	detection_state.configure({})
+	# Task 7: if pre-tree source configuration was missed, fall back to a
+	# single lazy load so the playable coordinator can construct the manager
+	# without explicit configure_biomass_sources().  Both paths land at the
+	# same _biomass_assembler / _biomass_visual_catalog state.
+	if not _biomass_source_configured:
+		var parts: Variant = BiomassPartCatalogScript.new()
+		var parts_loaded: bool = false
+		if parts is Object and parts != null and parts.has_method("load_path"):
+			parts_loaded = parts.load_path(BIOMASS_PART_CATALOG_PATH)
+		var library: Variant = BiomassRecipeLibraryScript.new()
+		var library_loaded: bool = false
+		if library is Object and library != null and parts_loaded and parts != null:
+			library_loaded = library.load_path(BIOMASS_RECIPE_CATALOG_PATH, parts)
+		var catalog: Dictionary = _load_biomass_visual_catalog()
+		_apply_biomass_sources(parts if parts_loaded else null, library if library_loaded else null, catalog)
+	_biomass_source_locked = true
 
 func configure_for_layout(layout: Dictionary, markers: Array = [], anchor: Vector3 = Vector3.ZERO) -> void:
 	fallback_anchor = anchor
@@ -265,12 +319,38 @@ func apply_summary(summary: Dictionary) -> bool:
 		for entry in raw_threats:
 			if not (entry is Dictionary):
 				continue
+			# Task 7: deterministically OMIT biomass records whose stored
+			# recipe is missing/invalid BEFORE we register the threat — the
+			# contract is "malformed restored records deterministically
+			# omitted", so the threat must never appear in the live set.
+			if is_biomass_archetype(String(entry.get("archetype_id", ""))) and not _stored_biomass_recipe_is_admissible(entry):
+				_record_restore_diagnostic("malformed_recipe_omitted:%s" % String(entry.get("instance_id", "")))
+				continue
 			var threat = ThreatAIStateScript.new()
 			threat.configure(entry)
 			threats.append(threat)
 			_spawn_placeholder(threat, idx, fallback_anchor)
+			# Task 7: after the threat is registered + placeholder spawned,
+			# rebuild its biomass visual from the stored recipe/seed.  The
+			# _restore_biomass_threat helper handles dead-no-visual and
+			# fallback-flag cases (omitted threats never reach here).
+			if is_biomass_archetype(String(threat.archetype_id)):
+				_restore_biomass_threat(entry)
 			idx += 1
 	return true
+
+## Task 7: True iff the entry's stored biomass recipe would survive
+## Recipe.from_dict against the loaded parts catalog.  Used by apply_summary
+## to deterministically omit malformed records.
+func _stored_biomass_recipe_is_admissible(entry: Dictionary) -> bool:
+	var stored_recipe_value: Variant = entry.get("biomass_recipe", null)
+	if not (stored_recipe_value is Dictionary) or (stored_recipe_value as Dictionary).is_empty():
+		return false
+	var stored_recipe: Dictionary = stored_recipe_value
+	var validated_recipe: Variant = BiomassRecipeScript.from_dict(stored_recipe, _biomass_parts)
+	if validated_recipe == null:
+		return false
+	return bool(validated_recipe.is_valid())
 
 func get_status_lines() -> PackedStringArray:
 	var alive: int = 0
@@ -306,9 +386,30 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 		if not (marker is Dictionary):
 			continue
 		var encounter_kind: String = _normalize_encounter_kind(str((marker as Dictionary).get("encounter_kind", "biomatter_swarm")))
-		var count: int = max(1, int((marker as Dictionary).get("count", 1)))
-		var local_pos: Variant = (marker as Dictionary).get("local_position", null)
-		for i in range(count):
+		# Task 7: biomass markers route through the dedicated biomass pipeline
+		# so they get a built visual + gait + restore metadata.  All other
+		# markers keep the legacy primitive-placeholder path.
+		if is_biomass_archetype(encounter_kind):
+			var count: int = max(1, int((marker as Dictionary).get("count", 1)))
+			var local_pos: Variant = (marker as Dictionary).get("local_position", null)
+			for i in range(count):
+				var world_pos: Vector3 = anchor
+				if local_pos is Array and (local_pos as Array).size() >= 3:
+					world_pos = Vector3(
+						anchor.x + float((local_pos as Array)[0]) + float(i) * 0.5,
+						anchor.y + float((local_pos as Array)[1]),
+						anchor.z + float((local_pos as Array)[2]),
+					)
+				else:
+					world_pos = Vector3(anchor.x + cos(float(idx)) * 4.0, anchor.y, anchor.z + sin(float(idx)) * 4.0)
+				var marker_id: String = str((marker as Dictionary).get("id", encounter_kind))
+				var spawn_seed: int = hash(String(marker_id) + ":" + str(i))
+				_spawn_biomass_threat(encounter_kind, world_pos, spawn_seed)
+				idx += 1
+			continue
+		var count_legacy: int = max(1, int((marker as Dictionary).get("count", 1)))
+		var local_pos_legacy: Variant = (marker as Dictionary).get("local_position", null)
+		for i in range(count_legacy):
 			var def: Dictionary = threat_archetypes.get(encounter_kind, {}) if threat_archetypes.get(encounter_kind, {}) is Dictionary else {}
 			if def.is_empty():
 				continue
@@ -318,14 +419,14 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 			merged["archetype_id"] = encounter_kind
 			merged["room_id"] = str((marker as Dictionary).get("room_id", ""))
 			merged["cell"] = (marker as Dictionary).get("cell", [0, 0])
-			if local_pos is Array and (local_pos as Array).size() >= 3:
+			if local_pos_legacy is Array and (local_pos_legacy as Array).size() >= 3:
 				# EncounterInjector markers carry the rolled room's floor-cell
 				# offset — spawn the threat IN its room. Multiple threats on
 				# one marker fan out by half a cell so they don't stack.
 				merged["world_position"] = [
-					anchor.x + float((local_pos as Array)[0]) + float(i) * 0.5,
-					anchor.y + float((local_pos as Array)[1]),
-					anchor.z + float((local_pos as Array)[2]),
+					anchor.x + float((local_pos_legacy as Array)[0]) + float(i) * 0.5,
+					anchor.y + float((local_pos_legacy as Array)[1]),
+					anchor.z + float((local_pos_legacy as Array)[2]),
 				]
 			else:
 				# Legacy markers (hand-authored gameplay slices, older saves)
@@ -503,6 +604,16 @@ func _update_placeholder(threat, _player_position: Vector3) -> void:
 		return
 	var y_bob: float = 0.2 if threat.state == ThreatAIStateScript.STATE_ATTACK else 0.0
 	node.position = Vector3(float(threat.world_position[0]), float(threat.world_position[1]) + y_bob, float(threat.world_position[2]))
+	# Task 7: forward biomass gait step.  Derive horizontal velocity from the
+	# diff between the threat's prior world position and the current one
+	# (NOT from authoritative state — the AI state never owns velocity).
+	var visual = _biomass_visuals.get(threat.instance_id, null)
+	if visual != null and is_instance_valid(visual) and visual.has_method("step_gait"):
+		var current_pos: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+		var prior_pos: Vector3 = _biomass_prior_world_position.get(threat.instance_id, current_pos) as Vector3
+		var velocity: Vector3 = (current_pos - prior_pos) / maxf(get_process_delta_time(), 0.0001)
+		visual.call("step_gait", get_process_delta_time(), velocity, String(threat.state))
+		_biomass_prior_world_position[threat.instance_id] = current_pos
 
 func _clear_runtime_nodes() -> void:
 	for child in get_children():
@@ -514,6 +625,15 @@ func _clear_runtime_nodes() -> void:
 	_path_runtime.clear()
 	combat_engaged = false
 	awareness_indicator = 0.0
+	# Task 7: free biomass visuals (these may live as children of placeholders
+	# that are about to be freed, but the manager-owned reference must also
+	# clear so a fresh apply_summary doesn't double-free).
+	for instance_id in _biomass_visuals.keys():
+		var visual: Variant = _biomass_visuals[instance_id]
+		if visual is Object and is_instance_valid(visual):
+			visual.queue_free()
+	_biomass_visuals.clear()
+	_biomass_prior_world_position.clear()
 
 func _unique_archetype_count() -> int:
 	var seen: Dictionary = {}
@@ -531,3 +651,295 @@ func _load_json_dict(path: String) -> Dictionary:
 	var text: String = FileAccess.get_file_as_string(path)
 	var parsed: Variant = JSON.parse_string(text)
 	return parsed if parsed is Dictionary else {}
+
+# ---------------------------------------------------------------------------
+# Task 7: biomass integration
+# ---------------------------------------------------------------------------
+
+## Pre-tree source configuration: own one RefCounted assembler + the loaded
+## PartCatalog / RecipeLibrary / visual catalog.  Idempotent after _ready()
+## so a second call is a hard no-op (the dispatcher only ever configures
+## once before add_child).
+func configure_biomass_sources(parts: Variant, library: Variant, visual_catalog: Dictionary = {}) -> void:
+	if _biomass_source_locked:
+		_record_restore_diagnostic("configure_biomass_sources refused after _ready")
+		return
+	if _biomass_source_configured:
+		_record_restore_diagnostic("configure_biomass_sources called twice")
+		return
+	_apply_biomass_sources(parts, library, visual_catalog)
+
+func _apply_biomass_sources(parts: Variant, library: Variant, visual_catalog: Dictionary) -> void:
+	_biomass_parts = parts if parts is Object else null
+	_biomass_library = library if library is Object else null
+	_biomass_visual_catalog = _filter_biomass_visual_catalog(visual_catalog if visual_catalog is Dictionary else _load_biomass_visual_catalog())
+	if _biomass_parts != null and _biomass_library != null:
+		_biomass_assembler = BiomassAssemblerScript.new()
+	else:
+		_biomass_assembler = null
+	_biomass_source_configured = true
+
+func _load_biomass_visual_catalog() -> Dictionary:
+	if not FileAccess.file_exists(BIOMASS_VISUAL_CATALOG_PATH):
+		return {}
+	var text: String = FileAccess.get_file_as_string(BIOMASS_VISUAL_CATALOG_PATH)
+	var parsed: Variant = JSON.parse_string(text)
+	if not (parsed is Dictionary):
+		return {}
+	var doc: Dictionary = parsed
+	var archetypes_value: Variant = doc.get("archetypes", {})
+	return archetypes_value if archetypes_value is Dictionary else {}
+
+func _filter_biomass_visual_catalog(catalog: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for archetype_id in BIOMASS_ARCHETYPES:
+		if catalog.has(archetype_id):
+			result[archetype_id] = catalog[archetype_id]
+		else:
+			result[archetype_id] = {
+				"primitive": "sphere",
+				"y_offset": 0.0,
+				"scale": 1.0,
+				"albedo": "#ffffff",
+				"visual_mode": "biomass",
+				"generated_recipe_weight": BIOMASS_WEIGHT,
+				"allowed_locomotion_hints": [],
+			}
+	return result
+
+## Validation / public seam: spawn a biomass threat using the exact signature
+## the contract demands. Returns the assembled visual, the existing primitive
+## fallback visual, or null when the threat could not be admitted.
+func inject_biomass_validation_encounter(archetype_id: String, recipe_id: String = "", seed: int = 0, world_position: Vector3 = Vector3.ZERO) -> Variant:
+	var threat: Variant = _spawn_biomass_threat(archetype_id, world_position, seed, recipe_id)
+	if threat == null:
+		return null
+	return _biomass_visuals.get(threat.instance_id, placeholder_nodes.get(threat.instance_id, null))
+
+## Compatibility seam for validation callers that only specify an archetype
+## and position. The curated library pool remains the sole recipe authority.
+func spawn_biomass_validation_encounter(archetype_id: String, world_position: Vector3 = Vector3.ZERO) -> Variant:
+	return inject_biomass_validation_encounter(archetype_id, "", 0, world_position)
+
+## Validation / public seam: stable, sorted, deduplicated restore diagnostics.
+## Returns PackedStringArray so callers iterating get a defensive read.
+func get_restore_diagnostics() -> PackedStringArray:
+	var sorted: Array = _biomass_restore_diagnostics.duplicate()
+	sorted.sort()
+	var seen: Dictionary = {}
+	var result: PackedStringArray = PackedStringArray()
+	for entry in sorted:
+		var key: String = String(entry)
+		if seen.has(key):
+			continue
+		seen[key] = true
+		result.append(key)
+	return result
+
+func _record_restore_diagnostic(message: String) -> void:
+	if message.is_empty():
+		return
+	_biomass_restore_diagnostics.append(message)
+
+func is_biomass_archetype(archetype_id: String) -> bool:
+	return BIOMASS_ARCHETYPES.has(archetype_id)
+
+## Deterministic, nonzero seed for a new biomass threat.  The manager owns
+## normalization so a smoke can call with seed=0 and still observe nonzero.
+func _derive_biomass_seed(instance_id: String, archetype_id: String, requested_seed: int) -> int:
+	if requested_seed != 0:
+		return requested_seed
+	var combined: int = hash(String(instance_id) + ":" + String(archetype_id))
+	if combined == 0:
+		combined = 1
+	# Fold to int32 range so downstream code never sees a value > 2^31-1.
+	return combined & 0x7fffffff
+
+## Spawn a biomass threat end-to-end:
+##   1. Pick curated recipe from library pool_for (sole authority).
+##   2. Compute deterministic nonzero seed.
+##   3. Store biomass_recipe + biomass_seed on the threat.
+##   4. assembler.build(recipe, parts) -> visual.
+##   5. configure_gait BEFORE scene registration; failure → free + fallback.
+##   6. Register visual under the threat's placeholder parent.
+##   7. If anything fails, stamp biomass_whole_threat_fallback=true + stable
+##      biomass_fallback_reason and skip the visual.
+func _spawn_biomass_threat(archetype_id: String, world_position: Vector3, requested_seed: int = 0, recipe_id_override: String = "") -> Variant:
+	if not is_biomass_archetype(archetype_id):
+		return null
+	if _biomass_library == null or _biomass_parts == null:
+		return null
+	var pool: PackedStringArray = _biomass_library.pool_for(archetype_id)
+	if pool.is_empty():
+		_record_restore_diagnostic("pool_empty:%s" % archetype_id)
+		return null
+	var pool_index: int = absi(hash(String(archetype_id) + ":" + str(requested_seed))) % pool.size()
+	var recipe_id: String = recipe_id_override if not recipe_id_override.is_empty() else String(pool[pool_index])
+	var recipe_obj: Variant = _biomass_library.get_recipe(recipe_id)
+	if recipe_obj == null or not recipe_obj.is_valid():
+		_record_restore_diagnostic("invalid_recipe:%s" % recipe_id)
+		return null
+	var threat: Variant = ThreatAIStateScript.new()
+	var instance_id: String = "%s_bio_%d" % [archetype_id, _biomass_threat_id_counter]
+	_biomass_threat_id_counter += 1
+	var seed_value: int = _derive_biomass_seed(instance_id, archetype_id, requested_seed)
+	threat.configure({
+		"instance_id": instance_id,
+		"archetype_id": archetype_id,
+		"display_name": str(threat_archetypes.get(archetype_id, {}).get("display_name", archetype_id)) if threat_archetypes.get(archetype_id, {}) is Dictionary else archetype_id,
+		"world_position": [world_position.x, world_position.y, world_position.z],
+		"cell": [0, 0],
+		"state": ThreatAIStateScript.STATE_IDLE,
+		"biomass_recipe": recipe_obj.to_dict(),
+		"biomass_seed": seed_value,
+	})
+	# Build → configure_gait BEFORE scene registration.  Failure synchronously
+	# frees the visual and applies the whole-threat primitive fallback
+	# metadata so the placeholder remains in use.
+	var visual: Variant = _biomass_assembler.build(recipe_obj, _biomass_parts)
+	var fallback_reason: String = ""
+	if visual == null:
+		var diags: PackedStringArray = _biomass_assembler.last_diagnostics()
+		fallback_reason = "assembler_failed:%s" % String(diags[0]) if diags.size() >= 1 else "assembler_failed"
+		threat.biomass_whole_threat_fallback = true
+		threat.biomass_fallback_reason = fallback_reason
+		_biomass_fallback_used_valid += 1
+		_record_restore_diagnostic(fallback_reason)
+		# Still register the threat as a normal placeholder (no visual).
+	else:
+		if not (visual is Object) or visual == null or not visual.has_method("configure_gait"):
+			threat.biomass_whole_threat_fallback = true
+			threat.biomass_fallback_reason = "visual_wrong_script"
+			if visual is Object:
+				visual.free()
+			visual = null
+			_record_restore_diagnostic("visual_wrong_script")
+		else:
+			var gait_ok: bool = bool(visual.call("configure_gait", _biomass_parts, recipe_obj, seed_value))
+			if not gait_ok:
+				visual.free()
+				visual = null
+				threat.biomass_whole_threat_fallback = true
+				threat.biomass_fallback_reason = "gait_configure_failed"
+				_biomass_fallback_used_valid += 1
+				_record_restore_diagnostic("gait_configure_failed:%s" % recipe_id)
+	threats.append(threat)
+	_spawn_placeholder(threat, threats.size() - 1, world_position)
+	if visual != null and visual is Object:
+		_biomass_visuals[instance_id] = visual
+		_attach_biomass_visual(instance_id, visual)
+		_biomass_prior_world_position[instance_id] = Vector3(world_position.x, world_position.y, world_position.z)
+	return threat
+
+## Testable whole-threat fallback seam. It preserves a valid curated recipe and
+## threat state, but deliberately skips the assembled visual so the existing
+## primitive placeholder remains the only renderable representation.
+func _spawn_biomass_fallback_threat(archetype_id: String, reason: String, world_position: Vector3 = Vector3.ZERO, requested_seed: int = 0) -> Variant:
+	if not is_biomass_archetype(archetype_id) or _biomass_library == null:
+		return null
+	var pool: PackedStringArray = _biomass_library.pool_for(archetype_id)
+	if pool.is_empty():
+		return null
+	var recipe: Variant = _biomass_library.get_recipe(String(pool[0]))
+	if recipe == null or not recipe.is_valid():
+		return null
+	var threat: Variant = ThreatAIStateScript.new()
+	var instance_id: String = "%s_bio_%d" % [archetype_id, _biomass_threat_id_counter]
+	_biomass_threat_id_counter += 1
+	threat.configure({
+		"instance_id": instance_id,
+		"archetype_id": archetype_id,
+		"world_position": [world_position.x, world_position.y, world_position.z],
+		"cell": [0, 0],
+		"state": ThreatAIStateScript.STATE_IDLE,
+		"biomass_recipe": recipe.to_dict(),
+		"biomass_seed": _derive_biomass_seed(instance_id, archetype_id, requested_seed),
+	})
+	threat.biomass_whole_threat_fallback = true
+	threat.biomass_fallback_reason = reason if not reason.is_empty() else "forced_fallback"
+	threats.append(threat)
+	_spawn_placeholder(threat, threats.size() - 1, world_position)
+	_record_restore_diagnostic("fallback:%s" % threat.biomass_fallback_reason)
+	return threat
+
+var _biomass_threat_id_counter: int = 1
+
+## Restored threat (came in via apply_summary / save-load round-trip):
+## use stored recipe/seed unchanged.  Malformed → omit.  Dead → keep dead,
+## no visual/fallback.  Failed build → fallback.
+func _restore_biomass_threat(entry: Dictionary) -> void:
+	var instance_id: String = String(entry.get("instance_id", ""))
+	var archetype_id: String = String(entry.get("archetype_id", ""))
+	if instance_id.is_empty() or not is_biomass_archetype(archetype_id):
+		return
+	var stored_recipe_value: Variant = entry.get("biomass_recipe", null)
+	var stored_seed: int = int(entry.get("biomass_seed", 0))
+	# Malformed: no recipe at all OR a non-dict recipe → omit.
+	if not (stored_recipe_value is Dictionary) or (stored_recipe_value as Dictionary).is_empty():
+		_record_restore_diagnostic("malformed_recipe:%s" % instance_id)
+		return
+	var stored_recipe: Dictionary = stored_recipe_value
+	# Validate the stored recipe survives Recipe.from_dict against the loaded
+	# parts catalog.  An invalid recipe is a malformed record.
+	var validated_recipe: Variant = BiomassRecipeScript.from_dict(stored_recipe, _biomass_parts)
+	if validated_recipe == null or not validated_recipe.is_valid():
+		_record_restore_diagnostic("invalid_recipe_after_round_trip:%s" % instance_id)
+		return
+	# Dead records stay dead, no visual, no fallback metadata.
+	if String(entry.get("state", "")) == ThreatAIStateScript.STATE_DEAD or float(entry.get("health", 1.0)) <= 0.0:
+		# The state is registered via apply_summary's normal path with no
+		# biomass visual + no fallback metadata.  Nothing more to do here.
+		return
+	# Build the visual from the validated recipe + the stored seed.
+	var visual: Variant = _biomass_assembler.build(validated_recipe, _biomass_parts)
+	var threat_index: int = threats.size() - 1
+	var threat = null
+	for candidate in threats:
+		if candidate != null and candidate.instance_id == instance_id:
+			threat = candidate
+			break
+	if threat == null:
+		_record_restore_diagnostic("restored_threat_missing:%s" % instance_id)
+		return
+	if visual == null:
+		threat.biomass_whole_threat_fallback = true
+		threat.biomass_fallback_reason = "restore_assembler_failed:%s" % instance_id
+		_biomass_fallback_used_valid += 1
+		_record_restore_diagnostic("restore_assembler_failed:%s" % instance_id)
+		return
+	if not (visual is Object) or not visual.has_method("configure_gait"):
+		threat.biomass_whole_threat_fallback = true
+		threat.biomass_fallback_reason = "restore_visual_wrong_script"
+		if visual is Object:
+			visual.free()
+		visual = null
+		_record_restore_diagnostic("restore_visual_wrong_script:%s" % instance_id)
+		return
+	var gait_ok: bool = bool(visual.call("configure_gait", _biomass_parts, validated_recipe, stored_seed))
+	if not gait_ok:
+		visual.free()
+		threat.biomass_whole_threat_fallback = true
+		threat.biomass_fallback_reason = "restore_gait_failed"
+		_biomass_fallback_used_valid += 1
+		_record_restore_diagnostic("restore_gait_failed:%s" % instance_id)
+		return
+	_biomass_visuals[instance_id] = visual
+	_attach_biomass_visual(instance_id, visual)
+	var wp: Array = entry.get("world_position", [0.0, 0.0, 0.0])
+	if wp is Array and (wp as Array).size() >= 3:
+		_biomass_prior_world_position[instance_id] = Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
+
+## Replace the primitive child under the stable placeholder root with the
+## assembled visual. Keeping the root preserves existing manager lifecycle and
+## movement code while ensuring successful biomass builds do not render a
+## second primitive over the real threat.
+func _attach_biomass_visual(instance_id: String, visual: Variant) -> void:
+	var placeholder: Variant = placeholder_nodes.get(instance_id, null)
+	if placeholder == null or not is_instance_valid(placeholder) or visual == null or not is_instance_valid(visual):
+		return
+	if visual.get_parent() != null:
+		visual.get_parent().remove_child(visual)
+	for child in placeholder.get_children():
+		placeholder.remove_child(child)
+		child.queue_free()
+	placeholder.add_child(visual)

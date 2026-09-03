@@ -10109,7 +10109,7 @@ func acquire_tool_for_validation(p_tool_id: String) -> bool:
 
 ## Captures a fresh RunSnapshot from the current runtime state. Returns
 ## null if the slice is not started or any required model is missing.
-func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
+func _build_run_snapshot(use_home_ship_summary: bool = false) -> RunSnapshot:
 	if not playable_started or slice_complete:
 		return null
 	if save_load_service == null:
@@ -10153,7 +10153,7 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
 	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
 	# field is left at its default for save-format back-compat.
-	if use_home_arc_summary:
+	if use_home_ship_summary:
 		if home_ship != null and not home_ship.arc_summary.is_empty():
 			snapshot.electrical_arc_summary = home_ship.arc_summary.duplicate(true)
 	elif electrical_arc_state != null:
@@ -10989,6 +10989,53 @@ func save_world_for_validation() -> bool:
 ## Task 7 validation seam: calls request_load() (world load) and returns its result.
 func load_world_for_validation() -> bool:
 	return request_load()
+
+## Task 7 validation seam: inject a biomass threat at a world position.  If
+## the manager exists it returns the live ThreatAIState; otherwise the
+## underlying method returns null.  Returns the same shape
+## `inject_biomass_validation_encounter(archetype_id, recipe_id, seed,
+## world_position) -> Variant` documented in the contract.
+func inject_biomass_validation_encounter(archetype_id: String, recipe_id: String = "", seed: int = 0, world_position: Vector3 = Vector3.ZERO) -> Variant:
+	if threat_manager == null or not is_instance_valid(threat_manager):
+		return null
+	if not threat_manager.has_method("inject_biomass_validation_encounter"):
+		return null
+	return threat_manager.inject_biomass_validation_encounter(archetype_id, recipe_id, seed, world_position)
+
+## Task 7 source configuration seam.  Forwards to the threat manager so a
+## coordinator can wire biomass sources without touching the manager internals.
+func configure_biomass_sources(parts: Variant = null, library: Variant = null, visual_catalog: Dictionary = {}) -> void:
+	if threat_manager == null or not is_instance_valid(threat_manager):
+		return
+	if not threat_manager.has_method("configure_biomass_sources"):
+		return
+	threat_manager.configure_biomass_sources(parts, library, visual_catalog)
+
+## Task 7 validation seam: revisit a previously-visited derelict by marker_id.
+## Returns a Dictionary {ok, marker_id, reason}. Re-activates the retained
+## ShipInstance (geometry rebuild + manager state restore) without bouncing
+## through the home ship when the player is already in-session.
+func revisit(marker_id: String) -> Dictionary:
+	if marker_id.is_empty():
+		return {"ok": false, "marker_id": marker_id, "reason": "empty_marker_id"}
+	if not visited_ships.has(marker_id):
+		return {"ok": false, "marker_id": marker_id, "reason": "not_visited"}
+	var inst = visited_ships[marker_id]
+	if inst == null:
+		return {"ok": false, "marker_id": marker_id, "reason": "instance_null"}
+	# Sync any drift in the active ship into its retained summary before
+	# we move on (matches the _build_world_snapshot sync).
+	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
+	_sync_current_ship_breach_environment()
+	_sync_current_ship_pillar_summaries()
+	# Re-activate geometry for the target ship.
+	var pos_in_ship: Array = inst.player_position_in_ship if inst != null else [0.0, 0.0, 0.0]
+	if not _activate_derelict_from_instance(inst, pos_in_ship):
+		return {"ok": false, "marker_id": marker_id, "reason": "activate_failed"}
+	current_ship = inst
+	away_from_start = true
+	return {"ok": true, "marker_id": marker_id, "reason": ""}
 
 ## Regenerates a derelict's geometry from its retained blueprint, makes it the
 ## active ship (re-applying its persisted systems state is implicit — the

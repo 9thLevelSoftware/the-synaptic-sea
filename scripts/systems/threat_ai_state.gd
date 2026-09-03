@@ -57,6 +57,23 @@ var anchored: bool = false
 var telegraph_seconds: float = 0.0
 var telegraph_remaining: float = 0.0
 var player_verb: String = "fight"     # distinct player response verb
+## Task 7: biomass assembled recipe + deterministic nonzero seed. The state
+## never mutates these — the manager owns the canonical copy and asks for it
+## back via get_summary(). A nonzero seed is mandatory because the gait
+## controller derives a phase from posmod(seed, 360).
+var _biomass_recipe: Dictionary = {}
+var biomass_recipe: Dictionary:
+	set(value):
+		_biomass_recipe = (value as Dictionary).duplicate(true) if value is Dictionary else {}
+	get:
+		return _biomass_recipe.duplicate(true)
+var biomass_seed: int = 0
+## Task 7: build-time metadata. _biomass_whole_threat_fallback==true means
+## the visual fell back to the existing primitive placeholder and a stable
+## fallback reason is recorded on _biomass_fallback_reason. Set by the
+## manager only; not part of the gameplay state machine.
+var biomass_whole_threat_fallback: bool = false
+var biomass_fallback_reason: String = ""
 
 func configure(config: Dictionary = {}) -> void:
 	instance_id = str(config.get("instance_id", instance_id))
@@ -115,6 +132,27 @@ func configure(config: Dictionary = {}) -> void:
 	player_verb = str(config.get("player_verb", beh.get("player_verb", player_verb)))
 	if player_verb.is_empty():
 		player_verb = "fight"
+	# Task 7: biomass assembled fields — deep-copied, never borrowed.
+	var raw_recipe: Variant = config.get("biomass_recipe", biomass_recipe)
+	if raw_recipe is Dictionary:
+		biomass_recipe = raw_recipe
+	if config.has("biomass_seed"):
+		var seed_value: int = int(config.get("biomass_seed", 0))
+		# Normalize invalid seeds to a deterministic nonzero value at the
+		# manager boundary; here we preserve the input verbatim so a
+		# standalone ThreatAIState round-trip is bit-exact.
+		biomass_seed = seed_value
+	if config.has("biomass_whole_threat_fallback"):
+		biomass_whole_threat_fallback = bool(config.get("biomass_whole_threat_fallback", false))
+	if config.has("biomass_fallback_reason"):
+		biomass_fallback_reason = str(config.get("biomass_fallback_reason", ""))
+
+## Sets the complete assembled recipe and its deterministic seed. The recipe
+## is copied on write and on read so callers cannot mutate the saved graph
+## through a nested Dictionary reference.
+func set_biomass_recipe(recipe: Dictionary, seed: int) -> void:
+	biomass_recipe = recipe
+	biomass_seed = seed if seed != 0 else 1
 
 func tick(delta: float, context: Dictionary = {}) -> bool:
 	if delta < 0.0:
@@ -263,6 +301,10 @@ func get_summary() -> Dictionary:
 		"telegraph_seconds": telegraph_seconds,
 		"telegraph_remaining": telegraph_remaining,
 		"player_verb": player_verb,
+		"biomass_recipe": biomass_recipe,
+		"biomass_seed": biomass_seed,
+		"biomass_whole_threat_fallback": biomass_whole_threat_fallback,
+		"biomass_fallback_reason": biomass_fallback_reason,
 	}
 
 func effective_move_speed() -> float:
