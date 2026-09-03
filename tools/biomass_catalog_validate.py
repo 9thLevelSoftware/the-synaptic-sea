@@ -317,8 +317,17 @@ def _validate_wrapper(path: Any, part_id: str, project_root: Path, errors: list[
         _append(errors, f"{label}: wrapper path could not be resolved or checked")
 
 
-def _validate_socket(socket: Any, part_id: str, index: int, fallback_dimensions: Any, errors: list[str], names: set[str]) -> None:
-    path = f"parts.{part_id}.sockets[{index}]"
+def _validate_socket(
+    socket: Any,
+    part_id: str,
+    index: int,
+    fallback_dimensions: Any,
+    errors: list[str],
+    names: set[str],
+    label: str | None = None,
+    check_fallback_bounds: bool = True,
+) -> None:
+    path = f"{label or f'parts.{part_id}'}.sockets[{index}]"
     if not _object(socket, _SOCKET_FIELDS, path, errors):
         return
     name = socket.get("name")
@@ -344,7 +353,7 @@ def _validate_socket(socket: Any, part_id: str, index: int, fallback_dimensions:
         _append(errors, f"{path}: root socket must have empty accepts_categories")
     if kind != "root" and isinstance(accepts, list) and not accepts:
         _append(errors, f"{path}: non-root socket must accept at least one category")
-    if _vector(socket.get("position_m"), f"{path}.position_m", errors) and _vector(fallback_dimensions, "fallback.dimensions_m", errors):
+    if _vector(socket.get("position_m"), f"{path}.position_m", errors) and check_fallback_bounds and _vector(fallback_dimensions, "fallback.dimensions_m", errors):
         if any(abs(coordinate) > dimension + 0.05 for coordinate, dimension in zip(socket["position_m"], fallback_dimensions)):
             _append(errors, f"{path}.position_m: position is outside fallback bounds")
     _vector(socket.get("rotation_deg"), f"{path}.rotation_deg", errors)
@@ -515,6 +524,22 @@ def _validate_recipe_part_metadata(part: Any, label: str, errors: list[str]) -> 
     sockets = part.get("sockets")
     if not isinstance(sockets, list) or not sockets:
         _append(errors, f"{label}.sockets: referenced part must have a non-empty socket array")
+        names: set[str] = set()
+    else:
+        names = set()
+        for index, socket in enumerate(sockets):
+            _validate_socket(
+                socket,
+                "referenced",
+                index,
+                None,
+                errors,
+                names,
+                label=label,
+                check_fallback_bounds=False,
+            )
+    if "socket_root_0" not in names:
+        _append(errors, f"{label}.sockets: missing root socket socket_root_0")
     collision_shapes = part.get("collision_shapes")
     if not isinstance(collision_shapes, list) or not collision_shapes:
         _append(errors, f"{label}.collision_shapes: referenced part must have a non-empty collision array")

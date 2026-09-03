@@ -742,3 +742,57 @@ def test_canonical_recipes_remain_accepted_with_valid_referenced_metadata() -> N
     catalog = part_map()
     for item in recipes()["recipes"].values():
         assert validate_recipe(item, catalog) == []
+
+
+@pytest.mark.parametrize(
+    ("part_id", "label"),
+    (
+        ("biomass_humanoid_torso_v1", "recipe.core.part_id"),
+        ("biomass_human_arm_v1", "recipe.attachments[0].part_id"),
+        ("biomass_gunk_connector_v1", "recipe.attachments[0].connector_part_id"),
+    ),
+)
+@pytest.mark.parametrize(
+    ("mutation", "diagnostic"),
+    (
+        ("socket_missing_field", "sockets[0]: missing field"),
+        ("socket_bad_kind_name", "sockets[0].kind: does not match socket name"),
+        ("socket_bad_position", "sockets[0].position_m: must be a finite numeric"),
+        ("socket_bad_rotation", "sockets[0].rotation_deg: must be a finite numeric"),
+        ("socket_bad_accepts", "sockets[0].accepts_categories: unknown category"),
+        ("socket_root_accepts", "sockets[0]: root socket must have empty"),
+        ("socket_duplicate_root", "duplicate socket name"),
+        ("socket_missing_root", "sockets: missing root socket"),
+    ),
+)
+def test_recipe_rejects_malformed_referenced_socket_metadata(
+    part_id: str, label: str, mutation: str, diagnostic: str,
+) -> None:
+    catalog = copy.deepcopy(part_map())
+    part = catalog[part_id]
+    if mutation == "socket_missing_field":
+        part["sockets"][0] = {"name": "socket_root_0"}
+    elif mutation == "socket_bad_kind_name":
+        part["sockets"][0]["name"] = "socket_head_0"
+    elif mutation == "socket_bad_position":
+        part["sockets"][0]["position_m"] = [float("nan"), 0, 0]
+    elif mutation == "socket_bad_rotation":
+        part["sockets"][0]["rotation_deg"] = [float("nan"), 0, 0]
+    elif mutation == "socket_bad_accepts":
+        part["sockets"][0]["accepts_categories"] = ["bogus"]
+    elif mutation == "socket_root_accepts":
+        part["sockets"][0]["accepts_categories"] = ["biomass_limb"]
+    elif mutation == "socket_duplicate_root":
+        part["sockets"].append(copy.deepcopy(part["sockets"][0]))
+    elif mutation == "socket_missing_root":
+        del part["sockets"][0]
+    else:
+        raise AssertionError(f"unknown test mutation: {mutation}")
+
+    errors = validate_recipe(recipe(), catalog)
+    if mutation == "socket_duplicate_root":
+        assert_has(errors, f"{label}.sockets")
+        assert_has(errors, "duplicate socket name")
+    else:
+        assert_has(errors, f"{label}.{diagnostic}")
+    assert errors == sorted(set(errors))
