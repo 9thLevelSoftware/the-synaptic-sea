@@ -41,15 +41,19 @@ and cleans failed/stale outputs. `biomass_composite_review.py` is the sole canon
 the manifest owns all 30 case IDs, commands/output, commit, Godot version, stage, input/output hashes,
 metrics, and protected digests; verify recomputes them. Proof stores only manifest path+SHA.
 
-Task 9 adds `tools/meshy_blender_validate.py` and `scripts/threats/biomass_assembler.gd` to its exact
+Task 9 adds `docs/game/06_validation_plan.md`, `tools/meshy_blender_validate.py`, and `scripts/threats/biomass_assembler.gd` to its exact
 file scope. RED tests first prove current acceptance of mesh-node extras `{"biomass_socket":true}`.
 Production validation then recursively rejects every GLB node extras key or string value containing
 case-insensitive `socket`, `marker`, `anchor`, `helper`, or `collision`, including hidden/mesh nodes;
 benign `{source:"meshy"}` and visual-only no-helper fixtures pass. Godot signatures remain
-headless-safe (`validate_part(instance:Node3D, entry:Dictionary)` and
-`validate_assembly(visual:Variant, recipe:Variant, parts:Variant)`), with exact preloaded script
-identity checks. The assembler validates every placeholder/wrapper before accepting it and frees the
-whole assembly on diagnostics; ADR-0058 remains authoritative.
+headless-safe (`BiomassWrapperValidator.validate_part(instance: Node3D, part_id: String, entry: Dictionary)` and
+`BiomassWrapperValidator.validate_assembly(visual: Variant, recipe: Variant, parts: Variant)`), with exact
+preloaded script identity checks. The assembler/factory passes the already-authoritative separate `part_id`
+alongside the closed catalog entry; the catalog schema is unchanged. `validate_part` compares instance
+`biomass_part_id` metadata exactly against that explicit expected ID, and missing or mismatched metadata is
+a stable diagnostic. `validate_assembly` derives authoritative expected part IDs from the recipe/catalog
+contract, never from instance metadata alone. The assembler validates every placeholder/wrapper before
+accepting it and frees the whole assembly on diagnostics; ADR-0058 remains authoritative.
 
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
 
