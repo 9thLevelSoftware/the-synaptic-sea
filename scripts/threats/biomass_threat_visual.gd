@@ -33,6 +33,8 @@ var _attachment_assembly_rest: Dictionary = {}
 var _runtime_node_count_value: int = 0
 var _triangle_budget_value: int = 0
 var _is_built: bool = false
+var _gait_controller: Variant = null
+var _gait_controller_script: GDScript = null
 
 ## Returns the registered part root for the given instance ID, or null when
 ## the ID is unknown.
@@ -84,6 +86,90 @@ func runtime_node_count() -> int:
 ## Returns the catalog triangle budget total across all part occurrences.
 func triangle_budget() -> int:
 	return _triangle_budget_value
+
+## Returns whether the visual has been assembled by the assembler.
+func is_built() -> bool:
+	return _is_built
+
+## Configures a gait controller for the assembled visual. The visual
+## dynamically loads the controller script (no const preload) to avoid a
+## dependency cycle with the gait controller. On failure, the previously
+## installed controller (if any) is freed, the new candidate is freed, and
+## the visual stays in exact assembly rest.
+func configure_gait(parts: Variant, recipe: Variant, seed: int) -> bool:
+	# Reset prior controller: free any installed, then attempt the candidate.
+	if _gait_controller != null and is_instance_valid(_gait_controller):
+		_gait_controller = null
+	var script: GDScript = _load_gait_controller_script()
+	if script == null:
+		return false
+	var candidate: Variant = script.new()
+	if candidate == null:
+		return false
+	if not (candidate is Object) or not (candidate as Object).has_method("configure"):
+		# Not a valid controller; let RefCounted fall out of scope.
+		return false
+	var configured: bool = false
+	if _is_built and parts != null and recipe != null:
+		# Defensive guards against malformed inputs.
+		if parts is Object and (parts as Object).get_script() != null:
+			var configured_call: Variant = (candidate as Object).call("configure", self, parts, recipe, seed)
+			if typeof(configured_call) == TYPE_BOOL:
+				configured = configured_call
+	if not configured:
+		# Candidate already a RefCounted — leaving it for GC is fine. Make
+		# sure we did not partially wire anything in.
+		return false
+	_gait_controller = candidate
+	return true
+
+## Advances the gait controller by `delta` given the world-space velocity
+## and AI state string. No-op when the visual has no configured controller.
+func step_gait(delta: float, velocity: Variant, ai_state: String) -> void:
+	if _gait_controller == null or not is_instance_valid(_gait_controller):
+		return
+	if not (_gait_controller as Object).has_method("step"):
+		return
+	(_gait_controller as Object).call("step", delta, velocity, ai_state)
+	for instance_id in _driven_ids():
+		var derived_value: Variant = (_gait_controller as Object).call("derived_mount_transform", instance_id)
+		if derived_value is Transform3D:
+			var mount: Node3D = attachment_mount(instance_id)
+			if mount != null and is_instance_valid(mount):
+				mount.transform = derived_value
+
+## Returns the active gait controller (RefCounted) or null. Borrowed
+## reference; caller must not free.
+func gait_controller() -> Variant:
+	return _gait_controller
+
+## Returns the currently configured gait driven IDs (lex-sorted) or empty
+## when no controller is active.
+func _driven_ids() -> PackedStringArray:
+	if _gait_controller == null or not is_instance_valid(_gait_controller):
+		return PackedStringArray()
+	if not (_gait_controller as Object).has_method("driven_ids"):
+		return PackedStringArray()
+	var value: Variant = (_gait_controller as Object).call("driven_ids")
+	if value is PackedStringArray:
+		return value
+	if value is Array:
+		var result: PackedStringArray = PackedStringArray()
+		for s in value:
+			result.append(String(s))
+		return result
+	return PackedStringArray()
+
+## Internal: dynamically load the gait controller script to avoid the
+## visual → controller dependency cycle. Cached on first successful load.
+func _load_gait_controller_script() -> GDScript:
+	if _gait_controller_script != null and is_instance_valid(_gait_controller_script):
+		return _gait_controller_script
+	var candidate: Variant = load("res://scripts/threats/biomass_gait_controller.gd")
+	if candidate is GDScript:
+		_gait_controller_script = candidate
+		return candidate
+	return null
 
 ## Internal: stores a registered part root and its socket nodes.
 func _register_part(instance_id: String, part_root: Node3D, socket_names: PackedStringArray) -> void:

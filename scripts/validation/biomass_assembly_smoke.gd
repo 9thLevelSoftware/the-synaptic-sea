@@ -18,6 +18,7 @@ const AssemblerScript: GDScript = preload("res://scripts/threats/biomass_assembl
 const PartCatalogScript: GDScript = preload("res://scripts/systems/biomass_part_catalog.gd")
 const RecipeScript: GDScript = preload("res://scripts/systems/biomass_recipe.gd")
 const RecipeLibraryScript: GDScript = preload("res://scripts/systems/biomass_recipe_library.gd")
+const GaitControllerScript: GDScript = preload("res://scripts/threats/biomass_gait_controller.gd")
 
 const PARTS_PATH: String = "res://data/combat/biomass_part_catalog.json"
 const RECIPES_PATH: String = "res://data/combat/biomass_recipe_catalog.json"
@@ -89,7 +90,10 @@ func _run() -> void:
 		return
 	if not _need(await _free_lifecycle_checks(parts, library), "queue_free lifecycle checks failed"):
 		return
+	if not _need(await _gait_smoke_checks(parts, library), "gait smoke checks failed"):
+		return
 	print("BIOMASS ASSEMBLY PASS recipes=5 max_nodes=%d max_triangles=%d" % [_max_nodes, _max_triangles])
+	print("BIOMASS GAIT PASS recipes=5 profiles=5 deterministic=true bounded=true rest=true drift=false")
 	quit(0)
 
 # ---------------------------------------------------------------------------
@@ -1066,3 +1070,703 @@ func _fail_with(message: String) -> bool:
 	print("BIOMASS ASSEMBLY FAIL: %s" % message)
 	quit(1)
 	return false
+
+# ---------------------------------------------------------------------------
+# Task 6 — Biomass gait smoke. Covers 5 profiles (exact role/phase),
+# same-seed determinism, 10k active step no-drift, <=15 rest exact, reconfig
+# reset/replaces, configure rejection false/rest/no-op, NaN/Inf/negative,
+# 35 deg cap, defensive iteration, no controller child, canonical serialization.
+# ---------------------------------------------------------------------------
+
+const GAIT_PROFILES: Dictionary = {
+	"biped_puppet_v1":          {"role": "locomotor", "freq": 1.8, "swing_deg": 24.0, "phases": [0.0, PI]},
+	"four_legged_scrambler_v1": {"role": "locomotor", "freq": 2.2, "swing_deg": 20.0, "phases": [0.0, PI, PI, 0.0]},
+	"tripod_hound_v1":          {"role": "locomotor", "freq": 2.6, "swing_deg": 28.0, "phases": [0.0, 2.0943951023931953, 4.188790204786391]},
+	"intestinal_dragger_v1":    {"role": "puller",    "freq": 1.4, "swing_deg": 18.0, "phases": [0.0]},
+	"tendril_knot_v1":          {"role": "slither",   "freq": 1.7, "swing_deg": 30.0, "phases": [0.0, 1.5707963267948966, 3.141592653589793, 4.71238898038469]},
+}
+
+func _gait_smoke_checks(parts: Variant, library: Variant) -> bool:
+	if not _need(await _gait_profile_role_phase_checks(parts, library), "gait profile role/phase check failed"):
+		return false
+	if not _need(await _gait_drive_orthogonal_checks(parts, library), "gait drive orthogonal checks failed"):
+		return false
+	if not _need(await _gait_determinism_checks(parts, library), "gait determinism checks failed"):
+		return false
+	if not _need(await _gait_long_horizon_checks(parts, library), "gait long-horizon checks failed"):
+		return false
+	if not _need(await _gait_reconfigure_checks(parts, library), "gait reconfigure checks failed"):
+		return false
+	if not _need(await _gait_rejection_checks(parts, library), "gait rejection checks failed"):
+		return false
+	if not _need(await _gait_nan_inf_negative_checks(parts, library), "gait NaN/Inf/negative checks failed"):
+		return false
+	if not _need(await _gait_cap_and_orthonormal_checks(parts, library), "gait cap/orthonormal checks failed"):
+		return false
+	if not _need(await _gait_no_child_checks(parts, library), "gait no-child checks failed"):
+		return false
+	if not _need(await _gait_canonical_serialization_checks(parts, library), "gait canonical serialization checks failed"):
+		return false
+	return true
+
+func _gait_build_visual(library: Variant, parts: Variant, recipe_id: String) -> Variant:
+	var recipe: Variant = library.get_recipe(recipe_id)
+	return AssemblerScript.new().build(recipe, parts)
+
+func _await_two_frames() -> void:
+	await process_frame
+	await physics_frame
+
+func _gait_role_phase_expect(recipe_id: String) -> Dictionary:
+	var recipe_path: String = "res://data/combat/biomass_recipe_catalog.json"
+	var text: String = FileAccess.get_file_as_string(recipe_path)
+	var parsed: Variant = JSON.parse_string(text)
+	var recipe_doc: Dictionary = (parsed as Dictionary)["recipes"][recipe_id]
+	var profile: Dictionary = GAIT_PROFILES[recipe_id]
+	var roles_index: Dictionary = {
+		"biomass_human_arm_v1": ["locomotor", "manipulator", "puller"],
+		"biomass_insect_leg_v1": ["locomotor"],
+		"biomass_cephalopod_tentacle_v1": ["locomotor", "puller", "slither"],
+		"biomass_animal_skull_v1": ["core", "detail"],
+		"biomass_humanoid_torso_v1": ["core"],
+		"biomass_gunk_connector_v1": ["connector"],
+		"biomass_claw_v1": ["detail", "manipulator"],
+		"biomass_maw_v1": ["detail"],
+	}
+	var profile_role: String = profile["role"]
+	var entries: Array = []
+	for edge in (recipe_doc["attachments"] as Array):
+		var part_id: String = edge["part_id"]
+		if profile_role in roles_index.get(part_id, []):
+			entries.append({"instance_id": edge["instance_id"]})
+	entries.sort_custom(func(a, b): return a["instance_id"] < b["instance_id"])
+	var driven: Array = []
+	for index in range(entries.size()):
+		var phase: float = profile["phases"][index % profile["phases"].size()]
+		driven.append({"instance_id": entries[index]["instance_id"], "phase": phase})
+	return {"driven": driven, "freq": profile["freq"], "swing_deg": profile["swing_deg"]}
+
+func _gait_profile_role_phase_checks(parts: Variant, library: Variant) -> bool:
+	for recipe_id in RECIPE_IDS:
+		var visual: Variant = _gait_build_visual(library, parts, recipe_id)
+		if not _need(visual != null, "gait build null for %s" % recipe_id):
+			return false
+		if not _need(visual.configure_gait(parts, library.get_recipe(recipe_id), 0), "gait configure failed for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		var ctrl: Variant = visual.gait_controller()
+		if not _need(ctrl != null and ctrl is Object, "gait controller null for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(ctrl.get_script() == GaitControllerScript, "gait controller wrong script for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		var expected: Dictionary = _gait_role_phase_expect(recipe_id)
+		var driven_ids: PackedStringArray = ctrl.driven_ids()
+		var expected_ids: Array = []
+		for d in expected["driven"]:
+			expected_ids.append(d["instance_id"])
+		if not _need(Array(driven_ids) == expected_ids, "driven IDs mismatch for %s: got %s expected %s" % [recipe_id, Array(driven_ids), expected_ids]):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		var phases_value: PackedFloat32Array = ctrl.driven_phases()
+		if not _need(phases_value.size() == expected["driven"].size(), "phase count mismatch for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		for index in range(expected["driven"].size()):
+			var got: float = phases_value[index]
+			var want: float = expected["driven"][index]["phase"]
+			if not _need(absf(got - want) < 1e-5, "phase[%d] mismatch for %s: got %f expected %f" % [index, recipe_id, got, want]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+		if not _need(absf(ctrl.freq_hz() - expected["freq"]) < 1e-9, "freq mismatch for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		var expected_swing: float = deg_to_rad(expected["swing_deg"])
+		if not _need(absf(ctrl.swing_rad() - expected_swing) < 1e-9, "swing mismatch for %s: got %f expected %f" % [recipe_id, ctrl.swing_rad(), expected_swing]):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(absf(ctrl.seed_phase()) < 1e-9, "seed_phase(0) != 0 for %s" % recipe_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		visual.queue_free()
+		await _await_two_frames()
+	return true
+
+func _gait_drive_orthogonal_checks(parts: Variant, library: Variant) -> bool:
+	var recipe_id: String = "biped_puppet_v1"
+	var visual: Variant = _gait_build_visual(library, parts, recipe_id)
+	if not _need(visual != null, "orthogonal build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe(recipe_id), 0), "orthogonal configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	var rest_bases: Dictionary = _capture_mount_basis_dict(visual)
+	var core_rest_world: Vector3 = visual.part("core").global_position
+	var leg_left_rest: Vector3 = visual.attachment_mount("leg_left").transform.origin
+	var leg_right_rest: Vector3 = visual.attachment_mount("leg_right").transform.origin
+	var head_rest: Vector3 = visual.attachment_mount("head").transform.origin
+	var claw_rest: Vector3 = visual.attachment_mount("left_claw").transform.origin
+	for step_index in range(60):
+		visual.step_gait(0.0167, Vector3(2.0, 0.0, 0.0), "hunt")
+	var leg_left_now: Vector3 = visual.attachment_mount("leg_left").transform.origin
+	var leg_right_now: Vector3 = visual.attachment_mount("leg_right").transform.origin
+	var head_now: Vector3 = visual.attachment_mount("head").transform.origin
+	var claw_now: Vector3 = visual.attachment_mount("left_claw").transform.origin
+	var core_now: Vector3 = visual.part("core").global_position
+	if not _need(leg_left_now.distance_to(leg_left_rest) > 1e-4 or _basis_deviates(visual.attachment_mount("leg_left").transform, rest_bases["leg_left"]), "driven leg_left did not deviate from rest"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(leg_right_now.distance_to(leg_right_rest) > 1e-4 or _basis_deviates(visual.attachment_mount("leg_right").transform, rest_bases["leg_right"]), "driven leg_right did not deviate from rest"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(head_now.is_equal_approx(head_rest), "non-driven head origin drifted"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(claw_now.is_equal_approx(claw_rest), "non-driven claw origin drifted"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(_transform_equal_basis(visual.attachment_mount("head").transform, rest_bases["head"]), "non-driven head basis drifted"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(_transform_equal_basis(visual.attachment_mount("left_claw").transform, rest_bases["left_claw"]), "non-driven claw basis drifted"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(core_now.is_equal_approx(core_rest_world), "core global_position moved (world bob leak)"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(visual.global_position.is_equal_approx(Vector3.ZERO), "visual root world position moved"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(visual.global_rotation.is_equal_approx(Vector3.ZERO), "visual root world rotation moved (yaw leak)"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_determinism_checks(parts: Variant, library: Variant) -> bool:
+	var recipe_id: String = "four_legged_scrambler_v1"
+	var seq_a: Array = await _capture_sequence(library, parts, recipe_id, 17, 80)
+	var seq_b: Array = await _capture_sequence(library, parts, recipe_id, 17, 80)
+	if not _need(_serialize_sequence(seq_a) == _serialize_sequence(seq_b), "same-seed sequences differ"):
+		return false
+	var seq_c: Array = await _capture_sequence(library, parts, recipe_id, 23, 80)
+	if not _need(_serialize_sequence(seq_a) != _serialize_sequence(seq_c), "different-seed sequences are equal"):
+		return false
+	return true
+
+func _gait_long_horizon_checks(parts: Variant, library: Variant) -> bool:
+	var recipe_id: String = "tripod_hound_v1"
+	var visual: Variant = _gait_build_visual(library, parts, recipe_id)
+	if not _need(visual != null, "long-horizon build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe(recipe_id), 31), "long-horizon configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	var rest_mounts: Dictionary = _capture_mount_origin_dict(visual)
+	var rest_bases: Dictionary = _capture_mount_basis_dict(visual)
+	var core_rest: Vector3 = visual.part("core").global_position
+	for step_index in range(10000):
+		visual.step_gait(0.0167, Vector3(2.5, 0.0, 0.0), "hunt")
+	for instance_id in rest_mounts.keys():
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount == null:
+			continue
+		if not _driven_ids_contain(visual, instance_id):
+			if not _need(mount.transform.origin.is_equal_approx(rest_mounts[instance_id]), "non-driven mount origin drift at %s" % instance_id):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+			if not _need(_transform_equal_basis(mount.transform, rest_bases[instance_id]), "non-driven mount basis drift at %s" % instance_id):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+	var core_now: Vector3 = visual.part("core").global_position
+	if not _need(core_now.is_equal_approx(core_rest), "core drifted in world space over 10k steps"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	for step_index in range(15):
+		visual.step_gait(0.0167, Vector3.ZERO, "idle")
+	for instance_id in rest_mounts.keys():
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount == null:
+			continue
+		if not _need(mount.transform.origin.is_equal_approx(rest_mounts[instance_id]), "rest origin drift at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(_transform_equal_basis(mount.transform, rest_bases[instance_id]), "rest basis drift at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_reconfigure_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+	if not _need(visual != null, "reconfig build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe("biped_puppet_v1"), 0), "first configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var first_ctrl: Variant = visual.gait_controller()
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	for step_index in range(10):
+		visual.step_gait(0.0167, Vector3(2.0, 0.0, 0.0), "hunt")
+	# Reconfigure the same recipe with a different seed.
+	if not _need(visual.configure_gait(parts, library.get_recipe("biped_puppet_v1"), 99), "reconfigure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var second_ctrl: Variant = visual.gait_controller()
+	if not _need(second_ctrl != null and second_ctrl != first_ctrl, "controller reference did not change on reconfigure"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Reset to assembly rest before stepping the new controller.
+	visual._reset_to_assembly_rest()
+	# New controller starts at elapsed=0; the snapshot before any step must
+	# show every mount at exact rest origin/basis.
+	for instance_id in ["leg_left", "leg_right", "head", "left_claw"]:
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount == null:
+			continue
+		if not _need(mount.transform.origin.is_equal_approx(visual.attachment_rest_transform(instance_id).origin), "reconfigure mount origin drifted at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(_transform_equal_basis(mount.transform, visual.attachment_rest_transform(instance_id)), "reconfigure mount basis drifted at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	# Step the new controller and confirm it produces motion (elapsed
+	# must have advanced past 0).
+	for step_index in range(5):
+		visual.step_gait(0.0167, Vector3(2.0, 0.0, 0.0), "hunt")
+	if not _need(second_ctrl.get("_elapsed") > 0.0, "reconfigured controller did not tick (elapsed=%s)" % str(second_ctrl.get("_elapsed"))):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_rejection_checks(parts: Variant, library: Variant) -> bool:
+	# Helper returns a fresh visual to use as the configure target.
+	var visual_wrong_parts_node: Node3D = null
+	var cases: Array = [
+		{"label": "null parts", "recipe_id": "biped_puppet_v1", "seed": 0, "parts_override": null, "null_recipe": false, "invalid_recipe": false},
+		{"label": "null recipe", "recipe_id": "biped_puppet_v1", "seed": 0, "parts_override": parts, "null_recipe": true, "invalid_recipe": false},
+		{"label": "wrong-script parts", "recipe_id": "biped_puppet_v1", "seed": 0, "null_recipe": false, "invalid_recipe": false, "wrong_parts": true},
+		{"label": "unloaded parts", "recipe_id": "biped_puppet_v1", "seed": 0, "null_recipe": false, "invalid_recipe": false, "unloaded_parts": true},
+		{"label": "invalid recipe", "recipe_id": "biped_puppet_v1", "seed": 0, "parts_override": parts, "null_recipe": false, "invalid_recipe": true},
+	]
+	for case in cases:
+		var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+		if not _need(visual != null, "rejection build null for %s" % case["label"]):
+			return false
+		get_root().add_child(visual)
+		visual.global_position = Vector3.ZERO
+		await process_frame
+		await physics_frame
+		var rest_mounts: Dictionary = _capture_mount_origin_dict(visual)
+		var rest_bases: Dictionary = _capture_mount_basis_dict(visual)
+		var used_parts: Variant
+		if case.get("null_recipe", false) or case.get("invalid_recipe", false) or case.get("wrong_parts", false) or case.get("unloaded_parts", false):
+			if case.get("wrong_parts", false):
+				visual_wrong_parts_node = VisualScript.new()
+				used_parts = visual_wrong_parts_node
+			elif case.get("unloaded_parts", false):
+				used_parts = PartCatalogScript.new()
+			elif case.get("null_recipe", false):
+				used_parts = parts
+			else:
+				used_parts = parts
+		else:
+			used_parts = case.get("parts_override", parts)
+		var used_recipe: Variant
+		if case.get("null_recipe", false):
+			used_recipe = null
+		elif case.get("invalid_recipe", false):
+			used_recipe = RecipeScript.from_dict({"recipe_id": "bad"}, parts)
+		else:
+			used_recipe = library.get_recipe(case["recipe_id"])
+		var accepted: bool = visual.configure_gait(used_parts, used_recipe, case["seed"])
+		if not _need(not accepted, "configure_gait accepted %s" % case["label"]):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(visual.gait_controller() == null, "controller retained after rejection for %s" % case["label"]):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		for instance_id in rest_mounts.keys():
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if mount == null:
+				continue
+			if not _need(mount.transform.origin.is_equal_approx(rest_mounts[instance_id]), "rejection %s left mount %s off rest origin" % [case["label"], instance_id]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+			if not _need(_transform_equal_basis(mount.transform, rest_bases[instance_id]), "rejection %s left mount %s off rest basis" % [case["label"], instance_id]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+		visual.step_gait(0.0167, Vector3(2.0, 0.0, 0.0), "hunt")
+		for instance_id in rest_mounts.keys():
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if mount == null:
+				continue
+			if not _need(mount.transform.origin.is_equal_approx(rest_mounts[instance_id]), "rejection %s + step_gait moved mount %s" % [case["label"], instance_id]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+		visual.queue_free()
+		await _await_two_frames()
+	# wrong_parts (VisualScript.new()) is a Node3D — must free explicitly.
+	# unloaded_parts (PartCatalogScript.new()) is a RefCounted, auto-collects.
+	if visual_wrong_parts_node != null and is_instance_valid(visual_wrong_parts_node):
+		visual_wrong_parts_node.free()
+	return true
+
+func _gait_nan_inf_negative_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+	if not _need(visual != null, "nan-inf build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe("biped_puppet_v1"), 0), "nan-inf configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	# Drive the controller into a known mid-gait state, then capture per-mount
+	# state. Bad deltas must no-op (leave the state untouched).
+	visual.step_gait(0.5, Vector3(2.0, 0.0, 0.0), "hunt")
+	var rest_mounts: Dictionary = _capture_mount_origin_dict(visual)
+	var rest_bases: Dictionary = _capture_mount_basis_dict(visual)
+	var bad_deltas: Array = [NAN, INF, -INF, -0.001, -1.0, -100.0]
+	for bad in bad_deltas:
+		visual.step_gait(bad, Vector3(2.0, 0.0, 0.0), "hunt")
+		visual.step_gait(bad, Vector3.ZERO, "stun")
+		for instance_id in rest_mounts.keys():
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if mount == null:
+				continue
+			if not _need(mount.transform.origin.is_equal_approx(rest_mounts[instance_id]), "bad delta %s moved mount %s" % [str(bad), instance_id]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+			if not _need(_transform_equal_basis(mount.transform, rest_bases[instance_id]), "bad delta %s moved basis of mount %s" % [str(bad), instance_id]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+	# After all bad deltas, advance with valid deltas — the controller should
+	# still tick normally (elapsed must have advanced past 0.5).
+	visual.step_gait(0.5, Vector3(2.0, 0.0, 0.0), "hunt")
+	var ctrl: Variant = visual.gait_controller()
+	if not _need(ctrl.get("_elapsed") > 0.5, "controller elapsed did not advance after bad deltas + valid tick (got %s)" % str(ctrl.get("_elapsed"))):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_cap_and_orthonormal_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "tendril_knot_v1")
+	if not _need(visual != null, "cap build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe("tendril_knot_v1"), 5), "cap configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	var ctrl: Variant = visual.gait_controller()
+	var driven: PackedStringArray = ctrl.driven_ids()
+	var rest_mounts: Dictionary = ctrl.mount_rest()
+	for step_index in range(10000):
+		visual.step_gait(0.016, Vector3(2.5, 0.0, 0.0), "hunt")
+		for instance_id in driven:
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if mount == null:
+				continue
+			var basis: Basis = mount.transform.basis
+			if not _need(basis.is_finite(), "non-finite basis at %s step %d" % [instance_id, step_index]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+			if not _need(_is_orthonormal_within(basis, 1e-5), "non-orthonormal basis at %s step %d" % [instance_id, step_index]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+			var rest_xform: Transform3D = rest_mounts[instance_id]
+			var rel: Basis = basis * rest_xform.basis.inverse()
+			var rel_quat: Quaternion = rel.get_rotation_quaternion()
+			var rel_angle_deg: float = rad_to_deg(rel_quat.get_angle())
+			if not _need(rel_angle_deg <= 35.0 + 1e-4, "cap exceeded at %s step %d (got %.3f deg)" % [instance_id, step_index, rel_angle_deg]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_no_child_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+	if not _need(visual != null, "no-child build null"):
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	var baseline_count: int = _count_scene_nodes(visual)
+	if not _need(_count_scene_nodes(visual) == baseline_count, "visual had unexpected children before configure_gait"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.configure_gait(parts, library.get_recipe("biped_puppet_v1"), 0)
+	if not _need(_count_scene_nodes(visual) == baseline_count, "visual gained children after configure_gait"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	for step_index in range(50):
+		visual.step_gait(0.0167, Vector3(2.0, 0.0, 0.0), "hunt")
+		if not _need(_count_scene_nodes(visual) == baseline_count, "visual gained children at step %d" % step_index):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	var ctrl: Variant = visual.gait_controller()
+	if not _need(ctrl.derived_mount_transform("__unknown_id__") == null, "derived_mount_transform leaked for unknown ID"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _gait_canonical_serialization_checks(parts: Variant, library: Variant) -> bool:
+	var visual: Variant = _gait_build_visual(library, parts, "biped_puppet_v1")
+	if not _need(visual != null, "serialization build null"):
+		return false
+	if not _need(visual.configure_gait(parts, library.get_recipe("biped_puppet_v1"), 0), "serialization configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var ctrl: Variant = visual.gait_controller()
+	var snap: Dictionary = ctrl.snapshot()
+	if not _need(snap.has("mounts") and snap.has("parts") and snap.has("driven_ids"), "snapshot missing keys"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var mounts: Dictionary = snap["mounts"]
+	var ids: Array = Array(mounts.keys())
+	var sorted_ids: Array = ids.duplicate()
+	sorted_ids.sort()
+	if not _need(ids == sorted_ids, "snapshot mount IDs are not sorted: " + str(ids)):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	for instance_id in mounts.keys():
+		var entry: Dictionary = mounts[instance_id]
+		if not _need(entry.has("origin") and entry.has("basis"), "snapshot entry missing origin/basis at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		var origin_value: Variant = entry["origin"]
+		var basis_value: Variant = entry["basis"]
+		if not _need(origin_value is Array and (origin_value as Array).size() == 3, "snapshot origin size != 3 at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(basis_value is Array and (basis_value as Array).size() == 9, "snapshot basis size != 9 at %s" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		for f in (origin_value as Array) + (basis_value as Array):
+			if not _need(f is float or f is int, "snapshot float leaked as non-numeric at %s: %s" % [instance_id, str(f)]):
+				visual.queue_free()
+				await _await_two_frames()
+				return false
+	var snap_b: Dictionary = ctrl.snapshot()
+	if not _need(snap == snap_b, "snapshot not stable across calls"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Geometry subkeys must be stable across rest steps (origin + basis per
+	# mount/part + sorted IDs + profile metadata).
+	var geometry_keys: Array = ["mounts", "parts", "driven_ids", "profile_key", "profile_role", "freq_hz", "seed_phase_rad", "phases_rad"]
+	visual.step_gait(0.0167, Vector3.ZERO, "idle")
+	var snap_c: Dictionary = ctrl.snapshot()
+	for key in geometry_keys:
+		if not _need(snap_c.get(key) == snap_b.get(key), "rest geometry[%s] drifted" % key):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	visual.step_gait(0.05, Vector3(2.5, 0.0, 0.0), "hunt")
+	var snap_d: Dictionary = ctrl.snapshot()
+	if not _need(snap_d.get("mounts") != snap_b.get("mounts"), "active mounts did not change"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _capture_mount_origin_dict(visual: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+		var edge: Dictionary = edge_value
+		var instance_id: String = String(edge.get("instance_id", ""))
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount != null:
+			out[instance_id] = mount.transform.origin
+	return out
+
+func _capture_mount_basis_dict(visual: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+		var edge: Dictionary = edge_value
+		var instance_id: String = String(edge.get("instance_id", ""))
+		var mount: Node3D = visual.attachment_mount(instance_id)
+		if mount != null:
+			out[instance_id] = mount.transform
+	return out
+
+func _capture_sequence(library: Variant, parts: Variant, recipe_id: String, seed: int, step_count: int) -> Array:
+	var visual: Variant = _gait_build_visual(library, parts, recipe_id)
+	if visual == null:
+		return []
+	if not visual.configure_gait(parts, library.get_recipe(recipe_id), seed):
+		visual.queue_free()
+		await _await_two_frames()
+		return []
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	var seq: Array = []
+	for step_index in range(step_count):
+		visual.step_gait(0.0167, Vector3(2.5, 0.0, 0.0), "hunt")
+		var frame: Array = []
+		for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+			var edge: Dictionary = edge_value
+			var instance_id: String = String(edge.get("instance_id", ""))
+			var mount: Node3D = visual.attachment_mount(instance_id)
+			if mount != null:
+				var basis: Basis = mount.transform.basis
+				frame.append([
+					instance_id,
+					mount.transform.origin.x,
+					mount.transform.origin.y,
+					mount.transform.origin.z,
+					basis.x.x, basis.x.y, basis.x.z,
+					basis.y.x, basis.y.y, basis.y.z,
+					basis.z.x, basis.z.y, basis.z.z,
+				])
+		seq.append(frame)
+	visual.queue_free()
+	await _await_two_frames()
+	return seq
+
+func _serialize_sequence(seq: Array) -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	for frame in seq:
+		for entry in frame:
+			var parts_arr: Array = entry
+			# entry: [id, ox, oy, oz, bxx, bxy, bxz, byx, byy, byz, bzx, bzy, bzz]
+			var piece: String = "%s|%.9f|%.9f|%.9f|b%.9f,%.9f,%.9f;%.9f,%.9f,%.9f;%.9f,%.9f,%.9f" % [
+				parts_arr[0],
+				float(parts_arr[1]), float(parts_arr[2]), float(parts_arr[3]),
+				float(parts_arr[4]), float(parts_arr[5]), float(parts_arr[6]),
+				float(parts_arr[7]), float(parts_arr[8]), float(parts_arr[9]),
+				float(parts_arr[10]), float(parts_arr[11]), float(parts_arr[12]),
+			]
+			lines.append(piece)
+	return "\n".join(lines)
+
+func _basis_deviates(current_xform: Transform3D, rest_value: Variant) -> bool:
+	if not rest_value is Transform3D:
+		return true
+	var rest: Transform3D = rest_value
+	var rel: Basis = current_xform.basis * rest.basis.inverse()
+	if not rel.is_finite():
+		return true
+	return rel.get_rotation_quaternion().get_angle() > 1e-5
+
+func _transform_equal_basis(a: Transform3D, b_value: Variant) -> bool:
+	if not b_value is Transform3D:
+		return false
+	var b: Transform3D = b_value
+	var rel: Basis = a.basis * b.basis.inverse()
+	if not rel.is_finite():
+		return false
+	return rel.get_rotation_quaternion().get_angle() <= 1e-5 and (a.origin - b.origin).length() <= 1e-5
+
+func _driven_ids_contain(visual: Variant, instance_id: String) -> bool:
+	var ctrl: Variant = visual.gait_controller()
+	if ctrl == null:
+		return false
+	var driven: PackedStringArray = ctrl.driven_ids()
+	return driven.has(instance_id)
+
+func _is_orthonormal_within(basis: Basis, tolerance: float) -> bool:
+	# Godot 4.7's Basis.is_orthonormal() takes no arguments; emulate a
+	# tolerance check.
+	if not basis.is_finite():
+		return false
+	var x: Vector3 = basis.x
+	var y: Vector3 = basis.y
+	var z: Vector3 = basis.z
+	if absf(x.length() - 1.0) > tolerance:
+		return false
+	if absf(y.length() - 1.0) > tolerance:
+		return false
+	if absf(z.length() - 1.0) > tolerance:
+		return false
+	if absf(x.dot(y)) > tolerance:
+		return false
+	if absf(y.dot(z)) > tolerance:
+		return false
+	if absf(x.dot(z)) > tolerance:
+		return false
+	return true
