@@ -27,7 +27,7 @@ const THREAT_SIZES := {
 signal threat_killed(record: Dictionary)
 
 var threat_archetypes: Dictionary = {}
-var threats: Array[ThreatAIState] = []
+var threats: Array = []  # holds ThreatAIState instances; untyped so the parse does not require the global class cache.
 var damage_pipeline = DamagePipelineScript.new()
 var cell_occupancy = CellOccupancyScript.new()
 var threat_nodes: Dictionary = {}  # instance_id -> Node2D
@@ -46,7 +46,7 @@ func _init_systems() -> void:
 	damage_pipeline.configure({})
 
 
-func spawn_threat(archetype_id: String, world_pos: Vector2, instance_id: String = "") -> ThreatAIState:
+func spawn_threat(archetype_id: String, world_pos: Vector2, instance_id: String = "") -> ThreatAIStateScript:
 	_init_systems()
 	if instance_id.is_empty():
 		instance_id = "threat_%d" % threats.size()
@@ -102,7 +102,7 @@ func spawn_threat(archetype_id: String, world_pos: Vector2, instance_id: String 
 
 
 func tick_threats(delta: float, player_position: Vector2, context: Dictionary = {}) -> void:
-	for threat_state: ThreatAIState in threats:
+	for threat_state: ThreatAIStateScript in threats:
 		if threat_state.health <= 0.0:
 			continue
 
@@ -140,7 +140,7 @@ func tick_threats(delta: float, player_position: Vector2, context: Dictionary = 
 
 
 func apply_damage_to_threat(instance_id: String, event: Dictionary) -> Dictionary:
-	var threat_state: ThreatAIState = _find_threat(instance_id)
+	var threat_state: ThreatAIStateScript = _find_threat(instance_id)
 	if threat_state == null:
 		return {}
 	var result := damage_pipeline.apply_to_threat(threat_state, event)
@@ -150,7 +150,7 @@ func apply_damage_to_threat(instance_id: String, event: Dictionary) -> Dictionar
 	return result
 
 
-func _move_threat(threat_state: ThreatAIState, delta: float, player_pos: Vector2) -> void:
+func _move_threat(threat_state: ThreatAIStateScript, delta: float, player_pos: Vector2) -> void:
 	var speed := threat_state.effective_move_speed()
 	if speed <= 0.0:
 		return
@@ -191,7 +191,7 @@ func _move_threat(threat_state: ThreatAIState, delta: float, player_pos: Vector2
 				cell_occupancy.occupy(old_grid, StringName(threat_state.instance_id))
 
 
-func _on_threat_died(threat_state: ThreatAIState) -> void:
+func _on_threat_died(threat_state: ThreatAIStateScript) -> void:
 	var grid_pos := GridCoordinateScript.world_to_grid(_threat_world_pos(threat_state))
 	cell_occupancy.release(grid_pos, StringName(threat_state.instance_id))
 	var node = threat_nodes.get(threat_state.instance_id)
@@ -209,14 +209,14 @@ func _create_threat_node(archetype_id: String, pos: Vector2) -> Node2D:
 	return node
 
 
-func _threat_world_pos(threat_state: ThreatAIState) -> Vector2:
+func _threat_world_pos(threat_state: ThreatAIStateScript) -> Vector2:
 	var wp: Array = threat_state.world_position
 	if wp.size() >= 2:
 		return Vector2(float(wp[0]), float(wp[1]))
 	return Vector2.ZERO
 
 
-func _find_threat(instance_id: String) -> ThreatAIState:
+func _find_threat(instance_id: String) -> ThreatAIStateScript:
 	for t in threats:
 		if t.instance_id == instance_id:
 			return t
