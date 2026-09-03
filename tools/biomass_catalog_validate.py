@@ -239,7 +239,12 @@ def _object(value: Any, expected: set[str], path: str, errors: list[str]) -> boo
 
 
 def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        return False
 
 
 def _vector(value: Any, path: str, errors: list[str]) -> bool:
@@ -275,15 +280,18 @@ def _validate_wrapper(path: Any, part_id: str, project_root: Path, errors: list[
     if not relative:
         _append(errors, f"{label}: res:// path must name a file")
         return
-    root = project_root.resolve()
-    candidate = (root / relative).resolve()
     try:
-        candidate.relative_to(root)
-    except ValueError:
-        _append(errors, f"{label}: wrapper path escapes project root")
-        return
-    if not candidate.is_file():
-        _append(errors, f"{label}: wrapper path does not exist: {path}")
+        root = project_root.resolve()
+        candidate = (root / relative).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            _append(errors, f"{label}: wrapper path escapes project root")
+            return
+        if not candidate.is_file():
+            _append(errors, f"{label}: wrapper path does not exist: {path}")
+    except (ValueError, OSError, RuntimeError):
+        _append(errors, f"{label}: wrapper path could not be resolved or checked")
 
 
 def _validate_socket(socket: Any, part_id: str, index: int, fallback_dimensions: Any, errors: list[str], names: set[str]) -> None:
@@ -298,14 +306,14 @@ def _validate_socket(socket: Any, part_id: str, index: int, fallback_dimensions:
     else:
         names.add(name)
     kind = socket.get("kind")
-    if kind not in SOCKET_KINDS:
+    if not isinstance(kind, str) or kind not in SOCKET_KINDS:
         _append(errors, f"{path}.kind: unsupported socket kind")
     elif isinstance(name, str) and SOCKET_RE.fullmatch(name):
         named_kind = name.split("_")[1]
         if kind != named_kind:
             _append(errors, f"{path}.kind: does not match socket name")
     accepts = socket.get("accepts_categories")
-    if not isinstance(accepts, list) or any(item not in CATEGORIES for item in accepts):
+    if not isinstance(accepts, list) or any(not isinstance(item, str) or item not in CATEGORIES for item in accepts):
         _append(errors, f"{path}.accepts_categories: unknown category")
     elif len(set(accepts)) != len(accepts):
         _append(errors, f"{path}.accepts_categories: duplicate category")
@@ -357,7 +365,7 @@ def _validate_part(part: Any, part_id: str, project_root: Path, errors: list[str
     if not _object(part, _PART_FIELDS, path, errors):
         return
     category = part.get("category")
-    if category not in CATEGORIES:
+    if not isinstance(category, str) or category not in CATEGORIES:
         _append(errors, f"{path}.category: unsupported category")
     species = part.get("species_tags")
     if not isinstance(species, list) or not species or any(not isinstance(item, str) or not item for item in species):
@@ -365,7 +373,7 @@ def _validate_part(part: Any, part_id: str, project_root: Path, errors: list[str
     elif len(set(species)) != len(species):
         _append(errors, f"{path}.species_tags: duplicate species tag")
     roles = part.get("assembly_roles")
-    if not isinstance(roles, list) or not roles or any(item not in ASSEMBLY_ROLES for item in roles):
+    if not isinstance(roles, list) or not roles or any(not isinstance(item, str) or item not in ASSEMBLY_ROLES for item in roles):
         _append(errors, f"{path}.assembly_roles: unknown role")
     elif len(set(roles)) != len(roles):
         _append(errors, f"{path}.assembly_roles: duplicate assembly role")
@@ -377,7 +385,7 @@ def _validate_part(part: Any, part_id: str, project_root: Path, errors: list[str
     fallback_dimensions = None
     if _object(fallback, _FALLBACK_FIELDS, f"{path}.fallback", errors):
         primitive = fallback.get("primitive")
-        if primitive not in {"box", "capsule", "sphere"}:
+        if not isinstance(primitive, str) or primitive not in {"box", "capsule", "sphere"}:
             _append(errors, f"{path}.fallback.primitive: unsupported primitive")
         fallback_dimensions = fallback.get("dimensions_m")
         _positive_vector(fallback_dimensions, f"{path}.fallback.dimensions_m", errors)
@@ -454,7 +462,7 @@ def _find_socket(part: Any, socket_name: str) -> dict[str, Any] | None:
 
 def _part_roles(part: Any) -> set[str]:
     roles = part.get("assembly_roles", []) if isinstance(part, Mapping) else []
-    return set(roles) if isinstance(roles, list) else set()
+    return {role for role in roles if isinstance(role, str)} if isinstance(roles, list) else set()
 
 
 def _part_category(part: Any) -> str | None:
@@ -476,7 +484,7 @@ def _part_descriptor_count(part: Any) -> int:
 
 
 def _validate_locomotion(hint: Any, parts: list[Any], errors: list[str]) -> None:
-    if hint not in LOCOMOTION_HINTS:
+    if not isinstance(hint, str) or hint not in LOCOMOTION_HINTS:
         _append(errors, "locomotion_hint: unsupported locomotion")
         return
     role_counts: dict[str, int] = {}
@@ -508,20 +516,23 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
     _finite_walk(recipe, "recipe", errors)
     if not _object(recipe, _RECIPE_FIELDS, "recipe", errors):
         return sorted(set(errors))
+    if not isinstance(recipe, dict):
+        return sorted(set(errors))
     parts = _as_part_map(part_catalog)
     if not isinstance(parts, Mapping):
         _append(errors, "part_catalog: must be a mapping")
         return sorted(set(errors))
     if not isinstance(recipe.get("recipe_id"), str) or not recipe["recipe_id"]:
         _append(errors, "recipe.recipe_id: must be a non-empty string")
-    if recipe.get("locomotion_hint") not in LOCOMOTION_HINTS:
+    if not isinstance(recipe.get("locomotion_hint"), str) or recipe.get("locomotion_hint") not in LOCOMOTION_HINTS:
         _append(errors, "recipe.locomotion_hint: unsupported locomotion")
     core = recipe.get("core")
     core_instance = None
     core_part = None
     if _object(core, _CORE_FIELDS, "recipe.core", errors):
-        core_instance = core.get("instance_id")
-        core_part_id = core.get("part_id")
+        core_record = core if isinstance(core, dict) else {}
+        core_instance = core_record.get("instance_id")
+        core_part_id = core_record.get("part_id")
         if not isinstance(core_instance, str) or not core_instance:
             _append(errors, "recipe.core.instance_id: must be a non-empty string")
         if not isinstance(core_part_id, str) or core_part_id not in parts:
@@ -578,7 +589,7 @@ def validate_recipe(recipe: object, part_catalog: Mapping[str, Any]) -> list[str
             _append(errors, f"{path}.connector_part_id: unknown connector part")
         elif _part_category(connector_part) != "biomass_connector" or "connector" not in _part_roles(connector_part):
             _append(errors, f"{path}.connector_part_id: connector lacks connector role/category")
-        if parent_id not in instances:
+        if not isinstance(parent_id, str) or parent_id not in instances:
             _append(errors, f"{path}.parent_instance_id: parent-before-child reference required")
         elif not isinstance(parent_socket_name, str):
             _append(errors, f"{path}.parent_socket: must be a string")
@@ -693,7 +704,7 @@ def validate_recipe_catalog(document: object, part_catalog: Mapping[str, Any]) -
         elif value != EXPECTED_POOLS[pool_id]:
             _append(errors, f"archetype_pools.{pool_id}: value does not match canonical pool")
         for recipe_id in value if isinstance(value, list) else []:
-            if recipe_id not in recipes:
+            if not isinstance(recipe_id, str) or recipe_id not in recipes:
                 _append(errors, f"archetype_pools.{pool_id}: unknown recipe id '{recipe_id}'")
     return sorted(set(errors))
 
@@ -737,14 +748,20 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         errors.append(f"parts: {exc}")
         parts_document = {}
-    errors.extend(validate_part_catalog(parts_document, project_root))
+    try:
+        errors.extend(validate_part_catalog(parts_document, project_root))
+    except (ValueError, OSError, RuntimeError):
+        errors.append("parts: validation failed due to malformed data or filesystem state")
     part_map = parts_document.get("parts", {}) if isinstance(parts_document, dict) else {}
     try:
         recipes_document = _load_json(resolve_input(args.recipes))
     except (OSError, ValueError) as exc:
         errors.append(f"recipes: {exc}")
         recipes_document = {}
-    errors.extend(validate_recipe_catalog(recipes_document, part_map if isinstance(part_map, Mapping) else {}))
+    try:
+        errors.extend(validate_recipe_catalog(recipes_document, part_map if isinstance(part_map, Mapping) else {}))
+    except (ValueError, OSError, RuntimeError):
+        errors.append("recipes: validation failed due to malformed data or filesystem state")
     errors = sorted(set(errors))
     if errors:
         for error in errors:

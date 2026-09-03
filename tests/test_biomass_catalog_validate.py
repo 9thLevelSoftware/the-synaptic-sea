@@ -329,3 +329,246 @@ def test_cli_rejects_nonfinite_and_duplicate_json(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "non-finite" in result.stdout
+
+
+def run_cli(tmp_path: Path, part_document: object, recipe_document: object) -> subprocess.CompletedProcess[str]:
+    part_path = tmp_path / "parts.json"
+    recipe_path = tmp_path / "recipes.json"
+    part_path.write_text(json.dumps(part_document), encoding="utf-8")
+    recipe_path.write_text(json.dumps(recipe_document), encoding="utf-8")
+    return subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--project-root",
+            str(ROOT),
+            "--parts",
+            str(part_path),
+            "--recipes",
+            str(recipe_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_public_validators_fail_closed_for_unhashable_json_values() -> None:
+    malformed_parts = parts()
+    malformed_parts["parts"]["biomass_claw_v1"]["assembly_roles"] = [{}]
+    malformed_parts["parts"]["biomass_claw_v1"]["category"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["fallback"]["primitive"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["sockets"][0]["kind"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["sockets"][0]["accepts_categories"] = [{}]
+    part_errors = validate_part_catalog(malformed_parts, ROOT)
+    assert isinstance(part_errors, list)
+    assert all(isinstance(error, str) for error in part_errors)
+    assert_has(part_errors, "assembly_roles")
+    assert_has(part_errors, "category")
+    assert_has(part_errors, "primitive")
+    assert_has(part_errors, "socket kind")
+    assert_has(part_errors, "accepts_categories")
+
+    malformed_recipe = recipe()
+    malformed_recipe["locomotion_hint"] = {}
+    malformed_recipe["core"]["part_id"] = {}
+    malformed_recipe["attachments"][0]["parent_instance_id"] = {}
+    malformed_recipe["attachments"][0]["part_id"] = {}
+    malformed_recipe["attachments"][0]["connector_part_id"] = {}
+    recipe_errors = validate_recipe(malformed_recipe, part_map())
+    assert isinstance(recipe_errors, list)
+    assert all(isinstance(error, str) for error in recipe_errors)
+    assert_has(recipe_errors, "locomotion")
+    assert_has(recipe_errors, "recipe.core.part_id")
+    assert_has(recipe_errors, "parent_instance_id")
+    assert_has(recipe_errors, "recipe.attachments[0].part_id")
+    assert_has(recipe_errors, "connector_part_id")
+
+    malformed_catalog = recipes()
+    malformed_catalog["archetype_pools"]["stalker"] = [{}]
+    catalog_errors = validate_recipe_catalog(malformed_catalog, part_map())
+    assert isinstance(catalog_errors, list)
+    assert all(isinstance(error, str) for error in catalog_errors)
+    assert_has(catalog_errors, "archetype_pools.stalker")
+
+
+def test_cli_rejects_unhashable_json_values_without_traceback(tmp_path: Path) -> None:
+    malformed_parts = parts()
+    malformed_parts["parts"]["biomass_claw_v1"]["assembly_roles"] = [{}]
+    malformed_parts["parts"]["biomass_claw_v1"]["category"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["fallback"]["primitive"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["sockets"][0]["kind"] = {}
+    malformed_parts["parts"]["biomass_claw_v1"]["sockets"][0]["accepts_categories"] = [{}]
+    malformed_recipes = recipes()
+    malformed_recipes["recipes"]["biped_puppet_v1"]["locomotion_hint"] = {}
+    malformed_recipes["recipes"]["biped_puppet_v1"]["core"]["part_id"] = {}
+    malformed_recipes["recipes"]["biped_puppet_v1"]["attachments"][0]["parent_instance_id"] = {}
+    malformed_recipes["recipes"]["biped_puppet_v1"]["attachments"][0]["part_id"] = {}
+    malformed_recipes["recipes"]["biped_puppet_v1"]["attachments"][0]["connector_part_id"] = {}
+    malformed_recipes["archetype_pools"]["stalker"] = [{}]
+    result = run_cli(tmp_path, malformed_parts, malformed_recipes)
+    repeat = run_cli(tmp_path, malformed_parts, malformed_recipes)
+    assert result.returncode != 0
+    assert repeat.returncode == result.returncode
+    assert result.stdout == repeat.stdout
+    output = result.stdout + result.stderr
+    assert "Traceback" not in output
+    assert result.stderr == ""
+    assert result.stdout
+    assert all(line.startswith("ERROR: ") for line in result.stdout.splitlines())
+
+
+def test_wrapper_nul_is_a_stable_direct_and_cli_diagnostic(tmp_path: Path) -> None:
+    malformed_parts = parts()
+    malformed_parts["parts"]["biomass_claw_v1"]["wrapper_scene_path"] = "res://bad\x00path.tscn"
+    direct = validate_part_catalog(malformed_parts, ROOT)
+    assert direct == sorted(set(direct))
+    assert "parts.biomass_claw_v1.wrapper_scene_path: wrapper path could not be resolved or checked" in direct
+
+    result = run_cli(tmp_path, malformed_parts, recipes())
+    assert result.returncode != 0
+    assert "Traceback" not in result.stdout + result.stderr
+    assert result.stderr == ""
+    assert "ERROR: parts.biomass_claw_v1.wrapper_scene_path:" in result.stdout
+
+
+def test_oversized_integer_geometry_values_fail_closed() -> None:
+    huge = 10**10000
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["fallback"]["dimensions_m"][0] = huge
+    errors = validate_part_catalog(document, ROOT)
+    assert_has(errors, "fallback.dimensions_m: must be a finite numeric")
+
+    document = parts()
+    document["parts"]["biomass_gunk_connector_v1"]["collision_shapes"][0]["radius_m"] = huge
+    errors = validate_part_catalog(document, ROOT)
+    assert_has(errors, "radius_m: must be positive")
+
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["triangle_budget"] = huge
+    errors = validate_part_catalog(document, ROOT)
+    assert_has(errors, "triangle_budget: value does not match canonical contract")
+
+
+def test_diagnostics_are_sorted_and_deduplicated() -> None:
+    document = parts()
+    document["parts"]["biomass_claw_v1"]["sockets"][0]["kind"] = "not-a-kind"
+    document["parts"]["biomass_claw_v1"]["sockets"][0]["accepts_categories"] = ["bad", "bad"]
+    errors = validate_part_catalog(document, ROOT)
+    assert errors == sorted(set(errors))
+
+
+def test_schemas_enforce_closed_records_and_exact_map_shapes() -> None:
+    part_schema = json.loads((ROOT / "data/combat/schemas/biomass_part_catalog_v1.schema.json").read_text(encoding="utf-8"))
+    recipe_schema = json.loads((ROOT / "data/combat/schemas/biomass_recipe_catalog_v1.schema.json").read_text(encoding="utf-8"))
+    for schema, required in (
+        (part_schema, {"schema_version", "document_kind", "limits", "parts"}),
+        (recipe_schema, {"schema_version", "document_kind", "recipes", "archetype_pools"}),
+    ):
+        assert schema["type"] == "object"
+        assert schema["additionalProperties"] is False
+        assert set(schema["required"]) == set(schema["properties"]) == required
+
+    assert part_schema["properties"]["limits"]["additionalProperties"] is False
+    assert set(part_schema["properties"]["limits"]["required"]) == set(part_schema["properties"]["limits"]["properties"])
+    assert recipe_schema["$defs"]["core"]["additionalProperties"] is False
+    assert set(recipe_schema["$defs"]["core"]["required"]) == set(recipe_schema["$defs"]["core"]["properties"])
+
+    for schema, map_name, minimum, maximum, names, value_shape in (
+        (part_schema, "parts", 8, 8, set(parts()["parts"]), {"$ref": "#/$defs/part"}),
+        (recipe_schema, "recipes", 5, 5, set(recipes()["recipes"]), {"$ref": "#/$defs/recipe"}),
+        (recipe_schema, "archetype_pools", 6, 6, set(recipes()["archetype_pools"]), {"type": "array", "items": {"type": "string"}}),
+    ):
+        mapping = schema["properties"][map_name]
+        assert mapping["type"] == "object"
+        assert mapping["minProperties"] == minimum
+        assert mapping["maxProperties"] == maximum
+        assert set(mapping["propertyNames"]["enum"]) == names
+        assert mapping["additionalProperties"] == value_shape
+
+    for name in ("socket", "fallback", "box_collision", "capsule_collision", "sphere_collision", "part"):
+        record = part_schema["$defs"][name]
+        assert record["type"] == "object"
+        assert record["additionalProperties"] is False
+        assert set(record["required"]) == set(record["properties"])
+    for name in ("core", "attachment", "recipe"):
+        record = recipe_schema["$defs"][name]
+        assert record["type"] == "object"
+        assert record["additionalProperties"] is False
+        assert set(record["required"]) == set(record["properties"])
+
+
+def test_nested_socket_fallback_and_each_collision_record_reject_unknown_and_missing_fields() -> None:
+    cases = (
+        ("biomass_claw_v1", "sockets", "kind"),
+        ("biomass_claw_v1", "fallback", "primitive"),
+        ("biomass_claw_v1", "collision_shapes", "shape"),
+        ("biomass_human_arm_v1", "collision_shapes", "shape"),
+        ("biomass_gunk_connector_v1", "collision_shapes", "shape"),
+    )
+    for part_id, field, required_key in cases:
+        document = parts()
+        target = document["parts"][part_id][field]
+        if field in {"sockets", "collision_shapes"}:
+            target = target[0]
+        target["unexpected"] = True
+        assert_has(validate_part_catalog(document, ROOT), "unknown field")
+
+        document = parts()
+        target = document["parts"][part_id][field]
+        if field in {"sockets", "collision_shapes"}:
+            target = target[0]
+        del target[required_key]
+        assert_has(validate_part_catalog(document, ROOT), "missing field")
+
+
+def test_nested_core_and_edge_records_reject_unknown_and_missing_fields() -> None:
+    document = recipe()
+    document["core"]["unexpected"] = True
+    document["attachments"][0]["unexpected"] = True
+    errors = validate_recipe(document, part_map())
+    assert_has(errors, "recipe.core: unknown field")
+    assert_has(errors, "recipe.attachments[0]: unknown field")
+
+    document = recipe()
+    del document["core"]["part_id"]
+    del document["attachments"][0]["connector_part_id"]
+    errors = validate_recipe(document, part_map())
+    assert_has(errors, "recipe.core: missing field")
+    assert_has(errors, "recipe.attachments[0]: missing field")
+
+
+def test_corrupted_core_and_connector_role_category_data_fail_closed() -> None:
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_humanoid_torso_v1"]["assembly_roles"] = [{}]
+    errors = validate_recipe(recipe(), catalog)
+    assert_has(errors, "core part lacks core role")
+
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_gunk_connector_v1"]["assembly_roles"] = [{}]
+    errors = validate_recipe(recipe(), catalog)
+    assert_has(errors, "connector lacks connector role/category")
+
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_gunk_connector_v1"]["category"] = {}
+    errors = validate_recipe(recipe(), catalog)
+    assert_has(errors, "connector lacks connector role/category")
+
+
+def test_biped_and_quadruped_require_a_head() -> None:
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_animal_skull_v1"]["category"] = "biomass_appendage"
+    assert_has(validate_recipe(recipe("biped_puppet_v1"), catalog), "biped requires a head")
+    assert_has(validate_recipe(recipe("four_legged_scrambler_v1"), catalog), "quadruped requires a head")
+
+
+def test_crawl_requires_a_locomotor_part() -> None:
+    catalog = copy.deepcopy(part_map())
+    catalog["biomass_insect_leg_v1"]["assembly_roles"] = ["detail"]
+    assert_has(validate_recipe(recipe("tripod_hound_v1"), catalog), "crawl requires a locomotor part")
+
+
+def test_known_pool_rejects_unknown_recipe_id() -> None:
+    document = recipes()
+    document["archetype_pools"]["stalker"].append("unknown_recipe")
+    assert_has(validate_recipe_catalog(document, part_map()), "archetype_pools.stalker: unknown recipe id")
