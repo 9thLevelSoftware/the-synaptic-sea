@@ -1231,7 +1231,7 @@ For every case, assert the exact recipe node/triangle oracle and caps `nodes<=16
 
 - [ ] **Step 5: Register only fresh validation truth**
 
-After the runner and marker exist, add the exact commands/markers to `docs/game/06_validation_plan.md`. Start the proof document with only the canonical manifest project-relative path `artifacts/validation-previews/biomass-assembly-placeholder/review.json` and its SHA-256, the exact qualitative manual-visual verdict `approved — all 30 placeholder assemblies are coherent`, reviewer, commit, Godot version, and the statement `no paid generation occurred; no promotion occurred`. The manifest alone owns per-case image hashes, runtime metrics (including maximum nodes/triangles), and input/output hashes; do not copy those values into the proof document.
+After the runner and marker exist, add the exact commands/markers to `docs/game/06_validation_plan.md`. Task 8 documents its commands and marker but does not add the seven canonical `run_clean` registrations. The readiness-doc bundle remains runnable at 651 until Task 9 implementation appends exactly seven lines after Task 8 evidence and replaces the 651 marker with 658. Start the proof document with only the canonical manifest project-relative path `artifacts/validation-previews/biomass-assembly-placeholder/review.json` and its SHA-256, the exact qualitative manual-visual verdict `approved — all 30 placeholder assemblies are coherent`, reviewer, commit, Godot version, and the statement `no paid generation occurred; no promotion occurred`. The manifest alone owns per-case image hashes, runtime metrics (including maximum nodes/triangles), and input/output hashes; do not copy those values into the proof document.
 
 - [ ] **Step 6: Commit Task 8**
 
@@ -1283,7 +1283,12 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. /opt/homebrew/bin/python3.11 -m py
 /opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/biomass_assembly_smoke.gd
 ```
 
-Then execute the exact fenced bash block under `## Regression bundle` in `docs/game/06_validation_plan.md`, with `ROOT=.` and `GODOT=/opt/homebrew/bin/godot`. Require exit 0, the exact final marker `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true`, and no unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines beyond that bundle's existing exact allowlists. The implementation verification must mechanically count lines whose trimmed text starts with `run_clean ` and require equality with the numeric marker; never infer or manually maintain the count. The focused wrapper smoke, Python tests, and assembly smoke remain required, and assembly failure must exit nonzero before the gait marker.
+Task 9 implementation then executes the exact fenced bash block under `## Regression bundle` in `docs/game/06_validation_plan.md`, with `ROOT=.` and `GODOT=/opt/homebrew/bin/godot`. Require exit 0, the exact final marker `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true`, and no unexpected `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` lines beyond that bundle's existing exact allowlists. The implementation verification must mechanically count lines whose trimmed text starts with `run_clean ` and require equality with the final echo marker's numeric value; never infer or manually maintain the count. The focused wrapper smoke, Python tests, and assembly smoke remain required, and assembly failure must exit nonzero before the gait marker. This future post-implementation check is not expected to pass against the current 651-command readiness document.
+Task 9 implementation also runs this future-only count/marker check after appending the seven lines; it intentionally is not expected to pass against the current readiness document:
+
+```bash
+/opt/homebrew/bin/python3.11 -c 'import re; from pathlib import Path; s=Path("docs/game/06_validation_plan.md").read_text(); n=sum(line.strip().startswith("run_clean ") for line in s.splitlines()); m=re.findall(r"REGRESSION PASS commands=(\d+)", s); assert m and n == int(m[-1]), (n, m[-1] if m else None)'
+```
 
 Expected marker: `BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=forbidden`.
 
