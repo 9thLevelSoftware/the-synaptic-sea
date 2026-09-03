@@ -110,6 +110,7 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 	var seen_instances: Dictionary = {String(core.get("instance_id")): true}
 	var occupied: Dictionary = {}
 	var depths: Dictionary = {String(core.get("instance_id")): 0}
+	var generated_max_depth: int = 0
 	var role_counts: Dictionary = {}
 	var triangle_total: int = 0
 	var runtime_nodes: int = 1
@@ -135,6 +136,8 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 		seen_instances[instance_id] = true
 		depths[instance_id] = int(depths[parent_id]) + 1
 		if not _need(int(depths[instance_id]) <= int(parts.limits().get("max_depth", 0)), "depth exceeded"): return false
+		if int(depths[instance_id]) > generated_max_depth:
+			generated_max_depth = int(depths[instance_id])
 		var child_part: Dictionary = parts.get_part(child_id)
 		var connector_part: Dictionary = parts.get_part(String(edge.get("connector_part_id")))
 		triangle_total += int(child_part.get("triangle_budget", 0)) + int(connector_part.get("triangle_budget", 0))
@@ -143,6 +146,9 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 		if roles is Array:
 			for role in roles:
 				role_counts[role] = int(role_counts.get(role, 0)) + 1
+	var catalog_max_depth: int = int(parts.limits().get("max_depth", 0))
+	if not _need(generated_max_depth <= catalog_max_depth, "generated depth exceeded catalog maximum"): return false
+	if not _need(generated_max_depth <= 2, "generated depth exceeded smoke depth limit"): return false
 	for role in required:
 		if not _need(int(role_counts.get(role, 0)) == int(required[role]), "%s count was %d, expected %d" % [role, int(role_counts.get(role, 0)), int(required[role])]): return false
 	if not _need(triangle_total <= int(parts.limits().get("max_triangles", 0)), "triangle budget exceeded %d" % triangle_total): return false
@@ -151,7 +157,15 @@ func _check_valid_recipe(recipe: Variant, parts: Variant, hint: String, max_atta
 	var baseline: Dictionary = recipe.to_dict()
 	defensive["recipe_id"] = "mutated"
 	(defensive["core"] as Dictionary)["part_id"] = "mutated"
-	(defensive["attachments"] as Array).clear()
+	var defensive_attachments_value: Variant = defensive.get("attachments")
+	if not _need(defensive_attachments_value is Array and not (defensive_attachments_value as Array).is_empty(), "defensive copy attachments missing or empty"): return false
+	var defensive_attachments: Array = defensive_attachments_value
+	var first_edge_value: Variant = defensive_attachments[0]
+	if not _need(first_edge_value is Dictionary, "defensive copy first attachment is not a dictionary"): return false
+	var first_edge: Dictionary = first_edge_value
+	if not _need(first_edge.get("part_id") is String and not String(first_edge.get("part_id")).is_empty(), "defensive copy first attachment part_id is invalid"): return false
+	first_edge["part_id"] = "mutated"
+	defensive_attachments.clear()
 	if not _need(recipe.to_dict() == baseline, "valid recipe leaked mutable state"): return false
 	return true
 
@@ -193,8 +207,7 @@ func _capacity_checks(parts: Variant) -> bool:
 				if not _need(first.is_valid(), "capacity %d unexpectedly rejected %s: %s" % [limit, hint, first.diagnostics()]): return false
 				if not _need((first.to_dict()["attachments"] as Array).size() == exact_count, "capacity %d padded %s" % [limit, hint]): return false
 			else:
-				if not _need(not first.is_valid() and first.to_dict().is_empty(), "capacity %d accepted %s" % [limit, hint]): return false
-				if not _need(first.diagnostics() == second.diagnostics(), "capacity failure diagnostics unstable %s/%d" % [hint, limit]): return false
+				if not _check_stable_failure_pair(first, second, "capacity %d %s" % [limit, hint]): return false
 	return true
 
 func _failure_checks(parts: Variant) -> bool:
@@ -215,13 +228,25 @@ func _failure_checks(parts: Variant) -> bool:
 		var starved: Variant = PartCatalogScript.new()
 		if not _need(starved.load_path(_write_starved_fixture(role)), "role-starved fixture did not load for %s" % role): return false
 		if not _expect_stable_failure(starved, 42, "biped" if role == "locomotor" else ("drag" if role == "puller" else "slither"), 6, "role-starved %s" % role): return false
+	for mode in ["exhausted_sockets", "triangle_overflow", "node_overflow"]:
+		var fixture_path: String = _write_loader_valid_failure_fixture(mode)
+		if not _need(not fixture_path.is_empty(), "%s fixture write failed" % mode): return false
+		var fixture_parts: Variant = PartCatalogScript.new()
+		if not _need(fixture_parts.load_path(fixture_path), "%s fixture did not load" % mode): return false
+		if not _expect_stable_failure(fixture_parts, 42, "biped", 6, "loader-valid %s" % mode): return false
+		_cleanup_temp_files()
 	_cleanup_temp_files()
 	return true
 
 func _expect_stable_failure(parts: Variant, seed_value: int, hint: String, max_attachments: int, label: String) -> bool:
 	var first: Variant = GeneratorScript.generate(parts, seed_value, hint, max_attachments)
 	var second: Variant = GeneratorScript.generate(parts, seed_value, hint, max_attachments)
-	if not _need(first is Object and second is Object and first.get_script() == RecipeScript and second.get_script() == RecipeScript and not first.is_valid() and not second.is_valid(), "%s was accepted" % label): return false
+	return _check_stable_failure_pair(first, second, label)
+
+func _check_stable_failure_pair(first: Variant, second: Variant, label: String) -> bool:
+	if not _need(first != null and second != null and first is Object and second is Object, "%s did not return non-null objects" % label): return false
+	if not _need(first.get_script() == RecipeScript and second.get_script() == RecipeScript, "%s returned the wrong recipe script" % label): return false
+	if not _need(not first.is_valid() and not second.is_valid(), "%s was accepted" % label): return false
 	var first_diagnostics: PackedStringArray = first.diagnostics()
 	var second_diagnostics: PackedStringArray = second.diagnostics()
 	if not _need(not first_diagnostics.is_empty() and first_diagnostics == second_diagnostics, "%s diagnostics were unstable/empty" % label): return false
@@ -232,7 +257,9 @@ func _expect_stable_failure(parts: Variant, seed_value: int, hint: String, max_a
 	for diagnostic in first_diagnostics:
 		if not _need(not seen.has(diagnostic), "%s diagnostics were not deduplicated" % label): return false
 		seen[diagnostic] = true
-	if not _need(first.to_dict().is_empty() and second.to_dict().is_empty(), "%s retained invalid data" % label): return false
+	var first_document: Dictionary = first.to_dict()
+	var second_document: Dictionary = second.to_dict()
+	if not _need(first_document == {} and second_document == {}, "%s retained invalid data" % label): return false
 	return true
 
 func _diversity_checks(parts: Variant) -> bool:
@@ -329,6 +356,58 @@ func _write_starved_fixture(role: String) -> String:
 	if not _write_text(path, JSON.stringify(document)):
 		return ""
 	return path
+
+func _write_loader_valid_failure_fixture(mode: String) -> String:
+	var canonical_text: String = FileAccess.get_file_as_string(PARTS_PATH)
+	var parsed: Variant = JSON.parse_string(canonical_text)
+	if not _need(parsed is Dictionary, "canonical catalog fixture did not parse for %s" % mode): return ""
+	var normalized_document: Variant = _normalize_integer_values(parsed)
+	if not _need(normalized_document is Dictionary, "catalog fixture normalization failed for %s" % mode): return ""
+	var document: Dictionary = normalized_document
+	var parts_value: Variant = document.get("parts")
+	if not _need(parts_value is Dictionary, "catalog parts fixture missing for %s" % mode): return ""
+	var raw_parts: Dictionary = parts_value
+	if mode == "exhausted_sockets":
+		for core_id in CORE_IDS:
+			var core_part: Dictionary = raw_parts.get(core_id, {})
+			var canonical_root: Dictionary = {}
+			var sockets_value: Variant = core_part.get("sockets", [])
+			if sockets_value is Array:
+				for socket_value in sockets_value as Array:
+					if socket_value is Dictionary and (socket_value as Dictionary).get("name") == "socket_root_0":
+						canonical_root = (socket_value as Dictionary).duplicate(true)
+						break
+			if not _need(not canonical_root.is_empty(), "canonical root socket missing for %s" % core_id): return ""
+			core_part["sockets"] = [canonical_root]
+			raw_parts[core_id] = core_part
+	elif mode == "triangle_overflow":
+		for part_id in raw_parts.keys():
+			var triangle_part: Dictionary = raw_parts[part_id]
+			triangle_part["triangle_budget"] = 30000
+			raw_parts[part_id] = triangle_part
+	elif mode == "node_overflow":
+		for core_id in CORE_IDS:
+			var node_part: Dictionary = raw_parts.get(core_id, {})
+			var node_sockets_value: Variant = node_part.get("sockets", [])
+			if not _need(node_sockets_value is Array, "canonical sockets missing for %s" % core_id): return ""
+			var node_sockets: Array = (node_sockets_value as Array).duplicate(true)
+			for index in range(100, 260):
+				node_sockets.append({
+					"name": "socket_appendage_%d" % index,
+					"kind": "appendage",
+					"accepts_categories": ["biomass_limb", "biomass_appendage"],
+					"position_m": [0, 0, 0],
+					"rotation_deg": [0, 0, 0],
+				})
+			node_part["sockets"] = node_sockets
+			raw_parts[core_id] = node_part
+	else:
+		_fail("unknown loader-valid fixture mode %s" % mode)
+		return ""
+	document["parts"] = raw_parts
+	if not _write_text(TEMP_PARTS_PATH, JSON.stringify(document)):
+		return ""
+	return TEMP_PARTS_PATH
 
 func _normalize_integer_values(value: Variant) -> Variant:
 	if value is Dictionary:
