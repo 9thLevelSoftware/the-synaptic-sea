@@ -1250,12 +1250,13 @@ git commit -m "test: prove placeholder biomass composite runtime"
 - Modify: `tests/test_meshy_blender_tools.py`
 - Modify: `tools/meshy_blender_validate.py`
 - Modify: `scripts/threats/biomass_assembler.gd`
+- Modify: `docs/game/06_validation_plan.md`
 
 **Interfaces:**
-- Consumes: one instantiated part wrapper/placeholder and its authoritative `biomass_part_catalog.json` entry.
+- Consumes: one instantiated part wrapper/placeholder, its authoritative separate `part_id`, and the closed `biomass_part_catalog.json` entry for that ID. The assembler/factory passes the already-authoritative `part_id`; the catalog entry remains closed and its schema is unchanged.
 - Produces:
-  - `BiomassWrapperValidator.validate_part(instance: Node3D, entry: Dictionary) -> PackedStringArray`
-  - `BiomassWrapperValidator.validate_assembly(visual: Variant, recipe: Variant, parts: Variant) -> PackedStringArray` (headless-safe signatures with exact preloaded Task 5 Visual and Task 3 Recipe/PartCatalog identity checks)
+  - `BiomassWrapperValidator.validate_part(instance: Node3D, part_id: String, entry: Dictionary) -> PackedStringArray`
+  - `BiomassWrapperValidator.validate_assembly(visual: Variant, recipe: Variant, parts: Variant) -> PackedStringArray` (headless-safe signature with exact preloaded Task 5 Visual and Task 3 Recipe/PartCatalog identity checks; authoritative expected part IDs come from the recipe/catalog contract, never from instance metadata alone)
 - Enforces the ADR-0058 boundary: socket names/transforms are Godot/repository metadata; exported GLBs contain visual meshes/materials only.
 
 - [ ] **Step 1: Write RED wrapper-authority smoke**
@@ -1268,7 +1269,7 @@ First prove the current executable validator accepts a mesh node with `extras:{"
 
 - [ ] **Step 3: Implement strict Godot wrapper validation**
 
-Normalize expected transforms from catalog `position_m`/`rotation_deg`; reject non-finite values and scales outside `1 ± 1e-4`; require exact socket-node inventory; compare transforms in the part root’s local space; and return stable sorted diagnostics. The assembler preloads the validator (which may preload Visual/Recipe/PartCatalog but never assembler), calls `validate_part` for every instantiated placeholder/wrapper before accepting it, and propagates stable diagnostics. Any diagnostic rejects/frees the whole assembly and routes through the existing whole-threat primitive fail-safe; never mix an invalid wrapper with valid parts silently.
+Normalize expected transforms from catalog `position_m`/`rotation_deg`; reject non-finite values and scales outside `1 ± 1e-4`; require exact socket-node inventory; compare transforms in the part root’s local space; compare instance `biomass_part_id` metadata exactly against the explicit expected `part_id` (missing or mismatched metadata is a stable diagnostic); and return stable sorted diagnostics. The assembler/factory passes the already-authoritative separate `part_id` to `validate_part` for every instantiated placeholder/wrapper before accepting it; do not inject `part_id` into the closed catalog entry. The assembler preloads the validator (which may preload Visual/Recipe/PartCatalog but never assembler) and propagates stable diagnostics. Any diagnostic rejects/frees the whole assembly and routes through the existing whole-threat primitive fail-safe; never mix an invalid wrapper with valid parts silently.
 
 - [ ] **Step 4: Run focused and full regressions**
 
@@ -1283,8 +1284,8 @@ Expected marker: `BIOMASS WRAPPER AUTHORITY PASS parts=8 recipes=5 glb_helpers=f
 - [ ] **Step 5: Commit Task 9**
 
 ```bash
-git add scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py
-git commit -m "feat: enforce Godot-owned biomass sockets"
+git add docs/superpowers/plans/2026-09-02-procedural-biomass-threat-assembly.md docs/game/06_validation_plan.md scripts/systems/biomass_wrapper_validator.gd scripts/validation/biomass_wrapper_authority_smoke.gd tools/meshy_blender_validate.py scripts/threats/biomass_assembler.gd tests/test_meshy_blender_tools.py
+git commit -m "docs: close biomass wrapper identity contract"
 ```
 
 ---
