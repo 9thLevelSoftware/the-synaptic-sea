@@ -520,7 +520,7 @@ git commit -m "feat: add governed biomass contracts and lifecycle"
   - `BiomassPartCatalog.get_part(part_id: String) -> Dictionary`
   - `BiomassPartCatalog.find_by_role(role: String) -> PackedStringArray`
   - `BiomassPartCatalog.socket(part_id: String, socket_name: String) -> Dictionary`
-  - `BiomassRecipe.from_dict(document: Dictionary, catalog: BiomassPartCatalog) -> BiomassRecipe`
+  - class-scope factory `BiomassRecipe.from_dict(document, catalog)`, declared `static func from_dict(document: Dictionary, catalog: BiomassPartCatalog) -> BiomassRecipe`
   - `BiomassRecipe.is_valid() -> bool`
   - `BiomassRecipe.diagnostics() -> PackedStringArray`
   - `BiomassRecipe.to_dict() -> Dictionary`
@@ -587,7 +587,7 @@ func find_by_role(role: String) -> PackedStringArray:
 
 - [ ] **Step 4: Implement graph validation and canonical serialization**
 
-`BiomassRecipe.from_dict` validates in one forward pass. Seed `seen_instances` with `core.instance_id`; before adding each attachment require its parent in `seen_instances`, then compute depth from its parent. Store only a defensive copy after zero diagnostics. `to_dict` returns a fresh deep copy. `canonical_json` uses `JSON.stringify(to_dict(), "", true)` only for runtime comparisons; host canonical bytes remain authoritative for hashes.
+`BiomassRecipe.from_dict` is declared `static func from_dict(document: Dictionary, catalog: BiomassPartCatalog) -> BiomassRecipe` and validates in one forward pass. Because the static factory lives on the same script and must compile under `godot --headless --script`, instantiate the return object with `load("res://scripts/systems/biomass_recipe.gd").new()` rather than self-referencing the `class_name`; external callers use a preloaded script constant and call `RecipeScript.from_dict(...)`. Seed `seen_instances` with `core.instance_id`; before adding each attachment require its parent in `seen_instances`, then compute depth from its parent. Store only a defensive copy after zero diagnostics. `to_dict` returns a fresh deep copy. `canonical_json` uses `JSON.stringify(to_dict(), "", true)` only for runtime comparisons; host canonical bytes remain authoritative for hashes.
 
 - [ ] **Step 5: Run GREEN smoke and headless parse gate**
 
@@ -614,8 +614,8 @@ git commit -m "feat: load biomass parts and attachment recipes"
 - Create: `scripts/validation/biomass_recipe_generator_smoke.gd`
 
 **Interfaces:**
-- Consumes: `BiomassPartCatalog` and `BiomassRecipe.from_dict` from Task 3.
-- Produces: `BiomassRecipeGenerator.generate(parts: BiomassPartCatalog, seed_value: int, locomotion_hint: String, max_attachments: int = 6) -> BiomassRecipe`.
+- Consumes: `BiomassPartCatalog` and the static `BiomassRecipe.from_dict` factory from Task 3.
+- Produces: class-scope `BiomassRecipeGenerator.generate(parts, seed_value, locomotion_hint, max_attachments)`, declared `static func generate(parts: BiomassPartCatalog, seed_value: int, locomotion_hint: String, max_attachments: int = 6) -> BiomassRecipe`.
 
 - [ ] **Step 1: Write RED determinism and diversity smoke**
 
@@ -669,7 +669,7 @@ static func _pick(sorted_ids: PackedStringArray, rng: RandomNumberGenerator) -> 
     return sorted_ids[rng.randi_range(0, sorted_ids.size() - 1)]
 ```
 
-Initialize a local `RandomNumberGenerator` with `seed_value if seed_value != 0 else 1`. Sort all catalog IDs and socket names before every random choice. Choose exactly one part carrying role `core`; `PLAN_COUNTS` applies only to non-core attachment instances, so a multi-role core does not satisfy an attachment count. Reserve compatible core sockets, satisfy required locomotion roles first, add optional head/appendage detail while below the limit, and attach one compatible appendage to a limb distal socket when available. Reusing a part ID for multiple instance IDs is allowed, but parent/socket occupancy remains unique. Emit parent-before-child records and validate the final dictionary through `BiomassRecipe.from_dict`; return an invalid recipe with diagnostics rather than silently dropping a required role.
+Declare both class-scope APIs explicitly: `static func generate(parts: BiomassPartCatalog, seed_value: int, locomotion_hint: String, max_attachments: int = 6) -> BiomassRecipe` and the shown `static func _pick(...)`. `generate` initializes a local `RandomNumberGenerator` with `seed_value if seed_value != 0 else 1`. Sort all catalog IDs and socket names before every random choice. Choose exactly one part carrying role `core`; `PLAN_COUNTS` applies only to non-core attachment instances, so a multi-role core does not satisfy an attachment count. Reserve compatible core sockets, satisfy required locomotion roles first, add optional head/appendage detail while below the limit, and attach one compatible appendage to a limb distal socket when available. Reusing a part ID for multiple instance IDs is allowed, but parent/socket occupancy remains unique. Emit parent-before-child records and validate the final dictionary through a preloaded recipe script constant's static `from_dict`; return an invalid recipe with diagnostics rather than silently dropping a required role.
 
 - [ ] **Step 4: Run GREEN and repeatability gates**
 
@@ -701,7 +701,7 @@ git commit -m "feat: generate deterministic biomass recipes"
 **Interfaces:**
 - Consumes: validated `BiomassRecipe` and `BiomassPartCatalog`.
 - Produces:
-  - `BiomassPlaceholderFactory.build(part_id: String, entry: Dictionary) -> Node3D`
+  - class-scope `BiomassPlaceholderFactory.build(part_id, entry)`, declared `static func build(part_id: String, entry: Dictionary) -> Node3D`
   - `BiomassThreatVisual.part(instance_id: String) -> Node3D`
   - `BiomassThreatVisual.socket(instance_id: String, socket_name: String) -> Node3D`
   - `BiomassThreatVisual.attachment_mount(instance_id: String) -> Node3D`
@@ -737,7 +737,7 @@ Expected: preload failure.
 
 - [ ] **Step 3: Implement deterministic primitive parts**
 
-The factory creates one `Node3D` root, one primitive `MeshInstance3D` from the catalog fallback shape/dimensions/color, and one `Node3D` for each socket using the repository-authoritative transforms in `biomass_part_catalog.json`. It sets metadata `biomass_part_id`, `biomass_category`, and `biomass_placeholder = true`. It creates no collision nodes.
+Declare the factory entry point as `static func build(part_id: String, entry: Dictionary) -> Node3D`; it owns no instance state and is called through the preloaded `BiomassPlaceholderFactoryScript`. The factory creates one `Node3D` root, one primitive `MeshInstance3D` from the catalog fallback shape/dimensions/color, and one `Node3D` for each socket using the repository-authoritative transforms in `biomass_part_catalog.json`. It sets metadata `biomass_part_id`, `biomass_category`, and `biomass_placeholder = true`. It creates no collision nodes.
 
 - [ ] **Step 4: Implement wrapper-or-fallback instantiation**
 
