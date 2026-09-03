@@ -56,6 +56,7 @@ var _derived_mounts: Dictionary = {}
 var _elapsed: float = 0.0
 var _rest_elapsed: float = 0.0
 var _active: bool = false
+var _pose_weight: float = 0.0
 var _last_snapshot: Dictionary = {}
 
 ## Configures the controller against the assembled visual + recipe.
@@ -123,8 +124,10 @@ func configure(visual: Variant, parts: Variant, recipe: Variant, seed: int) -> b
 	_elapsed = 0.0
 	_rest_elapsed = 0.0
 	_active = false
-	# Pre-populate derived mounts at exact rest so the visual can read
-	# before any step() has run.
+	_pose_weight = 0.0
+	# Pre-populate derived mounts for every known mount at exact rest so the
+	# visual can read before any step() has run, AND so non-driven mounts
+	# can be restored on every subsequent step.
 	_populate_derived_at_rest()
 	_configured = true
 	return true
@@ -132,6 +135,15 @@ func configure(visual: Variant, parts: Variant, recipe: Variant, seed: int) -> b
 ## Advances the gait by `delta` seconds given the current world-space
 ## velocity and AI state string. Updates the cached derived mount
 ## transforms in `_derived_mounts` for the visual to read back.
+##
+## Model:
+##   - Moving-active (state in ACTIVE_STATES AND horizontal_speed > NEAR_ZERO)
+##     advances `_elapsed` and sets `_pose_weight = clamp(horizontal/REF, 0, 1)`.
+##   - Everything else (rest state, near-zero active, bad delta, unknown state)
+##     freezes `_elapsed` and decays `_pose_weight` linearly at REST_DECAY_RATE.
+##   - Invalid / nonfinite / negative delta is a true no-op (state untouched).
+##   - On every valid step, every known mount is rewritten: driven IDs apply
+##     the live frozen phase/weight, non-driven IDs get the immutable rest.
 func step(delta: float, velocity: Variant, ai_state: String) -> void:
 	if not _configured:
 		return
@@ -139,30 +151,16 @@ func step(delta: float, velocity: Variant, ai_state: String) -> void:
 		return
 	var speed: float = _speed_of(velocity)
 	var now_active: bool = ACTIVE_STATES.has(String(ai_state))
-	if not now_active:
+	if now_active and speed > NEAR_ZERO_SPEED:
+		_active = true
+		_rest_elapsed = 0.0
+		_elapsed += delta
+		_pose_weight = clampf(speed / SPEED_REFERENCE, 0.0, 1.0)
+	else:
 		_active = false
 		_rest_elapsed += delta
-		_populate_derived_at_rest()
-		return
-	_active = true
-	_rest_elapsed = 0.0
-	if speed <= NEAR_ZERO_SPEED:
-		_populate_derived_at_rest()
-		return
-	_elapsed += delta
-	var weight: float = clampf(speed / SPEED_REFERENCE, 0.0, 1.0)
-	for index in range(_driven_ids.size()):
-		var instance_id: String = _driven_ids[index]
-		var phase: float = _driven_phases[index]
-		var rest_value: Variant = _mount_rest.get(instance_id, null)
-		if not rest_value is Transform3D:
-			continue
-		var rest: Transform3D = rest_value
-		var angle: float = _swing_rad * weight * sin(TAU * _freq * _elapsed + phase + _seed_phase)
-		var derived: Transform3D = _derive_basis(rest, angle)
-		if not derived.basis.is_finite() or not _is_orthonormal_within(derived.basis, ORTHONORMAL_EPS):
-			derived = Transform3D(rest.basis, rest.origin)
-		_derived_mounts[instance_id] = derived
+		_pose_weight = maxf(0.0, _pose_weight - REST_DECAY_RATE * delta)
+	_rebuild_derived_mounts()
 
 ## Returns the configured driven instance IDs (lex-sorted).
 func driven_ids() -> PackedStringArray:
@@ -288,6 +286,7 @@ func _reset_state() -> void:
 	_elapsed = 0.0
 	_rest_elapsed = 0.0
 	_active = false
+	_pose_weight = 0.0
 	_last_snapshot = {}
 
 func _valid_inputs(visual: Variant, parts: Variant, recipe: Variant) -> bool:
@@ -323,6 +322,9 @@ func _compare_instance_id(a: Dictionary, b: Dictionary) -> bool:
 	return String(a.get("instance_id", "")) < String(b.get("instance_id", ""))
 
 func _snapshot_rest(visual: Object, attachments: Array) -> bool:
+	# Reads from the visual's *immutable* Task 5 assembly-rest APIs. Never
+	# reach for live `.transform` snapshots — a previous gait's pose must
+	# never contaminate a freshly-configured controller.
 	var visual_obj: Object = visual
 	var core_doc: Variant = (visual_obj.recipe_document()).get("core", null)
 	if not core_doc is Dictionary:
@@ -330,10 +332,10 @@ func _snapshot_rest(visual: Object, attachments: Array) -> bool:
 	var core_instance_id: String = String((core_doc as Dictionary).get("instance_id", ""))
 	if core_instance_id.is_empty():
 		return false
-	var core_part: Variant = visual_obj.part(core_instance_id)
-	if core_part == null:
+	var core_rest: Variant = visual_obj.part_rest_transform(core_instance_id)
+	if not core_rest is Transform3D:
 		return false
-	_part_rest[core_instance_id] = (core_part as Node3D).transform
+	_part_rest[core_instance_id] = core_rest
 	for edge_value in attachments:
 		if not edge_value is Dictionary:
 			return false
@@ -341,29 +343,54 @@ func _snapshot_rest(visual: Object, attachments: Array) -> bool:
 		var instance_id: String = String(edge.get("instance_id", ""))
 		if instance_id.is_empty():
 			return false
-		var mount: Variant = visual_obj.attachment_mount(instance_id)
-		if mount == null:
+		var attachment_rest: Variant = visual_obj.attachment_rest_transform(instance_id)
+		if not attachment_rest is Transform3D:
 			return false
-		var part_node: Variant = visual_obj.part(instance_id)
-		if part_node == null:
+		var child_part_rest: Variant = visual_obj.part_rest_transform(instance_id)
+		if not child_part_rest is Transform3D:
 			return false
-		_mount_rest[instance_id] = (mount as Node3D).transform
-		_part_rest[instance_id] = (part_node as Node3D).transform
+		_mount_rest[instance_id] = attachment_rest
+		_part_rest[instance_id] = child_part_rest
 	return true
 
 func _populate_derived_at_rest() -> void:
-	for instance_id in _driven_ids:
+	# Populate EVERY known mount at exact rest, including non-driven IDs.
+	# The visual applies the full map so non-driven mounts are restored on
+	# every step (gap 5).
+	for instance_id in _mount_rest.keys():
 		var rest_value: Variant = _mount_rest.get(instance_id, null)
 		if rest_value is Transform3D:
-			_derived_mounts[instance_id] = Transform3D((rest_value as Transform3D).basis, (rest_value as Transform3D).origin)
+			var r: Transform3D = rest_value
+			_derived_mounts[instance_id] = Transform3D(r.basis, r.origin)
+
+func _rebuild_derived_mounts() -> void:
+	# Restoring all mounts first guarantees that even non-driven IDs end up
+	# at exact immutable rest on every valid step. Driven IDs are then
+	# overridden with the live derived basis from the frozen phase/weight.
+	_populate_derived_at_rest()
+	if _pose_weight <= 0.0 or _swing_rad <= 0.0:
+		return
+	for index in range(_driven_ids.size()):
+		var instance_id: String = _driven_ids[index]
+		var phase: float = _driven_phases[index]
+		var rest_value: Variant = _mount_rest.get(instance_id, null)
+		if not rest_value is Transform3D:
+			continue
+		var rest: Transform3D = rest_value
+		var angle: float = _swing_rad * _pose_weight * sin(TAU * _freq * _elapsed + phase + _seed_phase)
+		var derived: Transform3D = _derive_basis(rest, angle)
+		if not derived.basis.is_finite() or not _is_orthonormal_within(derived.basis, ORTHONORMAL_EPS):
+			derived = Transform3D(rest.basis, rest.origin)
+		_derived_mounts[instance_id] = derived
 
 func _speed_of(velocity: Variant) -> float:
+	# Horizontal speed only — vertical motion does not advance the gait.
 	if velocity is Vector2:
 		var v2: Vector2 = velocity
 		return v2.length()
 	if velocity is Vector3:
 		var v3: Vector3 = velocity
-		return v3.length()
+		return sqrt(v3.x * v3.x + v3.z * v3.z)
 	if velocity is float or velocity is int:
 		var f: float = float(velocity)
 		if is_finite(f):
@@ -378,8 +405,12 @@ func _derive_basis(rest: Transform3D, angle: float) -> Transform3D:
 	var derived_basis: Basis = rest.basis * rx * ry
 	if not derived_basis.is_finite():
 		return Transform3D(rest.basis, rest.origin)
-	# Cap relative rotation: shortest-arc quaternion angle.
-	var rel: Basis = derived_basis * rest.basis.inverse()
+	# Cap relative rotation in rest-local space. The relative basis is
+	# rest.basis^-1 * derived; the shortest-arc quaternion angle is capped
+	# to MAX_RELATIVE_DEG, then the capped relative is post-multiplied back
+	# into rest-local. The wrong (world-space) formula — cap * rest — does
+	# not satisfy the <=35 deg invariant when rest is nonidentity.
+	var rel: Basis = rest.basis.inverse() * derived_basis
 	var rel_quat: Quaternion = rel.get_rotation_quaternion()
 	if not rel_quat.is_finite():
 		return Transform3D(rest.basis, rest.origin)
@@ -389,7 +420,7 @@ func _derive_basis(rest: Transform3D, angle: float) -> Transform3D:
 		if not axis.is_finite() or axis.length() < 1e-6:
 			return Transform3D(rest.basis, rest.origin)
 		var cap: Basis = Basis(Quaternion(axis.normalized(), deg_to_rad(MAX_RELATIVE_DEG)))
-		derived_basis = cap * rest.basis
+		derived_basis = rest.basis * cap
 	if not derived_basis.is_finite() or not _is_orthonormal_within(derived_basis, ORTHONORMAL_EPS):
 		return Transform3D(rest.basis, rest.origin)
 	return Transform3D(derived_basis, rest.origin)

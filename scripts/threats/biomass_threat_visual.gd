@@ -93,13 +93,18 @@ func is_built() -> bool:
 
 ## Configures a gait controller for the assembled visual. The visual
 ## dynamically loads the controller script (no const preload) to avoid a
-## dependency cycle with the gait controller. On failure, the previously
-## installed controller (if any) is freed, the new candidate is freed, and
-## the visual stays in exact assembly rest.
+## dependency cycle with the gait controller. Before any prior controller
+## is cleared or the new candidate is attempted, the visual restores every
+## mount and part to its immutable assembly rest so an animation never
+## bleeds into a new configuration. On failure, no controller is installed
+## and the visual stays in exact assembly rest.
 func configure_gait(parts: Variant, recipe: Variant, seed: int) -> bool:
-	# Reset prior controller: free any installed, then attempt the candidate.
-	if _gait_controller != null and is_instance_valid(_gait_controller):
-		_gait_controller = null
+	# Always restore the immutable assembly pose first — never let a
+	# previous gait's pose bleed into the new configuration (success or
+	# failure).
+	_reset_to_assembly_rest()
+	# Drop the prior controller reference; the RefCounted GC handles it.
+	_gait_controller = null
 	var script: GDScript = _load_gait_controller_script()
 	if script == null:
 		return false
@@ -125,23 +130,32 @@ func configure_gait(parts: Variant, recipe: Variant, seed: int) -> bool:
 
 ## Advances the gait controller by `delta` given the world-space velocity
 ## and AI state string. No-op when the visual has no configured controller.
+## On every valid step, every known mount is rewritten from the controller's
+## derived-mount map — driven IDs get the live derived basis, non-driven IDs
+## get the immutable assembly rest. The visual root / core world position
+## are never touched.
 func step_gait(delta: float, velocity: Variant, ai_state: String) -> void:
 	if _gait_controller == null or not is_instance_valid(_gait_controller):
 		return
 	if not (_gait_controller as Object).has_method("step"):
 		return
 	(_gait_controller as Object).call("step", delta, velocity, ai_state)
-	for instance_id in _driven_ids():
+	for instance_id in _all_mount_ids():
 		var derived_value: Variant = (_gait_controller as Object).call("derived_mount_transform", instance_id)
 		if derived_value is Transform3D:
 			var mount: Node3D = attachment_mount(instance_id)
 			if mount != null and is_instance_valid(mount):
 				mount.transform = derived_value
 
-## Returns the active gait controller (RefCounted) or null. Borrowed
-## reference; caller must not free.
-func gait_controller() -> Variant:
-	return _gait_controller
+## Internal: returns every registered attachment instance ID, lex-sorted.
+func _all_mount_ids() -> PackedStringArray:
+	if not _is_built:
+		return PackedStringArray()
+	var ids: PackedStringArray = PackedStringArray()
+	for key in _attachment_mounts.keys():
+		ids.append(String(key))
+	ids.sort()
+	return ids
 
 ## Returns the currently configured gait driven IDs (lex-sorted) or empty
 ## when no controller is active.

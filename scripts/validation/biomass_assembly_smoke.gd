@@ -1107,6 +1107,8 @@ func _gait_smoke_checks(parts: Variant, library: Variant) -> bool:
 		return false
 	if not _need(await _gait_canonical_serialization_checks(parts, library), "gait canonical serialization checks failed"):
 		return false
+	if not _need(await _gait_linear_rest_decay_probe(parts, library), "gait linear rest decay probe failed"):
+		return false
 	return true
 
 func _gait_build_visual(library: Variant, parts: Variant, recipe_id: String) -> Variant:
@@ -1155,7 +1157,7 @@ func _gait_profile_role_phase_checks(parts: Variant, library: Variant) -> bool:
 			visual.queue_free()
 			await _await_two_frames()
 			return false
-		var ctrl: Variant = visual.gait_controller()
+		var ctrl: Variant = visual.get("_gait_controller")
 		if not _need(ctrl != null and ctrl is Object, "gait controller null for %s" % recipe_id):
 			visual.queue_free()
 			await _await_two_frames()
@@ -1341,7 +1343,7 @@ func _gait_reconfigure_checks(parts: Variant, library: Variant) -> bool:
 		visual.queue_free()
 		await _await_two_frames()
 		return false
-	var first_ctrl: Variant = visual.gait_controller()
+	var first_ctrl: Variant = visual.get("_gait_controller")
 	get_root().add_child(visual)
 	visual.global_position = Vector3.ZERO
 	await process_frame
@@ -1353,15 +1355,15 @@ func _gait_reconfigure_checks(parts: Variant, library: Variant) -> bool:
 		visual.queue_free()
 		await _await_two_frames()
 		return false
-	var second_ctrl: Variant = visual.gait_controller()
+	var second_ctrl: Variant = visual.get("_gait_controller")
 	if not _need(second_ctrl != null and second_ctrl != first_ctrl, "controller reference did not change on reconfigure"):
 		visual.queue_free()
 		await _await_two_frames()
 		return false
-	# Reset to assembly rest before stepping the new controller.
-	visual._reset_to_assembly_rest()
-	# New controller starts at elapsed=0; the snapshot before any step must
-	# show every mount at exact rest origin/basis.
+	# New controller starts at elapsed=0; configure_gait must have already
+	# restored every mount to its immutable assembly rest before we read.
+	# Do NOT call _reset_to_assembly_rest() here; it would mask a missing
+	# reset path in configure_gait.
 	for instance_id in ["leg_left", "leg_right", "head", "left_claw"]:
 		var mount: Node3D = visual.attachment_mount(instance_id)
 		if mount == null:
@@ -1431,7 +1433,7 @@ func _gait_rejection_checks(parts: Variant, library: Variant) -> bool:
 			visual.queue_free()
 			await _await_two_frames()
 			return false
-		if not _need(visual.gait_controller() == null, "controller retained after rejection for %s" % case["label"]):
+		if not _need(visual.get("_gait_controller") == null, "controller retained after rejection for %s" % case["label"]):
 			visual.queue_free()
 			await _await_two_frames()
 			return false
@@ -1500,7 +1502,7 @@ func _gait_nan_inf_negative_checks(parts: Variant, library: Variant) -> bool:
 	# After all bad deltas, advance with valid deltas — the controller should
 	# still tick normally (elapsed must have advanced past 0.5).
 	visual.step_gait(0.5, Vector3(2.0, 0.0, 0.0), "hunt")
-	var ctrl: Variant = visual.gait_controller()
+	var ctrl: Variant = visual.get("_gait_controller")
 	if not _need(ctrl.get("_elapsed") > 0.5, "controller elapsed did not advance after bad deltas + valid tick (got %s)" % str(ctrl.get("_elapsed"))):
 		visual.queue_free()
 		await _await_two_frames()
@@ -1521,7 +1523,7 @@ func _gait_cap_and_orthonormal_checks(parts: Variant, library: Variant) -> bool:
 	visual.global_position = Vector3.ZERO
 	await process_frame
 	await physics_frame
-	var ctrl: Variant = visual.gait_controller()
+	var ctrl: Variant = visual.get("_gait_controller")
 	var driven: PackedStringArray = ctrl.driven_ids()
 	var rest_mounts: Dictionary = ctrl.mount_rest()
 	for step_index in range(10000):
@@ -1575,7 +1577,7 @@ func _gait_no_child_checks(parts: Variant, library: Variant) -> bool:
 			visual.queue_free()
 			await _await_two_frames()
 			return false
-	var ctrl: Variant = visual.gait_controller()
+	var ctrl: Variant = visual.get("_gait_controller")
 	if not _need(ctrl.derived_mount_transform("__unknown_id__") == null, "derived_mount_transform leaked for unknown ID"):
 		visual.queue_free()
 		await _await_two_frames()
@@ -1592,7 +1594,7 @@ func _gait_canonical_serialization_checks(parts: Variant, library: Variant) -> b
 		visual.queue_free()
 		await _await_two_frames()
 		return false
-	var ctrl: Variant = visual.gait_controller()
+	var ctrl: Variant = visual.get("_gait_controller")
 	var snap: Dictionary = ctrl.snapshot()
 	if not _need(snap.has("mounts") and snap.has("parts") and snap.has("driven_ids"), "snapshot missing keys"):
 		visual.queue_free()
@@ -1651,6 +1653,241 @@ func _gait_canonical_serialization_checks(parts: Variant, library: Variant) -> b
 	visual.queue_free()
 	await _await_two_frames()
 	return true
+
+func _gait_linear_rest_decay_probe(parts: Variant, library: Variant) -> bool:
+	# Gap 1 + 2: linear pose-weight decay; horizontal-only speed; first rest frame
+	# is intermediate (not active, not exact rest); frame15 exact.
+	# Gap 3: configure_gait resets to assembly rest BEFORE clearing old/attempting new.
+	# Gap 4: snapshot uses attachment_rest_transform / part_rest_transform (immutable).
+	# Gap 5: non-driven mounts are rewritten exact rest every valid step.
+	# Gap 6: cap math is rest-local (rest.basis^-1 * derived → cap → rest.basis * cap).
+	# Gap 7: no public gait_controller() accessor; smoke reads _gait_controller via .get().
+	var recipe_id: String = "biped_puppet_v1"
+	var visual: Variant = _gait_build_visual(library, parts, recipe_id)
+	if not _need(visual != null, "linear rest probe build null"):
+		return false
+	get_root().add_child(visual)
+	visual.global_position = Vector3.ZERO
+	await process_frame
+	await physics_frame
+	# Public accessor must NOT exist.
+	if not _need(not visual.has_method("gait_controller"), "gait_controller() public accessor still present"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# First configure: drive one active step, capture driven basis.
+	if not _need(visual.configure_gait(parts, library.get_recipe(recipe_id), 0), "linear rest probe first configure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var ctrl: Variant = visual.get("_gait_controller")
+	if not _need(ctrl != null and ctrl is Object, "linear rest probe ctrl null"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var driven: PackedStringArray = ctrl.driven_ids()
+	var first_driven: String = String(driven[0])
+	var leg_rest: Transform3D = visual.attachment_rest_transform(first_driven)
+	if not _need(leg_rest != null and leg_rest is Transform3D, "linear rest probe leg_rest null"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# One active step at full speed.
+	visual.step_gait(1.0 / 60.0, Vector3(2.5, 0.0, 0.0), "hunt")
+	# First rest frame: drop to Vector3.ZERO but stay in "hunt" (active state, near-zero).
+	visual.step_gait(1.0 / 60.0, Vector3.ZERO, "hunt")
+	var leg_first_rest: Transform3D = visual.attachment_mount(first_driven).transform
+	# The first rest frame must be intermediate: basis deviates from rest by>0.05 rad
+	# AND origin is close to rest (no bob).
+	var rel_first_rest: Basis = leg_first_rest.basis * leg_rest.basis.inverse()
+	var angle_first_rest: float = rel_first_rest.get_rotation_quaternion().get_angle()
+	if not _need(angle_first_rest > 0.05, "first rest frame was exact rest (angle=%.6f); expected intermediate>0.05" % angle_first_rest):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(leg_first_rest.origin.is_equal_approx(leg_rest.origin), "first rest frame moved origin away from rest"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# After 15 more rest frames (idle state), weight must have decayed to 0 → exact rest.
+	for step_index in range(15):
+		visual.step_gait(1.0 / 60.0, Vector3.ZERO, "idle")
+	var leg_after_15: Transform3D = visual.attachment_mount(first_driven).transform
+	if not _need(leg_after_15.origin.is_equal_approx(leg_rest.origin), "frame15 rest origin not exact (Δ=%.9f)" % (leg_after_15.origin - leg_rest.origin).length()):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(_transform_equal_basis(leg_after_15, leg_rest), "frame15 rest basis not exact"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Vector3(0,100,0) must be near-zero/rest: elapsed must NOT advance.
+	var elapsed_before: float = float(ctrl.get("_elapsed"))
+	visual.step_gait(1.0 / 60.0, Vector3(0.0, 100.0, 0.0), "hunt")
+	var elapsed_after_vert: float = float(ctrl.get("_elapsed"))
+	if not _need(elapsed_after_vert == elapsed_before, "Vector3(0,100,0) advanced elapsed (was %.6f now %.6f)" % [elapsed_before, elapsed_after_vert]):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Non-driven mount restoration: tamper head mount, step, prove exact rest.
+	var head_id: String = "head"
+	var head_rest: Transform3D = visual.attachment_rest_transform(head_id)
+	var head_mount: Node3D = visual.attachment_mount(head_id)
+	head_mount.transform = Transform3D(Basis(Vector3(0.0, 1.0, 0.0), 1.0), Vector3(50.0, 60.0, 70.0))
+	visual.step_gait(1.0 / 60.0, Vector3(2.5, 0.0, 0.0), "hunt")
+	var head_after_step: Transform3D = visual.attachment_mount(head_id).transform
+	if not _need(head_after_step.origin.is_equal_approx(head_rest.origin), "non-driven mount origin not restored (Δ=%.9f)" % (head_after_step.origin - head_rest.origin).length()):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(_transform_equal_basis(head_after_step, head_rest), "non-driven mount basis not restored"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Snapshot must read immutable rest, not live mutated state. Mutate the live
+	# mount AND part, then read snapshot; the snapshot entries must equal the
+	# rest APIs.
+	head_mount.transform = Transform3D(Basis(Vector3(0.0, 1.0, 0.0), 1.0), Vector3(123.0, 456.0, 789.0))
+	var head_part: Node3D = visual.part(head_id)
+	head_part.transform = Transform3D(Basis(Vector3(1.0, 0.0, 0.0), 0.5), Vector3(1.0, 2.0, 3.0))
+	var snap: Dictionary = ctrl.snapshot()
+	var snap_head_mount: Dictionary = snap["mounts"][head_id]
+	var snap_head_origin: Array = snap_head_mount["origin"]
+	if not _need(float(snap_head_origin[0]) == snappedf(head_rest.origin.x, 1e-6), "snapshot head mount origin leaked live mutation"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(float(snap_head_origin[1]) == snappedf(head_rest.origin.y, 1e-6), "snapshot head mount origin leaked live mutation (y)"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var snap_head_part: Dictionary = snap["parts"][head_id]
+	var snap_head_part_origin: Array = snap_head_part["origin"]
+	if not _need(float(snap_head_part_origin[0]) == snappedf(head_rest.origin.x, 1e-6), "snapshot head part origin leaked live mutation"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Cap math (rest-local): call the private helper directly with a nonidentity rest
+	# and a 90° angle. The result must:
+	#   (a) be finite + orthonormal,
+	#   (b) cap the rest-local relative rotation to MAX_RELATIVE_DEG,
+	#   (c) equal rest.basis * Basis(quat(rel_local_axis, capped_angle)) — the
+	#       rest-local cap formula — NOT cap * rest.basis (the world-space
+	#       "reverting" formula that contradicts the spec when rest is rotated).
+	var rest_rotated: Basis = Basis(Vector3(0.0, 1.0, 0.0), deg_to_rad(45.0))
+	var rest_xform: Transform3D = Transform3D(rest_rotated, Vector3(0.0, 0.0, 0.0))
+	var big_angle: float = deg_to_rad(90.0)
+	var derived_value: Variant = ctrl.call("_derive_basis", rest_xform, big_angle)
+	if not _need(derived_value is Transform3D, "cap helper did not return Transform3D"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var derived_xform: Transform3D = derived_value
+	if not _need(derived_xform.basis.is_finite(), "cap helper returned non-finite basis"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	if not _need(_is_orthonormal_within(derived_xform.basis, 1e-5), "cap helper returned non-orthonormal basis"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Rest-local relative rotation angle must be <= 35° (capped).
+	var rel_basis: Basis = rest_xform.basis.inverse() * derived_xform.basis
+	var rel_angle_deg: float = rad_to_deg(rel_basis.get_rotation_quaternion().get_angle())
+	if not _need(rel_angle_deg <= 35.0 + 1e-4, "cap exceeded in rest-local (%.3f deg)" % rel_angle_deg):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Reverting cap (wrong: cap * rest) must differ. Build the world-space
+	# candidate exactly the way the buggy formula would, and assert the
+	# derived basis does NOT match it when rest is nonidentity.
+	var rx_world: Basis = Basis(Vector3(1.0, 0.0, 0.0), big_angle)
+	var ry_world: Basis = Basis(Vector3(0.0, 1.0, 0.0), big_angle * 0.25)
+	var pre_cap: Basis = rest_xform.basis * rx_world * ry_world
+	var pre_cap_rel: Basis = rest_xform.basis.inverse() * pre_cap
+	var pre_cap_quat: Quaternion = pre_cap_rel.get_rotation_quaternion()
+	var pre_cap_axis: Vector3 = pre_cap_quat.get_axis()
+	var reverted_basis: Basis = Basis(Quaternion(pre_cap_axis.normalized(), deg_to_rad(35.0))) * rest_xform.basis
+	if not _need(not _basis_equal_within(derived_xform.basis, reverted_basis, 1e-3), "reverting cap formula matches → cap is not rest-local"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Confirm the rest-local cap formula is what we built: rest.basis *
+	# Basis(quat(rel_local_axis, min(angle, 35°))).
+	var expected_local_cap: Basis = rest_xform.basis * Basis(Quaternion(pre_cap_axis.normalized(), deg_to_rad(minf(rad_to_deg(pre_cap_quat.get_angle()), 35.0))))
+	if not _need(_basis_equal_within(derived_xform.basis, expected_local_cap, 1e-4), "rest-local cap basis mismatch"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# Configure reset: animate, then reconfigure same recipe with new seed. The
+	# visual must be at exact rest BEFORE any subsequent step (no manual reset).
+	visual.configure_gait(parts, library.get_recipe(recipe_id), 99)
+	for step_index in range(5):
+		visual.step_gait(1.0 / 60.0, Vector3(2.5, 0.0, 0.0), "hunt")
+	if not _need(visual.configure_gait(parts, library.get_recipe(recipe_id), 7), "linear rest probe reconfigure failed"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	var new_ctrl: Variant = visual.get("_gait_controller")
+	if not _need(new_ctrl != null, "reconfigured ctrl null"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+		var instance_id: String = String(edge_value.get("instance_id", ""))
+		var rest_mount: Transform3D = visual.attachment_rest_transform(instance_id)
+		var mount_now: Transform3D = visual.attachment_mount(instance_id).transform
+		if not _need(mount_now.origin.is_equal_approx(rest_mount.origin), "post-reconfigure mount %s origin drifted" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(_transform_equal_basis(mount_now, rest_mount), "post-reconfigure mount %s basis drifted" % instance_id):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	# Invalid configure must not leave a controller installed; subsequent step is a no-op.
+	visual.configure_gait(null, library.get_recipe(recipe_id), 0)
+	if not _need(visual.get("_gait_controller") == null, "invalid configure retained controller"):
+		visual.queue_free()
+		await _await_two_frames()
+		return false
+	# All mounts must remain at exact rest after the invalid configure AND a subsequent step.
+	for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+		var instance_id2: String = String(edge_value.get("instance_id", ""))
+		var rest_mount2: Transform3D = visual.attachment_rest_transform(instance_id2)
+		var mount_now2: Transform3D = visual.attachment_mount(instance_id2).transform
+		if not _need(mount_now2.origin.is_equal_approx(rest_mount2.origin), "post-invalid-configure mount %s origin drifted" % instance_id2):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(_transform_equal_basis(mount_now2, rest_mount2), "post-invalid-configure mount %s basis drifted" % instance_id2):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	visual.step_gait(1.0 / 60.0, Vector3(2.5, 0.0, 0.0), "hunt")
+	for edge_value in (visual.recipe_document()).get("attachments", []) as Array:
+		var instance_id3: String = String(edge_value.get("instance_id", ""))
+		var rest_mount3: Transform3D = visual.attachment_rest_transform(instance_id3)
+		var mount_now3: Transform3D = visual.attachment_mount(instance_id3).transform
+		if not _need(mount_now3.origin.is_equal_approx(rest_mount3.origin), "step-after-invalid mount %s origin drifted" % instance_id3):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+		if not _need(_transform_equal_basis(mount_now3, rest_mount3), "step-after-invalid mount %s basis drifted" % instance_id3):
+			visual.queue_free()
+			await _await_two_frames()
+			return false
+	visual.queue_free()
+	await _await_two_frames()
+	return true
+
+func _basis_equal_within(a: Basis, b: Basis, tolerance: float) -> bool:
+	if not a.is_finite() or not b.is_finite():
+		return false
+	var rel: Basis = a * b.inverse()
+	if not rel.is_finite():
+		return false
+	return rel.get_rotation_quaternion().get_angle() <= tolerance and (a.x - b.x).length() <= tolerance and (a.y - b.y).length() <= tolerance and (a.z - b.z).length() <= tolerance
 
 func _capture_mount_origin_dict(visual: Variant) -> Dictionary:
 	var out: Dictionary = {}
@@ -1743,7 +1980,7 @@ func _transform_equal_basis(a: Transform3D, b_value: Variant) -> bool:
 	return rel.get_rotation_quaternion().get_angle() <= 1e-5 and (a.origin - b.origin).length() <= 1e-5
 
 func _driven_ids_contain(visual: Variant, instance_id: String) -> bool:
-	var ctrl: Variant = visual.gait_controller()
+	var ctrl: Variant = visual.get("_gait_controller")
 	if ctrl == null:
 		return false
 	var driven: PackedStringArray = ctrl.driven_ids()
