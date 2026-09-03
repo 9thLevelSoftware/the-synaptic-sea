@@ -1,7 +1,7 @@
 # ADR Index — Synaptic Sea Current Artifact Currency
 
-Currency date: 2026-07-10
-Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram validation
+Currency date: 2026-09-02
+Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram validation; ADR-0060 acceptance and index-placement verification (not a full index audit)
 
 | ADR | Path | Artifact reference |
 | --- | --- | --- |
@@ -32,7 +32,8 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0045 | docs/game/adr/0045-tooltip-triggers-minimap-retirement-web-charts.md | Proximity + inventory tooltip triggers; MapFogState/MinimapPanel deleted outright; item-gated WebChartState/ChartPanel; closes Domain 10 tooltip + map_reveal loops |
 | 0046 | docs/game/adr/0046-run-snapshot-slot-metadata.md | Run snapshot slot metadata |
 | 0047 | docs/game/adr/0047-encounter-tables-authoritative.md | Encounter tables authoritative over role constants |
-| 0048 | docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md | Mermaid-first as-built architecture source, evidence schema, locked rendering, and SVG freshness policy |
+| 0048 | docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md | Mermaid-first as-built architecture source, evidence schema, locked rendering, and SVG freshness policy (distinct Mermaid 0048 ADR; unaffected by ADR-0060) |
+| 0048 | docs/game/adr/ADR-0048-top-down-pivot.md | `ADR-0048: Top-down Pivot`; top-down 2D pivot, partially superseded by ADR-0060 |
 | 0049 | docs/game/adr/0049-threat-pathfinding.md | Pure ShipNavGraph + A* threat pathfollowing; replaces lerp motion; navmesh remains tooling |
 | 0050 | docs/game/adr/0050-derelict-hazard-source-of-truth.md | Runtime seed authoritative for derelict fire/breach; layout arrays optional overlays |
 | 0051 | docs/game/adr/0051-module-integrity-not-voxels.md | Module integrity is the unit of destruction (not voxels); salvage pillar grain lock |
@@ -44,6 +45,5 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 
 ## Notes
 
-- Number reuse exists in historical Task 12/13/10 ADRs (`0029`, `0031`, `0033`, `0034`, `0037`). The index keeps the file path as the identity because these ADRs were authored by separate package workers in a no-git/shared-workspace wave.
+- Number reuse exists in historical Task 12/13/10 ADRs (`0029`, `0031`, `0033`, `0034`, `0037`). The index keeps the file path as the identity because these ADRs were authored by separate package workers in a no-git/shared-workspace wave. The duplicate `0048` entries are likewise distinct artifacts: the canonical `ADR-0048-top-down-pivot.md` path is the top-down pivot, while the lowercase `0048-mermaid-architecture-diagram-source-and-svg-exports.md` path is the unrelated Mermaid ADR; both remain separately indexed by path.
 - ADR-0040 owns future currency checks for this index, requirements, systems map, validation plan, build plan, and Kanban manifests.
-| 0048 | docs/game/adr/ADR-0048-top-down-pivot.md | Top-down 2D pivot: supersedes ADR-0010/0017, replaces locked-iso 3D with TileMap-based presentation |
