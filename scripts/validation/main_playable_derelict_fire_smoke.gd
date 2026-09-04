@@ -103,6 +103,11 @@ func _validate() -> void:
 	afs.active_fires.clear()
 	afs.ignition_progress.clear()
 	afs.spread_progress.clear()
+	# Native worldgen can map a structural reactor breach to the engineering
+	# compartment. Seal it so vacuum does not immediately snuff this fire test.
+	var derelict_hull = current_ship.get_hull()
+	if derelict_hull != null:
+		derelict_hull.seal_compartment("engineering", 1.0)
 	# Disable arc cascade to keep the test clean (arc state is home-side anyway).
 	afs.cascade_rate_per_second = 0.0
 
