@@ -782,8 +782,10 @@ func _spawn_biomass_threat(archetype_id: String, world_position: Vector3, reques
 	var threat: Variant = ThreatAIStateScript.new()
 	var instance_id: String = "%s_bio_%d" % [archetype_id, _biomass_threat_id_counter]
 	_biomass_threat_id_counter += 1
+	var archetype_def: Variant = threat_archetypes.get(archetype_id, {})
+	var threat_config: Dictionary = archetype_def.duplicate(true) if archetype_def is Dictionary else {}
 	var seed_value: int = _derive_biomass_seed(instance_id, archetype_id, requested_seed)
-	threat.configure({
+	threat_config.merge({
 		"instance_id": instance_id,
 		"archetype_id": archetype_id,
 		"display_name": str(threat_archetypes.get(archetype_id, {}).get("display_name", archetype_id)) if threat_archetypes.get(archetype_id, {}) is Dictionary else archetype_id,
@@ -792,7 +794,8 @@ func _spawn_biomass_threat(archetype_id: String, world_position: Vector3, reques
 		"state": ThreatAIStateScript.STATE_IDLE,
 		"biomass_recipe": recipe_obj.to_dict(),
 		"biomass_seed": seed_value,
-	})
+	}, true)
+	threat.configure(threat_config)
 	# Build → configure_gait BEFORE scene registration.  Failure synchronously
 	# frees the visual and applies the whole-threat primitive fallback
 	# metadata so the placeholder remains in use.
@@ -846,15 +849,19 @@ func _spawn_biomass_fallback_threat(archetype_id: String, reason: String, world_
 	var threat: Variant = ThreatAIStateScript.new()
 	var instance_id: String = "%s_bio_%d" % [archetype_id, _biomass_threat_id_counter]
 	_biomass_threat_id_counter += 1
-	threat.configure({
+	var archetype_def: Variant = threat_archetypes.get(archetype_id, {})
+	var threat_config: Dictionary = archetype_def.duplicate(true) if archetype_def is Dictionary else {}
+	threat_config.merge({
 		"instance_id": instance_id,
 		"archetype_id": archetype_id,
+		"display_name": str(threat_archetypes.get(archetype_id, {}).get("display_name", archetype_id)) if threat_archetypes.get(archetype_id, {}) is Dictionary else archetype_id,
 		"world_position": [world_position.x, world_position.y, world_position.z],
 		"cell": [0, 0],
 		"state": ThreatAIStateScript.STATE_IDLE,
 		"biomass_recipe": recipe.to_dict(),
 		"biomass_seed": _derive_biomass_seed(instance_id, archetype_id, requested_seed),
-	})
+	}, true)
+	threat.configure(threat_config)
 	threat.biomass_whole_threat_fallback = true
 	threat.biomass_fallback_reason = reason if not reason.is_empty() else "forced_fallback"
 	threats.append(threat)

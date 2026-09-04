@@ -284,6 +284,7 @@ func _all_six_archetypes_phase() -> bool:
 func _summary_roundtrip_phase() -> bool:
 	var manager: Node = ThreatManagerScript.new()
 	manager.configure_biomass_sources(_parts, _library, _load_visual_catalog())
+	manager._ready()
 	get_root().add_child(manager)
 	# Spawn a biomass threat by directly invoking the spawn helper if it
 	# exists, otherwise fall back to invoking the assembler directly. Either
@@ -305,6 +306,9 @@ func _summary_roundtrip_phase() -> bool:
 	var threats_value: Variant = summary.get("threats", [])
 	if not _need(threats_value is Array and (threats_value as Array).size() == 1, "manager summary should have one threat, got %s" % str(threats_value)): return false
 	var first_threat: Dictionary = (threats_value as Array)[0]
+	var live_threats_value: Variant = manager.get("threats")
+	if not _need(live_threats_value is Array and (live_threats_value as Array).size() == 1, "live manager threat missing after successful spawn"): return false
+	if not _need(_assert_catalog_tuning(manager, (live_threats_value as Array)[0], "biomatter_swarm", "successful biomass spawn"), "successful biomass spawn tuning assertion failed"): return false
 	if not _need(first_threat.has("biomass_recipe"), "threat summary missing biomass_recipe"): return false
 	if not _need(first_threat.has("biomass_seed"), "threat summary missing biomass_seed"): return false
 	if not _need(int(first_threat["biomass_seed"]) != 0, "biomass_seed is zero — must be deterministic nonzero"): return false
@@ -331,6 +335,8 @@ func _summary_roundtrip_phase() -> bool:
 func _fallback_phase() -> bool:
 	var manager: Node = ThreatManagerScript.new()
 	manager.configure_biomass_sources(_parts, _library, _load_visual_catalog())
+	manager._ready()
+	get_root().add_child(manager)
 	# A malformed recipe that survives Recipe.from_dict() but explodes the
 	# assembler must still produce a fallback threat.  We feed an invalid
 	# recipe (an empty attachments list with an absent core part_id) through
@@ -349,8 +355,12 @@ func _fallback_phase() -> bool:
 	if not _need(visual == null, "assembler built an invalid recipe"): return false
 	# Spawn a fallback threat via the manager's spawn helper using a
 	# deliberately invalid archetype so the assembler path is exercised.
+	var fallback_threat: Variant = null
 	if manager.has_method("_spawn_biomass_fallback_threat"):
-		manager._spawn_biomass_fallback_threat("biomatter_swarm", "fallback_reason_smoke", Vector3.ZERO, 99)
+		fallback_threat = manager._spawn_biomass_fallback_threat("biomatter_swarm", "fallback_reason_smoke", Vector3.ZERO, 99)
+		if not _need(fallback_threat != null, "forced fallback did not create a threat"): return false
+		if not _need(bool(fallback_threat.biomass_whole_threat_fallback), "forced fallback marker missing"): return false
+		if not _need(_assert_catalog_tuning(manager, fallback_threat, "biomatter_swarm", "forced biomass fallback"), "forced biomass fallback tuning assertion failed"): return false
 	elif manager.has_method("spawn_biomass_validation_encounter"):
 		# Some implementations may always succeed via pool; we don't depend.
 		pass
@@ -512,6 +522,21 @@ func _load_visual_catalog() -> Dictionary:
 	var doc: Dictionary = parsed
 	var archetypes_value: Variant = doc.get("archetypes", {})
 	return archetypes_value if archetypes_value is Dictionary else {}
+
+func _assert_catalog_tuning(manager: Node, threat: Variant, archetype_id: String, label: String) -> bool:
+	if not _need(threat != null, "%s threat is null" % label): return false
+	var catalog_value: Variant = manager.get("threat_archetypes")
+	if not _need(catalog_value is Dictionary, "%s catalog is not a dictionary" % label): return false
+	var catalog: Dictionary = catalog_value
+	var definition_value: Variant = catalog.get(archetype_id, {})
+	if not _need(definition_value is Dictionary, "%s archetype definition is missing" % label): return false
+	var definition: Dictionary = definition_value
+	var summary: Dictionary = threat.get_summary()
+	for key in ["max_health", "noise_sensitivity", "light_sensitivity", "sight_sensitivity"]:
+		if not _need(definition.has(key), "%s catalog tuning missing %s" % [label, key]): return false
+		if not _need(summary.has(key), "%s threat summary missing %s" % [label, key]): return false
+		if not _need(is_equal_approx(float(summary[key]), float(definition[key])), "%s %s changed: expected %s got %s" % [label, key, str(definition[key]), str(summary[key])]): return false
+	return true
 
 func _need(condition: bool, message: String) -> bool:
 	if condition:
