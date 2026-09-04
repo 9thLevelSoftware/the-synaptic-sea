@@ -1484,7 +1484,7 @@ func _apply_first_run_contract_to_marker(marker) -> bool:
 				"layout": layout,
 				"gameplay_slice": gameplay_slice,
 			}
-		preview.queue_free()
+		preview.free()
 	var chosen_seed: int = first_run_contract.pick_seed(candidates)
 	marker.seed_value = chosen_seed
 	return true
