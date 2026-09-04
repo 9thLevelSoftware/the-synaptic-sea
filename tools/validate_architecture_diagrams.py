@@ -367,7 +367,8 @@ def render(diagram: ParsedDiagram, root: Path, temp: Path) -> Path:
     _version, node, cli, config = renderer_info(root)
     source_file = temp / f"{diagram.path.stem}.mmd"
     output_file = temp / f"{diagram.path.stem}.svg"
-    source_file.write_text(diagram.mermaid_source, encoding="utf-8", newline="\n")
+    with source_file.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(diagram.mermaid_source)
     command = [
         str(node),
         str(cli),
