@@ -44,13 +44,18 @@ func _validate() -> void:
 		playable.threat_manager.threats.clear()
 	playable.away_from_start = false
 
-	# Exhausted stamina -> movement gate halves effective speed (before death).
+	# Exhausted stamina -> the continuous vitals curve slows movement (before death).
 	playable.vitals_state.health = 100.0
 	playable.vitals_state.stamina = 5.0
 	_pump(0.2)
-	var gate_half: bool = absf(playable.player.get_effective_move_speed() - playable.player.move_speed * 0.5) < 0.001
+	var expected_speed: float = playable.player.move_speed * playable.vitals_state.get_movement_speed_multiplier()
+	# `gate_half` remains the frozen regression-marker field name from the old
+	# cliff model; the current contract is the exact continuous curve.
+	var gate_half: bool = expected_speed < playable.player.move_speed \
+		and expected_speed > 0.0 \
+		and absf(playable.player.get_effective_move_speed() - expected_speed) < 0.001
 	if not gate_half:
-		_fail("exhausted stamina should halve effective move speed (got %.3f of %.3f)" % [playable.player.get_effective_move_speed(), playable.player.move_speed])
+		_fail("exhausted stamina should follow the movement curve (got %.3f expected %.3f of %.3f)" % [playable.player.get_effective_move_speed(), expected_speed, playable.player.move_speed])
 		return
 
 	# Drain health to 0 -> incapacitation locks movement AND ends the run as death.
