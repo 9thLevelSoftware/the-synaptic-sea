@@ -182,9 +182,14 @@ func _validate() -> void:
 	var structural_breaches: Array = playable._structural_breach_compartments()
 	if not structural_breaches.is_empty():
 		var hull = cur.get_hull()
-		if hull == null or hull.get_breach_count() <= 0:
-			_fail("mapped structural breaches did not seed the live derelict hull")
+		if hull == null:
+			_fail("mapped structural breaches have no live derelict hull")
 			return
+		for compartment_id in structural_breaches:
+			var cid: String = str(compartment_id)
+			if not hull.compartments.has(cid) or not bool((hull.compartments[cid] as Dictionary).get("breach_open", false)):
+				_fail("mapped structural breach did not seed compartment %s" % cid)
+				return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
 
