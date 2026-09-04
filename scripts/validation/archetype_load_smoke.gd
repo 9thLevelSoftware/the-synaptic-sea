@@ -177,8 +177,6 @@ func _assert_loaded_structural_vectors(name_str: String, layout: Dictionary) -> 
 			if not (position is Array) or (position as Array).size() < 3:
 				push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s record=%d position is not an array of length >= 3" % [name_str, category, index])
 				return false
-			if index != 0:
-				continue
 			for field in ["cell", "source_cells"]:
 				if not record.has(field):
 					continue
