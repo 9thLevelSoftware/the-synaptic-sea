@@ -135,6 +135,10 @@ func _initialize() -> void:
 			ship.free()
 			quit(1)
 			return
+		if not _assert_loaded_structural_vectors(name_str, ship.get_layout_copy()):
+			ship.free()
+			quit(1)
+			return
 		ship.free()
 
 		# Round-trip blueprint: to_dict -> from_dict -> generate -> compare
@@ -149,3 +153,42 @@ func _initialize() -> void:
 
 	print("ARCHETYPE LOAD PASS archetypes=3 round_trip=3")
 	quit(0)
+
+
+func _assert_loaded_structural_vectors(name_str: String, layout: Dictionary) -> bool:
+	var plan_variant: Variant = layout.get("structural_plan", null)
+	if not (plan_variant is Dictionary):
+		push_error("ARCHETYPE SMOKE FAIL %s loaded structural_plan missing" % name_str)
+		return false
+	var plan: Dictionary = plan_variant
+	for category in ["placements", "floor_placements", "ceiling_placements"]:
+		var records_variant: Variant = plan.get(category, null)
+		if not (records_variant is Array) or (records_variant as Array).is_empty():
+			push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s missing records" % [name_str, category])
+			return false
+		var records: Array = records_variant
+		for index in range(records.size()):
+			var record_variant: Variant = records[index]
+			if not (record_variant is Dictionary):
+				push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s record=%d is not a Dictionary" % [name_str, category, index])
+				return false
+			var record: Dictionary = record_variant
+			var position: Variant = record.get("position", null)
+			if not (position is Array) or (position as Array).size() < 3:
+				push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s record=%d position is not an array of length >= 3" % [name_str, category, index])
+				return false
+			if index != 0:
+				continue
+			for field in ["cell", "source_cells"]:
+				if not record.has(field):
+					continue
+				var value: Variant = record[field]
+				if value is String:
+					push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s %s is a serialized string" % [name_str, category, field])
+					return false
+				if field == "source_cells" and value is Array:
+					for source_cell in (value as Array):
+						if source_cell is String:
+							push_error("ARCHETYPE SMOKE FAIL %s structural_plan %s source_cells contains a serialized string" % [name_str, category])
+							return false
+	return true

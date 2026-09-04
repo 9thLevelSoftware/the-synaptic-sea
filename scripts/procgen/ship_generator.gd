@@ -459,7 +459,7 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
 
 	# Write layout
-	var layout_json: String = JSON.stringify(layout, "  ")
+	var layout_json: String = JSON.stringify(_json_safe(layout), "  ")
 	var layout_file: FileAccess = FileAccess.open(layout_path, FileAccess.WRITE)
 	if layout_file == null:
 		push_error("SHIP GENERATOR FAIL cannot write layout: %s" % layout_path)
@@ -477,7 +477,7 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		return null
 
 	# Write the gameplay slice (built above, before the layout write).
-	var gameplay_json: String = JSON.stringify(gameplay, "  ")
+	var gameplay_json: String = JSON.stringify(_json_safe(gameplay), "  ")
 	var gameplay_file: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
 	if gameplay_file == null:
 		push_error("SHIP GENERATOR FAIL cannot write gameplay slice: %s" % gameplay_path)
@@ -500,6 +500,29 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	# "StructuralRoot" (geometry + nav) and "ObjectiveRoot" children under it.
 	loader.name = "GeneratedShip"
 	return loader
+
+
+func _json_safe(value: Variant) -> Variant:
+	if value is Vector2i:
+		var cell: Vector2i = value
+		return [cell.x, cell.y]
+	if value is Vector2:
+		var point: Vector2 = value
+		return [point.x, point.y]
+	if value is Vector3:
+		var position: Vector3 = value
+		return [position.x, position.y, position.z]
+	if value is Dictionary:
+		var dictionary: Dictionary = {}
+		for key_variant in value.keys():
+			dictionary[str(key_variant)] = _json_safe(value[key_variant])
+		return dictionary
+	if value is Array:
+		var array: Array = []
+		for child in value:
+			array.append(_json_safe(child))
+		return array
+	return value
 
 
 func kit_path_for_layout(layout: Dictionary) -> String:
