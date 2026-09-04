@@ -7,8 +7,8 @@ extends SceneTree
 #    event's pooled AudioStreamPlayer3D with stream != null, global_position
 #    == P1, bus == "sfx"; headed runs also require playing == true. Headless
 #    runs intentionally skip play() to avoid AudioServer teardown leaks.
-# 2. Honest fallback (ADR-0044): play_sfx(&"sfx.door.open", ...) — an
-#    UNcatalogued event — creates/positions its spatial player but assigns no
+# 2. Honest fallback (ADR-0044): play_sfx(&"sfx.tool.use", ...) — a
+#    catalogued event with deferred audio content — creates/positions its spatial player but assigns no
 #    stream and does not play (volume-push-only, identical to _play_via_bus's
 #    deferred-asset fallback).
 # 3. Production callsite proof: a corpse loot container spawned through the
@@ -100,16 +100,16 @@ func _validate() -> void:
 		return
 	var catalogued_playing_ok: bool = true
 
-	# --- Criterion 2: uncatalogued event stays an honest volume-push fallback ---
-	if not mgr.play_sfx(&"sfx.door.open", FALLBACK_POS):
-		_fail("play_sfx(sfx.door.open, pos) returned false")
+	# --- Criterion 2: deferred-content event stays an honest volume-push fallback ---
+	if not mgr.play_sfx(&"sfx.tool.use", FALLBACK_POS):
+		_fail("play_sfx(sfx.tool.use, pos) returned false")
 		return
-	var fb: AudioStreamPlayer3D = _spatial_player_for(mgr, "sfx.door.open")
+	var fb: AudioStreamPlayer3D = _spatial_player_for(mgr, "sfx.tool.use")
 	if fb == null:
-		_fail("no spatial player allocated for sfx.door.open")
+		_fail("no spatial player allocated for sfx.tool.use")
 		return
 	if fb.stream != null or fb.playing:
-		_fail("uncatalogued spatial player must not stream/play (ADR-0044 honest fallback)")
+		_fail("deferred-content spatial player must not stream/play (ADR-0044 honest fallback)")
 		return
 	if fb.global_position.distance_to(FALLBACK_POS) > 0.01:
 		_fail("fallback spatial player at %s, expected %s" % [str(fb.global_position), str(FALLBACK_POS)])
