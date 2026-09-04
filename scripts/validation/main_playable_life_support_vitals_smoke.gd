@@ -91,6 +91,12 @@ func _validate() -> void:
 	# Seal the pre-damaged cargo breach through the REAL interact dispatcher
 	# (_on_player_interact_requested), NOT a direct sp.try_start — this proves the seal loop
 	# is reachable in actual play (the dispatcher routes interact to breach_seal_points).
+	# Isolate this phase from higher-priority co-located fire/repair/bridge points.
+	for compartment_id in playable.fire_suppression_state.get_burning_compartments():
+		playable.fire_suppression_state.extinguish(str(compartment_id))
+	playable._clear_fire_suppression_points()
+	playable._clear_repair_points()
+	playable._clear_bridge_terminals()
 	playable.away_from_start = false
 	if int(playable.inventory_state.get_quantity("hull_sealant")) < 1:
 		playable.inventory_state.add_item("hull_sealant", 1)

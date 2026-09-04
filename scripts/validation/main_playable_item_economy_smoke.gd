@@ -40,6 +40,13 @@ func _validate() -> void:
 	playable.away_from_start = false
 	if is_instance_valid(playable.threat_manager):
 		playable.threat_manager.threats.clear()
+	# Isolate the seal phase from higher-priority co-located home affordances.
+	# The fire loop below rebuilds its own point after deliberately igniting.
+	for compartment_id in playable.fire_suppression_state.get_burning_compartments():
+		playable.fire_suppression_state.extinguish(str(compartment_id))
+	playable._clear_fire_suppression_points()
+	playable._clear_repair_points()
+	playable._clear_bridge_terminals()
 
 	# --- 1) Craft hull_sealant via the REAL craft path (no add_item of hull_sealant) ---------
 	inv.add_item("sealant", 2)
@@ -93,6 +100,7 @@ func _validate() -> void:
 	if not playable.fire_suppression_state.is_burning("engineering"):
 		_fail("engineering never ignited"); return
 	playable._refresh_fire_zones()
+	playable._build_fire_suppression_points()
 	playable.get_extinguisher_state().charge = playable.get_extinguisher_state().max_charge
 	var fps: Array = playable.get_fire_suppression_points_for_validation()
 	var fp = null
