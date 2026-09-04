@@ -119,25 +119,53 @@ func _run_validation() -> void:
 	if tm.threats.is_empty():
 		_fail("ThreatManager spawned no threats from %d markers" % markers.size())
 		return
-	var marker_lp: Dictionary = {}
+	# Build the exact spawn multiset from marker data, rather than decoding
+	# instance IDs.  Biomass threats use `<archetype>_bio_<counter>` IDs, and
+	# both biomass and legacy paths fan out marker counts by half a cell.
+	var expected_records: Array[Dictionary] = []
 	for marker_variant in markers:
 		var marker: Dictionary = marker_variant
-		marker_lp[str(marker.get("id", ""))] = marker.get("local_position")
+		var encounter_kind: String = str(marker.get("encounter_kind", "biomatter_swarm"))
+		var archetype_id: String = tm._normalize_encounter_kind(encounter_kind)
+		var count: int = max(1, int(marker.get("count", 1)))
+		var lp: Array = marker.get("local_position", []) if marker.get("local_position", []) is Array else []
+		for i in range(count):
+			expected_records.append({
+				"archetype_id": archetype_id,
+				"world_position": ANCHOR + Vector3(
+					float(lp[0]) + float(i) * 0.5,
+					float(lp[1]),
+					float(lp[2]),
+				),
+				"matched": false,
+			})
 	var positions_seen: Dictionary = {}
 	for threat in tm.threats:
-		# instance_id = "<marker_id>_<i>"; strip the trailing per-count index.
 		var iid: String = String(threat.instance_id)
-		var marker_id: String = iid.substr(0, iid.rfind("_"))
-		if not marker_lp.has(marker_id):
-			_fail("threat %s does not map back to a marker" % iid)
-			return
-		var lp: Array = marker_lp[marker_id]
-		var expected: Vector3 = ANCHOR + Vector3(float(lp[0]), float(lp[1]), float(lp[2]))
 		var actual: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
-		if actual.distance_to(expected) > 1.5:
-			_fail("threat %s spawned at %s, expected near %s (anchor+local_position)" % [iid, str(actual), str(expected)])
+		var matched_index: int = -1
+		for expected_index in range(expected_records.size()):
+			var expected_record: Dictionary = expected_records[expected_index]
+			if bool(expected_record.get("matched", false)):
+				continue
+			if String(expected_record.get("archetype_id", "")) != String(threat.archetype_id):
+				continue
+			var expected: Vector3 = expected_record.get("world_position", Vector3.INF) as Vector3
+			if actual.distance_to(expected) <= EPS:
+				matched_index = expected_index
+				break
+		if matched_index < 0:
+			_fail("threat %s archetype %s at %s has no unmatched expected spawn" % [iid, str(threat.archetype_id), str(actual)])
 			return
+		expected_records[matched_index]["matched"] = true
 		positions_seen["%.1f,%.1f" % [actual.x, actual.z]] = true
+	for expected_record in expected_records:
+		if not bool(expected_record.get("matched", false)):
+			_fail("expected %s at %s had no matching threat" % [
+				str(expected_record.get("archetype_id", "")),
+				str(expected_record.get("world_position", Vector3.INF)),
+			])
+			return
 	var distinct: bool = positions_seen.size() >= 2
 	if not distinct:
 		_fail("all %d threats share one position — anchor-cluster regression" % tm.threats.size())
