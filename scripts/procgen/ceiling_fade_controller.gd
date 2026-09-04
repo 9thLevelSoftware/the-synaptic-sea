@@ -23,6 +23,8 @@ func configure(loader_root: Node, player: Node3D) -> void:
 
 
 func _collect(node: Node) -> void:
+	if not is_instance_valid(node):
+		return
 	if node is Node3D and (node as Node3D).name.begins_with("Ceiling_"):
 		_ceilings.append(node)
 	for child in node.get_children():
@@ -30,10 +32,15 @@ func _collect(node: Node) -> void:
 
 
 func _process(_delta: float) -> void:
-	if _player == null:
+	if not is_instance_valid(_player):
+		_player = null
 		return
 	var pp: Vector3 = _player.global_position
-	for c in _ceilings:
+	for index in range(_ceilings.size() - 1, -1, -1):
+		var c: Node3D = _ceilings[index]
+		if not is_instance_valid(c):
+			_ceilings.remove_at(index)
+			continue
 		var d: float = c.global_position.distance_to(pp)
 		var near: bool = d <= fade_radius_m
 		c.visible = true
@@ -41,11 +48,13 @@ func _process(_delta: float) -> void:
 
 
 func _apply_alpha(node: Node3D, alpha: float) -> void:
+	if not is_instance_valid(node):
+		return
 	var key: String = node.get_path()
 	var cached = _material_cache.get(key, null)
 	if cached == null:
 		for child in node.get_children():
-			if child is MeshInstance3D:
+			if is_instance_valid(child) and child is MeshInstance3D:
 				var mesh_instance: MeshInstance3D = child
 				var mat: Material = mesh_instance.get_active_material(0)
 				if mat is StandardMaterial3D:
@@ -58,7 +67,7 @@ func _apply_alpha(node: Node3D, alpha: float) -> void:
 		_material_cache[key] = true
 	else:
 		for child in node.get_children():
-			if child is MeshInstance3D:
+			if is_instance_valid(child) and child is MeshInstance3D:
 				var mesh_instance: MeshInstance3D = child
 				var mat: Material = mesh_instance.get_active_material(0)
 				if mat is StandardMaterial3D:
