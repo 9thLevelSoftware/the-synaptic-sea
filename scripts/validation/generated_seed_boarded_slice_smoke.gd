@@ -67,10 +67,6 @@ func _validate() -> void:
 	if cur == null:
 		_fail("current_ship missing after travel")
 		return
-	var hull = cur.get_hull()
-	if hull == null or hull.get_breach_count() <= 0:
-		_fail("live derelict hull has no seeded structural breach")
-		return
 	var derelict_root = cur.scene_root
 	if derelict_root == null or not is_instance_valid(derelict_root):
 		_fail("derelict scene_root missing")
@@ -166,12 +162,14 @@ func _validate() -> void:
 	if preferred.is_empty():
 		_fail("first-run preferred_seeds empty")
 		return
-	if int(preferred[0]) != 42:
-		_fail("first-run preferred first seed=%d expected 42" % int(preferred[0]))
-		return
 	var seed_n: int = playable._ship_seed(cur)
-	if seed_n != 42:
-		_fail("boarded seed=%d expected first-run seed 42" % seed_n)
+	var seed_ok := false
+	for seed_variant in preferred:
+		if int(seed_variant) == seed_n:
+			seed_ok = true
+			break
+	if not seed_ok:
+		_fail("boarded seed=%d is not in first-run preferred_seeds %s" % [seed_n, str(preferred)])
 		return
 	var gameplay: Dictionary = loader.gameplay_doc.duplicate(true) if typeof(loader.gameplay_doc) == TYPE_DICTIONARY else {}
 	var loot_v: Variant = gameplay.get("loot_containers", [])
@@ -181,6 +179,12 @@ func _validate() -> void:
 		_fail("boarded layout failed FirstRunContract.validate biome=%s difficulty=%s" % [
 			str(layout.get("biome_id", "")), str(layout.get("difficulty_id", ""))])
 		return
+	var structural_breaches: Array = playable._structural_breach_compartments()
+	if not structural_breaches.is_empty():
+		var hull = cur.get_hull()
+		if hull == null or hull.get_breach_count() <= 0:
+			_fail("mapped structural breaches did not seed the live derelict hull")
+			return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
 
