@@ -61,9 +61,9 @@ Gate output was captured after fresh execution:
 ### 1. Focused Python gate
 
 ```text
-........................................................................ [ 93%]
-.....                                                                    [100%]
-77 passed in 10.89s
+........................................................................ [ 91%]
+.......                                                                  [100%]
+79 passed in 11.03s
 ```
 
 Exit code: `0`.
@@ -73,7 +73,7 @@ Exit code: `0`.
 ```text
 Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
 
-PROCGEN_STRUCTURAL_COMPILER_PASS seeds=5 placements=248 portals=46
+PROCGEN_STRUCTURAL_COMPILER_PASS seeds=5 placements=234 portals=83
 ```
 
 Exit code: `0`; no `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostics.
@@ -83,7 +83,7 @@ Exit code: `0`; no `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostics.
 ```text
 Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
 
-PROCGEN GOLDEN PARITY PASS seed=17 placements=51 wrappers=51 structural=true visual_only=GLB,material
+PROCGEN GOLDEN PARITY PASS seed=17 placements=48 wrappers=48 structural=true visual_only=GLB,material
 ```
 
 Exit code: `0`; no `ERROR:`, `WARNING:`, or `SCRIPT ERROR:` diagnostics.

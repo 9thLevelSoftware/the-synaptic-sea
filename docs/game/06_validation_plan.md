@@ -874,7 +874,7 @@ run_clean 'ADR-0049 threat pathfinder smoke' 'THREAT PATHFINDER PASS path=true s
 run_clean 'ADR-0049 threat path follow smoke' 'THREAT PATH FOLLOW PASS advanced=true no_tunnel=true graph=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_path_follow_smoke.gd
 run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREAT PATHFINDING PASS graph=true advanced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_threat_pathfinding_smoke.gd
 run_clean 'Procgen quality gate smoke' 'PROCGEN QUALITY GATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_quality_gate_smoke.gd
-run_clean 'Procgen golden parity smoke' 'PROCGEN GOLDEN PARITY PASS goldens=3 nav=true schema=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
+run_clean 'Procgen golden parity smoke' 'PROCGEN GOLDEN PARITY PASS seed=17 placements=48 wrappers=48 structural=true visual_only=GLB,material' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
 run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
 # --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
 run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd

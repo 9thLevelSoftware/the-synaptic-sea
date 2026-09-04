@@ -7,7 +7,7 @@ extends SceneTree
 ## ShipGenerator/GeneratedShipLoader wrappers, then compares only the
 ## canonical structural inventory. GLB/material and scene-path differences are
 ## visual-only and intentionally excluded from the structural comparison.
-## Marker: PROCGEN GOLDEN PARITY PASS seed=17 placements=51 wrappers=51 structural=true visual_only=GLB,material
+## Marker: PROCGEN GOLDEN PARITY PASS seed=17 placements=48 wrappers=48 structural=true visual_only=GLB,material
 
 const ShipBlueprintScript: GDScript = preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipGeneratorScript: GDScript = preload("res://scripts/procgen/ship_generator.gd")
