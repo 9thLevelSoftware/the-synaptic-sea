@@ -48,6 +48,11 @@ func _setup() -> void:
 	# vitals before the snapshot assertion if those threats remain active.
 	if playable.threat_manager != null:
 		playable.threat_manager.threats.clear()
+	# Fire is external to the summaries under test and otherwise drains health
+	# during the settle frames; clear it and prevent damaged systems re-igniting.
+	if playable.fire_suppression_state != null:
+		playable.fire_suppression_state.active_fires.clear()
+		playable.fire_suppression_state.ignition_rate_per_second = 0.0
 	# Set non-default vitals state; zero drain rates so background ticks
 	# do not drift values during the settle frames.
 	playable.vitals_state.configure({
