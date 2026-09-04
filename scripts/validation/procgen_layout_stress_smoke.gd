@@ -94,8 +94,13 @@ func _check_seed_17_structural_contract(layout: Dictionary, label: String) -> bo
 			push_error("STRESS FAIL %s seed=17 room %s has no footprint" % [label, str(room.get("id", "?"))])
 			return false
 		var footprint: Variant = room.get("footprint", null)
-		if not (footprint is Vector2i) or int((footprint as Vector2i).x) * int((footprint as Vector2i).y) != (cells as Array).size():
-			push_error("STRESS FAIL %s seed=17 room %s footprint/cell count mismatch" % [label, str(room.get("id", "?"))])
+		# Grown rooms may be non-rectangular; footprint is their bounding box,
+		# while explicit cells remain the occupancy authority.
+		if not (footprint is Vector2i) \
+				or int((footprint as Vector2i).x) < 1 \
+				or int((footprint as Vector2i).y) < 1 \
+				or int((footprint as Vector2i).x) * int((footprint as Vector2i).y) < (cells as Array).size():
+			push_error("STRESS FAIL %s seed=17 room %s footprint cannot contain explicit cells" % [label, str(room.get("id", "?"))])
 			return false
 		var room_cell_coordinates: Dictionary = {}
 		for cell_variant in cells:
