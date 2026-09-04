@@ -7,6 +7,7 @@ class_name FirstRunContract
 
 const CONTRACT_PATH: String = "res://data/procgen/slice/first_run_contract.json"
 const RoomVariantSelectorScript: GDScript = preload("res://scripts/procgen/room_variant_selector.gd")
+const FireCompartmentResolverScript: GDScript = preload("res://scripts/procgen/fire_compartment_resolver.gd")
 
 var contract: Dictionary = {}
 
@@ -37,6 +38,9 @@ func validate(layout: Dictionary, gameplay_slice: Dictionary = {}) -> bool:
 	if not layout.has("biome_id") or str(layout.get("biome_id", "")) != str(contract.get("biome_id", "")):
 		return false
 	if not layout.has("difficulty_id") or str(layout.get("difficulty_id", "")) != str(contract.get("difficulty_id", "")):
+		return false
+	var critical_path: Variant = layout.get("critical_path", [])
+	if not (critical_path is Array) or (critical_path as Array).size() < 2:
 		return false
 	var loot: Variant = gameplay_slice.get("loot_containers", [])
 	if not (loot is Array) or (loot as Array).size() < int(contract.get("require_min_loot_containers", 0)):
@@ -85,6 +89,29 @@ func _has_any_required_hazard(layout: Dictionary, gameplay_slice: Dictionary, re
 	_collect_hazard_array(layout.get("breach_zones", []), "breach_zone", available)
 	_collect_hazard_array(gameplay_slice.get("fire_zones", []), "fire_zone", available)
 	_collect_hazard_array(gameplay_slice.get("breach_zones", []), "breach_zone", available)
+	var structural_plan: Variant = layout.get("structural_plan", {})
+	if structural_plan is Dictionary:
+		var edges: Variant = (structural_plan as Dictionary).get("edges", {})
+		if edges is Dictionary:
+			for edge_variant in (edges as Dictionary).values():
+				if not (edge_variant is Dictionary):
+					continue
+				var edge: Dictionary = edge_variant
+				if str(edge.get("kind", "")).to_upper() != "BREACH":
+					continue
+				var room_ids: Array = []
+				var raw_room_ids: Variant = edge.get("room_ids", [])
+				if raw_room_ids is Array:
+					room_ids.append_array(raw_room_ids as Array)
+				else:
+					room_ids.append(edge.get("room_id", ""))
+				for room_id_variant in room_ids:
+					var room_id: String = str(room_id_variant).strip_edges()
+					if room_id.is_empty():
+						continue
+					if not FireCompartmentResolverScript.from_room_id(room_id, [layout]).is_empty():
+						available["breach_zone"] = true
+						break
 	# The live derelict path seeds hazards from room variants after loading. Count
 	# those same authoritative variant effects here so seed validation exercises
 	# the production generation contract rather than a smoke-only annotation.

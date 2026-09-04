@@ -67,6 +67,10 @@ func _validate() -> void:
 	if cur == null:
 		_fail("current_ship missing after travel")
 		return
+	var hull = cur.get_hull()
+	if hull == null or hull.get_breach_count() <= 0:
+		_fail("live derelict hull has no seeded structural breach")
+		return
 	var derelict_root = cur.scene_root
 	if derelict_root == null or not is_instance_valid(derelict_root):
 		_fail("derelict scene_root missing")
@@ -86,8 +90,9 @@ func _validate() -> void:
 		_fail("boarded layout empty")
 		return
 	var program_id: String = str(layout.get("program_id", ""))
-	if program_id == "coherent-proof-ship-001" or not program_id.begins_with("procgen-"):
-		_fail("boarded layout is hub golden, program_id=%s" % program_id)
+	var generated_program: bool = program_id.begins_with("procgen-") or program_id.begins_with("worldgen-")
+	if program_id == "coherent-proof-ship-001" or not generated_program:
+		_fail("boarded layout is not generated, program_id=%s" % program_id)
 		return
 	if str(layout.get("schema_version", "")) != "1.2.0":
 		_fail("schema_version=%s expected 1.2.0" % str(layout.get("schema_version", "")))
@@ -161,14 +166,12 @@ func _validate() -> void:
 	if preferred.is_empty():
 		_fail("first-run preferred_seeds empty")
 		return
+	if int(preferred[0]) != 42:
+		_fail("first-run preferred first seed=%d expected 42" % int(preferred[0]))
+		return
 	var seed_n: int = playable._ship_seed(cur)
-	var seed_ok := false
-	for seed_variant in preferred:
-		if int(seed_variant) == seed_n:
-			seed_ok = true
-			break
-	if not seed_ok:
-		_fail("boarded seed=%d is not in first-run preferred_seeds %s" % [seed_n, str(preferred)])
+	if seed_n != 42:
+		_fail("boarded seed=%d expected first-run seed 42" % seed_n)
 		return
 	var gameplay: Dictionary = loader.gameplay_doc.duplicate(true) if typeof(loader.gameplay_doc) == TYPE_DICTIONARY else {}
 	var loot_v: Variant = gameplay.get("loot_containers", [])
@@ -296,8 +299,10 @@ func _loot_on_interior_slot(layout: Dictionary, loot: Array) -> bool:
 
 
 func _wreck_overlay_present(layout: Dictionary) -> bool:
-	if not bool(layout.get("wreck_applied", false)):
-		return false
+	# Legacy GDScript wrecks stamp wreck_applied; native worldgen v5 records the
+	# same damage directly in structural edges / overlays without that flag.
+	if bool(layout.get("wreck_applied", false)):
+		return true
 	var blocked_v: Variant = layout.get("blocked_links", [])
 	if blocked_v is Array and not (blocked_v as Array).is_empty():
 		return true

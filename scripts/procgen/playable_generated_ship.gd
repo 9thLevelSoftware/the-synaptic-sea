@@ -1468,20 +1468,23 @@ func _apply_first_run_contract_to_marker(marker) -> bool:
 		return false
 	if not visited_ships.is_empty() or String(marker.marker_id).is_empty():
 		return false
-	var layout_generator = ShipLayoutGeneratorScript.new()
-	var slice_builder = GameplaySliceBuilderScript.new()
 	var candidates: Dictionary = {}
 	var biome_id: String = str(first_run_contract.contract.get("biome_id", ""))
 	var difficulty_id: String = str(first_run_contract.contract.get("difficulty_id", ""))
+	ship_generator.configure_run_context(biome_id, difficulty_id)
 	for seed_variant in first_run_contract.contract.get("preferred_seeds", []):
 		var seed_value: int = int(seed_variant)
-		var blueprint = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), seed_value)
-		var layout: Dictionary = layout_generator.generate_with_options(
-			blueprint, {}, biome_id, difficulty_id, true)
-		candidates[seed_value] = {
-			"layout": layout,
-			"gameplay_slice": slice_builder.build(layout),
-		}
+		var preview = ship_generator.generate_from_seed(seed_value, int(marker.size_class), int(marker.condition))
+		if preview == null:
+			continue
+		var layout: Dictionary = preview.get_layout_copy() if preview.has_method("get_layout_copy") else {}
+		var gameplay_slice: Dictionary = preview.gameplay_doc.duplicate(true) if preview.get("gameplay_doc") is Dictionary else {}
+		if not layout.is_empty() and not gameplay_slice.is_empty():
+			candidates[seed_value] = {
+				"layout": layout,
+				"gameplay_slice": gameplay_slice,
+			}
+		preview.queue_free()
 	var chosen_seed: int = first_run_contract.pick_seed(candidates)
 	marker.seed_value = chosen_seed
 	return true
@@ -3349,6 +3352,45 @@ func _variant_hazard_compartments(kind: String) -> Array:
 	result.sort()
 	return result
 
+
+## Scans the boarded derelict's structural plan for BREACH edges and maps their
+## room ids onto live hull compartments. Returns a deterministic, de-duplicated,
+## sorted list; unmapped structural rooms remain visual-only.
+func _structural_breach_compartments() -> Array:
+	var out: Dictionary = {}
+	if current_ship == null or typeof(current_ship.built_layout) != TYPE_DICTIONARY:
+		return []
+	var layout: Dictionary = current_ship.built_layout
+	var structural_plan: Variant = layout.get("structural_plan", {})
+	if not (structural_plan is Dictionary):
+		return []
+	var edges: Variant = (structural_plan as Dictionary).get("edges", {})
+	if not (edges is Dictionary):
+		return []
+	for edge_variant in (edges as Dictionary).values():
+		if not (edge_variant is Dictionary):
+			continue
+		var edge: Dictionary = edge_variant
+		if str(edge.get("kind", "")).to_upper() != "BREACH":
+			continue
+		var room_ids: Array = []
+		var raw_room_ids: Variant = edge.get("room_ids", [])
+		if raw_room_ids is Array:
+			room_ids.append_array(raw_room_ids as Array)
+		else:
+			room_ids.append(edge.get("room_id", ""))
+		for room_id_variant in room_ids:
+			var room_id: String = str(room_id_variant).strip_edges()
+			if room_id.is_empty():
+				continue
+			var compartment: String = FireCompartmentResolverScript.from_room_id(room_id, [layout])
+			if not compartment.is_empty():
+				out[compartment] = true
+	var result: Array = out.keys()
+	result.sort()
+	return result
+
+
 ## Maps an authored compartment_id or room role onto a live hull/fire compartment.
 ## Unmapped roles (airlock, corridor, …) return "" — visual overlay only.
 func _mapped_authored_compartment_id(raw: String) -> String:
@@ -3515,11 +3557,18 @@ func _seed_derelict_breaches() -> void:
 	if hull == null:
 		return
 	var seeded_any: bool = false
+	var breach_compartments: Dictionary = {}
 	for cid in _variant_hazard_compartments("breach"):
+		breach_compartments[str(cid)] = true
+	for cid in _structural_breach_compartments():
+		breach_compartments[str(cid)] = true
+	var sorted_breach_compartments: Array = breach_compartments.keys()
+	sorted_breach_compartments.sort()
+	for cid in sorted_breach_compartments:
 		if hull.compartments.has(str(cid)):
 			hull.damage_compartment(str(cid), 1.0, true)
 			seeded_any = true
-	# Authored overlay AFTER the variant seeder. damage_compartment does not
+	# Authored overlay AFTER the variant and structural seed. damage_compartment does not
 	# wipe other compartments; unmapped roles stay visual-only.
 	for cid in _authored_mapped_hazard_compartments("breach"):
 		if hull.compartments.has(str(cid)):
