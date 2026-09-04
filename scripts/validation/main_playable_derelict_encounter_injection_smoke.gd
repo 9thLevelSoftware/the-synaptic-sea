@@ -125,20 +125,53 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 			continue  # this derelict rolled zero encounters; re-scan and try another
 		encounter_count = encs.size()
 
-		# Encounters drive combat: the threat manager spawned from the injected markers
-		# (instance ids prefixed "enc_") rather than the hardcoded fallback ("fallback_").
+		# Encounters drive combat: ThreatManager must retain the injected markers
+		# and spawn the normalized archetypes/counts they declare. Correlate both
+		# marker IDs and archetype multisets so layout fallback markers cannot pass.
 		var tm = playable.threat_manager
 		if tm == null:
 			_fail("threat_manager missing after travel")
 			return
-		for threat in tm.threats:
-			if str(threat.instance_id).begins_with("enc_"):
-				injected_threats = true
-				break
-		if not injected_threats:
-			_fail("derelict has %d injected encounters but no threat spawned from them (instance ids: %s)" % [
-				encounter_count, str(_threat_ids(tm))])
+		var layout_marker_ids: Array = []
+		for marker_variant in encs:
+			if not (marker_variant is Dictionary):
+				_fail("layout encounter marker is not a Dictionary: %s" % str(marker_variant))
+				return
+			layout_marker_ids.append(str((marker_variant as Dictionary).get("id", "")))
+		var manager_marker_ids: Array = []
+		for marker_variant in tm.encounter_markers:
+			if not (marker_variant is Dictionary):
+				_fail("threat manager encounter marker is not a Dictionary: %s" % str(marker_variant))
+				return
+			manager_marker_ids.append(str((marker_variant as Dictionary).get("id", "")))
+		if manager_marker_ids.size() != layout_marker_ids.size():
+			_fail("threat manager retained %d encounter markers; layout emitted %d" % [
+				manager_marker_ids.size(), layout_marker_ids.size()])
 			return
+		layout_marker_ids.sort()
+		manager_marker_ids.sort()
+		if manager_marker_ids != layout_marker_ids:
+			_fail("threat manager encounter marker ids do not match layout: manager=%s layout=%s" % [
+				str(manager_marker_ids), str(layout_marker_ids)])
+			return
+
+		var expected_archetypes: Array = []
+		for marker_variant in encs:
+			var encounter_marker: Dictionary = marker_variant
+			var normalized_kind: String = tm._normalize_encounter_kind(str(encounter_marker.get("encounter_kind", "biomatter_swarm")))
+			var marker_count: int = max(1, int(encounter_marker.get("count", 1)))
+			for _i in range(marker_count):
+				expected_archetypes.append(normalized_kind)
+		var actual_archetypes: Array = []
+		for threat in tm.threats:
+			actual_archetypes.append(str(threat.archetype_id))
+		expected_archetypes.sort()
+		actual_archetypes.sort()
+		if actual_archetypes != expected_archetypes:
+			_fail("threat archetypes do not match injected encounters: actual=%s expected=%s" % [
+				str(actual_archetypes), str(expected_archetypes)])
+			return
+		injected_threats = true
 		break
 
 	if not any_travel:
@@ -152,12 +185,6 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	print("MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=%s reachable=true biome=%s difficulty=%s encounters=%d" % [
 		str(injected_threats).to_lower(), stamped_biome, stamped_difficulty, encounter_count])
 	_teardown_and_quit(0)
-
-func _threat_ids(tm) -> Array:
-	var out: Array = []
-	for threat in tm.threats:
-		out.append(str(threat.instance_id))
-	return out
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
 	if node is PlayableGeneratedShip:
