@@ -6534,7 +6534,17 @@ func travel_to(marker) -> Dictionary:
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
-	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
+	var mid: String = String(marker.marker_id)
+	# Scanner markers are regenerated on each scan. For a visited ship, restore
+	# the retained blueprint identity before generating replacement geometry so
+	# revisit uses the exact seed/size/condition from the first boarding.
+	if visited_ships.has(mid):
+		var retained = visited_ships[mid]
+		if retained != null and retained.blueprint != null:
+			marker.seed_value = int(retained.blueprint.seed_value)
+			marker.size_class = int(retained.blueprint.size)
+			marker.condition = int(retained.blueprint.condition)
+	var was_generated: bool = synaptic_sea_world.is_generated(mid)
 	var first_run_contract_applied: bool = _apply_first_run_contract_to_marker(marker)
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	# Light up the procgen expansion lane for this derelict: resolve a deterministic
@@ -6601,7 +6611,6 @@ func travel_to(marker) -> Dictionary:
 			leaving.scene_root.queue_free()
 			leaving.scene_root = null  # retained instance, scene dropped
 
-	var mid: String = String(marker.marker_id)
 	var inst
 	if visited_ships.has(mid):
 		# Revisit: reuse the retained instance (its systems state is preserved);
@@ -11080,7 +11089,10 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	# Rebuild from this derelict's OWN seed/size/condition so a save-reload reproduces
 	# its injected encounters + biome/difficulty stamps (not empty / a stale marker's).
 	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	var new_root: Node3D = ship_generator.generate_from_seed(
+		int(inst.blueprint.seed_value),
+		int(inst.blueprint.size),
+		int(inst.blueprint.condition))
 	if new_root == null:
 		return false
 	_attach_derelict_active(inst, new_root)
@@ -11104,7 +11116,10 @@ func _ensure_derelict_geometry(inst) -> void:
 		return
 	# Regenerate from this derelict's OWN context (see _apply_run_context_from_blueprint).
 	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	var new_root: Node3D = ship_generator.generate_from_seed(
+		int(inst.blueprint.seed_value),
+		int(inst.blueprint.size),
+		int(inst.blueprint.condition))
 	if new_root == null:
 		return
 	inst.scene_root = new_root

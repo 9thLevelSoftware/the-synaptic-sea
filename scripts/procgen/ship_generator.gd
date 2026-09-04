@@ -22,7 +22,7 @@ const EncounterInjectorScript := preload("res://scripts/procgen/encounter_inject
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 
 const USE_WORLDGEN := true
-const WORLDGEN_VERSION: int = 2
+const WORLDGEN_VERSION: int = 5
 const WORLDGEN_KIT_ID: String = "ship_structural_v0"
 const WORLDGEN_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const WORLDGEN_ARCHETYPE_BY_SIZE: Dictionary = {
@@ -110,9 +110,9 @@ func generate_from_seed(
 		seed_value: int,
 		size: int = 0,
 		condition: int = 1) -> Node3D:
-	# Prefer DerelictGenerator when the platform GDExtension is loaded.
-	# The checked-in addon currently ships only win64, so Linux/macOS keep
-	# the layout pipeline rather than failing every generate_from_seed caller.
+	# Prefer DerelictGenerator when the current platform GDExtension is loaded.
+	# Keep the layout pipeline as the explicit fallback for platforms without a
+	# checked-in compatible binary.
 	if USE_WORLDGEN and ClassDB.class_exists("DerelictGenerator"):
 		return _generate_via_worldgen(seed_value, size, condition)
 	var blueprint = ShipBlueprintScript.new(size, condition, seed_value)
@@ -294,6 +294,13 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	if gameplay.is_empty() or not (gameplay.get("objectives", []) is Array) or (gameplay.get("objectives", []) as Array).is_empty():
 		push_error("SHIP GENERATOR FAIL worldgen gameplay slice builder returned no objectives")
 		return null
+	# GeneratedShipLoader reads hazard links from layout; mirror the GDScript
+	# path by duplicating builder-authored arcs before loading both documents.
+	var layout_arcs: Variant = layout.get("arc_zones", [])
+	var slice_arcs: Variant = gameplay.get("arc_zones", [])
+	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
+			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
+		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
 	var loot_tables: Dictionary = LootRollerScript.load_tables()
 	if loot_tables.is_empty():
 		push_error("SHIP GENERATOR FAIL game loot registry is empty")
