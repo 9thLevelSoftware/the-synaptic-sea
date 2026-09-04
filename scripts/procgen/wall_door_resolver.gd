@@ -75,6 +75,7 @@ func _legacy_cell_grid_to_layout(cell_grid: Dictionary, room_plan: Array[Diction
 				"to_cell": adjacency.get("to_cell", null),
 				"module_id": str(adjacency.get("module_id", "bulkhead_portal_2x1")),
 				"state": str(adjacency.get("state", adjacency.get("portal_type", "DOOR"))).to_upper(),
+				"deck": int(room_decks.get(from_room, 0)),
 			}
 			if adjacency.has("exterior"):
 				portal["exterior"] = adjacency["exterior"]

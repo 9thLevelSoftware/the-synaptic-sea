@@ -10,13 +10,13 @@ func _initialize() -> void:
 				"cells": [Vector2i(0,0), Vector2i(1,0), Vector2i(0,1), Vector2i(1,1)],
 				"origin": Vector2i(0, 0),
 				"footprint": Vector2i(2, 2),
-				"deck": 0,
+				"deck": 1,
 			},
 			"corridor_01": {
 				"cells": [Vector2i(2,0), Vector2i(2,1)],
 				"origin": Vector2i(2, 0),
 				"footprint": Vector2i(1, 2),
-				"deck": 0,
+				"deck": 1,
 			},
 		},
 		"adjacencies": [
@@ -26,9 +26,9 @@ func _initialize() -> void:
 	}
 
 	var room_plan: Array[Dictionary] = [
-		{"id": "airlock_01", "role": "airlock", "zone_id": "entry", "deck": 0,
+		{"id": "airlock_01", "role": "airlock", "zone_id": "entry", "deck": 1,
 		 "position_hint": "bow", "target_cells": 4, "footprint": Vector2i(2, 2)},
-		{"id": "corridor_01", "role": "corridor", "zone_id": "spine", "deck": 0,
+		{"id": "corridor_01", "role": "corridor", "zone_id": "spine", "deck": 1,
 		 "position_hint": "center", "target_cells": 2, "footprint": Vector2i(1, 2)},
 	]
 
