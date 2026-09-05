@@ -230,6 +230,19 @@ Paused/incomplete chain:
 
 At handoff creation, `kanban_list(status=running)` and `kanban_list(status=ready)` both returned zero. Do not unblock Task 9 or any auto-decomposed child until a developer has reviewed this document.
 
+## Late interrupted review reconciliation
+
+The read-only review delegation `deleg_67716770` inspected source commit `353f5d1` but was interrupted before returning a verdict. Its transcript produced no standalone finding. Subsequent targeted review fixes through `74d40b0` and PR #16's successful required CI checks supersede that incomplete run.
+
+One merged automated-review warning remains worth an explicit human contract decision: `synchronize_door_entities()` does not force surviving existing `DOOR`/`HATCH` entities to `open=false`. This is not currently classified as a structural/runtime defect because:
+
+- `furnish()` intentionally generates unlocked doors with an independent 25% initial-open roll;
+- `ShipMutationDiff` and Godot persistence store `door_open` independently from `door_locked`;
+- repaired or newly created doors are explicitly closed, while only surviving existing unlocked doors preserve their generated open state;
+- structural `DOOR`/`HATCH` means standing-passable, not necessarily visually closed.
+
+The reviewer should confirm whether the product contract requires every post-damage unlocked door to start closed. If so, address it as a separate TDD change; do not silently fold that policy change into the paused biomass work. The review's helper-deduplication suggestions are non-blocking cleanup.
+
 ## Recommended developer review
 
 1. Confirm `09eb2584` is an ancestor and the only descendant change is this handoff document:
