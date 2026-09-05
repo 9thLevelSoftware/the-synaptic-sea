@@ -14,7 +14,9 @@ sections below.
 - Main `HEAD` for the integrated evidence: `655ae0380f5950c6723aec9fa9b150a463ad4ff4`.
 - Isolated worktree: `/Users/christopherwilloughby/Code/the-synaptic-sea-docs`.
 - Isolated branch: `docs/evidence-rebind-reconciliation`.
-- Isolated worktree `HEAD`: `655ae0380f5950c6723aec9fa9b150a463ad4ff4`.
+- Isolated worktree `HEAD` at documentation inspection: `f3f1259b5d451d6c13f39e521ea13f79f893ca1c`
+  (documentation reconciliation commit; parent/main evidence baseline is
+  `655ae0380f5950c6723aec9fa9b150a463ad4ff4`).
 - The isolated worktree was clean before the documentation edits; the dirty main checkout was
   not reset, stashed, cleaned, staged, or overwritten.
 
@@ -42,7 +44,8 @@ Pre-existing worktrees observed before Task A3:
 
 The worktree table above is retained as historical Task A context. The current docs worktree used for
 this reconciliation is `/Users/christopherwilloughby/Code/the-synaptic-sea-docs` on
-`docs/evidence-rebind-reconciliation` at `655ae038`; the main checkout was not reset, stashed,
+`docs/evidence-rebind-reconciliation`, based on `655ae038` and now carrying the documentation
+reconciliation commit `f3f1259b`; the main checkout was not reset, stashed,
 cleaned, staged, or overwritten.
 
 Recent integrated history includes `655ae038 test: pin reapprove fixtures to pre-reapprove journal
@@ -112,9 +115,10 @@ was used to close a card.
 
 ### Repository and planning records
 
-- The docs worktree and main both resolve to `655ae0380f5950c6723aec9fa9b150a463ad4ff4`,
+- Main resolves to the integrated evidence baseline `655ae0380f5950c6723aec9fa9b150a463ad4ff4`
   with the integrated evidence commits `d3df50da`, `d444f8a6`, `cc8c8c95`, `ceb8fe5a`,
-  `c70f9b17`, `48202a8b`, and the fixture-pinning `655ae038`.
+  `c70f9b17`, `48202a8b`, and the fixture-pinning `655ae038`. The docs worktree adds this
+  documentation reconciliation on top at `f3f1259b`.
 - The tracked loot plan envelope is
   `assets/_staging/meshy/_plans/loot_container_derelict_v1.json` with
   `references_resolved=true`, four `resolved_references`, and provider payload SHA-256
