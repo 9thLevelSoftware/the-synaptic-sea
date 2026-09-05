@@ -1,0 +1,2321 @@
+{
+  "schema": "structural_rebuild_catalog_v1",
+  "rows": [
+    {
+      "row_id": "ship_structural_v0:floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.tres",
+      "original_structural_module_id": "floor_1x1",
+      "replacement_structural_module_id": "floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:floor_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
+      "original_structural_module_id": "floor_2x1",
+      "replacement_structural_module_id": "floor_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+      "footprint_cells": [
+        2,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:corridor_floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x1",
+      "replacement_structural_module_id": "corridor_floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:corridor_floor_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x2",
+      "replacement_structural_module_id": "corridor_floor_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:wall_straight_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_straight_1x1_contract.tres",
+      "original_structural_module_id": "wall_straight_1x1",
+      "replacement_structural_module_id": "wall_straight_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:wall_end_cap",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
+      "original_structural_module_id": "wall_end_cap",
+      "replacement_structural_module_id": "wall_end_cap",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 6
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:wall_inner_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+      "original_structural_module_id": "wall_inner_corner",
+      "replacement_structural_module_id": "wall_inner_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:wall_outer_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+      "original_structural_module_id": "wall_outer_corner",
+      "replacement_structural_module_id": "wall_outer_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:wall_t_junction",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+      "original_structural_module_id": "wall_t_junction",
+      "replacement_structural_module_id": "wall_t_junction",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_face_north_01",
+          "replacement_socket": "SOCK_wall_face_north_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_east_01",
+          "replacement_socket": "SOCK_wall_face_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_west_01",
+          "replacement_socket": "SOCK_wall_face_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:doorway_frame_open_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:doorway_frame_blocked_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:bulkhead_portal_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+      "original_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+      "footprint_cells": [
+        2,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 4,
+          "wiring_spool": 1,
+          "circuit_board": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 22
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:ramp_up_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
+      "original_structural_module_id": "ramp_up_1x2",
+      "replacement_structural_module_id": "ramp_up_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:pillar_support_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
+      "original_structural_module_id": "pillar_support_1x1",
+      "replacement_structural_module_id": "pillar_support_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_down_01",
+          "replacement_socket": "SOCK_prop_anchor_down_01"
+        },
+        {
+          "original_socket": "SOCK_prop_anchor_up_01",
+          "replacement_socket": "SOCK_prop_anchor_up_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_v0:ceiling_cap_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_v0",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+      "original_structural_module_id": "ceiling_cap_1x1",
+      "replacement_structural_module_id": "ceiling_cap_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_internal_01",
+          "replacement_socket": "SOCK_prop_anchor_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.tres",
+      "original_structural_module_id": "floor_1x1",
+      "replacement_structural_module_id": "floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:floor_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
+      "original_structural_module_id": "floor_2x1",
+      "replacement_structural_module_id": "floor_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+      "footprint_cells": [
+        2,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:corridor_floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x1",
+      "replacement_structural_module_id": "corridor_floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:corridor_floor_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x2",
+      "replacement_structural_module_id": "corridor_floor_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:wall_straight_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_straight_1x1_contract.tres",
+      "original_structural_module_id": "wall_straight_1x1",
+      "replacement_structural_module_id": "wall_straight_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:wall_end_cap",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
+      "original_structural_module_id": "wall_end_cap",
+      "replacement_structural_module_id": "wall_end_cap",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 6
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:wall_inner_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+      "original_structural_module_id": "wall_inner_corner",
+      "replacement_structural_module_id": "wall_inner_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:wall_outer_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+      "original_structural_module_id": "wall_outer_corner",
+      "replacement_structural_module_id": "wall_outer_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:wall_t_junction",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+      "original_structural_module_id": "wall_t_junction",
+      "replacement_structural_module_id": "wall_t_junction",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_face_north_01",
+          "replacement_socket": "SOCK_wall_face_north_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_east_01",
+          "replacement_socket": "SOCK_wall_face_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_west_01",
+          "replacement_socket": "SOCK_wall_face_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:doorway_frame_open_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:doorway_frame_blocked_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:bulkhead_portal_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+      "original_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+      "footprint_cells": [
+        2,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 4,
+          "wiring_spool": 1,
+          "circuit_board": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 22
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:ramp_up_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
+      "original_structural_module_id": "ramp_up_1x2",
+      "replacement_structural_module_id": "ramp_up_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:pillar_support_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
+      "original_structural_module_id": "pillar_support_1x1",
+      "replacement_structural_module_id": "pillar_support_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_down_01",
+          "replacement_socket": "SOCK_prop_anchor_down_01"
+        },
+        {
+          "original_socket": "SOCK_prop_anchor_up_01",
+          "replacement_socket": "SOCK_prop_anchor_up_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_hazard:ceiling_cap_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_hazard",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+      "original_structural_module_id": "ceiling_cap_1x1",
+      "replacement_structural_module_id": "ceiling_cap_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_internal_01",
+          "replacement_socket": "SOCK_prop_anchor_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.tres",
+      "original_structural_module_id": "floor_1x1",
+      "replacement_structural_module_id": "floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:floor_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
+      "original_structural_module_id": "floor_2x1",
+      "replacement_structural_module_id": "floor_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+      "footprint_cells": [
+        2,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:corridor_floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x1",
+      "replacement_structural_module_id": "corridor_floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:corridor_floor_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x2",
+      "replacement_structural_module_id": "corridor_floor_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:wall_straight_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_straight_1x1_contract.tres",
+      "original_structural_module_id": "wall_straight_1x1",
+      "replacement_structural_module_id": "wall_straight_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:wall_end_cap",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
+      "original_structural_module_id": "wall_end_cap",
+      "replacement_structural_module_id": "wall_end_cap",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 6
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:wall_inner_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+      "original_structural_module_id": "wall_inner_corner",
+      "replacement_structural_module_id": "wall_inner_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:wall_outer_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+      "original_structural_module_id": "wall_outer_corner",
+      "replacement_structural_module_id": "wall_outer_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:wall_t_junction",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+      "original_structural_module_id": "wall_t_junction",
+      "replacement_structural_module_id": "wall_t_junction",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_face_north_01",
+          "replacement_socket": "SOCK_wall_face_north_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_east_01",
+          "replacement_socket": "SOCK_wall_face_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_west_01",
+          "replacement_socket": "SOCK_wall_face_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:doorway_frame_open_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:doorway_frame_blocked_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:bulkhead_portal_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+      "original_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+      "footprint_cells": [
+        2,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 4,
+          "wiring_spool": 1,
+          "circuit_board": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 22
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:ramp_up_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
+      "original_structural_module_id": "ramp_up_1x2",
+      "replacement_structural_module_id": "ramp_up_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:pillar_support_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
+      "original_structural_module_id": "pillar_support_1x1",
+      "replacement_structural_module_id": "pillar_support_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_down_01",
+          "replacement_socket": "SOCK_prop_anchor_down_01"
+        },
+        {
+          "original_socket": "SOCK_prop_anchor_up_01",
+          "replacement_socket": "SOCK_prop_anchor_up_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_industrial:ceiling_cap_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_industrial",
+      "structural_kit_id": "ship_structural_v0",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+      "original_structural_module_id": "ceiling_cap_1x1",
+      "replacement_structural_module_id": "ceiling_cap_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_internal_01",
+          "replacement_socket": "SOCK_prop_anchor_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.tres",
+      "original_structural_module_id": "floor_1x1",
+      "replacement_structural_module_id": "floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:floor_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
+      "original_structural_module_id": "floor_2x1",
+      "replacement_structural_module_id": "floor_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+      "footprint_cells": [
+        2,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:corridor_floor_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x1",
+      "replacement_structural_module_id": "corridor_floor_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:corridor_floor_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
+      "original_structural_module_id": "corridor_floor_1x2",
+      "replacement_structural_module_id": "corridor_floor_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_east_01",
+          "replacement_socket": "SOCK_floor_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_west_01",
+          "replacement_socket": "SOCK_floor_edge_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 14
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:wall_straight_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_straight_1x1_contract.tres",
+      "original_structural_module_id": "wall_straight_1x1",
+      "replacement_structural_module_id": "wall_straight_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:wall_end_cap",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
+      "original_structural_module_id": "wall_end_cap",
+      "replacement_structural_module_id": "wall_end_cap",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_end_west_01",
+          "replacement_socket": "SOCK_wall_end_west_01"
+        },
+        {
+          "original_socket": "SOCK_wall_end_east_01",
+          "replacement_socket": "SOCK_wall_end_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_internal_01",
+          "replacement_socket": "SOCK_wall_face_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 6
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:wall_inner_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+      "original_structural_module_id": "wall_inner_corner",
+      "replacement_structural_module_id": "wall_inner_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:wall_outer_corner",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+      "original_structural_module_id": "wall_outer_corner",
+      "replacement_structural_module_id": "wall_outer_corner",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_outer_corner_vertex_north_01",
+          "replacement_socket": "SOCK_outer_corner_vertex_north_01"
+        },
+        {
+          "original_socket": "SOCK_inner_corner_vertex_south_01",
+          "replacement_socket": "SOCK_inner_corner_vertex_south_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:wall_t_junction",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+      "original_structural_module_id": "wall_t_junction",
+      "replacement_structural_module_id": "wall_t_junction",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_wall_face_north_01",
+          "replacement_socket": "SOCK_wall_face_north_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_east_01",
+          "replacement_socket": "SOCK_wall_face_east_01"
+        },
+        {
+          "original_socket": "SOCK_wall_face_west_01",
+          "replacement_socket": "SOCK_wall_face_west_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:doorway_frame_open_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_structural_module_id": "doorway_frame_open_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 12
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:doorway_frame_blocked_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
+      "original_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_structural_module_id": "doorway_frame_blocked_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+      "footprint_cells": [
+        1,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:bulkhead_portal_2x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+      "original_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_structural_module_id": "bulkhead_portal_2x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+      "footprint_cells": [
+        2,
+        0
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_portal_edge_west_01",
+          "replacement_socket": "SOCK_portal_edge_west_01"
+        },
+        {
+          "original_socket": "SOCK_portal_edge_east_01",
+          "replacement_socket": "SOCK_portal_edge_east_01"
+        },
+        {
+          "original_socket": "SOCK_portal_center_internal_01",
+          "replacement_socket": "SOCK_portal_center_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 3,
+          "scrap_metal": 4,
+          "wiring_spool": 1,
+          "circuit_board": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 22
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:ramp_up_1x2",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
+      "original_structural_module_id": "ramp_up_1x2",
+      "replacement_structural_module_id": "ramp_up_1x2",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+      "footprint_cells": [
+        1,
+        2
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_floor_edge_south_01",
+          "replacement_socket": "SOCK_floor_edge_south_01"
+        },
+        {
+          "original_socket": "SOCK_floor_edge_north_01",
+          "replacement_socket": "SOCK_floor_edge_north_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 2,
+          "scrap_metal": 3
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 16
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:pillar_support_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
+      "original_structural_module_id": "pillar_support_1x1",
+      "replacement_structural_module_id": "pillar_support_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_down_01",
+          "replacement_socket": "SOCK_prop_anchor_down_01"
+        },
+        {
+          "original_socket": "SOCK_prop_anchor_up_01",
+          "replacement_socket": "SOCK_prop_anchor_up_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 2
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    },
+    {
+      "row_id": "ship_structural_biomatter:ceiling_cap_1x1",
+      "active": true,
+      "layout_kit_id": "ship_structural_biomatter",
+      "structural_kit_id": "ship_structural_biomatter",
+      "structural_contract_id": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+      "original_structural_module_id": "ceiling_cap_1x1",
+      "replacement_structural_module_id": "ceiling_cap_1x1",
+      "replacement_wrapper_id": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+      "footprint_cells": [
+        1,
+        1
+      ],
+      "socket_mapping": [
+        {
+          "original_socket": "SOCK_prop_anchor_internal_01",
+          "replacement_socket": "SOCK_prop_anchor_internal_01"
+        }
+      ],
+      "action_id": "rebuild_structure",
+      "requirements": {
+        "materials": {
+          "plating": 1,
+          "scrap_metal": 1
+        },
+        "tool_class": "welding_lance",
+        "skill_id": "repair",
+        "min_skill": 0,
+        "duration_seconds": 8
+      }
+    }
+  ]
+}
