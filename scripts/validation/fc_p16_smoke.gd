@@ -6,10 +6,14 @@ extends SceneTree
 const LoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 const ModuleIntegrityStateScript := preload("res://scripts/systems/module_integrity_state.gd")
 const PlayableGeneratedShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
+const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
+const StructuralRebuildCatalogScript := preload("res://scripts/systems/structural_rebuild_catalog.gd")
 
 const LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout.json"
 const KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const GAMEPLAY_PATH: String = "res://data/procgen/smoke/seed_000017/gameplay_slice.json"
+const HIVE_TEMPLATE_PATH: String = "res://data/procgen/templates/hive.json"
 
 
 func _initialize() -> void:
@@ -45,6 +49,11 @@ func _initialize() -> void:
 		return
 	var original: Dictionary = intact_result.get("original_descriptor", {})
 	if not _assert_authored_descriptor(original, target_id, placement_id, edge_key, structural_kind, expected_position):
+		return
+	if not _assert_all_active_contract_identity(loader, layout):
+		return
+	if not _assert_unsupported_contract_loads(
+			layout, kit, gameplay, target_id, structural_kind):
 		return
 	var intact_revision: String = str(original.get("layout_revision", ""))
 	var intact_fingerprint: String = str(original.get("layout_fingerprint", ""))
@@ -189,6 +198,14 @@ func _initialize() -> void:
 	if str(moved_identity.get("layout_revision", "")) == intact_revision:
 		_fail("changed original transform retained the prior derived revision")
 		return
+	var identity_changed_originals: Array = all_originals.duplicate(true)
+	var identity_changed_descriptor: Dictionary = (identity_changed_originals[0] as Dictionary).duplicate(true)
+	identity_changed_descriptor["structural_contract_id"] = "res://data/placement/contracts/structural/ship_structural_v0/not-authored.tres"
+	identity_changed_originals[0] = identity_changed_descriptor
+	var contract_changed_identity: Dictionary = loader.call("derive_structural_layout_identity", layout, identity_changed_originals)
+	if str(contract_changed_identity.get("layout_revision", "")) == intact_revision:
+		_fail("changed structural contract retained the prior derived revision")
+		return
 
 	# Explicit revisions remain authoritative while still recording a fingerprint.
 	var explicit_layout: Dictionary = layout.duplicate(true)
@@ -282,6 +299,13 @@ func _assert_authored_descriptor(
 	if str(descriptor.get("wrapper_id", "")) != "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn":
 		_fail("descriptor lost authoritative wrapper")
 		return false
+	if str(descriptor.get("layout_kit_id", "")) != "ship_structural_v0" \
+			or str(descriptor.get("structural_kit_id", "")) != "ship_structural_v0" \
+			or str(descriptor.get("structural_contract_id", "")) \
+			!= "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres" \
+			or str(descriptor.get("rebuild_contract_status", "")) != "supported":
+		_fail("descriptor lost exact layout/kit/contract identity: %s" % str(descriptor))
+		return false
 	if descriptor.get("footprint", []) != [1.0, 1.0]:
 		_fail("descriptor lost authored footprint: %s" % str(descriptor.get("footprint", null)))
 		return false
@@ -317,6 +341,211 @@ func _assert_authored_descriptor(
 		_fail("absent component/system bindings were guessed")
 		return false
 	return true
+
+
+## P17 dependency proof: actual layout routing selects an exact structural kit,
+## and the loader resolves every module from that kit and its loaded contract
+## Resource. The rebuild catalog is only the expected side of the comparison.
+func _assert_all_active_contract_identity(loader, v0_layout: Dictionary) -> bool:
+	var catalog = StructuralRebuildCatalogScript.new()
+	if not catalog.load_canonical() or catalog.row_count() != 60:
+		_fail("canonical rebuild catalog did not expose all 60 reviewed rows")
+		return false
+	var layout_generator = ShipLayoutGeneratorScript.new()
+	var ship_generator = ShipGeneratorScript.new()
+	var hive_template: Dictionary = _load_json(HIVE_TEMPLATE_PATH)
+	if str(hive_template.get("id", "")) != "hive":
+		_fail("actual hive template identity is missing")
+		return false
+	var routes: Array[Dictionary] = [
+		{"source": "v0_fixture", "layout": v0_layout.duplicate(true)},
+		{"source": "breach_field", "layout": {
+			"kit_id": str(layout_generator.call("_kit_id_for_biome", "breach_field")),
+		}},
+		{"source": "dead_fleet", "layout": {
+			"kit_id": str(layout_generator.call("_kit_id_for_biome", "dead_fleet")),
+		}},
+		# ShipLayoutGenerator's actual hive branch stamps this exact kit ID. The
+		# checked source template above prevents a catalog row from inventing it.
+		{"source": "hive", "layout": {
+			"template_id": str(hive_template.get("id", "")),
+			"kit_id": "ship_structural_biomatter",
+		}},
+	]
+	var seen_rows: Dictionary = {}
+	var route_kits: Dictionary = {}
+	for route in routes:
+		var source_layout: Dictionary = route.get("layout", {}) as Dictionary
+		var layout_kit_id: String = str(source_layout.get("kit_id", ""))
+		var kit_path: String = str(ship_generator.call("kit_path_for_layout", source_layout))
+		var source_kit: Dictionary = _load_json(kit_path)
+		if layout_kit_id.is_empty() or source_kit.is_empty():
+			_fail("production structural route did not resolve: %s" % str(route))
+			return false
+		route_kits[layout_kit_id] = source_kit
+		var modules_variant: Variant = source_kit.get("modules", null)
+		if not modules_variant is Array or (modules_variant as Array).size() != 15:
+			_fail("resolved kit did not contain 15 actual modules: %s" % kit_path)
+			return false
+		for module_variant in modules_variant as Array:
+			if not module_variant is Dictionary:
+				_fail("resolved kit contains a non-module row")
+				return false
+			var module_id: String = str((module_variant as Dictionary).get("module_id", ""))
+			var row_id: String = "%s:%s" % [layout_kit_id, module_id]
+			var expected: Dictionary = catalog.resolve_row(row_id)
+			var actual: Dictionary = loader.resolve_structural_source_identity(
+				source_layout, source_kit, module_id)
+			if expected.is_empty() or actual.is_empty() \
+					or not _actual_identity_matches_catalog(actual, expected):
+				_fail("production loader/catalog identity mismatch for %s actual=%s" % [
+					row_id, str(actual)])
+				return false
+			seen_rows[row_id] = true
+	if seen_rows.size() != 60 or seen_rows.size() != catalog.row_count():
+		_fail("production identity proof did not cover exactly 60 rows")
+		return false
+	var v0_kit: Dictionary = route_kits.get("ship_structural_v0", {}) as Dictionary
+	var v0_source: Dictionary = {"kit_id": "ship_structural_v0"}
+	for mutant_case in [
+		{"kit": _mutated_kit(v0_kit, "floor_1x1", "godot_contract", ""),
+			"reason": "missing_socket_contract"},
+		{"kit": _mutated_kit(v0_kit, "floor_1x1", "godot_contract",
+			"res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres"),
+			"reason": "unsupported_rebuild"},
+		{"kit": _mutated_kit(v0_kit, "floor_1x1", "godot_wrapper_scene",
+			"res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn"),
+			"reason": "unsupported_rebuild"},
+		{"kit": _mutated_kit(v0_kit, "floor_1x1", "footprint_cells", [2, 1]),
+			"reason": "unsupported_rebuild"},
+		{"kit": _mutated_kit(v0_kit, "floor_1x1", "socket_names", ["SOCK_not_authored"]),
+			"reason": "unsupported_rebuild"},
+	]:
+		var unsupported: Dictionary = loader.resolve_structural_source_identity(
+			v0_source, mutant_case.get("kit", {}) as Dictionary, "floor_1x1")
+		if unsupported.is_empty() \
+				or str(unsupported.get("structural_contract_id", "")) != "" \
+				or str(unsupported.get("rebuild_contract_status", "")) \
+				!= str(mutant_case.get("reason", "")):
+			_fail("loader authorized missing/mismatched contract identity: %s" % str(unsupported))
+			return false
+	return true
+
+
+func _actual_identity_matches_catalog(actual: Dictionary, expected: Dictionary) -> bool:
+	if str(actual.get("rebuild_contract_status", "")) != "supported" \
+			or str(actual.get("layout_kit_id", "")) != str(expected.get("layout_kit_id", "")) \
+			or str(actual.get("structural_kit_id", "")) != str(expected.get("structural_kit_id", "")) \
+			or str(actual.get("structural_contract_id", "")) != str(expected.get("structural_contract_id", "")) \
+			or str(actual.get("structural_module_id", "")) != str(expected.get("original_structural_module_id", "")) \
+			or str(actual.get("wrapper_id", "")) != str(expected.get("replacement_wrapper_id", "")) \
+			or actual.get("footprint_cells", []) != expected.get("footprint_cells", []) \
+			or str(actual.get("contract_kit_id", "")) != "ship_structural_v0":
+		return false
+	var actual_sockets: Array = actual.get("socket_names", []) as Array
+	var expected_sockets: Array = []
+	for mapping_variant in expected.get("socket_mapping", []) as Array:
+		expected_sockets.append(str((mapping_variant as Dictionary).get("original_socket", "")))
+	actual_sockets.sort()
+	expected_sockets.sort()
+	return actual_sockets == expected_sockets
+
+
+## P17 contract metadata is optional for physical compatibility. These cases
+## drive the real loader, retain the actual wrapper and kit-authored descriptor,
+## then prove pure replacement policy denies without deriving a fallback.
+func _assert_unsupported_contract_loads(
+		source_layout: Dictionary,
+		source_kit: Dictionary,
+		gameplay: Dictionary,
+		target_id: String,
+		structural_module_id: String) -> bool:
+	var kit_record: Dictionary = _kit_module_record(source_kit, structural_module_id)
+	var conflicting_contract: String = _different_contract_path(
+		source_kit, structural_module_id)
+	if kit_record.is_empty() or conflicting_contract.is_empty():
+		_fail("fixture cannot build unsupported rebuild contract cases")
+		return false
+	var cases: Array[Dictionary] = [
+		{"kit": _mutated_kit(source_kit, structural_module_id, "godot_contract", ""),
+			"reason": "missing_socket_contract"},
+		{"kit": _mutated_kit(
+			source_kit, structural_module_id, "godot_contract", conflicting_contract),
+			"reason": "unsupported_rebuild"},
+	]
+	for test_case in cases:
+		var probe = LoaderScript.new()
+		get_root().add_child(probe)
+		if not probe.load_from_documents(
+				source_layout.duplicate(true),
+				(test_case.get("kit", {}) as Dictionary).duplicate(true),
+				gameplay.duplicate(true), false):
+			probe.free()
+			_fail("wrapper-valid ship failed for unsupported rebuild contract")
+			return false
+		var wrapper: Node3D = _find_wrapper(probe.structural_root, target_id)
+		var integrity_map: RefCounted = probe.call("get_module_integrity_map")
+		var inspection: Dictionary = integrity_map.call("inspect_rebuild_target", target_id)
+		var descriptor: Dictionary = inspection.get("original_descriptor", {}) as Dictionary
+		var expected_reason: String = str(test_case.get("reason", ""))
+		if wrapper == null or not bool(inspection.get("ok", false)) \
+				or str(descriptor.get("structural_module_id", "")) != structural_module_id \
+				or str(descriptor.get("wrapper_id", "")) \
+				!= str(kit_record.get("godot_wrapper_scene", "")) \
+				or descriptor.get("footprint", []) != kit_record.get("footprint_cells", []) \
+				or descriptor.get("sockets", []) != kit_record.get("socket_names", []) \
+				or not str(descriptor.get("structural_contract_id", "")).is_empty() \
+				or str(descriptor.get("rebuild_contract_status", "")) != expected_reason:
+			probe.free()
+			_fail("unsupported contract lost physical descriptor: %s" % str(inspection))
+			return false
+		integrity_map.call("apply_damage", target_id, 1.0, structural_module_id)
+		var rebuild_state: RefCounted = integrity_map.call("get_structural_rebuild_state")
+		var denial: Dictionary = rebuild_state.call(
+			"evaluate_replace", integrity_map, target_id,
+			"%s:%s" % [str(source_layout.get("kit_id", "")), structural_module_id],
+			str(descriptor.get("layout_revision", "")),
+			str(descriptor.get("layout_fingerprint", "")))
+		probe.free()
+		if bool(denial.get("ok", true)) \
+				or str(denial.get("reason", "")) != expected_reason:
+			_fail("unsupported contract replacement did not fail closed: %s" % str(denial))
+			return false
+	return true
+
+
+func _kit_module_record(source_kit: Dictionary, module_id: String) -> Dictionary:
+	for module_variant in source_kit.get("modules", []) as Array:
+		if module_variant is Dictionary \
+				and str((module_variant as Dictionary).get("module_id", "")) == module_id:
+			return (module_variant as Dictionary).duplicate(true)
+	return {}
+
+
+func _different_contract_path(source_kit: Dictionary, module_id: String) -> String:
+	for module_variant in source_kit.get("modules", []) as Array:
+		if not module_variant is Dictionary \
+				or str((module_variant as Dictionary).get("module_id", "")) == module_id:
+			continue
+		var contract_path: String = str((module_variant as Dictionary).get("godot_contract", ""))
+		if not contract_path.is_empty():
+			return contract_path
+	return ""
+
+
+func _mutated_kit(
+		source_kit: Dictionary, module_id: String, field: String, value: Variant) -> Dictionary:
+	var mutated: Dictionary = source_kit.duplicate(true)
+	var modules: Array = mutated.get("modules", []) as Array
+	for index in range(modules.size()):
+		var module: Dictionary = modules[index] as Dictionary
+		if str(module.get("module_id", "")) != module_id:
+			continue
+		module[field] = value
+		modules[index] = module
+		break
+	mutated["modules"] = modules
+	return mutated
 
 
 func _wrapper_is_destroyed_noncolliding(wrapper: Node3D) -> bool:

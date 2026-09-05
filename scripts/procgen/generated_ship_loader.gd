@@ -1,6 +1,8 @@
 extends Node3D
 class_name GeneratedShipLoader
 
+const MODULAR_ASSET_SPEC_SCRIPT_PATH: String = "res://scripts/placement/modular_asset_spec.gd"
+
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
@@ -738,12 +740,14 @@ func _register_original_structural_descriptors(
 		return -1
 	var plan: Dictionary = plan_variant
 	var kit_records: Dictionary = _build_kit_module_record_map(source_kit)
+	var layout_kit_id: String = str(source_layout.get("kit_id", ""))
+	var structural_kit_id: String = str(source_kit.get("kit_id", ""))
 	var descriptors: Array = []
-	if not _append_original_descriptors(descriptors, plan.get("placements", []), "edge", kit_records, module_to_scene):
+	if not _append_original_descriptors(descriptors, plan.get("placements", []), "edge", kit_records, module_to_scene, layout_kit_id, structural_kit_id):
 		return -1
-	if not _append_original_descriptors(descriptors, plan.get("floor_placements", []), "floor", kit_records, module_to_scene):
+	if not _append_original_descriptors(descriptors, plan.get("floor_placements", []), "floor", kit_records, module_to_scene, layout_kit_id, structural_kit_id):
 		return -1
-	if not _append_original_descriptors(descriptors, plan.get("ceiling_placements", []), "ceiling", kit_records, module_to_scene):
+	if not _append_original_descriptors(descriptors, plan.get("ceiling_placements", []), "ceiling", kit_records, module_to_scene, layout_kit_id, structural_kit_id):
 		return -1
 	var identity: Dictionary = derive_structural_layout_identity(source_layout, descriptors)
 	var fingerprint: String = str(identity.get("layout_fingerprint", ""))
@@ -798,7 +802,9 @@ func _append_original_descriptors(
 		records_variant: Variant,
 		layer: String,
 		kit_records: Dictionary,
-		module_to_scene: Dictionary) -> bool:
+		module_to_scene: Dictionary,
+		layout_kit_id: String,
+		structural_kit_id: String) -> bool:
 	if not records_variant is Array:
 		return layer == "ceiling"
 	for record_variant in (records_variant as Array):
@@ -812,6 +818,9 @@ func _append_original_descriptors(
 				or not module_to_scene.has(structural_module_id):
 			return false
 		var kit_record: Dictionary = kit_records[structural_module_id]
+		var wrapper_id: String = str(module_to_scene[structural_module_id])
+		var contract_identity: Dictionary = _resolve_structural_contract_descriptor(
+			kit_record, structural_module_id, wrapper_id)
 		var placement_position: Array = _read_placement_position(record)
 		if placement_position.size() < 3:
 			return false
@@ -841,19 +850,139 @@ func _append_original_descriptors(
 			"structural_module_id": structural_module_id,
 			"placement_id": str(record.get("placement_id", record.get("id", ""))),
 			"layout_layer": layer,
-			"wrapper_id": str(module_to_scene[structural_module_id]),
+			"wrapper_id": wrapper_id,
+			"layout_kit_id": layout_kit_id,
+			"structural_kit_id": structural_kit_id,
+			"structural_contract_id": str(contract_identity.get("structural_contract_id", "")),
+			"rebuild_contract_status": str(contract_identity.get(
+				"rebuild_contract_status", "unsupported_rebuild")),
 			"transform": {
 				"position": placement_position.duplicate(true),
 				"yaw_degrees": float(record.get("yaw_degrees", 0.0)),
 			},
-			"footprint": _array_field(kit_record, "footprint_cells"),
-			"sockets": _array_field(kit_record, "socket_names"),
+			"footprint": (contract_identity.get("footprint_cells", []) as Array).duplicate(true),
+			"sockets": (contract_identity.get("socket_names", []) as Array).duplicate(true),
 			"socket_bindings": _array_field(record, "socket_bindings"),
 			"room_bindings": room_bindings,
 			"edge_binding": edge_binding,
 			"component_bindings": _array_field(record, "component_bindings"),
 			"system_links": _array_field(record, "system_links"),
 		})
+	return true
+
+
+## Read-only production identity seam used by registration and the all-active
+## contract proof. The caller supplies the exact layout/kit documents selected
+## by generation; fields are resolved from the kit module and loaded Resource,
+## never from the rebuild policy catalog.
+func resolve_structural_source_identity(
+		source_layout: Dictionary,
+		source_kit: Dictionary,
+		structural_module_id: String) -> Dictionary:
+	var layout_kit_id: String = str(source_layout.get("kit_id", ""))
+	var structural_kit_id: String = str(source_kit.get("kit_id", ""))
+	if layout_kit_id.is_empty() or structural_kit_id.is_empty() \
+			or structural_module_id.is_empty():
+		return {}
+	var kit_records: Dictionary = _build_kit_module_record_map(source_kit)
+	if not kit_records.has(structural_module_id):
+		return {}
+	var kit_record: Dictionary = kit_records[structural_module_id]
+	var wrapper_id: String = str(kit_record.get("godot_wrapper_scene", ""))
+	var identity: Dictionary = _resolve_structural_contract_descriptor(
+		kit_record, structural_module_id, wrapper_id)
+	if identity.is_empty():
+		return {}
+	identity["layout_kit_id"] = layout_kit_id
+	identity["structural_kit_id"] = structural_kit_id
+	return identity
+
+
+## Contract identity is explicit authored data. Missing or conflicting P17
+## metadata marks replacement unsupported without preventing a wrapper-valid
+## ship from loading. Footprint and sockets remain the actual authored kit
+## identity; no contract path is derived from a module name or fallback kit.
+func _resolve_structural_contract_descriptor(
+		kit_record: Dictionary,
+		structural_module_id: String,
+		actual_wrapper_id: String) -> Dictionary:
+	var wrapper_id: String = str(kit_record.get("godot_wrapper_scene", ""))
+	var contract_id: String = str(kit_record.get("godot_contract", ""))
+	var footprint: Array = _array_field(kit_record, "footprint_cells")
+	var socket_names: Array = _array_field(kit_record, "socket_names")
+	var identity: Dictionary = {
+		"structural_module_id": structural_module_id,
+		"structural_contract_id": "",
+		"contract_kit_id": "",
+		"rebuild_contract_status": "unsupported_rebuild",
+		"wrapper_id": actual_wrapper_id,
+		"footprint_cells": footprint.duplicate(true),
+		"socket_names": socket_names.duplicate(true),
+	}
+	if contract_id.is_empty() or not ResourceLoader.exists(contract_id):
+		identity["rebuild_contract_status"] = "missing_socket_contract"
+		return identity
+	if wrapper_id.is_empty() or wrapper_id != actual_wrapper_id \
+			or not ResourceLoader.exists(wrapper_id):
+		return identity
+	var contract: Resource = ResourceLoader.load(contract_id)
+	var contract_script: Script = contract.get_script() as Script if contract != null else null
+	if contract == null or contract_script == null \
+			or contract_script.resource_path != MODULAR_ASSET_SPEC_SCRIPT_PATH \
+			or str(contract.get("module_id")) != structural_module_id \
+			or str(contract.get("wrapper_scene")) != actual_wrapper_id \
+			or str(contract.get("contract_path")) != contract_id:
+		return identity
+	var contract_footprint_variant: Variant = contract.get("footprint_cells")
+	if not contract_footprint_variant is Array \
+			or not _same_integral_pair(footprint, contract_footprint_variant as Array):
+		return identity
+	var contract_sockets_variant: Variant = contract.get("sockets")
+	if not contract_sockets_variant is Array \
+			or not _kit_sockets_exist_in_contract(socket_names, contract_sockets_variant as Array):
+		return identity
+	identity["structural_contract_id"] = contract_id
+	identity["contract_kit_id"] = str(contract.get("kit_id"))
+	identity["rebuild_contract_status"] = "supported"
+	return identity
+
+
+func _same_integral_pair(left: Array, right: Array) -> bool:
+	if left.size() != 2 or right.size() != 2:
+		return false
+	for index in range(2):
+		var left_value: Variant = left[index]
+		var right_value: Variant = right[index]
+		if (typeof(left_value) != TYPE_INT and typeof(left_value) != TYPE_FLOAT) \
+				or (typeof(right_value) != TYPE_INT and typeof(right_value) != TYPE_FLOAT) \
+				or not is_finite(float(left_value)) or not is_finite(float(right_value)) \
+				or float(left_value) != floorf(float(left_value)) \
+				or float(right_value) != floorf(float(right_value)) \
+				or int(left_value) != int(right_value):
+			return false
+	return true
+
+
+func _kit_sockets_exist_in_contract(kit_socket_names: Array, contract_sockets: Array) -> bool:
+	if kit_socket_names.is_empty() or contract_sockets.is_empty():
+		return false
+	var available: Dictionary = {}
+	for socket_variant in contract_sockets:
+		if not socket_variant is Dictionary:
+			return false
+		var socket_id: String = str((socket_variant as Dictionary).get("id", ""))
+		if socket_id.is_empty() or available.has(socket_id):
+			return false
+		available[socket_id] = true
+	var seen: Dictionary = {}
+	for socket_name_variant in kit_socket_names:
+		if not socket_name_variant is String:
+			return false
+		var socket_name: String = str(socket_name_variant)
+		if not socket_name.begins_with("SOCK_") or seen.has(socket_name) \
+				or not available.has(socket_name.trim_prefix("SOCK_")):
+			return false
+		seen[socket_name] = true
 	return true
 
 

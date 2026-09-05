@@ -6,10 +6,22 @@ class_name ModuleIntegrityMap
 
 const ModuleIntegrityStateScript: GDScript = preload("res://scripts/systems/module_integrity_state.gd")
 const StructuralRebuildStateScript: GDScript = preload("res://scripts/systems/structural_rebuild_state.gd")
+const StructuralRebuildCatalogScript: GDScript = preload("res://scripts/systems/structural_rebuild_catalog.gd")
 
 ## module_id -> ModuleIntegrityState
 var _modules: Dictionary = {}
-var _structural_rebuild_state: RefCounted = StructuralRebuildStateScript.new()
+var _structural_rebuild_state: RefCounted
+var _structural_rebuild_catalog: RefCounted
+
+
+func _init() -> void:
+	_structural_rebuild_state = StructuralRebuildStateScript.new()
+	_structural_rebuild_catalog = StructuralRebuildCatalogScript.new()
+	if not bool(_structural_rebuild_state.call("bind_integrity_owner", self)):
+		return
+	if not bool(_structural_rebuild_catalog.call("load_canonical")):
+		return
+	_structural_rebuild_state.call("bind_catalog_authority", _structural_rebuild_catalog)
 
 
 func clear() -> void:
