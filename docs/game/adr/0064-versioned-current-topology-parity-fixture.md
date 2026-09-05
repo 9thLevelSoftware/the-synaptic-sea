@@ -76,8 +76,10 @@ ADR-0053 and REQ-ENC-001 define room occupancy as nonempty, four-connected
 integer cell sets. Since `f27c5b92`, connector growth may produce nonrectangular
 sets; a room's `footprint` records their bounding-box dimensions, not a promise
 that every cell in that box is occupied. For example, bifurcated seed 17 has a
-five-cell corridor inside a 2-by-3 box. Generation, serialization and structural
-compilation must preserve the actual occupied cells, including the unfilled cell.
+five-cell corridor inside a 2-by-3 box. Its missing cell belongs to a different
+room; it is not globally empty. Generation, serialization and structural
+compilation must preserve each room's actual cells and disjoint ownership rather
+than fill the first room's entire box.
 
 The earlier stress assertion from `eec54287` equating bounding-box area with
 cell count predates that contract. Its replacement must validate nonempty unique
