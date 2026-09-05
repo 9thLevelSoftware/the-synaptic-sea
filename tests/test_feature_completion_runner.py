@@ -158,6 +158,54 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
         self.assertTrue(self._bundle(allowed)["passed"])
         self.assertFalse(self._bundle("WARNING: unexpected\nSYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n", code=1)["passed"])
 
+    def test_bundle_injects_exact_python3_shim_only_into_child_environment(self):
+        body = "run_clean() { :; }\nrun_clean 'one' 'one' true\necho 'SYNAPTIC_SEA REGRESSION PASS commands=999 clean_output=true'\n"
+        observed = {}
+
+        def fake(command, **kwargs):
+            if command[-1] == "--version":
+                return subprocess.CompletedProcess(command, 0, "GNU bash", "")
+            observed["env"] = kwargs["env"]
+            return subprocess.CompletedProcess(command, 0, "SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n", "")
+
+        with patch.object(runner, "extract_regression_bundle", return_value=(body, 1)), patch.object(runner, "_verified_bash", return_value="C:\\Program Files\\Git\\bin\\bash.exe"):
+            result = runner.execute_bundle(Path("C:\\Godot\\godot.exe"), self.evidence, self.user_data, run=fake, timeout=1)
+
+        self.assertTrue(result["passed"])
+        executable = Path(runner.sys.executable).resolve()
+        shim_dir = self.evidence / "canonical-bin"
+        shim = shim_dir / "python3"
+        self.assertEqual(str(executable), observed["env"]["FEATURE_COMPLETION_PYTHON"])
+        self.assertEqual(str(shim_dir), observed["env"]["PATH"].split(os.pathsep)[0])
+        self.assertEqual(
+            "#!/usr/bin/env bash\nexec %s \"$@\"\n" % runner.shlex.quote(executable.as_posix()),
+            shim.read_text(encoding="utf-8"))
+
+    def test_python3_shim_survives_nested_canonical_bash_login_shell(self):
+        bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+        if not bash.is_file():
+            self.skipTest("Git Bash is required for this Windows shell regression")
+        shim_dir, executable = runner._canonical_python_shim(self.evidence)
+        probe = self.root / "nested_python_probe.py"
+        probe.write_text(
+            "import sys\nprint(sys.executable)\nprint(sys.argv[1])\nraise SystemExit(7)\n",
+            encoding="utf-8")
+        script = self.root / "nested-python3-regression.sh"
+        script.write_text(
+            "bash -lc 'python3 \"$1/nested_python_probe.py\" sentinel' _ \"$ROOT\"\n",
+            encoding="utf-8", newline="\n")
+        environment = {
+            **os.environ,
+            "ROOT": str(self.root),
+            "FEATURE_COMPLETION_PYTHON": str(executable),
+            "PATH": str(shim_dir) + os.pathsep + os.environ.get("PATH", ""),
+        }
+        result = subprocess.run([str(bash), str(script)], env=environment,
+                                text=True, capture_output=True, check=False, timeout=10)
+        self.assertEqual(7, result.returncode, result.stderr)
+        self.assertIn(str(executable), result.stdout)
+        self.assertIn("sentinel", result.stdout)
+
     def test_windows_rejects_wsl_bash_and_accepts_git_bash_with_windows_paths(self):
         def fake(command, **kwargs):
             return subprocess.CompletedProcess(command, 0, "GNU bash", "")

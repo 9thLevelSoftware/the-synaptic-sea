@@ -6,9 +6,11 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -191,14 +193,34 @@ def _verified_bash(run: Run) -> str:
     return bash
 
 
+def _canonical_python_shim(evidence: Path) -> tuple[Path, Path]:
+    """Create a per-run `python3` command for the documented Bash bundle."""
+    executable = Path(sys.executable).resolve()
+    if not executable.is_file():
+        raise RunnerError(f"runner Python executable is unavailable: {executable}")
+    shim_dir = evidence / "canonical-bin"
+    shim_dir.mkdir(exist_ok=True)
+    shim = shim_dir / "python3"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        f"exec {shlex.quote(executable.as_posix())} \"$@\"\n",
+        encoding="utf-8", newline="\n")
+    shim.chmod(shim.stat().st_mode | 0o111)
+    return shim_dir, executable
+
+
 def execute_bundle(godot: Path, evidence: Path, user_data: Path, run: Run = subprocess.run, timeout: float = 3600.0) -> dict[str, Any]:
     body, count = extract_regression_bundle()
     bash = _verified_bash(run)
     temp = evidence / "canonical_regression_bundle.sh"
     temp.write_text(_prepared_bundle(body), encoding="utf-8", newline="\n")
+    shim_dir, python_executable = _canonical_python_shim(evidence)
+    env = {**_environment(user_data), "ROOT": str(ROOT), "GODOT": str(godot),
+           "FEATURE_COMPLETION_PYTHON": str(python_executable)}
+    env["PATH"] = str(shim_dir) + os.pathsep + env.get("PATH", "")
     started = time.monotonic()
     stdout, stderr, exit_code, timed_out, cleanup_error = _capture([bash, str(temp)], cwd=ROOT,
-        env={**_environment(user_data), "ROOT": str(ROOT), "GODOT": str(godot)}, timeout=timeout, run=run)
+        env=env, timeout=timeout, run=run)
     (evidence / "baseline.stdout.log").write_text(stdout, encoding="utf-8")
     (evidence / "baseline.stderr.log").write_text(stderr, encoding="utf-8")
     marker_lines = [line for line in stdout.splitlines() if re.fullmatch(r"SYNAPTIC_SEA REGRESSION PASS commands=(\d+) clean_output=true", line)]
