@@ -1514,6 +1514,8 @@ membership changes).
 | `fc_p06_smoke` | standalone-feature-completion |
 | `fc_p07_smoke` | standalone-feature-completion |
 | `fc_p08_smoke` | standalone-feature-completion |
+| `fc_p09_smoke` | standalone-feature-completion |
+| `fc_p10_smoke` | standalone-feature-completion |
 | `fc_p11_live_smoke` | standalone-feature-completion |
 | `fc_p11_smoke` | standalone-feature-completion |
 | `fc_p12_smoke` | standalone-feature-completion |
