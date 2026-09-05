@@ -710,6 +710,9 @@ replacement, owner pointer and signal reconnection seams;
 physical playback while a restore candidate is staged, suppress synthetic restore
 events that mutate hydrated SFX routing/captions/cooldowns, and publish its bus
 settings on successful activation without replaying restoration events.
+`scripts/camera/iso_camera_rig.gd` only to defer current-camera selection before
+staged tree entry and activate the replacement camera after the accepted swap.
+Every injected failure must retain the old viewport camera as current.
 Failure tests must compare actual global bus volume/mute before and after both
 post-rebuild and post-world-apply failures, not only audio model counters;
 `scripts/ui/save_load_menu.gd` and `scripts/ui/menu_coordinator.gd` only modern

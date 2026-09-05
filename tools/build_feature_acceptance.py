@@ -279,6 +279,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/systems/save_restore_candidate.gd",
         "scripts/main.gd", "scripts/title_main.gd",
         "scripts/audio/audio_manager.gd",
+        "scripts/camera/iso_camera_rig.gd",
         "scripts/ui/save_load_menu.gd", "scripts/ui/menu_coordinator.gd",
         *[f"scripts/systems/{name}.gd" for name in (
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
