@@ -20,18 +20,21 @@ because their focused smokes are classified.
 
 Current verified progress (2026-09-05): the isolated P00 baseline passed all 652
 canonical commands and its native-generation probe, supporting ADR-0060's Windows
-Godot 4.7.2 validation decision. The execution worktree's later changes still need
-their complete regression run. P09's crafted-tool proof now measures the actual
-quality-dependent work rate through a committed transaction; the natural schematic
-and donor acquisition journey remains open. P10 has a clean partial scene test for
-manual load, rollback, stations and first-revisit job collection, with fresh-process
-and adversarial save cases still pending.
+Godot 4.7.2 validation decision. Later execution-worktree changes still require the
+complete regression run.
 
-P17 now has committed canonical physical-volume data/helpers and an exact isolated
-candidate collision-query utility. The query passed in the full project; the volume
-helper passed a byte-identical isolated project test. Live cart/component bindings,
-registered docking routes, candidate navigation, paid rebuild application and their
-end-to-end acceptance remain unfinished.
+P09 proves crafted quality changes actual timed work. A discovery run using repaired
+travel systems found the genuine schematic lot `loot:-2:-2:1:container_53:000` in
+`salvage_engineering`; the natural schematic and donor acquisition journey remains
+open. P10 has a clean partial scene test covering exact-quality field output through
+two reloads, a revisit, and ordinary collection once; fresh-process, adversarial,
+component-move, and integration checks remain open.
+
+P17's query and physical-volume helper both pass in the full project. The helper's
+full-project evidence artifact is retained at
+`artifacts/feature-completion/P17-physical-shared-20260905/summary.json`.
+Live cart/component bindings, registered docking routes, candidate navigation, paid
+rebuild application, and end-to-end acceptance remain unfinished.
 
 ## Historical milestone: Vertical Slice v1 (as of 2026-08-11)
 
