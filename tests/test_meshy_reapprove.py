@@ -41,7 +41,11 @@ def _copy_fixture_project(tmp_path: Path) -> Path:
     shutil.copytree(FIXTURE_ASSET_ROOT, project_root / "assets/_staging/meshy" / ASSET_ID, copy_function=os.link)
     journal_path = project_root / JOURNAL_RELATIVE
     journal_path.unlink()
-    shutil.copy2(ROOT / JOURNAL_RELATIVE, journal_path)
+    # The live journal is mutable governed evidence (reapprove rewrites it in
+    # place), so tests must never copy it. This pinned snapshot is the original
+    # pre-reapprove journal (SHA-256 c4b5be55db4f433ff9e2be57b9f5161701beb974d71c4455ab44c4d104376a15).
+    pinned_journal = ROOT / "tests/fixtures/meshy_reapprove/loot_container_derelict_v1_journal.json"
+    shutil.copy2(pinned_journal, journal_path)
     (project_root / PLAN_RELATIVE).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / PLAN_RELATIVE, project_root / PLAN_RELATIVE)
     for relative in stage_module.governance.PROTECTED_RUNTIME_RELATIVE_PATHS:
@@ -352,7 +356,16 @@ def test_resolve_plan_leaves_batch_journal_and_task_dirs_untouched(tmp_path: Pat
     )
 
     assert _tree_digest(asset_root) == before
-    assert _tree_digest(asset_root / "_batches") == _tree_digest(FIXTURE_ASSET_ROOT / "_batches")
+    # Compare against the pinned pre-reapprove journal, not the live journal,
+    # which reapprove legitimately rewrites in place.
+    pinned_batches = tmp_path / "pinned_batches"
+    shutil.copytree(
+        ROOT / "tests/fixtures/meshy_reapprove",
+        pinned_batches,
+    )
+    pinned_batches_journal = pinned_batches / "loot_container_derelict_v1_journal.json"
+    pinned_batches_journal.rename(pinned_batches_journal.with_name("9e04213bc806421d8e64c9c9c23f26d3.json"))
+    assert _tree_digest(asset_root / "_batches") == _tree_digest(pinned_batches)
     for task_dir in sorted(path for path in asset_root.iterdir() if path.is_dir() and path.name != "_batches"):
         source = FIXTURE_ASSET_ROOT / task_dir.name
         assert _tree_digest(task_dir) == _tree_digest(source)
