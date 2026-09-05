@@ -718,9 +718,11 @@ post-rebuild and post-world-apply failures, not only audio model counters;
 `scripts/ui/save_load_menu.gd` and `scripts/ui/menu_coordinator.gd` only modern
 world-envelope slot dispatch; existing manual/auto/quick save and migration smokes
 only for the reviewed coherent-world policy and strict legacy compatibility;
-owner binding and tick/collection enablement seams only; new `fc_p10_smoke.gd` and
-the nine approved `p10_*.json` migration fixtures under
-`tests/fixtures/feature_completion/`.
+owner binding and tick/collection enablement seams only; new `fc_p10_smoke.gd`,
+`fc_p10_process_smoke.gd` (producer/consumer modes), optional strict
+`tools/run_p10_process_smoke.py` and its focused
+`tests/test_p10_process_runner.py`, and the nine approved `p10_*.json` migration
+fixtures under `tests/fixtures/feature_completion/`.
 **Non-goals:** changing save filenames or wiping historical data.
 
 - [ ] Implement ADR-0059 decisions 23-26: coherent world envelopes for modern
@@ -744,6 +746,30 @@ the nine approved `p10_*.json` migration fixtures under
   fails.
 - [ ] Save before/after enqueue, start, completion and partial collection; reload
   twice and compare quantity, quality, progress and receipts exactly.
+- [ ] Add a fresh-process disk proof. Producer mode uses the production save API
+  to write the versioned baseline slot, then separately writes immutable expected
+  observations and a digest manifest into one unique test directory. It records the
+  baseline artifact path and digest without treating the expected-observation manifest
+  as save evidence. Consumer one starts in a separately launched OS process and
+  receives only the baseline path plus expected-observation manifest; it first verifies
+  the baseline input digest, then independently asserts exact owners, lots, knowledge,
+  jobs, escrow, station IDs, progress, pending receipts and component origins from
+  disk. It collects once through the production interaction, saves the resulting world
+  through the production API, and records a distinct post-collection artifact and
+  digest. Consumer two is another fresh OS process: it loads only that persisted
+  post-collection slot and proves no remaining output, recharge, duplicate reservation,
+  duplicate collection, receipt replay, or migrated sidecar. The baseline copy/digest
+  remains available for comparison; different baseline and post-collection digests are
+  valid. No consumer may accept producer memory, a process-local singleton, or a copied
+  fixture as evidence. The strict Python orchestration, if used, creates one unique
+  directory and sets only that directory's `APPDATA`, `LOCALAPPDATA`, and Godot save
+  path for every child process. It rejects missing producer/consumer markers,
+  diagnostics, unexpected output, a baseline digest mismatch, or cleanup beyond the
+  unique directory. It retains raw logs, manifests, baseline/post-save artifacts and
+  accepted evidence on success; only scratch user directories may be cleaned after
+  capture, while failures are retained for diagnosis. `FC P10 PROCESS PASS` is
+  preparatory process-isolation evidence only. It never substitutes for `FC P10 PASS`,
+  the G1 profile, canonical regression, player gates, or independent P10 review.
 - [ ] Run P10, `save_migration_service_smoke.gd`, `save_migration_world_smoke.gd`,
   `save_load_service_smoke.gd`, then G1 profile and full regression.
 - [ ] Close ADR-0059 decisions 29-31: reject forged terminal refund/field receipts,

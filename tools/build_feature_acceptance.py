@@ -288,6 +288,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "ship_instance", "ship_runtime", "pillar_persistence",
         )],
         COORDINATOR, "tests/fixtures/feature_completion/**", f"{VALIDATION}fc_p10_smoke.gd",
+        f"{VALIDATION}fc_p10_process_smoke.gd", "tools/run_p10_process_smoke.py",
+        "tests/test_p10_process_runner.py",
     ],
     "P11": [
         *[f"scripts/systems/{name}.gd" for name in ("component_catalog", "component_placement_state", "component_mount_resolver", "ship_modification_state")],
@@ -1437,6 +1439,11 @@ def _verification(card_id: str, root: Path) -> list[dict[str, Any]]:
         ))
     if card_id == "P09":
         checks.append(_check("& $Python -m unittest tests.test_crafting_economy", "OK", forbid_diagnostics=False))
+    if card_id == "P10":
+        checks.append(_check(
+            "& $Python tools/run_p10_process_smoke.py --godot $Godot --root . --evidence-dir artifacts/feature-completion/P10-process",
+            "FC P10 PROCESS PASS",
+        ))
     if card_id == "P17":
         checks.extend([
             _check("& $Python -m unittest tests.test_structural_rebuild_catalog", "OK", forbid_diagnostics=False),
