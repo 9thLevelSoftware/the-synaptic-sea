@@ -173,6 +173,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/main_playable_item_economy_smoke.gd",
         "scripts/validation/main_playable_survival_stakes_smoke.gd",
         "scripts/validation/audio_spatial_playback_smoke.gd",
+        "scripts/validation/load_denied_sfx_smoke.gd",
         "scripts/validation/vitals_state_save_load_smoke.gd",
         "scripts/validation/room_assigner_smoke.gd",
         "scripts/validation/capture_current_topology_fixture.gd",

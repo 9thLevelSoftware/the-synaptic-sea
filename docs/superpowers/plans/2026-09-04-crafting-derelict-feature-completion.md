@@ -243,6 +243,13 @@ case count; no copied hard-coded count becomes the authority.
 
 ### P00 — Establish a clean engine, import and native-runtime baseline
 
+The canonical `load_denied_sfx_smoke.gd` reproduced an engine warning on the
+expected missing-save input path. Scope permits only that smoke and the
+coordinator's `request_load` missing-save branch to treat ordinary load denial
+without an engine warning. Preserve the false result, denial sound, and live
+world/save state. Acceptance requires the exact existing marker and clean output;
+do not suppress warnings globally or classify unrelated load failures as success.
+
 **Depends:** none. **Requirements:** FC-02. **Owner:** primary/toolchain worker.
 **Allowed files:** `docs/game/06_validation_plan.md`, `README.md`, `AGENTS.md` only
 for a reviewed toolchain correction; the two doorway damaged/breached `.glb.import`
