@@ -287,6 +287,21 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     Verify a restored inactive derelict's first revisit completes due work once,
     retains its pending output, and permits exact-once player collection across
     two reloads.
+32. Mandatory terminal history uses nested `craft-jobs-2` and `field-pending-2`
+    contracts; it must not silently change the meaning of an existing v1 payload.
+    Migrate recognized `craft-jobs-1` and prior unversioned field-pending summaries
+    in detached copies, preserving exact paid, consumed and output lots. A prior
+    cancelled job with consumed lots records forfeiture. A cancelled job without
+    reconstructable refund history retains an explicit
+    `legacy_unrecorded_cancelled_v1` history-only tombstone, which can never
+    authorize a refund. Surviving refund receipts may supply exact history only
+    after complete job, owner, station, ingredient and receipt reconciliation.
+    An old field receipt without reconstructable terminal producer history rejects
+    with a specific diagnostic and leaves the source untouched; migration must
+    not discard it or invent a producer. Empty prior field history is permitted
+    only without an extant field receipt. Missing mandatory fields in a v2 record
+    are malformed, never a request for legacy migration. Verify valid prior-v5
+    terminal-state resave and two reloads alongside v2 history-deletion mutants.
 
 ## Locked transaction payloads
 
