@@ -18,6 +18,21 @@ task-level result, focused smoke membership, or historical milestone claim const
 full canonical-program acceptance. In particular, P09 and P10 are not accepted merely
 because their focused smokes are classified.
 
+Current verified progress (2026-09-05): the isolated P00 baseline passed all 652
+canonical commands and its native-generation probe, supporting ADR-0060's Windows
+Godot 4.7.2 validation decision. The execution worktree's later changes still need
+their complete regression run. P09's crafted-tool proof now measures the actual
+quality-dependent work rate through a committed transaction; the natural schematic
+and donor acquisition journey remains open. P10 has a clean partial scene test for
+manual load, rollback, stations and first-revisit job collection, with fresh-process
+and adversarial save cases still pending.
+
+P17 now has committed canonical physical-volume data/helpers and an exact isolated
+candidate collision-query utility. The query passed in the full project; the volume
+helper passed a byte-identical isolated project test. Live cart/component bindings,
+registered docking routes, candidate navigation, paid rebuild application and their
+end-to-end acceptance remain unfinished.
+
 ## Historical milestone: Vertical Slice v1 (as of 2026-08-11)
 
 - Contract: [`docs/game/features/vertical_slice_v1.md`](docs/game/features/vertical_slice_v1.md)
