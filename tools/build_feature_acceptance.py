@@ -160,6 +160,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/procgen/ship_blueprint.gd",
         "scripts/procgen/ship_generator.gd",
         "scripts/procgen/life_boat.gd",
+        "scripts/procgen/room_assigner.gd",
         "scripts/procgen/playable_generated_ship.gd",
         "scripts/validation/fc_p00_ceiling_lifetime_smoke.gd",
         "scripts/validation/fc_p00_native_arc_smoke.gd",
@@ -168,6 +169,11 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/item_economy_smoke.gd",
         "scripts/validation/main_playable_item_economy_smoke.gd",
         "scripts/validation/main_playable_survival_stakes_smoke.gd",
+        "scripts/validation/audio_spatial_playback_smoke.gd",
+        "scripts/validation/vitals_state_save_load_smoke.gd",
+        "scripts/validation/room_assigner_smoke.gd",
+        "scripts/validation/capture_current_topology_fixture.gd",
+        "scripts/validation/procgen_golden_parity_smoke.gd",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
         "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
@@ -214,8 +220,9 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         *[f"scripts/systems/{name}.gd" for name in (
             "quality_tier_resolver", "work_action_resolver", "consumable_state",
             "medicine_state", "stimulant_state", "effect_dispatcher", "component_mount_resolver",
+            "ship_modification_state",
         )],
-        "scripts/ui/inventory_row.gd", "scripts/ui/recipe_picker_panel.gd",
+        "scripts/ui/inventory_panel.gd", "scripts/ui/inventory_row.gd", "scripts/ui/recipe_picker_panel.gd",
         "scripts/systems/work_action_driver.gd", COORDINATOR,
         "docs/game/balance/crafting_materials_tuning.md", f"{VALIDATION}fc_p05_smoke.gd",
     ],
@@ -233,9 +240,10 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         f"{VALIDATION}fc_p06_smoke.gd",
     ],
     "P08": [
-        *[f"scripts/systems/{name}.gd" for name in ("pending_output_store", "crafting_state", "field_crafting_state", "deconstruction_resolver", "ship_instance")],
+        "docs/game/adr/0062-ship-owned-pending-output-receipts.md",
+        *[f"scripts/systems/{name}.gd" for name in ("pending_output_store", "craft_job_scheduler", "crafting_state", "field_crafting_state", "deconstruction_resolver", "ship_instance", "inventory_state", "ship_inventory", "world_snapshot")],
         "scripts/tools/crafting_station.gd", "scripts/tools/work_yield_drop.gd", COORDINATOR,
-        f"{VALIDATION}fc_p08_smoke.gd",
+        f"{VALIDATION}fc_p08_smoke.gd", f"{VALIDATION}fc_p07_smoke.gd",
     ],
     "P09": [
         "data/recipes/recipe_definitions.json", "data/materials/material_definitions.json",
@@ -267,7 +275,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         )],
     ],
     "P12": [
-        *[f"scripts/systems/{name}.gd" for name in ("ship_work_transaction", "work_action_state", "work_action_driver", "work_action_channel", "work_action_resolver", "component_mount_resolver")],
+        *[f"scripts/systems/{name}.gd" for name in ("ship_work_transaction", "work_action_state", "work_action_driver", "work_action_channel", "work_action_resolver", "component_mount_resolver", "component_placement_state")],
         "scripts/tools/repair_point.gd", "scripts/ui/ship_modification_panel.gd",
         "scripts/ui/work_action_hud_panel.gd", WORK_ACTION_CATALOG, COORDINATOR,
         *[f"{VALIDATION}{name}.gd" for name in (
@@ -275,6 +283,10 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "ship_mod_system_effect_smoke", "ship_mod_system_effect_away_smoke",
             "ship_mod_power_budget_scene_smoke", "ship_mod_power_budget_scene_away_smoke",
             "ship_mod_restore_effects_smoke", "ship_mod_restore_effects_away_smoke",
+            "component_dismount_interact_smoke", "component_dismount_interact_away_smoke",
+            "component_mount_xp_live_smoke", "component_mount_xp_live_away_smoke",
+            "component_mount_sfx_live_smoke", "component_mount_sfx_live_away_smoke",
+            "component_remount_sfx_live_smoke", "component_remount_sfx_live_away_smoke",
         )],
     ],
     "P13": [
@@ -350,7 +362,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
 }
 
 CARD_SMOKES = {
-    "P00": ["fc_p00_ceiling_lifetime_smoke.gd", "fc_p00_native_arc_smoke.gd", "derelict_arc_smoke.gd", "crafting_state_smoke.gd", "module_integrity_consequences_smoke.gd", "repair_loop_smoke.gd", "main_playable_slice_station_craft_smoke.gd", "pilot_switch_smoke.gd", "main_playable_survival_stakes_smoke.gd"],
+    "P00": ["fc_p00_ceiling_lifetime_smoke.gd", "fc_p00_native_arc_smoke.gd", "derelict_arc_smoke.gd", "crafting_state_smoke.gd", "module_integrity_consequences_smoke.gd", "repair_loop_smoke.gd", "main_playable_slice_station_craft_smoke.gd", "pilot_switch_smoke.gd", "main_playable_survival_stakes_smoke.gd", "audio_spatial_playback_smoke.gd", "vitals_state_save_load_smoke.gd", "room_assigner_smoke.gd", "procgen_golden_parity_smoke.gd"],
     "P03": [
         "inventory_state_smoke.gd", "material_state_smoke.gd",
         "production_output_full_consume_smoke.gd", "production_output_full_consume_away_smoke.gd",

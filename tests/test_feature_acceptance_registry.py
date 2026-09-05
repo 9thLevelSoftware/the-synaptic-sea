@@ -431,9 +431,11 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "scripts/validation/item_economy_smoke.gd",
             "scripts/validation/main_playable_item_economy_smoke.gd",
             "scripts/validation/main_playable_survival_stakes_smoke.gd",
+            "scripts/validation/audio_spatial_playback_smoke.gd",
         ):
             self.assertIn(expected_path, [entry["path"] for entry in p00["allowlist"]])
         self.assertTrue(any("main_playable_survival_stakes_smoke.gd" in check["command"] for check in p00["verification"]))
+        self.assertTrue(any("audio_spatial_playback_smoke.gd" in check["command"] for check in p00["verification"]))
         p04 = next(card for card in manifest["cards"] if card["id"] == "P04")
         for expected_path in (
             "scripts/systems/ship_instance.gd",
@@ -460,6 +462,7 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "scripts/systems/medicine_state.gd",
             "scripts/systems/stimulant_state.gd",
             "scripts/systems/effect_dispatcher.gd",
+            "scripts/systems/ship_modification_state.gd",
         ):
             self.assertIn(expected_path, [entry["path"] for entry in p05["allowlist"]])
         p07 = next(card for card in manifest["cards"] if card["id"] == "P07")
@@ -496,6 +499,7 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "scripts/validation/ship_mod_system_effect_away_smoke.gd",
             "scripts/validation/ship_mod_power_budget_scene_away_smoke.gd",
             "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+            "scripts/systems/component_placement_state.gd",
         ):
             self.assertIn(expected_path, [entry["path"] for entry in p12["allowlist"]])
         p16 = next(card for card in manifest["cards"] if card["id"] == "P16")

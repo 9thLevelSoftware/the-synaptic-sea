@@ -3,10 +3,10 @@
   "cases": [
     {"id": "P03", "profile": "crafting", "script": "scripts/validation/fc_p03_smoke.gd", "marker": "FC P03 PASS", "scope": "model", "status": "planned"},
     {"id": "P04", "profile": "crafting", "script": "scripts/validation/fc_p04_smoke.gd", "marker": "FC P04 PASS", "scope": "model", "status": "planned"},
-    {"id": "P05", "profile": "crafting", "script": "scripts/validation/fc_p05_smoke.gd", "marker": "FC P05 PASS", "scope": "model", "status": "planned"},
+    {"id": "P05", "profile": "crafting", "script": "scripts/validation/fc_p05_smoke.gd", "marker": "FC P05 PASS", "scope": "scene", "status": "planned"},
     {"id": "P06", "profile": "crafting", "script": "scripts/validation/fc_p06_smoke.gd", "marker": "FC P06 PASS", "scope": "scene", "status": "planned"},
     {"id": "P07", "profile": "crafting", "script": "scripts/validation/fc_p07_smoke.gd", "marker": "FC P07 PASS", "scope": "model", "status": "planned"},
-    {"id": "P08", "profile": "crafting", "script": "scripts/validation/fc_p08_smoke.gd", "marker": "FC P08 PASS", "scope": "model", "status": "planned"},
+    {"id": "P08", "profile": "crafting", "script": "scripts/validation/fc_p08_smoke.gd", "marker": "FC P08 PASS", "scope": "scene", "status": "planned"},
     {"id": "P09", "profile": "crafting", "script": "scripts/validation/fc_p09_smoke.gd", "marker": "FC P09 PASS", "scope": "scene", "status": "planned"},
     {"id": "P10", "profile": "crafting", "script": "scripts/validation/fc_p10_smoke.gd", "marker": "FC P10 PASS", "scope": "scene", "status": "planned"},
     {"id": "P11", "profile": "restoration", "script": "scripts/validation/fc_p11_smoke.gd", "marker": "FC P11 PASS", "scope": "model", "status": "planned"},

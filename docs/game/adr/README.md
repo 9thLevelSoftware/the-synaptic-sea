@@ -41,8 +41,9 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0058 | docs/game/adr/0058-meshy-candidates-blender-authority.md | Meshy candidate-only generation, Blender canonical masters, staged review, and Godot runtime authority |
 | 0059 | docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md | Accepted contract; implementation pending: persistent quality lots, paid jobs, ship-scoped physical work and structural replacement |
 | 0060 | docs/game/adr/0060-windows-feature-completion-validation-runtime.md | Proposed: Windows 4.7.2 validation runtime, pending canonical compatibility evidence |
-| 0061 | docs/game/adr/0061-persist-resolved-generation-context.md | Accepted contract: retain resolved generation context through reload and revisit; validation pending |
-| 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: lifeboat biome selection follows the compiled structural kit contract; implementation pending |
+| 0061 | docs/game/adr/0061-persist-resolved-generation-context.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
+| 0062 | docs/game/adr/0062-ship-owned-pending-output-receipts.md | Accepted P08 contract: ship-owned immutable pending receipts supersede only ADR-0059's pending-output placeholder; focused validation pending |
+| 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
 | 0064 | docs/game/adr/0064-versioned-current-topology-parity-fixture.md | Accepted contract: version current topology parity as a reviewed fixture; candidate validation and implementation pending |
 
 ## Notes

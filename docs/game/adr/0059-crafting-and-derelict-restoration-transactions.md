@@ -1,8 +1,9 @@
 # ADR-0059: Persistent crafting lots and transactional derelict restoration
 
-- Status: **Accepted for the Crafting and Derelict Feature Completion program; implementation pending.**
+- Status: **Accepted for the Crafting and Derelict Feature Completion program; scoped implementation underway; full acceptance pending.**
 - Date: 2026-09-04
-- Related: ADR-0038, ADR-0051, existing RunSnapshot versioning and ShipRuntime contracts.
+- Related: ADR-0038, ADR-0051, [ADR-0062](0062-ship-owned-pending-output-receipts.md),
+  existing RunSnapshot versioning and ShipRuntime contracts.
 - Spec: [feature completion contract](../features/crafting_derelict_feature_completion.md).
 
 ## Context
@@ -85,6 +86,28 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     an empty legacy collection. P04 adds this nested holder state without changing
     the existing `world-4` outer version reserved for P10's ordered v5 migration.
 
+13. Queued crafting escrow remains physically accounted at its source holder until
+    work starts or the escrow is successfully transferred by refund. The scheduler job's
+    exact `ingredient_escrow` is the sole serialized reservation authority. Inventory
+    holders receive a nonserialized read-through binding and include exact unstarted
+    escrow mass in raw player load and hard cargo capacity while keeping it outside the
+    spendable lot ledger. Restore rebuilds this view from validated jobs; holders never
+    serialize a second reservation copy. A direct refund may exclude only that job's
+    authority-verified reservation while staging the return, so its own mass is not
+    counted twice and every other job remains counted. Pending-output receipts transfer
+    physical mass from source reservation to the ship/station store once; tombstones
+    prevent restored producers from republishing the same receipt.
+
+14. Portable field crafting is attended work owned by the active player. Its paid
+    job advances only while the playable run is active, the player node is present,
+    health is above the existing incapacitation threshold, and stamina is above the
+    existing work-inability threshold (`0.001`). Losing attendance pauses the same
+    job without spending again, refunding, or restarting it; recovery resumes that
+    exact progress. Menu and UI input capture do not remove attendance, and field
+    crafting gains no station-radius or hold-input requirement. Home and away runtime
+    branches use the same gate, so an end-run transition cannot advance the job later
+    in the same frame.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are
@@ -96,7 +119,7 @@ rename these keys without a superseding ADR.
 |---|---|---|
 | `item_lots_v1` | inventory or holder | `lot_id`, `item_id`, `quantity`, `quality_score`, `quality_tier`, `condition`, `origin` |
 | `craft_jobs_v1` | ship/station scheduler | `job_id`, `ship_id`, `station_instance_id`, `recipe_id`, `state`, `progress`, `ingredient_escrow`, `output_receipt_id` |
-| `pending_outputs_v1` | station or salvageable destroyed-station holder | `owner_id`, `receipt_id`, `lots`, `collected_quantities` |
+| `pending_outputs_v1` | ShipInstance / physical station holder | Superseded for this row by [ADR-0062](0062-ship-owned-pending-output-receipts.md): `schema`, `ship_id`, and receipt records containing station/producer/purpose/source identity, immutable `original_lots`, `remaining_lots`, `collected_quantities`, and terminal state |
 | `recipe_knowledge_v1` | current-run player | `owner_id`, `known_recipe_ids`, `event_receipt_ids` |
 | `work_transactions_v1` | selected ship | `work_id`, `ship_id`, `target_id`, `target_revision`, `state`, `escrow`, `commit_receipt_id` |
 | `structural_rebuild_v1` | ShipInstance/pillar persistence | `replacement_id`, `module_id`, `layout_revision`, `wrapper_id`, `transform`, `footprint`, `sockets`, `state` |

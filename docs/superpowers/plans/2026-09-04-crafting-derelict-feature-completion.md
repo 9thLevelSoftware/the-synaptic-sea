@@ -15,12 +15,14 @@ through tested migration rather than replacing the gameplay framework.
 generation, JSON catalogs, Python validation tools, Windows PowerShell.
 
 **Spec:** [crafting_derelict_feature_completion.md](../../game/features/crafting_derelict_feature_completion.md).
-Read it together with [proposed ADR-0059](../../game/adr/0059-crafting-and-derelict-restoration-transactions.md).
+Read it together with [accepted ADR-0059](../../game/adr/0059-crafting-and-derelict-restoration-transactions.md).
 
 ## Global constraints
 
-- Plan status: **scope/direction agreed; detailed plan ready for execution review,
-  not implemented**. Created 2026-09-04 against `f4a65669`.
+- Plan status: **source accounting frozen and execution in progress as of
+  2026-09-05**. Scoped implementations called out below have focused independent
+  acceptance; canonical whole-program and player gates remain pending. Created
+  2026-09-04 against `f4a65669`.
 - Use board `synaptic-sea-stage-gate` explicitly. Do not invent a board CLI/API.
 - Every execution card includes requirement IDs, allowed files, non-goals, tests,
   dependencies, evidence links, and a single owner.
@@ -283,6 +285,15 @@ The canonical survival-stakes scene fixture may be corrected in
 `scripts/validation/main_playable_survival_stakes_smoke.gd` to expect the current
 Hermite encumbrance curve with its 0.35 minimum multiplier, replacing only the
 stale pre-PKG-C3.1b half-speed cliff expectation while preserving the scenario.
+`scripts/validation/audio_spatial_playback_smoke.gd` may replace its obsolete
+catalogued door-open fallback probe with a real routed absent-catalog event and
+must still prove that neither a stream nor playback is created.
+The baseline consistency scope also permits `vitals_state_save_load_smoke.gd`
+to isolate its persistence case from ambient fire, and `room_assigner.gd` with
+`room_assigner_smoke.gd` to preserve the authored security-vault footprint.
+Under ADR-0064, `capture_current_topology_fixture.gd` and
+`procgen_golden_parity_smoke.gd` may capture and compare the versioned current
+topology fixture without treating an unreviewed capture as acceptance evidence.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
@@ -361,6 +372,8 @@ scope. Stored `confidence: V` is never counted as an executed check.
 ### P03 — Preserve quality lots behind compatible inventory APIs
 
 **Depends:** P01-P02. **Requirements:** FC-05, FC-12.
+
+**Scoped status (d3d4b89c):** implementation and focused independent review accepted for quality-lot ledger. Full canonical validation and player gates remain pending; this status does not promote whole-feature evidence.
 **Allowed files:** new `item_lot_ledger.gd`; `inventory_state.gd`, `material_state.gd`,
 `item_defs.gd`; new `fc_p03_smoke.gd`. All scripts here are under `scripts/systems/`
 except the smoke under `scripts/validation/`. Also allow fixture initialization
@@ -400,6 +413,8 @@ assert(ledger.get_quantity("scrap_metal") == 4)
 ### P04 — Carry lots through the real logistics and salvage paths
 
 **Depends:** P03. **Requirements:** FC-05, FC-09.
+
+**Scoped status (bab5dbce):** implementation and focused independent review accepted for lossless lot logistics and salvage. Full canonical validation and player gates remain pending; this status does not promote whole-feature evidence.
 **Allowed files:** `scripts/systems/{ship_inventory,cargo_transfer,cart_state,
 equipment_state,deconstruction_resolver}.gd`,
 `scripts/tools/{cargo_hold_control,cart_control,work_yield_drop,loot_container}.gd`,
@@ -433,14 +448,21 @@ consumption is invariant. Capacity rejection cannot delete a source item.
 ### P05 — Give crafted quality visible and mechanical consequences
 
 **Depends:** P03-P04. **Requirements:** FC-06.
+**Scoped status (current integration, commit pending):** implementation and focused
+independent review accepted for deterministic quality effects. Full canonical
+validation and player gates remain pending; this status does not promote
+whole-feature evidence.
 **Allowed files:** new `item_quality_effects.gd`, `data/items/quality_effects.json`;
 `quality_tier_resolver.gd`, `work_action_resolver.gd`, `consumable_state.gd`,
 `medicine_state.gd` and `stimulant_state.gd` only exact-lot potency context and
 effect application, preserving independent skill/tolerance behavior;
 `effect_dispatcher.gd` only medicine positive-health restoration potency, with
 standard multiplier 1 when no quality context is supplied;
-`component_mount_resolver.gd` in systems; `inventory_row.gd`, `recipe_picker_panel.gd`
-in UI; `scripts/systems/work_action_driver.gd` only selected tool/repair lot effect context;
+`ship_modification_state.gd` only its installed source-lot-derived power-draw
+getter, using catalog draw times the lot quality multiplier and legacy multiplier 1;
+`component_mount_resolver.gd` in systems; `inventory_panel.gd` only its exact selected-lot
+Use request, plus `inventory_row.gd` and `recipe_picker_panel.gd` in UI;
+`scripts/systems/work_action_driver.gd` only selected tool/repair lot effect context;
 `scripts/procgen/playable_generated_ship.gd` only its two WorkActionDriver start
 context seams and adjacent lot-selection helper, using actually held compatible
 tool lots and paid repair-material snapshots;
@@ -469,6 +491,9 @@ quality changes the authored consumer value, and never increases item quantity.
 ### P06 — Enforce recipe knowledge through every production entry point
 
 **Depends:** P01-P02. **Requirements:** FC-04.
+**Scoped status (bab5dbce):** implementation and focused independent review accepted
+for production recipe-knowledge routing. Full canonical validation and player gates
+remain pending; this status does not promote whole-feature evidence.
 **Allowed files:** `scripts/systems/{crafting_state,field_crafting_state,
 recipe_knowledge_state}.gd`, `scripts/tools/crafting_station.gd`,
 `scripts/ui/recipe_picker_panel.gd`, coordinator knowledge/list/start seams;
@@ -495,6 +520,10 @@ the real learning event unlocks it; replaying that event does not award twice.
 ### P07 — Implement paid, independent and persistent station jobs
 
 **Depends:** P03, P06. **Requirements:** FC-07..08.
+**Scoped status (bab5dbce):** implementation and focused independent review accepted
+for paid station jobs before the P08 escrow-mass integration child. Full canonical
+validation and player gates remain pending; this status does not promote
+whole-feature evidence.
 **Allowed files:** new `craft_job_state.gd`, `craft_job_scheduler.gd`;
 `crafting_state.gd`, `station_state.gd`, `ship_runtime.gd` under systems;
 new `fc_p07_smoke.gd`; `scripts/tools/crafting_station.gd` only production station
@@ -528,10 +557,23 @@ different stations never overwrite another station's active job.
 ### P08 — Make completion, refunds and salvage output lossless
 
 **Depends:** P04, P07. **Requirements:** FC-08..09.
-**Allowed files:** new `pending_output_store.gd`; `crafting_state.gd`,
-`field_crafting_state.gd`, `deconstruction_resolver.gd`, `ship_instance.gd` under
-systems; `crafting_station.gd`, `work_yield_drop.gd` under tools; coordinator
-completion seams; new `fc_p08_smoke.gd`. **Non-goals:** infinite hidden player storage.
+**Allowed files:** ADR-0062 for the reviewed `pending_outputs_v1` correction; new
+`pending_output_store.gd`; `craft_job_scheduler.gd` only its
+non-destructive output/refund peek and exact-receipt acknowledgement APIs;
+`crafting_state.gd`, `field_crafting_state.gd`, `deconstruction_resolver.gd`,
+`ship_instance.gd`, `inventory_state.gd`, `ship_inventory.gd`, and `world_snapshot.gd`
+under systems; `crafting_station.gd`, `work_yield_drop.gd` under tools; coordinator
+completion, station-destruction, and whole-world holder preflight seams; new
+`fc_p08_smoke.gd`; `fc_p07_smoke.gd` only exact escrow-mass reservation assertions.
+The scheduler job escrow is the single serialized reservation authority. Source holders
+read exact unstarted escrow through a nonserialized authority binding so reserved lots
+remain unavailable while their mass still counts for player load and hard cargo capacity.
+A direct refund credits only its own verified reservation during the atomic return; other
+jobs remain counted. Portable field work advances through one shared home/away attendance
+gate only while the run is active, the player exists and is not incapacitated, and stamina
+is above the established `0.001` work threshold. Losing attendance pauses the same paid
+job; UI input capture does not pause it. **Non-goals:** infinite hidden player storage,
+field station-radius or hold-input requirements.
 
 - [ ] Fill output stacks after work starts; reproduce any craft/deconstruction loss.
   Test multi-output salvage with only one destination having room.
@@ -541,6 +583,9 @@ completion seams; new `fc_p08_smoke.gd`. **Non-goals:** infinite hidden player s
   same recoverable owner store if their original holder cannot accept the refund.
 - [ ] Expose orphaned station output/escrow as a persistent salvageable container
   after station destruction; never place it in inaccessible removed geometry.
+- [ ] Exercise the actual home and away coordinator process paths: exhausted,
+  incapacitated, or ended runs preserve field-job progress and payment; recovered
+  attendance resumes it, including while a UI panel captures movement input.
 - [ ] Run P08, `main_playable_slice_station_craft_smoke.gd`,
   `main_playable_slice_salvage_picker_smoke.gd`; test save/revisit/partial collection.
 
@@ -596,6 +641,8 @@ interrupt, collect and use differentiated output through normal controls.
 ### P11 — Enforce real component and slot compatibility
 
 **Depends:** P01-P02. **Requirements:** FC-13.
+
+**Scoped status (c8b03806):** implementation and focused independent review accepted for component and physical-slot compatibility. Full canonical validation and player gates remain pending; this status does not promote whole-feature evidence.
 **Allowed files:** `scripts/systems/{component_catalog,component_placement_state,
 component_mount_resolver,ship_modification_state}.gd`,
 `scripts/ui/ship_modification_panel.gd`, component catalog; new `fc_p11_smoke.gd`;
@@ -641,10 +688,16 @@ unchanged; a compatible catalogued component in the same slot passes preflight.
 ### P12 — Unify physical work with exactly-once transactions
 
 **Depends:** P03, P11. **Requirements:** FC-14.
+**Scoped status (current integration, commit pending):** implementation and focused
+independent review accepted for exact-lot timed work transactions. Full canonical
+validation and player gates remain pending; this status does not promote
+whole-feature evidence.
 **Allowed files:** new `ship_work_transaction.gd`; existing `work_action_state.gd`,
 `work_action_driver.gd`, `work_action_channel.gd`, `work_action_resolver.gd`,
 `component_mount_resolver.gd`; `repair_point.gd`, `ship_modification_panel.gd`,
 `work_action_hud_panel.gd`; work-action catalog; new `fc_p12_smoke.gd`.
+`component_placement_state.gd` may carry the exact source lot through atomic
+mount persistence and dismount recovery without changing compatibility policy.
 Production scope includes `scripts/procgen/playable_generated_ship.gd` only its
 work start/tick/commit, inventory-payment mirror, and ship-mod action-request
 seams. Exact paid lot escrow must precede physical mutation; pass that snapshot's
@@ -654,6 +707,11 @@ while preserving fit/selection assertions. Existing `fc_p11_live_smoke.gd` and
 `ship_mod_{system_effect,power_budget_scene,restore_effects}{,_away}_smoke.gd`
 may wait for actual timed coordinator completion before their original effect
 assertions; they must not bypass the transaction to force an immediate mutation.
+Fixture-only scope also includes `component_dismount_interact{,_away}_smoke.gd`,
+`component_mount_xp_live{,_away}_smoke.gd`,
+`component_mount_sfx_live{,_away}_smoke.gd`, and
+`component_remount_sfx_live{,_away}_smoke.gd`; retain XP, SFX, owner, and
+physical-slot assertions and do not replace completion with force-apply seams.
 **Non-goals:** replacing the whole interaction system.
 
 - [ ] Assert that install/removal has no immediate effect and cannot commit twice.
@@ -739,6 +797,8 @@ materials are paid, and install/remove does not reproduce this repair effect.
 ### P16 — Preserve destroyed structure as identifiable rebuild targets
 
 **Depends:** P01-P02. **Requirements:** FC-18.
+
+**Scoped status (5494a846):** implementation and focused independent review accepted for persistent destroyed-structure descriptors. Full canonical validation and player gates remain pending; this status does not promote whole-feature evidence.
 **Allowed files:** new `structural_rebuild_state.gd`; `module_integrity_map.gd`,
 `module_integrity_state.gd`; `generated_ship_loader.gd` module registration;
 `scripts/procgen/playable_generated_ship.gd` only its module-integrity ownership

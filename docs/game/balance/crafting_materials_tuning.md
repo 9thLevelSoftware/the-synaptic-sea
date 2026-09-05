@@ -10,10 +10,10 @@ Requirement range: REQ-CS-001..015
 
 `QualityTierResolver.compute_score(material_quality, skill_level, station_level, powered)` currently uses:
 
-- material quality weight: `0.40`
-- skill bonus cap: `0.35` via `skill_level * 0.08`
-- station bonus cap: `0.25` via `station_level * 0.06`
-- powered bonus: `+0.05`
+- `score = material_quality*0.40 + clamp(skill_level*0.08, 0, 0.35) + clamp(station_level*0.06, 0, 0.25) + (powered ? 0.05 : 0)`
+- material quality weight: `0.40`; skill cap: `0.35`; station cap: `0.25`; powered bonus: `+0.05`.
+  The maximum is `1.0`, so masterwork remains attainable. Quality and condition
+  are independent: condition never participates in this score.
 
 Keep the final score clamped to `[0.0, 1.0]`. Preserve monotonicity: improving any one input must never reduce the final score.
 
