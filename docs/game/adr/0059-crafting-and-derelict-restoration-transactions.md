@@ -282,8 +282,12 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     rule. After activation, revisit and tick, the flag must match actual scene
     production oxygen context: current scene overlap or active field atmosphere.
     Prove the precise legitimate projection difference, malformed
-    non-boolean rejection, and rejection for unrelated oxygen-field drift, alongside
-    nondefault roundtrips and malformed audio, settings and ship-system denials.
+    non-boolean rejection, and rejection for unrelated oxygen-field drift. Before
+    applying a persisted ThreatManager summary, clear only its derived runtime nodes
+    and caches; then restore the authoritative manager, threat, detection and damage
+    fields exactly. They receive no comparison exception or schema change. Prove a
+    nondefault combat roundtrip and fresh-process restore, alongside malformed audio,
+    settings and ship-system denials.
 30. Recoverable terminal receipts retain exact producer history after escrow is
     released. Validate original lots, producer identity, terminal outcome and
     sequence against that history, including field outputs and cancellation

@@ -702,7 +702,7 @@ review, G1 profile, canonical regression and player gates remain pending.
 `scripts/systems/{run_snapshot,world_snapshot,save_migration_service,
 save_load_service,crafting_state,craft_job_state,craft_job_scheduler,station_state,
 field_crafting_state,recipe_knowledge_state,component_placement_state,
-ship_instance,ship_runtime,pillar_persistence}.gd`; coordinator capture, detached prepare/commit,
+ship_instance,ship_runtime,pillar_persistence,threat_manager}.gd`; coordinator capture, detached prepare/commit,
 new `scripts/systems/save_restore_candidate.gd` for the detached owner graph;
 `scripts/main.gd` and `scripts/title_main.gd` only staged playable-instance
 replacement, owner pointer and signal reconnection seams;
@@ -785,8 +785,11 @@ fixtures under `tests/fixtures/feature_completion/`.
   current scene overlap or active field atmosphere. Test one precise
   staged-rebuild projection difference, malformed non-boolean rejection, and unrelated
   oxygen-field drift rejection. Preserve all other oxygen values, thresholds, breach
-  state and zone IDs exactly; no broad summary ignore or normalization may hide lost
-  saved state.
+  state and zone IDs exactly. Before applying a persisted ThreatManager summary, clear
+  only derived runtime nodes and caches, then apply manager, threat, detection and
+  damage fields exactly; there is no combat comparison exception or schema change.
+  Include a nondefault combat roundtrip and fresh-process restore check. No broad
+  summary ignore or normalization may hide lost saved state.
 
 **G1 exit:** FC-04..12 evidence is complete; the player can obtain, craft, queue,
 interrupt, collect and use differentiated output through normal controls.

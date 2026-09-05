@@ -285,7 +285,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
             "crafting_state", "craft_job_state", "craft_job_scheduler", "station_state",
             "field_crafting_state", "recipe_knowledge_state", "component_placement_state",
-            "ship_instance", "ship_runtime", "pillar_persistence",
+            "ship_instance", "ship_runtime", "pillar_persistence", "threat_manager",
         )],
         COORDINATOR, "tests/fixtures/feature_completion/**", f"{VALIDATION}fc_p10_smoke.gd",
         f"{VALIDATION}fc_p10_process_smoke.gd", "tools/run_p10_process_smoke.py",
