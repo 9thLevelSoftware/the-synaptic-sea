@@ -99,18 +99,32 @@ func _initialize() -> void:
 	if t < 2:
 		_fail("refresh_station_tier"); return
 
-	# --- batch enqueue via crafting state ---
-	var accepted: int = craft.enqueue_craft("craft_power_cell", 4)
-	if accepted < 1:
-		_fail("enqueue_craft should accept"); return
-	var fab = craft.get_station("fabricator")
-	if fab == null or fab.queue.size() < 1:
-		_fail("fabricator queue empty"); return
-
-	# begin_craft respects station tier
 	var mat = preload("res://scripts/systems/material_state.gd").new()
 	if mat.has_method("configure"):
 		mat.configure({})
+	# --- paid batch enqueue via crafting state ---
+	inv.add_item("scrap_metal", 4)
+	inv.add_item("wiring_bundle", 8)
+	inv.add_item("reactive_gel", 4)
+	var accepted: int = craft.enqueue_craft(
+		"craft_power_cell", 4, null, inv, mat, 5, "batch-ship", "fabricator-batch")
+	if accepted != 4:
+		_fail("paid enqueue_craft should accept exact batch"); return
+	if inv.get_quantity("scrap_metal") != 0 or inv.get_quantity("wiring_bundle") != 0 \
+			or inv.get_quantity("reactive_gel") != 0:
+		_fail("paid batch did not reserve exact ingredients"); return
+	var job_summary: Dictionary = craft.get_summary().get("craft_jobs_v1", {})
+	var owners: Array = job_summary.get("owners", [])
+	if owners.size() != 1 or (owners[0] as Dictionary).get("job_ids", []).size() != 4:
+		_fail("paid scheduler queue missing four jobs"); return
+	var job_ids: Array = (owners[0] as Dictionary).get("job_ids", [])
+	craft.tick(45.0)
+	var scheduler = craft.get_craft_job_scheduler()
+	if str(scheduler.get_job(str(job_ids[0])).get("state", "")) != "output_ready" \
+			or absf(float(scheduler.get_job(str(job_ids[1])).get("progress_seconds", -1.0)) - 15.0) > 0.001:
+		_fail("paid batch did not advance serially"); return
+
+	# begin_craft respects station tier
 	# Ensure materials for power cell
 	inv.add_item("scrap_metal", 5)
 	inv.add_item("wiring_bundle", 5)

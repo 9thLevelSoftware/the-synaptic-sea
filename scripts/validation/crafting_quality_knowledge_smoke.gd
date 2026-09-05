@@ -82,10 +82,11 @@ func _initialize() -> void:
 		var ingredients: Dictionary = recipe.get("ingredients", {}) if typeof(recipe.get("ingredients", {})) == TYPE_DICTIONARY else {}
 		for mat_id in ingredients.keys():
 			var need: int = int(ingredients[mat_id])
-			inv.add_item(str(mat_id), need + 2)
-			if mats.has_method("set_quality") and mats.has_method("has_definition"):
-				if mats.has_definition(str(mat_id)):
-					mats.set_quality(str(mat_id), 0.9)
+			inv.add_lot({
+				"lot_id":"quality-source:%s" % str(mat_id), "item_id":str(mat_id),
+				"quantity":need + 2, "quality_score":0.9, "quality_tier":"masterwork",
+				"condition":1.0, "origin":{"fixture":"deconstruction-quality"},
+			})
 		var result: Dictionary = decon.deconstruct(rid, inv, mats, {"skill_level": 3, "tool_factor": 1.0})
 		if not result.is_empty() and result.has("quality"):
 			if float(result.get("quality", 0.0)) <= 0.5:

@@ -75,6 +75,7 @@ const BreachSealPointScript := preload("res://scripts/tools/breach_seal_point.gd
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
+const RecipeKnowledgeStateScript := preload("res://scripts/systems/recipe_knowledge_state.gd")
 const DeconstructionResolverScript := preload("res://scripts/systems/deconstruction_resolver.gd")
 const CraftingStationScript := preload("res://scripts/tools/crafting_station.gd")
 const ProductionStationScript := preload("res://scripts/tools/production_station.gd")
@@ -86,6 +87,7 @@ const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd
 const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
 const CargoHoldControlScript := preload("res://scripts/tools/cargo_hold_control.gd")
+const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
 const CartControlScript := preload("res://scripts/tools/cart_control.gd")
 const CartStateScript := preload("res://scripts/systems/cart_state.gd")
@@ -357,6 +359,7 @@ const FIRE_PRESENCE_PERCENT: int = 15
 var crafting_state                          # CraftingState
 var material_state                          # MaterialState
 var field_crafting_state                    # FieldCraftingState
+var recipe_knowledge_state                  # RecipeKnowledgeState, current-run player owner
 var deconstruction_resolver                 # DeconstructionResolver
 var crafting_station_root: Node3D = null
 var crafting_stations: Array = []
@@ -1416,6 +1419,8 @@ func _build_runtime_nodes() -> void:
 	# later Continue/F9 load is already attributed to this run's freeze set.
 	_run_id = _generate_run_id()
 	save_load_service.set_active_run_id(_run_id)
+	recipe_knowledge_state = RecipeKnowledgeStateScript.new()
+	recipe_knowledge_state.configure("player:%s" % _run_id, crafting_state.get_recipe_catalog())
 	# Timed/rotating autosave loop (additive to the REQ-012 checkpoint save).
 	# Defaults: 90 in-game-second cadence, 8-event cadence, 5 s real-time budget
 	# guard, rotating autosave_a/b/c. Driven from _process via _tick_autosave_policy().
@@ -1629,6 +1634,13 @@ func _runtime_for(ship) -> RefCounted:
 	var opts: Dictionary = {
 		"is_home": is_home,
 	}
+	if crafting_state != null and crafting_state.has_method("get_craft_job_scheduler") \
+			and crafting_state.has_method("get_scheduler_context_for_ship"):
+		opts["craft_job_scheduler"] = crafting_state.call("get_craft_job_scheduler")
+		opts["craft_job_context_provider"] = Callable(
+			crafting_state, "get_scheduler_context_for_ship").bind(str(ship.ship_id))
+		if crafting_state.has_method("receive_completion_receipts"):
+			opts["craft_job_receipt_sink"] = Callable(crafting_state, "receive_completion_receipts")
 	if is_home:
 		opts["hull_override"] = hull_integrity_state
 		opts["web_override"] = hull_web_state
@@ -1680,7 +1692,10 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		for st in crafting_stations:
 			if is_instance_valid(st):
 				st.set_powered(stations_powered)
-		if crafting_state.tick(delta):
+		# ShipRuntime is the production tick/catch-up authority for paid jobs.
+		# This band only drains durable completion receipts into inventory/UI.
+		if crafting_state.has_method("has_completion_receipts") \
+				and bool(crafting_state.call("has_completion_receipts")):
 			_on_craft_completed()
 	# M7-B Task 9: the extinguisher recharge port draws from the same "stations"
 	# channel as the crafting stations, but its power is independent of crafting_state.
@@ -2255,6 +2270,7 @@ func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: fl
 	_spawn_hangar_control(inst)
 	_spawn_cargo_hold_control(inst)
 	_spawn_cart_controls_for_ship(inst)
+	_restore_floor_drops_for_ship(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -2690,16 +2706,25 @@ func _equip_from_inventory(item_id: String, auto: bool) -> bool:
 		if not auto:
 			_emit_equip_denied_sfx()
 		return false
-	inventory_state.remove_item(item_id, 1)
-	var res: Dictionary = equipment_state.equip(item_id)
+	var outgoing: Array = inventory_state.take_lots(item_id, 1)
+	if outgoing.is_empty():
+		if not auto:
+			_emit_equip_denied_sfx()
+		return false
+	var equipped_lot: Dictionary = outgoing[0] as Dictionary
+	var res: Dictionary = equipment_state.equip_lot(equipped_lot)
 	if not bool(res.get("ok", false)):
-		inventory_state.add_item(item_id, 1)   # equip failed -> put it back
+		inventory_state.add_lot(equipped_lot)
 		if not auto:
 			_emit_equip_denied_sfx()
 		return false
 	var displaced: String = str(res.get("displaced", ""))
 	if displaced != "":
-		inventory_state.add_item(displaced, 1)
+		var displaced_lot: Dictionary = res.get("displaced_lot", {}) as Dictionary
+		if displaced_lot.is_empty() or inventory_state.add_lot(displaced_lot) != 1:
+			equipment_state.equip_lot(displaced_lot) if not displaced_lot.is_empty() else equipment_state.equip(displaced)
+			inventory_state.add_lot(equipped_lot)
+			return false
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	_recompute_player_encumbrance()
@@ -2718,9 +2743,14 @@ func play_equip_denied_sfx_for_validation() -> void:
 func _unequip_to_inventory(slot: String) -> String:
 	if equipment_state == null or inventory_state == null:
 		return ""
-	var item_id: String = equipment_state.unequip(slot)
+	var item_id: String = equipment_state.get_equipped(slot)
 	if item_id != "":
-		inventory_state.add_item(item_id, 1)
+		var lot: Dictionary = equipment_state.unequip_lot(slot)
+		var restored: int = inventory_state.add_lot(lot) if not lot.is_empty() else inventory_state.add_item(item_id, 1)
+		if restored != 1:
+			if not lot.is_empty(): equipment_state.equip_lot(lot)
+			else: equipment_state.equip(item_id)
+			return ""
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
 		_recompute_player_encumbrance()
@@ -4182,7 +4212,15 @@ func _refresh_station_tiers_from_ship_mod() -> void:
 	for kind in CRAFTING_STATION_KINDS:
 		if str(kind) == "salvage":
 			continue
+		# Keep the established kind-scoped picker projection, then update only
+		# explicitly owned live home stations. Never broadcast a component tier to
+		# a same-kind station on another ship.
 		crafting_state.refresh_station_tier(str(kind), placed, component_catalog)
+		for station_node in crafting_stations:
+			if is_instance_valid(station_node) and str(station_node.station_kind) == str(kind):
+				crafting_state.refresh_station_tier(
+					str(kind), placed, component_catalog,
+					str(station_node.ship_id), str(station_node.station_instance_id))
 
 
 ## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).
@@ -4919,20 +4957,70 @@ func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
 						break
 
 
+func _deposit_objective_reward_lot(lot: Dictionary) -> int:
+	if lot.is_empty() or current_ship == null or inventory_state == null \
+			or player == null or not (player is Node3D) \
+			or not is_instance_valid(current_ship.scene_root):
+		return 0
+	var item_id: String = str(lot.get("item_id", ""))
+	var quantity: int = int(lot.get("quantity", 0))
+	if item_id.is_empty() or quantity <= 0:
+		return 0
+	# Stage the complete reward in its ship-owned floor holder first. Moving from
+	# that holder uses the exact-lot split authority, leaving a persistent residual
+	# when the player's stack accepts only part or none of the reward.
+	var id: String = current_ship.allocate_floor_drop_id()
+	var staged_drop = WorkYieldDropScript.new()
+	var parent: Node3D = current_ship.scene_root as Node3D
+	var pos: Vector3 = parent.global_transform.affine_inverse() * ((player as Node3D).global_position + Vector3(0.6, 0, 0.4))
+	if not staged_drop.configure_lots(id, {
+		"schema":"item-lots-1", "holder_namespace":"floor:%s" % id,
+		"sequence":0, "lots":[lot.duplicate(true)],
+	}, inventory_state, pos, 1.8, String(current_ship.ship_id)):
+		staged_drop.free()
+		return 0
+	# Persist before collection so a full destination can never strand a reward in
+	# a transient callback. Materialize through the canonical restore path so signal
+	# registration and ship ownership cannot drift from saved/revisited drops.
+	var descriptor: Dictionary = staged_drop.get_persistence_descriptor()
+	staged_drop.free()
+	if not current_ship.upsert_floor_drop_descriptor(descriptor):
+		return 0
+	if not _restore_floor_drops_for_ship(current_ship):
+		return 0 # The descriptor remains owned and can materialize on revisit.
+	var drop = null
+	for candidate in work_yield_drops:
+		if is_instance_valid(candidate) and str(candidate.drop_id) == id:
+			drop = candidate
+			break
+	if drop == null:
+		return 0 # The descriptor remains owned and can materialize on revisit.
+	var added: int = CargoTransferScript.move_item(drop, inventory_state, item_id, quantity)
+	if drop.items.is_empty():
+		current_ship.remove_floor_drop(id)
+		work_yield_drops.erase(drop)
+		drop.queue_free()
+	elif not current_ship.upsert_floor_drop_descriptor(drop.get_persistence_descriptor()):
+		push_error("PlayableGeneratedShip: refused objective residual floor-drop descriptor '%s'" % id)
+	return added
+
 func _spawn_work_yield_drop(items: Dictionary) -> void:
-	if items.is_empty() or player == null or not (player is Node3D):
+	if items.is_empty() or player == null or not (player is Node3D) \
+			or current_ship == null or not is_instance_valid(current_ship.scene_root):
 		return
-	var drop_id: String = "work_yield_%d" % int(Time.get_ticks_msec())
+	var drop_id: String = current_ship.allocate_floor_drop_id()
 	var drop = WorkYieldDropScript.new()
-	var pos: Vector3 = (player as Node3D).global_position + Vector3(0.6, 0.0, 0.4)
-	# Parent under current ship root when away so drops leave with the ship.
-	var parent: Node = self
-	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
-		parent = current_ship.scene_root
-		pos = (current_ship.scene_root as Node3D).global_transform.affine_inverse() * pos
-	drop.configure(drop_id, items, inventory_state, pos, 1.8)
+	var world_position: Vector3 = (player as Node3D).global_position + Vector3(0.6, 0.0, 0.4)
+	var parent: Node3D = current_ship.scene_root as Node3D
+	var pos: Vector3 = parent.global_transform.affine_inverse() * world_position
+	drop.configure(drop_id, items, inventory_state, pos, 1.8, String(current_ship.ship_id))
 	parent.add_child(drop)
 	work_yield_drops.append(drop)
+	if not current_ship.upsert_floor_drop_descriptor(drop.get_persistence_descriptor()):
+		work_yield_drops.erase(drop)
+		drop.queue_free()
+		push_error("PlayableGeneratedShip: refused invalid floor-drop descriptor '%s'" % drop_id)
+		return
 	if drop.has_signal("scooped") and not drop.scooped.is_connected(_on_work_yield_scooped):
 		drop.scooped.connect(_on_work_yield_scooped)
 	# Cart-overload floor pile is the real ground-drop call site for SFX_DROP_ITEM.
@@ -4950,8 +5038,14 @@ func _on_work_yield_scooped(drop_id: String, _granted: Dictionary) -> void:
 	for d in work_yield_drops:
 		if not is_instance_valid(d):
 			continue
-		if str(d.drop_id) == drop_id and bool(d.scooped_flag):
-			continue
+		if str(d.drop_id) == drop_id:
+			var owner = _find_ship_by_id(str(d.owning_ship_id))
+			if bool(d.scooped_flag):
+				if owner != null:
+					owner.remove_floor_drop(drop_id)
+				continue
+			if owner != null:
+				owner.upsert_floor_drop_descriptor(d.get_persistence_descriptor())
 		kept.append(d)
 	work_yield_drops = kept
 	# Floor pile scooped into inventory — reuse tool-pickup bus cue (full or partial).
@@ -4961,6 +5055,54 @@ func _on_work_yield_scooped(drop_id: String, _granted: Dictionary) -> void:
 
 func get_work_yield_drops_for_validation() -> Array:
 	return work_yield_drops.duplicate()
+
+func _sync_live_floor_drops() -> void:
+	var kept: Array = []
+	for drop in work_yield_drops:
+		if not is_instance_valid(drop) or bool(drop.scooped_flag):
+			continue
+		var owner = _find_ship_by_id(str(drop.owning_ship_id))
+		if owner != null and owner.upsert_floor_drop_descriptor(drop.get_persistence_descriptor()):
+			kept.append(drop)
+	work_yield_drops = kept
+
+func _untrack_floor_drop_nodes_for_ship(owner_ship_id: String) -> void:
+	var kept: Array = []
+	for drop in work_yield_drops:
+		if is_instance_valid(drop) and str(drop.owning_ship_id) != owner_ship_id:
+			kept.append(drop)
+	work_yield_drops = kept
+
+func _restore_floor_drops_for_ship(owner) -> bool:
+	if owner == null or not is_instance_valid(owner.scene_root):
+		return false
+	var live_ids: Dictionary = {}
+	for existing in work_yield_drops:
+		if is_instance_valid(existing) and str(existing.owning_ship_id) == str(owner.ship_id):
+			live_ids[str(existing.drop_id)] = true
+	var ids: Array = owner.floor_drop_descriptors.keys()
+	ids.sort()
+	for raw_id in ids:
+		var drop_id: String = str(raw_id)
+		if live_ids.has(drop_id):
+			continue
+		var descriptor: Dictionary = owner.floor_drop_descriptors[drop_id] as Dictionary
+		var drop = WorkYieldDropScript.new()
+		var local_transform: Transform3D = ShipInstanceScript.transform_from_summary(descriptor.get("transform", []))
+		if not drop.configure_lots(
+				drop_id,
+				descriptor.get("item_lots_v1", {}) as Dictionary,
+				inventory_state,
+				local_transform.origin,
+				1.8,
+				str(owner.ship_id)):
+			return false
+		owner.scene_root.add_child(drop)
+		drop.transform = local_transform
+		work_yield_drops.append(drop)
+		if drop.has_signal("scooped") and not drop.scooped.is_connected(_on_work_yield_scooped):
+			drop.scooped.connect(_on_work_yield_scooped)
+	return true
 
 
 ## PKG-C4.1b: update engaged LOS via physics raycast when space state available.
@@ -5479,6 +5621,9 @@ func _build_crafting_stations() -> void:
 		return
 	if crafting_state == null:
 		return
+	var owner_ship_id: String = str(home_ship.ship_id)
+	if owner_ship_id.is_empty():
+		return
 	var positions: Array = _home_local_station_positions()
 	if positions.is_empty():
 		# Fallback: spread the stations around the scene_root origin so they always exist
@@ -5492,19 +5637,34 @@ func _build_crafting_stations() -> void:
 		var pos: Vector3 = positions[idx % positions.size()]
 		idx += 1
 		var st = CraftingStationScript.new()
+		var station_instance_id: String = _crafting_station_instance_id(kind, pos)
 		st.configure(kind, crafting_state, material_state, inventory_state,
-			deconstruction_resolver, player_progression, pos, 1.8)
+			deconstruction_resolver, player_progression, pos, 1.8, recipe_knowledge_state,
+			owner_ship_id, station_instance_id)
 		st.surgery_provider = self  # Stream F medbay surgery
 		if not st.craft_started.is_connected(_on_craft_started):
 			st.craft_started.connect(_on_craft_started)
 		if not st.salvage_completed.is_connected(_on_salvage_completed):
 			st.salvage_completed.connect(_on_salvage_completed)
+		if st.has_signal("reverse_engineered") and not st.reverse_engineered.is_connected(_on_reverse_engineered):
+			st.reverse_engineered.connect(_on_reverse_engineered)
 		if not st.craft_blocked.is_connected(_on_craft_blocked):
 			st.craft_blocked.connect(_on_craft_blocked)
 		if st.has_signal("recipe_picker_requested") and not st.recipe_picker_requested.is_connected(_on_recipe_picker_requested):
 			st.recipe_picker_requested.connect(_on_recipe_picker_requested)
 		home_ship.scene_root.add_child(st)
 		crafting_stations.append(st)
+
+
+## Stable physical identity derived from authored kind + canonical home-local
+## placement. It does not depend on construction order or process instance IDs.
+func _crafting_station_instance_id(station_kind: String, local_position: Vector3) -> String:
+	return "station:%s@%d,%d,%d" % [
+		station_kind,
+		roundi(local_position.x * 1000.0),
+		roundi(local_position.y * 1000.0),
+		roundi(local_position.z * 1000.0),
+	]
 
 func _clear_crafting_stations() -> void:
 	for st in crafting_stations:
@@ -5838,6 +5998,13 @@ func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 	else:
 		print("SALVAGE COMPLETED item=%s qty=%d" % [item_id, int(yields.get("quantity", 0))])
 
+func _on_reverse_engineered(component_id: String, event_receipt_id: String) -> void:
+	if recipe_knowledge_state == null:
+		return
+	var result: Dictionary = recipe_knowledge_state.receive_reverse_engineer(component_id, event_receipt_id)
+	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open() and bool(result.get("ok", false)):
+		recipe_picker_panel.refresh()
+
 func _on_craft_blocked(station_kind: String, reason: String) -> void:
 	print("CRAFT BLOCKED station=%s reason=%s" % [station_kind, reason])
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -5917,8 +6084,11 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 	if field_crafting_state.is_crafting():
 		_on_craft_blocked("field_crafting", "busy")
 		return false
-	if not field_crafting_state.can_craft(recipe_id, inventory_state):
-		_on_craft_blocked("field_crafting", "cannot_craft")
+	if crafting_state != null and not crafting_state.is_recipe_known(recipe_id, recipe_knowledge_state):
+		_on_craft_blocked("field_crafting", "missing_recipe_knowledge")
+		return false
+	if not field_crafting_state.can_craft(recipe_id, inventory_state, recipe_knowledge_state):
+		_on_craft_blocked("field_crafting", "missing_recipe_knowledge")
 		return false
 	var produces: Dictionary = {}
 	if crafting_state != null:
@@ -5930,7 +6100,7 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("fabrication"))
-	if field_crafting_state.begin_craft(recipe_id, inventory_state, material_state, skill):
+	if field_crafting_state.begin_craft(recipe_id, inventory_state, material_state, skill, recipe_knowledge_state):
 		_refresh_inventory_hud()
 		_recompute_player_encumbrance()
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
@@ -5944,7 +6114,7 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 func field_craft_first_ready_for_validation() -> bool:
 	if field_crafting_state == null or inventory_state == null:
 		return false
-	var rid: String = field_crafting_state.first_ready_recipe_id(inventory_state)
+	var rid: String = field_crafting_state.first_ready_recipe_id(inventory_state, recipe_knowledge_state)
 	if rid.is_empty():
 		return false
 	return begin_field_craft_recipe(rid)
@@ -6514,8 +6684,23 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 			"unique_state": unique_item_state,
 		})
 		var granted: Array = []
+		var reward_index: int = 0
 		for entry in rolled:
-			var added: int = inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
+			var reward: Dictionary = entry as Dictionary
+			var item_id: String = str(reward.get("item_id", ""))
+			var qty: int = int(reward.get("quantity", 0))
+			var score: float = clampf(float(reward.get("quality_score", reward.get("quality", 0.5))), 0.0, 1.0)
+			var raw_condition_score: Variant = reward.get("condition_score", 1.0)
+			var item_condition: float = clampf(float(raw_condition_score), 0.0, 1.0) if raw_condition_score is float or raw_condition_score is int else 1.0
+			var reward_lot: Dictionary = {
+				"lot_id": "objective:%s:%03d" % [seed_source, reward_index],
+				"item_id": item_id, "quantity": qty, "quality_score": score,
+				"quality_tier": QualityTierResolverScript.tier_for_score(score),
+				"condition": item_condition,
+				"origin": {"salvage_objective": objective_id, "seed_source": seed_source, "seed_key": str(reward.get("seed_key", "")), "source_condition": str(reward.get("condition", ""))},
+			}
+			var added: int = _deposit_objective_reward_lot(reward_lot)
+			reward_index += 1
 			if added > 0:
 				var granted_entry: Dictionary = (entry as Dictionary).duplicate(true)
 				granted_entry["quantity"] = added
@@ -6656,6 +6841,7 @@ func travel_to(marker) -> Dictionary:
 	_sync_current_ship_arc_summary()
 	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
+	_sync_live_floor_drops()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
 		# Leaving home: record the player's position so travel_home can restore it.
@@ -6667,6 +6853,7 @@ func travel_to(marker) -> Dictionary:
 			# It will be re-docked to the new target below; do NOT free it.
 			pass
 		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			_untrack_floor_drop_nodes_for_ship(String(leaving.ship_id))
 			if leaving.scene_root.get_parent() == self:
 				remove_child(leaving.scene_root)
 			leaving.scene_root.queue_free()
@@ -6720,6 +6907,7 @@ func travel_home() -> bool:
 	_sync_current_ship_arc_summary()
 	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
+	_sync_live_floor_drops()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
@@ -6735,6 +6923,7 @@ func travel_home() -> bool:
 			# It is re-docked to home below; do NOT free it.
 			pass
 		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			_untrack_floor_drop_nodes_for_ship(String(leaving.ship_id))
 			if leaving.scene_root.get_parent() == self:
 				remove_child(leaving.scene_root)
 			leaving.scene_root.queue_free()
@@ -7033,7 +7222,7 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 	if station_kind == "field_crafting":
 		if field_crafting_state == null:
 			return []
-		return field_crafting_state.list_recipe_entries(inventory_state)
+		return field_crafting_state.list_recipe_entries(inventory_state, recipe_knowledge_state)
 	if station_kind == "salvage":
 		if deconstruction_resolver == null:
 			return []
@@ -7048,7 +7237,7 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("fabrication"))
-	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill)
+	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill, crafting_state.get_station_tier(station_kind), recipe_knowledge_state)
 
 ## REQ-CS-016 / 017 / 018: panel confirm handler.
 func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
@@ -7059,6 +7248,9 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 		if field_crafting_state != null and field_crafting_state.is_crafting():
 			_on_craft_blocked(station_kind, "busy")
 			return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
+		if crafting_state != null and not crafting_state.is_recipe_known(recipe_id, recipe_knowledge_state):
+			_on_craft_blocked(station_kind, "missing_recipe_knowledge")
+			return {"ok": false, "reason": "missing_recipe_knowledge", "recipe_id": recipe_id}
 		if begin_field_craft_recipe(recipe_id):
 			return {"ok": true, "reason": "started", "recipe_id": recipe_id}
 		# begin_field_craft_recipe already emits deny SFX on failure.
@@ -7088,6 +7280,9 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 		if is_instance_valid(st) and st.station_kind == station_kind:
 			if st.try_craft_recipe(recipe_id):
 				return {"ok": true, "reason": "started", "recipe_id": recipe_id}
+			if crafting_state != null and not crafting_state.is_recipe_known(recipe_id, recipe_knowledge_state):
+				_on_craft_blocked(station_kind, "missing_recipe_knowledge")
+				return {"ok": false, "reason": "missing_recipe_knowledge", "recipe_id": recipe_id}
 			_on_craft_blocked(station_kind, "begin_failed")
 			return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
 	_on_craft_blocked(station_kind, "station_missing")
@@ -7123,7 +7318,28 @@ func _on_inventory_transfer_completed() -> void:
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
+	var definition: Dictionary = ItemDefsScript.get_definition(ItemDefsScript.load_definitions(), item_id)
+	if str(definition.get("use_kind", "")) == "read_skill_book":
+		_read_recipe_book(str(definition.get("book_id", item_id)))
+		return
 	_use_consumable_item(item_id, use_all)
+
+## Actual inventory Use action for authored skill books. Books remain readable
+## reference items; PlayerProgressionState owns the existing once-only read rule.
+func _read_recipe_book(book_id: String) -> Dictionary:
+	if book_id.is_empty() or inventory_state == null or inventory_state.get_quantity(book_id) <= 0:
+		return {"ok": false, "reason": "missing_book"}
+	if player_progression == null or recipe_knowledge_state == null or crafting_state == null:
+		return {"ok": false, "reason": "knowledge_pipeline_missing"}
+	var read_first_time: bool = player_progression.grant_xp_from_book(book_id)
+	var result: Dictionary = recipe_knowledge_state.receive_book_read(
+		book_id, "book:%s:%s" % [recipe_knowledge_state.owner_id, book_id], crafting_state.get_recipe_catalog())
+	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
+		recipe_picker_panel.refresh()
+	if bool(result.get("ok", false)):
+		_refresh_inventory_hud()
+		_set_hazard_feedback_line("Schematic read: %s" % book_id)
+	return {"ok": bool(result.get("ok", false)), "already_read": not read_first_time, "learned_recipe_ids": result.get("learned_recipe_ids", [])}
 
 func _open_inventory_self() -> void:
 	if not is_instance_valid(inventory_panel) or inventory_state == null:
@@ -10986,6 +11202,7 @@ func _build_world_snapshot():
 	_sync_current_ship_arc_summary()
 	_sync_current_ship_breach_environment()
 	_sync_current_ship_pillar_summaries()
+	_sync_live_floor_drops()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
 		ws.world_summary = synaptic_sea_world.get_summary()
@@ -11004,6 +11221,7 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		ws.home_floor_drops_v1 = home_ship.get_floor_drop_summary()
 		ws.home_breach_environment = home_ship.breach_environment_summary.duplicate(true)
 		var home_cart_dicts: Array = []
 		for c in home_ship.get_carts():
@@ -11199,11 +11417,46 @@ func _ensure_derelict_geometry(inst) -> void:
 	_spawn_hangar_control(inst)
 	_spawn_cargo_hold_control(inst)
 	_spawn_cart_controls_for_ship(inst)
+	_restore_floor_drops_for_ship(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SynapticSeaWorld and the
 ## visited-ships registry, then re-activates the saved derelict if the snapshot
 ## was taken aboard one. Returns false on any hard failure.
+func _prepare_world_holder_restore(ws) -> Dictionary:
+	var next_equipment = EquipmentStateScript.create()
+	if not ws.player_equipment.is_empty() and not next_equipment.apply_summary(ws.player_equipment):
+		return {"ok": false}
+	var home_summary: Dictionary = {
+		"ship_id": "ship_start",
+		"marker_id": "",
+		"carts": ws.home_ship_carts.duplicate(true),
+	}
+	if not ws.home_ship_inventory.is_empty():
+		home_summary["inventory"] = ws.home_ship_inventory.duplicate(true)
+	if not ws.home_floor_drops_v1.is_empty():
+		home_summary["floor_drops_v1"] = ws.home_floor_drops_v1.duplicate(true)
+	var next_home = ShipInstanceScript.create("ship_start", "", null, null, null)
+	if not next_home.apply_summary(home_summary):
+		return {"ok": false}
+	var next_visited: Dictionary = {}
+	for raw_mid in ws.visited_ships:
+		var mid: String = str(raw_mid)
+		var raw_summary: Variant = ws.visited_ships[raw_mid]
+		if mid.is_empty() or not (raw_summary is Dictionary):
+			return {"ok": false}
+		var next_ship = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
+		if not next_ship.apply_summary(raw_summary as Dictionary) \
+				or str(next_ship.marker_id) != mid or str(next_ship.ship_id).is_empty():
+			return {"ok": false}
+		next_visited[mid] = next_ship
+	return {
+		"ok": true,
+		"equipment": next_equipment,
+		"home": next_home,
+		"visited": next_visited,
+	}
+
 func _apply_world_snapshot(ws) -> bool:
 	if ws == null:
 		return false
@@ -11213,6 +11466,16 @@ func _apply_world_snapshot(ws) -> bool:
 	if home_snap == null:
 		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
 		return false
+	# Validate every P04-owned holder into detached models before the run reload
+	# mutates scene or player state. Present malformed payloads reject the whole
+	# restore; missing legacy payloads become empty holders.
+	var prepared: Dictionary = _prepare_world_holder_restore(ws)
+	if not bool(prepared.get("ok", false)):
+		push_warning("PlayableGeneratedShip: world load rejected — malformed holder or equipment state")
+		return false
+	var prepared_home = prepared.home
+	var prepared_equipment = prepared.equipment
+	var prepared_visited: Dictionary = prepared.visited as Dictionary
 	# Restore the home-departure position. On an away-save the home slice's
 	# player_position holds where the player left home from (see _build_world_snapshot);
 	# without copying it back, a later travel_home() after a fresh process would
@@ -11228,6 +11491,10 @@ func _apply_world_snapshot(ws) -> bool:
 	if home_ship != null:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
 		home_ship.breach_environment_summary = ws.home_breach_environment.duplicate(true)
+		home_ship.inventory = prepared_home.inventory
+		home_ship.carts = prepared_home.carts
+		home_ship.floor_drop_sequence = prepared_home.floor_drop_sequence
+		home_ship.floor_drop_descriptors = prepared_home.floor_drop_descriptors.duplicate(true)
 		# _apply_run_snapshot() has already rebuilt the home scene, so its initial
 		# _build_breach_zone(false) ran before the world-level home environment was
 		# restored. Rebuild the live oxygen zones now that the persisted summary is
@@ -11235,17 +11502,11 @@ func _apply_world_snapshot(ws) -> bool:
 		# later travel transition happens to reapply the ShipInstance state.
 		if not ws.home_breach_environment.is_empty() and not away_from_start:
 			_build_breach_zone(false)
-		if not ws.home_ship_inventory.is_empty():
-			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
-		# Restore home-ship carts BEFORE spawning their controls so the CartStates
-		# are in place when _spawn_cart_controls_for_ship iterates them.
-		home_ship.get_carts().clear()
-		for cd in ws.home_ship_carts:
-			if typeof(cd) == TYPE_DICTIONARY:
-				var cart = CartStateScript.create()
-				cart.apply_summary(cd as Dictionary)
-				home_ship.get_carts().append(cart)
+		# Holders were fully validated above and can now be materialized together.
 		_spawn_cart_controls_for_ship(home_ship)
+		if not _restore_floor_drops_for_ship(home_ship):
+			push_warning("PlayableGeneratedShip: world load rejected — could not materialize home floor drops")
+			return false
 		if not away_from_start:
 			_build_loot_containers()
 			_build_sealed_hatches()
@@ -11254,21 +11515,7 @@ func _apply_world_snapshot(ws) -> bool:
 	#     snapshot (older save, or nothing was worn) clears any currently-worn gear so
 	#     pre-load equipment never leaks across a load (_reset_runtime_for_reload does not
 	#     touch equipment_state).
-	if equipment_state != null:
-		if not ws.player_equipment.is_empty():
-			equipment_state.apply_summary(ws.player_equipment)
-			# Legacy-save reconciliation (PR #62): apply_summary restores slot
-			# ids blindly. An id that no longer declares an equip slot (e.g.
-			# capacitor_cell, demoted from equip item to pure ammo) is moved
-			# back to inventory instead of squatting in the slot.
-			for slot in equipment_state.slots.keys():
-				var equipped_id: String = str(equipment_state.slots[slot])
-				if equipped_id != "" and not equipment_state.can_equip(equipped_id):
-					equipment_state.unequip(String(slot))
-					if inventory_state != null:
-						inventory_state.add_item(equipped_id, 1)
-		else:
-			equipment_state.slots.clear()
+	equipment_state = prepared_equipment
 	_recompute_player_encumbrance()
 	if meta_progression_state != null and not ws.meta_progression_summary.is_empty():
 		meta_progression_state.apply_summary(ws.meta_progression_summary)
@@ -11279,11 +11526,7 @@ func _apply_world_snapshot(ws) -> bool:
 	if synaptic_sea_world != null and not ws.world_summary.is_empty():
 		synaptic_sea_world.apply_summary(ws.world_summary)
 	# 3. Rebuild the retained-derelict registry from the slices.
-	visited_ships.clear()
-	for mid in ws.visited_ships:
-		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
-		if inst.apply_summary(ws.visited_ships[mid]):
-			visited_ships[String(mid)] = inst
+	visited_ships = prepared_visited
 	world_time = float(ws.world_time)  # Live Persistent Ships Phase 1 (additive; 0.0 default for older saves)
 	# 4. If saved aboard a derelict, re-activate it.
 	if String(ws.current_location) != "":
@@ -11558,6 +11801,13 @@ func _postprocess_loot_grants(granted: Array, source_id: String, source: Node3D 
 			unique_item_state.record_codex_unlock(codex_entry_id)
 		if meta_progression_state != null and not codex_entry_id.is_empty():
 			meta_progression_state.unlock_codex_entry(codex_entry_id)
+		if recipe_knowledge_state != null and crafting_state != null and not codex_entry_id.is_empty():
+			recipe_knowledge_state.receive_codex_discovery(
+				codex_entry_id,
+				"codex:%s:%s" % [seed_key, codex_entry_id],
+				crafting_state.get_recipe_catalog())
+			if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
+				recipe_picker_panel.refresh()
 		if equipment_state != null and item_id != "" and equipment_state.can_equip(item_id):
 			_equip_from_inventory(item_id, true)
 		# Domain 10 (ADR-0045) Source A: a found web_chart imports every currently
@@ -11595,6 +11845,14 @@ func _postprocess_loot_grants(granted: Array, source_id: String, source: Node3D 
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
 ## various _build_*_zone helpers, but in reverse.
 func _reset_runtime_for_reload() -> void:
+	# Floor-drop nodes are disposable projections. The snapshot already captured
+	# their exact lots; detach every old projection before rebuilding either hull.
+	for drop in work_yield_drops:
+		if is_instance_valid(drop):
+			if drop.get_parent() != null:
+				drop.get_parent().remove_child(drop)
+			drop.queue_free()
+	work_yield_drops.clear()
 	# REQ-012 fix: if the player is aboard a traveled derelict when a reload is
 	# triggered, we must return to the starting ship BEFORE rebuilding the slice.
 	# Without this block:
@@ -12293,11 +12551,18 @@ func cargo_interact_deposit_for_validation(ship_id: String) -> int:
 			break
 	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
 		return 0
-	(player as Node3D).global_position = control.global_position
-	var before: int = _hold_item_total(inst)
-	_on_player_interact_requested(player)   # opens the transfer panel for this hold
-	inventory_panel_deposit_all_for_validation()
-	return _hold_item_total(inst) - before
+	# Sample legitimate positions inside the physical cargo radius. This keeps the
+	# real dispatcher intact while avoiding an authored prop that overlaps the
+	# exact center and has higher interaction precedence.
+	for offset in [Vector3.ZERO, Vector3(1.0, 0, 0), Vector3(-1.0, 0, 0), Vector3(0, 0, 1.0), Vector3(0, 0, -1.0)]:
+		(player as Node3D).global_position = control.global_position + offset
+		await get_tree().physics_frame
+		var before: int = _hold_item_total(inst)
+		_on_player_interact_requested(player)
+		if inventory_panel_is_open_for_validation():
+			inventory_panel_deposit_all_for_validation()
+			return _hold_item_total(inst) - before
+	return 0
 
 func _hold_item_total(inst) -> int:
 	var total: int = 0

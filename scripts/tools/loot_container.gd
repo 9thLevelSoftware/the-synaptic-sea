@@ -9,6 +9,7 @@ class_name LootContainer
 
 const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 
 signal container_searched(container_id: String, granted: Array)
@@ -82,7 +83,11 @@ static func normalized_contents(spec: Dictionary) -> Array:
 		var qty: int = int(stack.get("qty", stack.get("quantity", 0)))
 		if item_id.is_empty() or qty <= 0:
 			continue
-		out.append({"item_id": item_id, "qty": qty, "quantity": qty})
+		var normalized: Dictionary = stack.duplicate(true)
+		normalized["item_id"] = item_id
+		normalized["qty"] = qty
+		normalized["quantity"] = qty
+		out.append(normalized)
 	return out
 
 func try_interact(player_body: Node) -> bool:
@@ -96,9 +101,18 @@ func try_interact(player_body: Node) -> bool:
 		return false
 	var granted: Array = []
 	if loot_context.has("contents"):
+		if not _can_accept_contents(normalized_contents(loot_context)):
+			return false
 		granted = _grant_authored_contents()
 	else:
-		granted = _grant_rolled_contents()
+		var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
+		if not _can_accept_contents(rolled):
+			return false
+		granted = _grant_rolled_contents(rolled)
+	# A full inventory must not consume a reachable source. The caller can free
+	# stack room and interact again; no quality/provenance is discarded.
+	if granted.is_empty():
+		return false
 	# Searching consumes the container even if the bag was full (no re-roll on revisit).
 	set_searched(true)
 	emit_signal("container_searched", container_id, granted)
@@ -110,6 +124,7 @@ func _grant_authored_contents() -> Array:
 	if typeof(item_defs) != TYPE_DICTIONARY:
 		item_defs = ItemDefsScript.load_definitions()
 	var unique_state = loot_context.get("unique_state", null)
+	var index: int = 0
 	for stack_v in normalized_contents(loot_context):
 		if not (stack_v is Dictionary):
 			continue
@@ -124,7 +139,8 @@ func _grant_authored_contents() -> Array:
 		if unique_state != null and not unique_id.is_empty() and unique_state.has_method("can_claim"):
 			if not bool(unique_state.can_claim(unique_id, seed_key)):
 				continue
-		var added: int = inventory_state.add_item(item_id, qty)
+		var added: int = _deposit_lot(item_id, qty, stack, index)
+		index += 1
 		if added <= 0:
 			continue
 		var grant_entry: Dictionary = {
@@ -140,20 +156,62 @@ func _grant_authored_contents() -> Array:
 		granted.append(grant_entry)
 	return granted
 
-func _grant_rolled_contents() -> Array:
+## Guard every stack together before the first atomic lot deposit. This prevents
+## a container from consuming itself after accepting only an early stack.
+func _can_accept_contents(contents: Array) -> bool:
+	if inventory_state == null or not inventory_state.has_method("can_accept"):
+		return true
+	var totals: Dictionary = {}
+	for entry_v in contents:
+		if not (entry_v is Dictionary):
+			continue
+		var entry: Dictionary = entry_v as Dictionary
+		var item_id: String = str(entry.get("item_id", ""))
+		var qty: int = int(entry.get("quantity", entry.get("qty", 0)))
+		if not item_id.is_empty() and qty > 0:
+			totals[item_id] = int(totals.get(item_id, 0)) + qty
+	for item_id_v in totals:
+		if not inventory_state.can_accept(str(item_id_v), int(totals[item_id_v])):
+			return false
+	return true
+
+func _grant_rolled_contents(rolled: Array = []) -> Array:
 	var granted: Array = []
-	var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
+	if rolled.is_empty():
+		rolled = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
+	var index: int = 0
 	for entry in rolled:
 		var item_id: String = str((entry as Dictionary).get("item_id", ""))
 		var qty: int = int((entry as Dictionary).get("quantity", 0))
 		if item_id.is_empty() or qty <= 0:
 			continue
-		var added: int = inventory_state.add_item(item_id, qty)
+		var added: int = _deposit_lot(item_id, qty, entry as Dictionary, index)
+		index += 1
 		if added > 0:
 			var grant_entry: Dictionary = (entry as Dictionary).duplicate(true)
 			grant_entry["quantity"] = added
 			granted.append(grant_entry)
 	return granted
+
+## Loot is born as a real lot, including corpse/container provenance. Scalar
+## inventories remain supported only for old fixtures that predate P03.
+func _deposit_lot(item_id: String, qty: int, entry: Dictionary, index: int) -> int:
+	if inventory_state == null:
+		return 0
+	if inventory_state.has_method("add_lot"):
+		var score: float = clampf(float(entry.get("quality_score", entry.get("quality", 0.5))), 0.0, 1.0)
+		var raw_origin: Variant = entry.get("origin", {})
+		var origin: Dictionary = (raw_origin as Dictionary).duplicate(true) if raw_origin is Dictionary else {}
+		if origin.is_empty():
+			origin = {"loot_container": container_id, "seed_source": seed_source}
+		return int(inventory_state.add_lot({
+			"lot_id": str(entry.get("lot_id", "loot:%s:%03d" % [seed_source, index])),
+			"item_id": item_id, "quantity": qty, "quality_score": score,
+			"quality_tier": QualityTierResolverScript.tier_for_score(score),
+			"condition": clampf(float(entry.get("condition_score", 1.0)), 0.0, 1.0),
+			"origin": origin,
+		}))
+	return int(inventory_state.add_item(item_id, qty)) if inventory_state.has_method("add_item") else 0
 
 func _interaction_radius() -> float:
 	if collision_shape != null and collision_shape.shape is SphereShape3D:

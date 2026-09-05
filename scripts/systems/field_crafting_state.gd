@@ -24,31 +24,31 @@ func get_field_recipes() -> Array:
 ## Field crafting is intentionally skill-ungated for start (skill only affects
 ## quality), so entries use a high skill level for status and only report
 ## missing_ingredients / output_full as blockers.
-func list_recipe_entries(inventory) -> Array:
-	return _crafting_state.list_recipe_entries("field_crafting", inventory, 999)
+func list_recipe_entries(inventory, knowledge = null) -> Array:
+	return _crafting_state.list_recipe_entries("field_crafting", inventory, 999, 0, knowledge)
 
-func first_ready_recipe_id(inventory) -> String:
-	for entry in list_recipe_entries(inventory):
+func first_ready_recipe_id(inventory, knowledge = null) -> String:
+	for entry in list_recipe_entries(inventory, knowledge):
 		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
 			return str((entry as Dictionary).get("recipe_id", ""))
 	return ""
 
-func can_craft(recipe_id: String, inventory) -> bool:
+func can_craft(recipe_id: String, inventory, knowledge = null) -> bool:
 	var recipe: Dictionary = _crafting_state.get_recipe(recipe_id)
 	if recipe.is_empty():
 		return false
 	if str(recipe.get("station_kind", "")) != "field_crafting":
 		return false
-	return _crafting_state.can_craft(recipe_id, inventory)
+	return _crafting_state.can_craft(recipe_id, inventory, knowledge)
 
 ## Begins a field craft. Quality is resolved with station_level=0 and powered=false.
-func begin_craft(recipe_id: String, inventory, material_state, player_skill_level: int) -> bool:
+func begin_craft(recipe_id: String, inventory, material_state, player_skill_level: int, knowledge = null) -> bool:
 	var recipe: Dictionary = _crafting_state.get_recipe(recipe_id)
 	if recipe.is_empty():
 		return false
 	if str(recipe.get("station_kind", "")) != "field_crafting":
 		return false
-	if not can_craft(recipe_id, inventory):
+	if not can_craft(recipe_id, inventory, knowledge):
 		return false
 	# Use the base CraftingState logic but force a synthetic field station
 	var station = StationStateScript.new()

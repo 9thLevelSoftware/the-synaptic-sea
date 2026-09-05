@@ -3,6 +3,8 @@ class_name DeconstructionResolver
 
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const JunkYieldResolverScript := preload("res://scripts/systems/junk_yield_resolver.gd")
+const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
+const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 
 ## Pure model for breaking items down into base materials.
 ## Reads deconstruction recipes (category == "deconstruction") from the
@@ -39,26 +41,54 @@ func deconstruct(recipe_id: String, inventory, material_state, context: Dictiona
 		return {}
 	if str(recipe.get("category", "")) != "deconstruction":
 		return {}
-	if not can_deconstruct(recipe_id, inventory):
+	var candidate = _inventory_candidate(inventory)
+	if candidate == null or not can_deconstruct(recipe_id, candidate):
 		return {}
+	var ingredients: Dictionary = recipe.get("ingredients", {}) as Dictionary
+	var ingredient_ids: Array = ingredients.keys()
+	ingredient_ids.sort()
+	if ingredient_ids.size() != 1 or int(ingredients[ingredient_ids[0]]) != 1:
+		return {}
+	var source_item_id: String = str(ingredient_ids[0])
+	var taken: Array = candidate.take_lots(source_item_id, 1)
+	if taken.size() != 1:
+		return {}
+	var source_lot: Dictionary = taken[0] as Dictionary
+	# Lot state is the modern quality authority. MaterialState is retained only as
+	# a compatibility fallback for an older source shape without lot metadata.
 	var source_quality: float = _source_ingredient_quality(recipe, material_state)
+	if source_lot.has("quality_score"):
+		source_quality = clampf(float(source_lot.quality_score), 0.0, 1.0)
 	var skill_level: int = int(context.get("skill_level", 0))
 	var tool_factor: float = maxf(0.25, float(context.get("tool_factor", 1.0)))
 	var out_quality: float = _resolve_yield_quality(source_quality, skill_level, tool_factor)
-	if _crafting_state.consume_ingredients(recipe_id, inventory):
-		var produces: Dictionary = _crafting_state.get_produces(recipe_id)
-		var out_id: String = str(produces.get("item_id", ""))
-		var out_qty: int = int(produces.get("quantity", 0))
-		if not out_id.is_empty() and out_qty > 0:
-			if material_state != null and material_state.has_method("has_definition") \
-					and material_state.has_definition(out_id) \
-					and material_state.has_method("set_quality"):
-				material_state.set_quality(out_id, out_quality)
-			var result: Dictionary = produces.duplicate()
-			result["quality"] = out_quality
-			result["source_quality"] = source_quality
-			return result
-	return {}
+	var produces: Dictionary = _crafting_state.get_produces(recipe_id)
+	var out_id: String = str(produces.get("item_id", ""))
+	var out_qty: int = int(produces.get("quantity", 0))
+	if out_id.is_empty() or out_qty <= 0 or not candidate.can_accept(out_id, out_qty):
+		return {}
+	var salvage_lot_id: String = _yield_lot_id("deconstruct:%s" % recipe_id, str(source_lot.lot_id), 0, out_id)
+	if candidate.add_lot({
+		"lot_id": salvage_lot_id,
+		"item_id": out_id,
+		"quantity": out_qty,
+		"quality_score": out_quality,
+		"quality_tier": QualityTierResolverScript.tier_for_score(out_quality),
+		"condition": 1.0,
+		"origin": {"salvage_target": recipe_id, "source_lot_id": str(source_lot.lot_id)},
+	}) != out_qty:
+		return {}
+	if not inventory.apply_summary(candidate.get_summary()):
+		return {}
+	if material_state != null and material_state.has_method("has_definition") \
+			and material_state.has_definition(out_id) and material_state.has_method("set_quality"):
+		material_state.set_quality(out_id, out_quality)
+	var result: Dictionary = produces.duplicate()
+	result["quality"] = out_quality
+	result["source_quality"] = source_quality
+	result["salvage_lot_id"] = salvage_lot_id
+	result["deposited"] = true
+	return result
 
 
 func _source_ingredient_quality(recipe: Dictionary, material_state) -> float:
@@ -240,50 +270,53 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 	var yields: Array = JunkYieldResolverScript.yields_for_item(item_id, _junk_defs)
 	if yields.is_empty():
 		return {}
-	# Pre-check stack room for every yield so we never consume junk without
-	# depositing its materials (mirrors craft can_accept guards).
-	var can_all: bool = true
+	var candidate = _inventory_candidate(inventory)
+	if candidate == null:
+		return {}
+	var taken: Array = candidate.take_lots(item_id, 1)
+	if taken.size() != 1:
+		return {}
+	var source_lot: Dictionary = taken[0] as Dictionary
+	var totals: Dictionary = {}
 	for entry_variant in yields:
 		if not (entry_variant is Dictionary):
-			continue
-		var entry: Dictionary = entry_variant
-		var mid: String = str(entry.get("material_id", ""))
-		var qty: int = int(entry.get("quantity", 0))
-		if mid.is_empty() or qty <= 0:
-			continue
-		if not inventory.can_accept(mid, qty):
-			can_all = false
-			break
-	if not can_all:
-		return {}
-	if inventory.remove_item(item_id, 1) != 1:
-		return {}
+			return {}
+		var entry: Dictionary = entry_variant as Dictionary
+		var material_id: String = str(entry.get("material_id", ""))
+		var quantity: int = int(entry.get("quantity", 0))
+		if material_id.is_empty() or quantity <= 0:
+			return {}
+		totals[material_id] = int(totals.get(material_id, 0)) + quantity
+	for material_id in totals:
+		if not candidate.can_accept(str(material_id), int(totals[material_id])):
+			return {}
 	var materials: Dictionary = {}
 	var first_id: String = ""
 	var first_qty: int = 0
-	for entry_variant2 in yields:
-		if not (entry_variant2 is Dictionary):
-			continue
-		var y: Dictionary = entry_variant2
+	var quality: float = _resolve_yield_quality(float(source_lot.quality_score), 0, 1.0)
+	for yield_index in range(yields.size()):
+		var y: Dictionary = yields[yield_index] as Dictionary
 		var mid2: String = str(y.get("material_id", ""))
 		var qty2: int = int(y.get("quantity", 0))
-		if mid2.is_empty() or qty2 <= 0:
-			continue
-		inventory.add_item(mid2, qty2)
-		if material_state != null and material_state.has_method("has_definition") \
-				and material_state.has_definition(mid2) \
-				and material_state.has_method("set_quality"):
-			# PKG-B2.4a: junk salvage inherits a soft base from tool quality context later;
-			# default inheritance curve with standard source (0.5).
-			material_state.set_quality(mid2, _resolve_yield_quality(0.5, 0, 1.0))
+		var added: int = candidate.add_lot({
+			"lot_id": _yield_lot_id("junk:%s" % item_id, str(source_lot.lot_id), yield_index, mid2),
+			"item_id": mid2, "quantity": qty2, "quality_score": quality,
+			"quality_tier": QualityTierResolverScript.tier_for_score(quality), "condition": 1.0,
+			"origin": {"junk_source": item_id, "source_lot_id": str(source_lot.lot_id)},
+		})
+		if added != qty2:
+			return {}
 		materials[mid2] = int(materials.get(mid2, 0)) + qty2
 		if first_id.is_empty():
 			first_id = mid2
 			first_qty = qty2
-	if first_id.is_empty():
-		# No depositable yields — restore junk (should not happen after pre-check).
-		inventory.add_item(item_id, 1)
+	if first_id.is_empty() or not inventory.apply_summary(candidate.get_summary()):
 		return {}
+	for material_id in materials:
+		if material_state != null and material_state.has_method("has_definition") \
+				and material_state.has_definition(str(material_id)) \
+				and material_state.has_method("set_quality"):
+			material_state.set_quality(str(material_id), quality)
 	return {
 		"item_id": first_id,
 		"quantity": first_qty,
@@ -291,6 +324,21 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 		"materials": materials,
 		"multi_yield": materials.size() > 1,
 	}
+
+func _inventory_candidate(inventory):
+	if inventory == null or not inventory.has_method("get_summary") \
+			or not inventory.has_method("apply_summary") \
+			or not inventory.has_method("get_holder_namespace") \
+			or not inventory.has_method("take_lots") or not inventory.has_method("add_lot") \
+			or not inventory.has_method("can_accept"):
+		return null
+	var candidate = InventoryStateScript.new(str(inventory.get_holder_namespace()))
+	if not candidate.apply_summary(inventory.get_summary()):
+		return null
+	return candidate
+
+static func _yield_lot_id(action_id: String, source_lot_id: String, yield_index: int, item_id: String) -> String:
+	return "salvage:%s:source=%s:yield=%03d:%s" % [action_id, source_lot_id, yield_index, item_id]
 
 func get_summary() -> Dictionary:
 	return {

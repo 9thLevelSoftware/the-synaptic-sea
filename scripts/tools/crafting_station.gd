@@ -15,6 +15,7 @@ class_name CraftingStation
 
 signal craft_started(station_kind: String, recipe_id: String)
 signal salvage_completed(item_id: String, yields: Dictionary)
+signal reverse_engineered(component_id: String, event_receipt_id: String)
 signal craft_blocked(station_kind: String, reason: String)
 ## REQ-CS-016: non-salvage interact opens the coordinator recipe picker for this kind.
 signal recipe_picker_requested(station_kind: String)
@@ -22,11 +23,14 @@ signal recipe_picker_requested(station_kind: String)
 const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 
 var station_kind: String = ""
+var ship_id: String = ""
+var station_instance_id: String = ""
 var crafting_state                       # CraftingState
 var material_state                       # MaterialState
 var inventory_state                      # InventoryState
 var deconstruction_resolver              # DeconstructionResolver
 var player_progression                   # PlayerProgressionState | null
+var recipe_knowledge                     # RecipeKnowledgeState | null
 ## Optional coordinator ref for medbay surgery (Stream F). When set and
 ## station_kind == "medbay", try_interact prefers try_medbay_surgery first.
 var surgery_provider = null
@@ -48,7 +52,7 @@ func _ready() -> void:
 	if not body_exited.is_connected(_on_body_exited):
 		body_exited.connect(_on_body_exited)
 
-func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8) -> void:
+func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8, p_recipe_knowledge = null, p_ship_id: String = "", p_station_instance_id: String = "") -> void:
 	# Debug-build guards for the required dependencies (player_progression is intentionally
 	# optional — _player_skill() null-guards it, mirroring repair_point.gd).
 	assert(p_crafting_state != null, "p_crafting_state must not be null")
@@ -57,17 +61,27 @@ func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inv
 	assert(p_deconstruction_resolver != null, "p_deconstruction_resolver must not be null")
 	assert(radius >= 0.0, "radius must be non-negative")
 	station_kind = p_station_kind
+	ship_id = p_ship_id
+	station_instance_id = p_station_instance_id
 	crafting_state = p_crafting_state
 	material_state = p_material_state
 	inventory_state = p_inventory_state
 	deconstruction_resolver = p_deconstruction_resolver
 	player_progression = p_player_progression
+	recipe_knowledge = p_recipe_knowledge
 	interaction_radius = radius
 	candidate_player = null
 	position = world_position
 	name = "CraftingStation_%s" % p_station_kind
 	set_meta("crafting_station", true)
 	set_meta("station_kind", station_kind)
+	set_meta("crafting_ship_id", ship_id)
+	set_meta("station_instance_id", station_instance_id)
+	if not ship_id.is_empty() and not station_instance_id.is_empty() \
+			and crafting_state.has_method("bind_station_runtime_context"):
+		crafting_state.call(
+			"bind_station_runtime_context", ship_id, station_instance_id, station_kind,
+			inventory_state, recipe_knowledge, player_progression)
 	_ensure_collision(radius)
 	_ensure_marker(radius)
 
@@ -76,6 +90,12 @@ func set_validation_player_in_range(player_body: Node) -> void:
 
 func set_powered(value: bool) -> void:
 	powered = value
+	if crafting_state != null and not ship_id.is_empty() and not station_instance_id.is_empty() \
+			and crafting_state.has_method("get_or_create_station_instance"):
+		var station = crafting_state.call(
+			"get_or_create_station_instance", ship_id, station_instance_id, station_kind)
+		if station != null and station.has_method("set_power"):
+			station.call("set_power", value)
 
 func set_marker_visible(is_visible: bool) -> void:
 	marker_visible = is_visible
@@ -96,7 +116,7 @@ func try_interact(player_body: Node) -> bool:
 		return false
 	# Single active craft (CraftingState holds one global _active_craft): if one is already
 	# running, this station blocks with feedback and consumes interact (no fall-through).
-	if crafting_state.is_crafting():
+	if _is_this_station_busy():
 		emit_signal("craft_blocked", station_kind, "busy")
 		return true
 	# Stream F: medbay field surgery when the patient is critical (before crafts).
@@ -114,7 +134,7 @@ func try_craft_recipe(recipe_id: String) -> bool:
 	if recipe_id.is_empty() or crafting_state == null or inventory_state == null:
 		emit_signal("craft_blocked", station_kind, "no_craftable_recipe")
 		return false
-	if crafting_state.is_crafting():
+	if _is_this_station_busy():
 		emit_signal("craft_blocked", station_kind, "busy")
 		return false
 	if crafting_state.get_station_kind(recipe_id) != station_kind:
@@ -123,8 +143,12 @@ func try_craft_recipe(recipe_id: String) -> bool:
 	if str(crafting_state.get_recipe(recipe_id).get("category", "")) == "deconstruction":
 		emit_signal("craft_blocked", station_kind, "deconstruction_not_here")
 		return false
-	if not crafting_state.can_craft(recipe_id, inventory_state):
-		emit_signal("craft_blocked", station_kind, "missing_ingredients")
+	if not crafting_state.is_recipe_known(recipe_id, recipe_knowledge):
+		emit_signal("craft_blocked", station_kind, "missing_recipe_knowledge")
+		return false
+	var station_tier: int = _station_tier()
+	if not crafting_state.can_craft(recipe_id, inventory_state, recipe_knowledge, station_tier):
+		emit_signal("craft_blocked", station_kind, "insufficient_tier" if station_tier < crafting_state.get_station_tier_min(recipe_id) else "missing_ingredients")
 		return false
 	if crafting_state.get_required_skill_level(recipe_id) > _player_skill():
 		emit_signal("craft_blocked", station_kind, "insufficient_skill")
@@ -133,7 +157,9 @@ func try_craft_recipe(recipe_id: String) -> bool:
 	if not inventory_state.can_accept(str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
 		emit_signal("craft_blocked", station_kind, "output_full")
 		return false
-	if crafting_state.begin_craft(recipe_id, inventory_state, material_state, _player_skill()):
+	if crafting_state.begin_craft(
+			recipe_id, inventory_state, material_state, _player_skill(), recipe_knowledge,
+			ship_id, station_instance_id):
 		emit_signal("craft_started", station_kind, recipe_id)
 		return true
 	emit_signal("craft_blocked", station_kind, "begin_failed")
@@ -147,7 +173,8 @@ func first_ready_recipe_id() -> String:
 		return ""
 	if not crafting_state.has_method("list_recipe_entries"):
 		return ""
-	var entries: Array = crafting_state.list_recipe_entries(station_kind, inventory_state, _player_skill())
+	var entries: Array = crafting_state.list_recipe_entries(
+		station_kind, inventory_state, _player_skill(), _station_tier(), recipe_knowledge)
 	for entry in entries:
 		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
 			return str((entry as Dictionary).get("recipe_id", ""))
@@ -177,13 +204,44 @@ func try_salvage_target(target_id: String) -> bool:
 		emit_signal("craft_blocked", station_kind, "nothing_to_salvage")
 		return false
 	var out_id: String = str(produced.get("item_id", ""))
-	var out_qty: int = int(produced.get("quantity", 0))
-	# Deconstruct returns produces without depositing; junk already deposited materials.
-	if not target_id.begins_with("junk:"):
-		if not out_id.is_empty() and out_qty > 0:
-			inventory_state.add_item(out_id, out_qty)
+	# The resolver commits source consumption and all yields as one inventory
+	# transaction. The station must not deliver the same output a second time.
+	# The resolver has already consumed the target. Allocate the durable operation
+	# receipt once here, before notifying any listener that may replay delivery.
+	if recipe_knowledge != null and recipe_knowledge.has_method("allocate_event_receipt"):
+		var component_id: String = _reverse_component_id(target_id)
+		if not component_id.is_empty():
+			var receipt: String = str(recipe_knowledge.allocate_event_receipt("reverse_engineer"))
+			if not receipt.is_empty():
+				emit_signal("reverse_engineered", component_id, receipt)
 	emit_signal("salvage_completed", out_id, produced)
 	return true
+
+func _reverse_component_id(target_id: String) -> String:
+	if target_id.begins_with("junk:"):
+		return target_id.substr(5)
+	var recipe: Dictionary = crafting_state.get_recipe(target_id) if crafting_state != null else {}
+	var ingredients: Variant = recipe.get("ingredients", {})
+	if ingredients is Dictionary and not (ingredients as Dictionary).is_empty():
+		var ids: Array = (ingredients as Dictionary).keys()
+		ids.sort()
+		return str(ids[0])
+	return ""
+
+
+func _is_this_station_busy() -> bool:
+	if not ship_id.is_empty() and not station_instance_id.is_empty() \
+			and crafting_state.has_method("is_station_busy"):
+		return bool(crafting_state.call("is_station_busy", ship_id, station_instance_id))
+	return bool(crafting_state.call("is_crafting"))
+
+
+func _station_tier() -> int:
+	if not ship_id.is_empty() and not station_instance_id.is_empty() \
+			and crafting_state.has_method("get_station_instance_tier"):
+		return int(crafting_state.call(
+			"get_station_instance_tier", ship_id, station_instance_id, station_kind))
+	return int(crafting_state.call("get_station_tier", station_kind))
 
 func _interaction_radius() -> float:
 	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:

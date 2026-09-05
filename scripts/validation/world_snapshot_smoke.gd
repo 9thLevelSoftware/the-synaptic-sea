@@ -112,6 +112,30 @@ func _initialize() -> void:
 	assert(rt_legacy != null, "legacy dict without run_id still round-trips")
 	assert(String(rt_legacy.run_id) == "", "run_id defaults to \"\" for older saves")
 
+	# P04 additive floor holders keep world-4: absence is legacy-empty, while a
+	# present malformed current payload fails closed instead of disappearing.
+	var ws_floor = WorldSnapshotScript.new()
+	ws_floor.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_floor.godot_version = godot_version
+	ws_floor.home_floor_drops_v1 = {
+		"schema": "ship-floor-drops-1", "ship_id": "ship_start", "sequence": 0, "drops": [],
+	}
+	var rt_floor = WorldSnapshotScript.from_dict(
+		ws_floor.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_floor != null and str(rt_floor.home_floor_drops_v1.ship_id) == "ship_start",
+		"home floor-holder payload survives without an outer version change")
+	var malformed_floor: Dictionary = ws_floor.to_dict()
+	malformed_floor["home_floor_drops_v1"] = {}
+	assert(WorldSnapshotScript.from_dict(
+		malformed_floor, WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version) == null,
+		"present empty floor payload rejects")
+	var absent_floor: Dictionary = ws_floor.to_dict()
+	absent_floor.erase("home_floor_drops_v1")
+	var rt_absent_floor = WorldSnapshotScript.from_dict(
+		absent_floor, WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_absent_floor != null and rt_absent_floor.home_floor_drops_v1.is_empty(),
+		"absent floor payload migrates as legacy empty")
+
 	print("WORLD SNAPSHOT PASS round_trip=true version_gated=true")
 	quit(0)
 

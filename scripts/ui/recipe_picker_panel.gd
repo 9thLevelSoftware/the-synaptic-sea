@@ -178,7 +178,9 @@ func _format_row(entry: Dictionary) -> String:
 		for mat_id in (ingredients as Dictionary):
 			ing_parts.append("%s×%d" % [str(mat_id), int((ingredients as Dictionary)[mat_id])])
 	var ing_str: String = " ".join(ing_parts) if not ing_parts.is_empty() else "-"
-	return "[%s] %s  skill=%d  %s → %s×%d" % [status, name, skill, ing_str, out_id, out_qty]
+	var hint: String = str(entry.get("knowledge_hint", ""))
+	var hint_suffix: String = "  hint=%s" % hint if status == "missing_recipe_knowledge" and not hint.is_empty() else ""
+	return "[%s] %s  skill=%d  %s → %s×%d%s" % [status, name, skill, ing_str, out_id, out_qty, hint_suffix]
 
 func _render() -> void:
 	if _title_label != null:

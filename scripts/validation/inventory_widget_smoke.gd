@@ -13,7 +13,8 @@ func _init() -> void:
 	await _run_section_a()
 	await _run_section_b()
 	await _run_section_c()
-	print("INVENTORY WIDGET SMOKE PASS section_a=true section_b=true section_c=true")
+	await _run_section_d()
+	print("INVENTORY WIDGET SMOKE PASS section_a=true section_b=true section_c=true section_d=true")
 	quit()
 
 func _run_section_a() -> void:
@@ -188,3 +189,23 @@ func _run_section_c() -> void:
 	assert(inv3.get_quantity("field_pack") == 0, "transferred unit rolled back out of carry")
 	assert(inv3.get_quantity("eva_backpack") == 1, "carry untouched after rollback")
 	panel3.queue_free()
+
+func _run_section_d() -> void:
+	var inv = InventoryStateScript.new("ui-exact-self")
+	inv.add_lot({"lot_id":"self-master", "item_id":"eva_backpack", "quantity":1, "quality_score":0.9, "quality_tier":"masterwork", "condition":0.4, "origin":{"test":"self"}})
+	var hold = ShipInventoryScript.create(1000.0)
+	hold.add_lot({"lot_id":"hold-poor", "item_id":"field_pack", "quantity":1, "quality_score":0.1, "quality_tier":"poor", "condition":0.8, "origin":{"test":"hold"}})
+	var equip = EquipmentStateScript.create()
+	var panel = InventoryPanelScript.new(); root.add_child(panel); await process_frame
+	panel.open_transfer(inv, hold, "HOLD", equip); await process_frame
+	var self_row = (panel._rows["self"] as Array)[0]
+	var self_payload: Dictionary = panel.row_lot_drag_payload("self", self_row.item_id, self_row.lot_id, self_row.lot_quantity)
+	assert(str(self_payload.get("lot_id", "")) == "self-master", "rendered self row carries exact lot id")
+	panel.zone_for("slot:back")._drop_data(Vector2.ZERO, self_payload)
+	assert(str((equip.slot_lots["back"] as Dictionary).get("lot_id", "")) == "self-master" and hold.get_quantity("eva_backpack") == 0, "self exact lot equipped without transfer")
+	# Rejected replacement restores the selected container lot atomically.
+	var hold_row = (panel._rows["container"] as Array)[0]
+	var hold_payload: Dictionary = panel.row_lot_drag_payload("container", hold_row.item_id, hold_row.lot_id, hold_row.lot_quantity)
+	panel.zone_for("slot:back")._drop_data(Vector2.ZERO, hold_payload)
+	assert(str((equip.slot_lots["back"] as Dictionary).get("lot_id", "")) == "hold-poor" and inv.get_quantity("eva_backpack") == 1, "container row equips its exact lot and returns displaced exact lot")
+	panel.queue_free()

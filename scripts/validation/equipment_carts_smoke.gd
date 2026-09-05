@@ -24,6 +24,20 @@ func _run_section_a() -> void:
 	for _i in range(3):
 		await process_frame
 
+	# The coordinator takes and returns the real selected lot, so a worn item
+	# does not become a scalar standard-quality replacement.
+	assert(ship.inventory_state.add_lot({"lot_id":"live-equip-lot", "item_id":"eva_backpack", "quantity":1, "quality_score":0.82, "quality_tier":"excellent", "condition":0.44, "origin":{"corpse":"live-equip"}}) == 1, "seed exact equipment lot")
+	assert(ship.equip_for_validation("eva_backpack") == true, "live coordinator equipped seeded lot")
+	var equipped_lot: Dictionary = (ship.equipment_state.slot_lots.get("back", {}) as Dictionary).duplicate(true)
+	assert(str(equipped_lot.get("lot_id", "")) == "live-equip-lot" and float(equipped_lot.get("quality_score", 0.0)) == 0.82 and float(equipped_lot.get("condition", 0.0)) == 0.44 and equipped_lot.get("origin", {}) == {"corpse":"live-equip"}, "live equip preserves exact metadata")
+	assert(ship.unequip_for_validation("back") == "eva_backpack", "live coordinator unequipped selected lot")
+	var returned_lot: Dictionary = {}
+	for lot_v in (ship.inventory_state.get_lot_summary().get("lots", []) as Array):
+		if lot_v is Dictionary and str((lot_v as Dictionary).get("lot_id", "")) == "live-equip-lot":
+			returned_lot = lot_v as Dictionary
+			break
+	assert(not returned_lot.is_empty() and float(returned_lot.get("quality_score", 0.0)) == 0.82 and float(returned_lot.get("condition", 0.0)) == 0.44 and returned_lot.get("origin", {}) == {"corpse":"live-equip"}, "live unequip returns exact metadata")
+
 	# Auto-equip path via the manual seam (equips a backpack from inventory).
 	var base_cap: float = ship.player_capacity_for_validation()
 	assert(ship.equip_for_validation("eva_backpack") == true, "backpack equipped")

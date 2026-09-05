@@ -196,19 +196,26 @@ func _equip_in_inventory(item_id: String) -> bool:
 		return false
 	if _player_inv.get_quantity(item_id) <= 0 or not _equip.can_equip(item_id):
 		return false
-	var res: Dictionary = _equip.equip(item_id)
+	var outgoing: Array = _player_inv.take_lots(item_id, 1)
+	if outgoing.is_empty():
+		return false
+	var equipped_lot: Dictionary = outgoing[0] as Dictionary
+	var res: Dictionary = _equip.equip_lot(equipped_lot) if _equip.has_method("equip_lot") else _equip.equip(item_id)
 	if not bool(res.get("ok", false)):
+		_player_inv.add_lot(equipped_lot)
 		return false
 	var displaced: String = str(res.get("displaced", ""))
 	if displaced != "":
-		if int(_player_inv.add_item(displaced, 1)) < 1:
+		var displaced_lot: Dictionary = res.get("displaced_lot", {}) as Dictionary
+		var restored: int = int(_player_inv.add_lot(displaced_lot)) if not displaced_lot.is_empty() else int(_player_inv.add_item(displaced, 1))
+		if restored < 1:
 			# No carry room for the displaced item — abort atomically so nothing is lost.
 			# _player_inv still holds item_id (remove_item below hasn't run), so restoring the
 			# slot to displaced leaves item_id in carry. The second equip returns item_id as the
 			# newly-displaced value; it is intentionally ignored — item_id stays put in carry.
-			_equip.equip(displaced)
+			_equip.equip_lot(displaced_lot) if not displaced_lot.is_empty() and _equip.has_method("equip_lot") else _equip.equip(displaced)
+			_player_inv.add_lot(equipped_lot)
 			return false
-	_player_inv.remove_item(item_id, 1)
 	return true
 
 ## Equip-from-container (ADR-0026): auto-transfer one unit of an equippable from the container
@@ -237,12 +244,16 @@ func equip_from_container(item_id: String) -> bool:
 func unequip_slot(slot_id: String) -> bool:
 	if _player_inv == null or _equip == null:
 		return false
-	var item_id: String = _equip.unequip(slot_id)
-	if item_id == "":
+	var item_id: String = _equip.get_equipped(slot_id)
+	if item_id.is_empty():
 		return false
-	if int(_player_inv.add_item(item_id, 1)) < 1:
+	var lot: Dictionary = _equip.unequip_lot(slot_id) if _equip.has_method("unequip_lot") else {}
+	if lot.is_empty():
+		_equip.unequip(slot_id)
+	var restored: int = int(_player_inv.add_lot(lot)) if not lot.is_empty() else int(_player_inv.add_item(item_id, 1))
+	if restored < 1:
 		# No carry room — restore the worn item rather than destroy it.
-		_equip.equip(item_id)
+		_equip.equip_lot(lot) if not lot.is_empty() and _equip.has_method("equip_lot") else _equip.equip(item_id)
 		return false
 	_after_mutation()
 	return true
@@ -351,6 +362,9 @@ func zone_drop(target: String, data) -> void:
 		var slot: String = target.substr(5)
 		for id in ((data as Dictionary).get("ids", []) as Array):
 			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
+				if (data as Dictionary).has("lot_id"):
+					equip_selected_lot(from_pane, String(id), str((data as Dictionary).get("lot_id", "")))
+					return
 				if from_pane == "container":
 					equip_from_container(String(id))
 				else:
@@ -359,8 +373,29 @@ func zone_drop(target: String, data) -> void:
 					equip_selected()
 				return
 		return
+	if _mode == "transfer" and target != from_pane and (data as Dictionary).has("lot_id"):
+		transfer_selected_lot(from_pane, str((data as Dictionary).get("item_id", "")), str((data as Dictionary).get("lot_id", "")), int((data as Dictionary).get("quantity", 0)))
+		return
 	if _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container"):
 		transfer_selected(from_pane)
+
+func equip_selected_lot(from_pane: String, item_id: String, lot_id: String) -> bool:
+	if lot_id.is_empty() or _equip == null or _player_inv == null:
+		return false
+	var source = _inv_for_pane(from_pane)
+	if source == null:
+		return false
+	var lots: Array = source.take_lots(item_id, 1, PackedStringArray([lot_id]))
+	if lots.is_empty(): return false
+	var lot: Dictionary = lots[0] as Dictionary
+	var result: Dictionary = _equip.equip_lot(lot)
+	if not bool(result.get("ok", false)):
+		source.add_lot(lot); return false
+	var displaced: Dictionary = result.get("displaced_lot", {}) as Dictionary
+	if not displaced.is_empty() and _player_inv.add_lot(displaced) != 1:
+		_equip.equip_lot(displaced); source.add_lot(lot); return false
+	_after_mutation()
+	return true
 
 ## Move every id in `pane` to the other pane (manual — includes tools). Distinct from the
 ## Deposit All button, which uses deposit_all (parts/supplies only). Returns total moved.
@@ -509,6 +544,24 @@ func transfer_quantity(from_pane: String, item_id: String, qty: int) -> int:
 		_emit_transfer_denied_sfx()
 	return moved
 
+## Additive lot-row seam for quality-aware callers. The existing aggregate row
+## framework remains intact, while a lot detail/selection surface can transfer
+## only its selected stable identity; CargoTransfer never substitutes another
+## lot when this constraint cannot be satisfied.
+func transfer_selected_lot(from_pane: String, item_id: String, lot_id: String, qty: int) -> int:
+	if _mode != "transfer" or lot_id.is_empty():
+		return 0
+	var src = _inv_for_pane(from_pane)
+	var dst = _inv_for_pane(_other_pane(from_pane))
+	if src == null or dst == null:
+		return 0
+	var moved: int = CargoTransferScript.move_item(src, dst, item_id, qty, PackedStringArray([lot_id]))
+	if moved > 0:
+		_after_mutation()
+	else:
+		_emit_transfer_denied_sfx()
+	return moved
+
 ## "A" convenience: bulk deposit part+supply (tools excluded) into the container.
 func deposit_all_to_container() -> int:
 	if _mode != "transfer" or _player_inv == null or _container == null:
@@ -526,6 +579,10 @@ func deposit_all_to_container() -> int:
 ## The drag payload the mouse path and the smokes both use.
 func _build_drag_payload(pane: String) -> Dictionary:
 	return {"from_pane": pane, "ids": _model_for_pane(pane).get_selected_ids()}
+
+## Lot rows use this concrete payload rather than the aggregate legacy selection.
+func row_lot_drag_payload(pane: String, item_id: String, lot_id: String, quantity: int) -> Dictionary:
+	return {"from_pane": pane, "item_id": item_id, "lot_id": lot_id, "quantity": quantity, "ids": [item_id]}
 
 # --- rendering (widget-tree rebuild) ---
 
@@ -587,15 +644,29 @@ func _make_pane_section(pane: String, title: String) -> Control:
 	zone.custom_minimum_size = Vector2(320, 200)
 	var rows_vbox := VBoxContainer.new()
 	zone.add_child(rows_vbox)
-	var ids: Array = _ids_for_pane(pane)
-	for i in range(ids.size()):
-		var row = InventoryRowScript.create(self, pane, i, String(ids[i]), _defs)
+	var rows: Array = _lot_rows_for_pane(pane)
+	for i in range(rows.size()):
+		var entry: Dictionary = rows[i] as Dictionary
+		var row = InventoryRowScript.create(self, pane, i, str(entry.item_id), _defs, str(entry.lot_id), int(entry.quantity))
 		rows_vbox.add_child(row)
 		(_rows[pane] as Array).append(row)
 		row.set_selected(_model_for_pane(pane).is_selected(i))
 	_zones[pane] = zone
 	box.add_child(zone)
 	return box
+
+func _lot_rows_for_pane(pane: String) -> Array:
+	var inv = _inv_for_pane(pane)
+	if inv == null or not inv.has_method("get_lot_summary"):
+		return []
+	var lots: Variant = inv.get_lot_summary().get("lots", [])
+	var out: Array = []
+	if lots is Array:
+		for lot_v in lots:
+			if lot_v is Dictionary:
+				out.append((lot_v as Dictionary).duplicate(true))
+	out.sort_custom(func(a, b): return str(a.get("lot_id", "")) < str(b.get("lot_id", "")))
+	return out
 
 func _make_footer() -> Control:
 	var h := HBoxContainer.new()

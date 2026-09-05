@@ -34,6 +34,7 @@
       { "item_id": "fuel_line",       "qty_min": 1, "qty_max": 2, "weight": 3, "rarity": "common" },
       { "item_id": "power_cell",      "qty_min": 1, "qty_max": 2, "weight": 3, "rarity": "uncommon" },
       { "item_id": "thruster_nozzle", "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "rare", "depth_weight_scale": 0.12 },
+      { "item_id": "fabrication_schematic_basic", "qty_min": 1, "qty_max": 1, "weight": 0.3, "rarity": "rare", "condition_weights": { "wrecked": 1.4 } },
       { "item_id": "captains_black_box", "qty_min": 1, "qty_max": 1, "weight": 0.2, "rarity": "legendary", "unique_id": "captains_black_box", "codex_entry_id": "captains_black_box", "biome_weights": { "dead_fleet": 2.0, "default": 0.5 }, "condition_weights": { "wrecked": 1.4 } },
       { "item_id": "fire_extinguisher", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
       { "item_id": "fuel_canister",  "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },

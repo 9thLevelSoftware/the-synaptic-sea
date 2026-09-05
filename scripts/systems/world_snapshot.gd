@@ -17,6 +17,7 @@ var unique_item_summary: Dictionary = {}        # UniqueItemState.get_summary()
 var home_looted_containers: Array = []          # home ship's searched loot-container ids
 var home_ship_inventory: Dictionary = {}        # home ship's ShipInventory.get_summary()
 var home_ship_carts: Array = []                  # home ship's [CartState.get_summary()...]
+var home_floor_drops_v1: Dictionary = {}         # home ShipInstance.get_floor_drop_summary()
 var home_breach_environment: Dictionary = {}     # home ShipInstance breach environment only
 var player_equipment: Dictionary = {}           # EquipmentState.get_summary()
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
@@ -42,16 +43,14 @@ var godot_version: String = ""
 var saved_at: String = ""
 
 func to_dict() -> Dictionary:
-	return {
+	var result: Dictionary = {
 		"world_summary": world_summary.duplicate(true),
 		"home_ship": home_ship.duplicate(true),
 		"meta_progression_summary": meta_progression_summary.duplicate(true),
 		"unique_item_summary": unique_item_summary.duplicate(true),
 		"home_looted_containers": home_looted_containers.duplicate(),
-		"home_ship_inventory": home_ship_inventory.duplicate(true),
 		"home_ship_carts": home_ship_carts.duplicate(true),
 		"home_breach_environment": home_breach_environment.duplicate(true),
-		"player_equipment": player_equipment.duplicate(true),
 		"visited_ships": visited_ships.duplicate(true),
 		"current_location": current_location,
 		"world_time": world_time,
@@ -65,6 +64,13 @@ func to_dict() -> Dictionary:
 		"godot_version": godot_version,
 		"saved_at": saved_at,
 	}
+	if not home_ship_inventory.is_empty():
+		result["home_ship_inventory"] = home_ship_inventory.duplicate(true)
+	if not home_floor_drops_v1.is_empty():
+		result["home_floor_drops_v1"] = home_floor_drops_v1.duplicate(true)
+	if not player_equipment.is_empty():
+		result["player_equipment"] = player_equipment.duplicate(true)
+	return result
 
 ## Reconstructs a WorldSnapshot. Returns null when data is missing/not a dict,
 ## or when either version marker does not match (per ADR-0007/0012: incompatible
@@ -94,11 +100,25 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		ws.home_looted_containers = []
 		for cid in (looted_variant as Array):
 			ws.home_looted_containers.append(String(cid))
+	if dict.has("home_ship_inventory"):
+		if not (dict["home_ship_inventory"] is Dictionary) or (dict["home_ship_inventory"] as Dictionary).is_empty():
+			return null
 	ws.home_ship_inventory = _deep_copy_dict(dict.get("home_ship_inventory", {}))
 	var hc_variant: Variant = dict.get("home_ship_carts", [])
-	ws.home_ship_carts = (hc_variant as Array).duplicate(true) if hc_variant is Array else []
+	if not (hc_variant is Array):
+		return null
+	ws.home_ship_carts = (hc_variant as Array).duplicate(true)
+	if dict.has("home_floor_drops_v1"):
+		if not (dict["home_floor_drops_v1"] is Dictionary) or (dict["home_floor_drops_v1"] as Dictionary).is_empty():
+			return null
+	ws.home_floor_drops_v1 = _deep_copy_dict(dict.get("home_floor_drops_v1", {}))
 	ws.home_breach_environment = _deep_copy_dict(dict.get("home_breach_environment", {}))
+	if dict.has("player_equipment"):
+		if not (dict["player_equipment"] is Dictionary) or (dict["player_equipment"] as Dictionary).is_empty():
+			return null
 	ws.player_equipment = _deep_copy_dict(dict.get("player_equipment", {}))
+	if dict.has("visited_ships") and not (dict["visited_ships"] is Dictionary):
+		return null
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
 	ws.current_location = str(dict.get("current_location", ""))
 	ws.world_time = float(dict.get("world_time", 0.0))
