@@ -204,22 +204,29 @@ collision-free imported-visual boundary remains unchanged.
 
 The initial rounded gameplay boxes, in metres as width, height, depth, are:
 
-| Profile | W | H | D | Placement |
-|---|---:|---:|---:|---|
-| cart | 0.75 | 0.56 | 0.50 | floor |
-| floor_drop | 0.35 | 0.25 | 0.35 | floor, local Y 0.20 |
-| air_recycler | 0.80 | 0.56 | 0.60 | authored mount |
-| conduit | 0.30 | 1.00 | 0.22 | authored mount |
-| console_generic_wall | 0.60 | 0.54 | 0.34 | wall |
-| console_generic_deck | 0.60 | 0.54 | 0.34 | deck |
-| hull_plating | 1.00 | 1.00 | 0.08 | wall |
-| locker_wall | 0.60 | 0.75 | 0.34 | wall |
-| machinery_block | 0.80 | 0.90 | 0.60 | authored mount |
-| nav_console | 0.90 | 0.71 | 0.36 | authored mount |
-| pump | 0.40 | 0.52 | 0.40 | authored mount |
-| reactor_console | 0.60 | 0.75 | 0.35 | authored mount |
-| sensor_rack | 0.40 | 0.78 | 0.28 | authored mount |
-| thruster_control | 0.68 | 0.48 | 0.37 | authored mount |
+| Profile | W | H | D | Mount | Local position [x,y,z] | Local yaw degrees |
+|---|---:|---:|---:|---|---|---:|
+| cart | 0.75 | 0.56 | 0.50 | floor | [0,0.28,0] | 0 |
+| floor_drop | 0.35 | 0.25 | 0.35 | floor | [0,0.20,0] | 0 |
+| air_recycler | 0.80 | 0.56 | 0.60 | deck | [0,0.28,0] | 0 |
+| conduit | 0.30 | 1.00 | 0.22 | wall | [0,0.50,0.11] | 0 |
+| console_generic_wall | 0.60 | 0.54 | 0.34 | wall | [0,0.27,0.17] | 0 |
+| console_generic_deck | 0.60 | 0.54 | 0.34 | deck | [0,0.27,0] | 0 |
+| hull_plating | 1.00 | 1.00 | 0.08 | wall | [0,0.50,0.04] | 0 |
+| locker_wall | 0.60 | 0.75 | 0.34 | wall | [0,0.375,0.17] | 0 |
+| machinery_block | 0.80 | 0.90 | 0.60 | deck | [0,0.45,0] | 0 |
+| nav_console | 0.90 | 0.71 | 0.36 | wall | [0,0.355,0.18] | 0 |
+| pump | 0.40 | 0.52 | 0.40 | deck | [0,0.26,0] | 0 |
+| reactor_console | 0.60 | 0.75 | 0.35 | wall | [0,0.375,0.175] | 0 |
+| sensor_rack | 0.40 | 0.78 | 0.28 | wall | [0,0.39,0.14] | 0 |
+| thruster_control | 0.68 | 0.48 | 0.37 | wall | [0,0.24,0.185] | 0 |
+
+These are explicit authored values, including zero coordinates and yaw; absent
+fields never default to them. Compose `world = ship * mount_anchor * profile_local`.
+The mount anchor lies on the deck surface or wall/deck intersection; its +Y is
+ship up and its +Z is the registered wall interior normal (deck +Z is its authored
+forward). Foundation rows declare only `structural_rebuild` as their blocking
+purpose. A later reviewed integration may add player-motion capability.
 
 Except for `floor_drop`, a floor/deck profile uses local Y equal to half its
 height and local Z zero. A wall profile uses local Y equal to half its height and
@@ -248,6 +255,12 @@ candidate wrapper's exact authored shapes on a dedicated query layer. It uses
 shape rotation and local offset and cleans every temporary RID. A missing direct
 state returns pending/unsupported through the stable P13 token/context
 revalidation path; it never falls back to AABBs or sampled points.
+
+One path-clear operation must first check exact start and final poses with
+`intersect_shape()`, then sweep each nonzero segment with `cast_motion()`.
+Initial overlap must never be accepted from a clear sweep fraction. A zero-length
+segment still requires the pose-overlap check. Foundation tests cover start/end
+overlap, zero-length clear/blocked poses and a thin rotated obstacle mid-segment.
 
 This private query proves only obstruction newly introduced by the candidate.
 Every accepted route must also pass an independent existing-world clearance

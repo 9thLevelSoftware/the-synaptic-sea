@@ -382,6 +382,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "tools/check_structural_rebuild_catalog.py", "tests/test_structural_rebuild_catalog.py",
         "tools/check_runtime_physical_volume_catalog.py",
         "tests/test_runtime_physical_volume_catalog.py", "tools/classify_orphan_smokes.sh",
+        "docs/game/06_validation_plan.md",
         WORK_ACTION_CATALOG, f"{VALIDATION}fc_p17_smoke.gd", f"{VALIDATION}fc_p16_smoke.gd",
         f"{VALIDATION}structural_rebuild_policy_smoke.gd",
         f"{VALIDATION}runtime_physical_volume_smoke.gd",
@@ -1440,6 +1441,7 @@ def _verification(card_id: str, root: Path) -> list[dict[str, Any]]:
         checks.extend([
             _check("& $Python -m unittest tests.test_structural_rebuild_catalog", "OK", forbid_diagnostics=False),
             _check("& $Python -m unittest tests.test_runtime_physical_volume_catalog", "OK", forbid_diagnostics=False),
+            _check("bash tools/classify_orphan_smokes.sh --check", "ORPHAN CLASSIFICATION CHECK PASS", forbid_diagnostics=False),
         ])
     if card_id in {"P00", "P10", "P20", "P22"}:
         profile = "baseline" if card_id == "P00" else "crafting" if card_id == "P10" else "restoration" if card_id == "P20" else "all"

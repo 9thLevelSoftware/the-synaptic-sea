@@ -990,6 +990,8 @@ regeneration from the same seed/version; destruction does not erase repairabilit
 `structural_rebuild_preflight.gd`; new
 `runtime_physical_volume_catalog.gd`, `runtime_physical_volume.gd`, and
 `structural_rebuild_collision_query.gd`; `ship_work_transaction.gd`,
+`docs/game/06_validation_plan.md` and `tools/classify_orphan_smokes.sh` only for
+the two foundation smokes' standalone membership and exact PASS-marker rows;
 `work_action_catalog.gd`, `work_action_resolver.gd`; narrow source-kit/module/
 contract and registered-endpoint seams in `generated_ship_loader.gd`,
 `modular_socket_catalog.gd`, `dock_ports.gd`,
@@ -1030,6 +1032,7 @@ additions. The foundation authorization does not permit those product edits.
   Godot 4.7.2 `PhysicsDirectSpaceState3D.intersect_shape()` and `cast_motion()`.
   Preserve rotations/local offsets, use zero margin, isolate the candidate, and
   free every RID on every result. Do not substitute AABBs or sampled points.
+  Check exact start/final overlap before each sweep, including zero-length paths.
 - [ ] Prove foundation behavior through strict catalog Python tests and real
   Godot primitive/query smokes. The initial gameplay dimensions require scene
   clearance validation before later live integration; synthetic fixture-only
