@@ -84,6 +84,16 @@ Template B provides seed-driven variation candidates for:
 - **Objective placements:** each objective room has multiple floor cells, supporting at least two valid placements per sequence slot.
 - **Hazard placement:** the fire zone can be moved to the alternate optional link or duplicated on other non-critical side links if future kits add them.
 
+## Acceptance criteria
+
+- **Gameplay:** Template B loads from its authored layout and gameplay-slice files as a single-deck Y-shaped ship distinct from Template A.
+- **Gameplay:** The player can choose either major branch first, but both branches must be completed before the reactor objective becomes available.
+- **Gameplay:** All five authored objectives complete in sequence and advance the run to complete.
+- **Gameplay:** Blocked branch-end shortcuts remain sealed until the restore-systems condition clears them, without removing the canonical completion route.
+- **Gameplay:** The timed fire affects only the optional tool-storage link and never blocks a required objective or the critical path.
+- **Gameplay:** The optional oxygen pump spawns in `tool_storage_01` and halves breach-zone oxygen drain after pickup.
+- **Constraint:** Seed variation selects only among the documented blocked-link, objective, hazard, and tool-placement candidates.
+
 ## Verification
 
 - Loads end-to-end via `main_playable_slice_template_b_completion_smoke.gd`.

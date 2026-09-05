@@ -123,6 +123,15 @@ Common failures and fixes:
 A clean Blender save or a non-empty file is not sufficient evidence for
 promotion. Record the command and fresh validator output with the asset review.
 
+## Acceptance criteria
+
+- **Workflow:** Each structural module keeps its editable `.blend` and matching `.source.json` together under the external source root while JSON placement contracts remain authoritative.
+- **Workflow:** Geometry edits preserve the module ID, origin, contract bounds, socket empties, and collision helper, and never directly edit runtime files under `assets/imported/structural/`.
+- **Workflow:** Export includes only tagged `Export_*` visual collections with one valid `intact`, `damaged`, or `breached` role per collection, or the documented `Geometry` intact fallback; authoring helpers do not enter the GLB.
+- **Workflow:** Source validation proves required objects, coordinate-converted sockets, contract bounds, unique variant roles, valid non-empty staged GLBs, Blender re-import, and a quiet Godot import before promotion.
+- **Workflow:** Promotion occurs only after validation and review, records fresh validator output, and performs the requested external backup before copying staged GLBs into runtime assets.
+- **Constraint:** Canonical material names remain unchanged and source-only helpers or linked authoring libraries never become runtime dependencies.
+
 ## Coordinate Reference
 
 The placement contract uses **Y-up** coordinates. Blender uses **Z-up**. Convert

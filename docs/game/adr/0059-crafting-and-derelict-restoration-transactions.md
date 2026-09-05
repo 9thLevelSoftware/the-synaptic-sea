@@ -1,6 +1,6 @@
 # ADR-0059: Persistent crafting lots and transactional derelict restoration
 
-- Status: **Proposed; no implementation authorized by this record alone.**
+- Status: **Accepted for the Crafting and Derelict Feature Completion program; implementation pending.**
 - Date: 2026-09-04
 - Related: ADR-0038, ADR-0051, existing RunSnapshot versioning and ShipRuntime contracts.
 - Spec: [feature completion contract](../features/crafting_derelict_feature_completion.md).
@@ -33,6 +33,12 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
    compatible views; all mutators update the ledger, and old direct-dictionary
    writes are routed through these APIs. Quality, condition and provenance are
    separate fields. Legacy saves migrate deterministically without quantity loss.
+   Generated lot IDs include a persistent holder namespace and sequence so separate
+   holders cannot generate colliding identities. Owners supply stable source IDs
+   for legacy migration; new anonymous holders allocate and retain a unique
+   namespace. A metadata lot deposit is atomic; partial transfers split at the
+   source before depositing a complete outgoing lot. Legacy quantity-only adds
+   retain partial admission by computing capacity before generating their lot.
 3. Give each fabrication job a stable job ID, source ship/station IDs, ingredient
    escrow, state, progress, resolved output and collection receipt. Enqueue reserves;
    start consumes; completion records output once. Pending output is persistent.
@@ -53,10 +59,40 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
 9. Snapshot only coherent transaction boundaries. Persist escrow and receipts with
    their owners. Restoring a completed receipt cannot award output, materials or XP
    a second time. Unsupported future save versions are rejected without overwrite.
-10. Additive summary fields and a migration revision are required for lot/job and
-    replacement state. Exact next schema identifiers are allocated from current
-    HEAD by P01/P03; this ADR is the required authorization record for extending
-    RunSnapshot, not permission to silently reinterpret existing save fields.
+10. ComponentPlacementState owns physical slot occupancy. ShipModificationState
+    derives fit, power and effects from that owner. Generated physical slots carry
+    explicit authored profile IDs resolved against the current catalog; runtime
+    wall/center guesses cannot grant fit permission. Restore overlays saved dynamic
+    component contents onto freshly generated descriptors and never trusts saved
+    socket, footprint or type policies. P11 establishes this commit path; P12 wraps
+    the same path in timed work rather than introducing another mutation authority.
+11. Additive summary fields and a migration revision are required for lot/job and
+    replacement state. Current HEAD ends its ordered run chain at
+    `gate2-current-run-4` and its world target at `world-4`
+    (`scripts/systems/save_migration_service.gd`). The reserved successors are
+    `gate2-current-run-5` and `world-5`. P10 must append deterministic forward
+    steps, preserve every old step, and test future-version rejection before either
+    identifier becomes an implemented save format. This ADR authorizes that bounded
+    extension; it does not permit silent reinterpretation of existing fields.
+
+## Locked transaction payloads
+
+The following additive payload names are the inter-card contract. They are
+serialized only at coherent transaction boundaries and are owned by the holder
+named below. P03/P07/P10 may add nested fields needed for validation, but may not
+rename these keys without a superseding ADR.
+
+| Payload | Owner | Required identity / exactly-once fields |
+|---|---|---|
+| `item_lots_v1` | inventory or holder | `lot_id`, `item_id`, `quantity`, `quality_score`, `quality_tier`, `condition`, `origin` |
+| `craft_jobs_v1` | ship/station scheduler | `job_id`, `ship_id`, `station_instance_id`, `recipe_id`, `state`, `progress`, `ingredient_escrow`, `output_receipt_id` |
+| `pending_outputs_v1` | station or salvageable destroyed-station holder | `owner_id`, `receipt_id`, `lots`, `collected_quantities` |
+| `recipe_knowledge_v1` | current-run player | `owner_id`, `known_recipe_ids`, `event_receipt_ids` |
+| `work_transactions_v1` | selected ship | `work_id`, `ship_id`, `target_id`, `target_revision`, `state`, `escrow`, `commit_receipt_id` |
+| `structural_rebuild_v1` | ShipInstance/pillar persistence | `replacement_id`, `module_id`, `layout_revision`, `wrapper_id`, `transform`, `footprint`, `sockets`, `state` |
+
+`job_id`, `work_id`, and every receipt ID are idempotency keys. Retrying an already
+committed ID is a no-op; an incomplete transaction retains recoverable escrow.
 
 ## Consequences and controls
 

@@ -38,7 +38,16 @@ A player boards a derelict, searches lockers/crates/caches, reads rarity from co
 
 ## Acceptance criteria
 
-Mapped 1:1 to REQ-LE-001..009 in `docs/game/05_requirements.md`.
+Mapped to existing requirement rows: `REQ-LE-001`, `REQ-LE-002`, `REQ-LE-005`.
+
+- **Gameplay:** Identical table key, seed source, biome, depth, condition, and container kind produce identical finite loot rolls.
+- **Gameplay:** Industrial crates, survivor lockers, maintenance caches, and hidden caches bias distinct authored loot pools.
+- **Gameplay:** Biome, depth, and hull condition modify loot outcomes without bypassing the authored table.
+- **Gameplay:** Rarity is visible through the shared palette and inventory-row border styling.
+- **Gameplay:** Junk items resolve to authored material yields through merged item definitions.
+- **Gameplay:** A world-unique item can be claimed once per world state and its unique/codex state survives the documented snapshot boundary.
+- **Gameplay:** Every granted item produces a HUD loot line, rarity styling, and an audio-caption event.
+- **Constraint:** This package adds no crafting execution, vendor economy, final-art dependency, or broad item-stat rewrite.
 
 ## Verification
 

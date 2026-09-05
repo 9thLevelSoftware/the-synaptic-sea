@@ -134,7 +134,17 @@ synthetic death event while the run snapshot is wiped.
 
 ## Acceptance criteria
 
-Mapped 1:1 to REQ-PM-001..010 in `docs/game/05_requirements.md`.
+Mapped to existing requirement rows: `REQ-PM-001`, `REQ-PM-006`, `REQ-PM-007`.
+
+- **Gameplay:** Authored training actions resolve to typed skill XP, apply class category multipliers, use the `(level + 1) * 100` curve, and stop at level 10.
+- **Gameplay:** Cross-category training grants 50% XP and records the cross-trained amount by skill.
+- **Gameplay:** A skill book grants its authored one-shot XP once per run; schematic books also satisfy their authored skill-tree prerequisite.
+- **Gameplay:** Skill-tree unlock checks both level and book prerequisites and records unlocked branches without directly changing skill levels.
+- **Gameplay:** A fresh run offers the eight authored classes, applies the selected class's starting skills and multipliers, and persists `class_id` in the run snapshot.
+- **Gameplay:** Meta currency, unlocked classes, hub upgrades, and codex entries persist in `user://meta_progression.json` with explicit schema version handling.
+- **Gameplay:** Hub-upgrade purchase rejects unknown, unaffordable, or prerequisite-blocked upgrades and deducts currency exactly once on success.
+- **Gameplay:** Run completion or death applies the authored meta payout; death clears current-run state while preserving meta state for the next run.
+- **Constraint:** This package adds no cosmetic customization, faction reputation, cross-class death transfer, or full meta reset on death.
 
 ## Verification
 

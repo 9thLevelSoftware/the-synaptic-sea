@@ -2,6 +2,54 @@
 
 Requirements must be granular, testable, and linked to feature specs or ADRs.
 
+## Feature-completion registry policy (P01, 2026-09-04)
+
+`docs/game/inventory/feature_acceptance.json` is the machine-readable acceptance
+registry for this program. It preserves all 130 existing `REQ-*` headings as source
+coverage, including deferred and expected-unbuilt scope. The reviewed registry
+freezes 622 distinct active acceptance criteria as the whole-game metric denominator;
+exact same-package boilerplate aliases do not inflate that count. P23 owns individual
+evidence review and may not remove an item because implementation is absent. FC rows
+below are additive and do not change an existing requirement's recorded status.
+
+Fresh evidence has four independent dimensions: recorded, implemented, validated,
+and accepted. The current program evidence state is `not_verified` unless a P-card
+attaches a fresh runner result and player evidence. Inventory `confidence: V` and
+historical requirement labels never satisfy that condition.
+
+## Crafting and derelict feature-completion requirements (FC-01..24)
+
+Source: `features/crafting_derelict_feature_completion.md`; architecture:
+ADR-0059; registry/card manifest: `inventory/feature_acceptance.json` and
+`data/validation/feature_completion_cards.json`.
+
+| ID | Status | Owner | Required outcome |
+|---|---|---|---|
+| FC-01 | Approved, unimplemented | P01/P02 | Classify all active runtime/design scope and make evidence executable. |
+| FC-02 | Approved, unimplemented | P00 | Clean supported-engine/native runtime baseline. |
+| FC-03 | Approved, unimplemented | P02 | Reject false PASS, diagnostics, timeout and bad exits. |
+| FC-04 | Approved, unimplemented | P06/P10 | Identical knowledge/skill/tier/ingredient production gate. |
+| FC-05 | Approved, unimplemented | P03/P04 | Preserve quantity and quality through all holders/transfers. |
+| FC-06 | Approved, unimplemented | P05 | Quality has visible declared live effects. |
+| FC-07 | Approved, unimplemented | P07 | Paid, identified, station-owned jobs execute once. |
+| FC-08 | Approved, unimplemented | P07/P08 | Power/cancel/retry preserve escrow, progress, quantities. |
+| FC-09 | Approved, unimplemented | P08 | Full destinations never lose output/salvage. |
+| FC-10 | Approved, unimplemented | P09 | Reachable, non-profitable recipe and repair chains. |
+| FC-11 | Approved, unimplemented | P09/P21 | UI exposes choices, costs, quality, queue and blockers. |
+| FC-12 | Approved, unimplemented | P10 | Old/new saves preserve jobs, knowledge, outputs and quality. |
+| FC-13 | Approved, unimplemented | P11 | Only catalogued compatible parts fit physical slots. |
+| FC-14 | Approved, unimplemented | P12 | Physical work is timed, interruptible, exactly once. |
+| FC-15 | Approved, unimplemented | P13 | Explicit selected ship prevents home-ship mutation. |
+| FC-16 | Approved, unimplemented | P14 | Installed condition/power effects reverse exactly once. |
+| FC-17 | Approved, unimplemented | P15 | Selected repair target consumes materials once. |
+| FC-18 | Approved, unimplemented | P16/P17 | Destroyed structure stays inspectable and replaceable. |
+| FC-19 | Approved, unimplemented | P17 | Replacement checks footprint, sockets, occupancy and egress. |
+| FC-20 | Approved, unimplemented | P18 | Replacement restores geometry, collision, nav and atmosphere. |
+| FC-21 | Approved, unimplemented | P20/P21 | Claimed repaired ship is usable under real readiness rules. |
+| FC-22 | Approved, unimplemented | P19/P20 | Repairs/replacements/machinery survive revisit, docking and saves. |
+| FC-23 | Approved, unimplemented | P01/P23 | Every active designed system receives its own acceptance disposition. |
+| FC-24 | Approved, unimplemented | P24 | Offline native export supports the core loop without dev tools. |
+
 ## Status legend
 
 - Proposed

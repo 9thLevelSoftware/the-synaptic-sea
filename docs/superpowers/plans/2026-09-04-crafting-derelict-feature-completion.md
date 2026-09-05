@@ -246,7 +246,29 @@ case count; no copied hard-coded count becomes the authority.
 for a reviewed toolchain correction; the two doorway damaged/breached `.glb.import`
 files and `scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn`
 only if a reproducible source defect is demonstrated. Generated caches stay in an
-isolated worktree. **Non-goals:** gameplay edits, blanket reimport churn or installs.
+isolated worktree. Evidence-driven scope addition: `scripts/procgen/ceiling_fade_controller.gd`
+and `scripts/validation/fc_p00_ceiling_lifetime_smoke.gd` may fix the baseline
+freed-player access reproduced by the canonical main save/load smoke. Acceptance:
+freeing or replacing the tracked player never reads a freed object; rebinding a
+live player restores ceiling fading; both the focused lifetime smoke and main
+save/load smoke pass without unexpected diagnostics. A second reproduced baseline
+gap permits `scripts/procgen/ship_generator.gd` and
+`scripts/validation/fc_p00_native_arc_smoke.gd`, strengthening only existing
+zone-identity/reload/revisit assertions in `scripts/validation/derelict_arc_smoke.gd`, plus only generation calls in
+`scripts/procgen/playable_generated_ship.gd` functions
+`_activate_derelict_from_instance` and `_ensure_derelict_geometry`: preserve builder-authored arc-zone
+descriptors through the native generation route, matching the existing fallback
+projection. Acceptance requires explicit native-route evidence, deterministic
+same-seed descriptors, real scene arc markers, and a clean `derelict_arc_smoke.gd`
+covering its existing away-tick/save/revisit assertions. Regeneration must select
+the same generation route and saved seed/size/condition as initial travel so the
+persisted arc IDs address the rebuilt geometry. ADR-0061 additionally permits
+`scripts/procgen/ship_blueprint.gd` and the coordinator's initial generation-context
+capture and `_apply_run_context_from_blueprint` seams to serialize and restore the
+actual resolved biome/difficulty, including first-run overrides. The optional
+versioned blueprint context must round-trip; malformed present context is distinct
+from absent legacy data. **Non-goals:** unrelated
+gameplay edits, blanket reimport churn or installs.
 
 - [ ] Record HEAD, clean/dirty paths, engine path/version, native extension load,
   import source existence and current test outputs. Preserve real save data.
@@ -314,7 +336,7 @@ file is removed from the denominator merely because its implementation is missin
   expected marker; a changed/unrecognized document structure must fail visibly.
 - [ ] Run `python -m pytest -q tests/test_feature_completion_runner.py
   tests/test_feature_acceptance_registry.py` and
-  `python -m unittest discover -s tools -p test_build_system_inventory.py`, then
+  `python tools/test_build_system_inventory.py` (standalone self-test), then
   inventory `--check`/`--coverage`. Register each subsequent task's exact script.
 
 **Evidence:** `summary.json` contains raw-log paths and separate model/scene/player
@@ -325,7 +347,15 @@ scope. Stored `confidence: V` is never counted as an executed check.
 **Depends:** P01-P02. **Requirements:** FC-05, FC-12.
 **Allowed files:** new `item_lot_ledger.gd`; `inventory_state.gd`, `material_state.gd`,
 `item_defs.gd`; new `fc_p03_smoke.gd`. All scripts here are under `scripts/systems/`
-except the smoke under `scripts/validation/`. **Non-goals:** UI, cargo, rebalancing.
+except the smoke under `scripts/validation/`. Also allow fixture initialization
+changes only in `scripts/validation/production_output_full_consume_smoke.gd`,
+`scripts/validation/production_output_full_consume_away_smoke.gd`,
+`scripts/validation/work_yield_scoop_denied_sfx_smoke.gd`,
+`scripts/validation/work_yield_scoop_denied_away_smoke.gd`,
+`scripts/validation/work_yield_partial_scoop_smoke.gd`, and
+`scripts/validation/work_yield_partial_scoop_away_smoke.gd`: replace direct
+aggregate-dictionary assignments with ledger-backed inventory APIs while preserving
+every behavior assertion. **Non-goals:** UI, cargo, rebalancing.
 
 - [ ] Reproduce loss by adding two qualities of the same item; specify exact lots,
   aggregate quantity, split behavior, stack cap and legacy-load expectations.
@@ -358,7 +388,13 @@ assert(ledger.get_quantity("scrap_metal") == 4)
 equipment_state,deconstruction_resolver}.gd`,
 `scripts/tools/{cargo_hold_control,cart_control,work_yield_drop,loot_container}.gd`,
 `scripts/ui/{inventory_panel,inventory_row,inventory_drop_zone}.gd`,
-`scripts/procgen/playable_generated_ship.gd` transfer seams; new `fc_p04_smoke.gd`.
+`scripts/procgen/playable_generated_ship.gd` transfer, exact-lot equip/unequip,
+loot and salvage deposits, cart/equipment validation, and floor-drop snapshot/revisit
+binding seams; `scripts/systems/ship_instance.gd` cargo/cart identity and persistent
+floor-holder binding; `scripts/systems/world_snapshot.gd` only floor-holder payload
+validation if needed; `scripts/tools/crafting_station.gd` only lot-aware salvage
+deposits, preserving P06 receipts and P07 job ownership;
+new `fc_p04_smoke.gd`.
 **Non-goals:** changing transfer distance, encumbrance or cargo weight policy.
 
 - [ ] Enumerate every inventory mutation caller with `rg`; assign lot-aware source
@@ -403,7 +439,11 @@ quality changes the authored consumer value, and never increases item quantity.
 **Allowed files:** `scripts/systems/{crafting_state,field_crafting_state,
 recipe_knowledge_state}.gd`, `scripts/tools/crafting_station.gd`,
 `scripts/ui/recipe_picker_panel.gd`, coordinator knowledge/list/start seams;
-`data/recipes/recipe_definitions.json`; new `fc_p06_smoke.gd`.
+`data/recipes/recipe_definitions.json`, `data/items/item_definitions.json`,
+`data/items/loot_tables.json` (existing engineering salvage table); new
+`fc_p06_smoke.gd`. The item-data expansion supplies a real readable skill book for
+the existing book catalog. Its normal-play acquisition and inventory Read action
+must be wired and verified; additional file scope requires a recorded exact path.
 **Non-goals:** adding a separate metaprogression system or hundreds of recipes.
 
 - [ ] Use the authored non-starter recipe to demonstrate picker/direct-start gate
@@ -424,7 +464,11 @@ the real learning event unlocks it; replaying that event does not award twice.
 **Depends:** P03, P06. **Requirements:** FC-07..08.
 **Allowed files:** new `craft_job_state.gd`, `craft_job_scheduler.gd`;
 `crafting_state.gd`, `station_state.gd`, `ship_runtime.gd` under systems;
-new `fc_p07_smoke.gd`. **Non-goals:** queue UI or changing station power balance.
+new `fc_p07_smoke.gd`; `scripts/tools/crafting_station.gd` only production station
+identity/job ownership calls; `scripts/procgen/playable_generated_ship.gd` only
+`_build_crafting_stations` and its adjacent stable-identity helper. IDs use the
+actual owning ship and stable authored local placement, never station kind alone
+or a transient iteration counter. **Non-goals:** queue UI or changing station power balance.
 
 - [ ] Promote the one-payment/two-output probe into a regression; add concurrent
   same-kind stations and repeated-tick/completion cases.
@@ -513,7 +557,21 @@ interrupt, collect and use differentiated output through normal controls.
 **Depends:** P01-P02. **Requirements:** FC-13.
 **Allowed files:** `scripts/systems/{component_catalog,component_placement_state,
 component_mount_resolver,ship_modification_state}.gd`,
-`scripts/ui/ship_modification_panel.gd`, component catalog; new `fc_p11_smoke.gd`.
+`scripts/ui/ship_modification_panel.gd`, component catalog; new `fc_p11_smoke.gd`;
+`scripts/procgen/playable_generated_ship.gd` only its physical-slot/ship-mod panel
+binding seam, plus `scripts/validation/ship_modification_smoke.gd` for a real
+physical-slot fixture. This binding is required for P11 to function in gameplay;
+P13 generalizes explicit ship ownership. Coordinate with P06's disjoint knowledge
+seams in the same coordinator file. Explicit authored physical-slot profile IDs may
+be emitted by `scripts/procgen/wall_door_resolver.gd`, preserved by
+`scripts/procgen/layout_serializer.gd`, and projected in only the native component
+slot seam of `scripts/procgen/ship_generator.gd`. Coordinate the latter with P00's
+separate arc projection. ComponentPlacementState owns occupancy; ship-mod state is
+a derived view. Saved fit policy must never override current layout/catalog data.
+`data/procgen/golden/coherent_ship_001/layout.json` may receive explicit physical
+slot metadata without changing room geometry, module keys or placement order.
+The same metadata-only change is allowed in `coherent_ship_002/layout.json` only
+if its actual runtime/regression references require the same physical-slot path.
 **Non-goals:** timing changes until P12 or synthetic replacement slots.
 
 - [ ] Reproduce purified-water installation using the real catalog; add unknown
@@ -624,6 +682,9 @@ materials are paid, and install/remove does not reproduce this repair effect.
 **Depends:** P01-P02. **Requirements:** FC-18.
 **Allowed files:** new `structural_rebuild_state.gd`; `module_integrity_map.gd`,
 `module_integrity_state.gd`; `generated_ship_loader.gd` module registration;
+`scripts/procgen/playable_generated_ship.gd` only its module-integrity ownership
+binding/restore seam, so descriptor inspection follows the actual map changed by
+live fire, damage and repair rather than an independent loader-only copy;
 new `fc_p16_smoke.gd`. **Non-goals:** reconstruction or altered room generation.
 
 - [ ] Destroy a real generated/authored wall and prove its stable descriptor remains

@@ -756,6 +756,23 @@ Product follow-up (not this stack): a fourth biome with distinct modifiers if co
 
 ---
 
+## Acceptance criteria
+
+Mapped to existing requirement rows: `REQ-WALK-001`, `REQ-DECAY-001`, `REQ-DECAY-002`, `REQ-FILL-001`, `REQ-HIVE-001`, `REQ-SLICE-001`.
+
+- **Gameplay:** Production walkability uses compiler edge kinds plus authored vertical connections, keeps enclosure and standing-play floods distinct, and blocks standing traversal through SOLID, LOCKED, and BREACH edges.
+- **Gameplay:** Damaged and wrecked generation overlays blocked links and module damage without deleting logical room links, double-compiling, or losing standing start-to-goal reachability.
+- **Gameplay:** Live structural wrapper collision matches the documented wall slabs and doorway opening used by the capsule-sweep contract.
+- **Gameplay:** Generated loot, salvage approaches, components, and dressing consume deterministic interior wall/center slots without sharing reserved cells or dumping onto the first floor cell.
+- **Gameplay:** The hive template remains connector-grown occupancy and binds a biomatter kit through the existing socket and wrapper-map fallback contracts.
+- **Gameplay:** A generated damaged/wrecked away ship is boarded through the production travel attach path and retains standing navigation, slot content, wreck state, objectives, and 30 away ticks.
+- **Workflow:** Each independently mergeable package cites its requirement, limits its files and non-goals, and registers a smoke in the canonical bundle only in the same change that makes its required marker green.
+- **Constraint:** The stack preserves schema 1.2.0, the hand-authored hub boot, loader-only instantiation, compiler-owned sockets, and curated golden layouts.
+- **Deferred:** Unique hive meshes and a fourth biome remain follow-up content after the socketed biomatter remap.
+- **Deferred:** Crawl-through-BREACH gameplay remains a separate crouch-collision feature because the current crouch action does not resize the player capsule.
+
+---
+
 ## Requirements to add
 
 Extend `docs/game/05_requirements.md`. Keep REQ-ENC-001..003. Rewrite REQ-ENC-004 rationale (mapping is live; loader kit file is not).

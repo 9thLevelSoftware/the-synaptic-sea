@@ -39,7 +39,9 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0052 | docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md | portable prop sidecars, generated bindings, and visual-only runtime binding |
 | 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
 | 0058 | docs/game/adr/0058-meshy-candidates-blender-authority.md | Meshy candidate-only generation, Blender canonical masters, staged review, and Godot runtime authority |
-| 0059 | docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md | Proposed: persistent quality lots, paid jobs, ship-scoped physical work and structural replacement |
+| 0059 | docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md | Accepted contract; implementation pending: persistent quality lots, paid jobs, ship-scoped physical work and structural replacement |
+| 0060 | docs/game/adr/0060-windows-feature-completion-validation-runtime.md | Proposed: Windows 4.7.2 validation runtime, pending canonical compatibility evidence |
+| 0061 | docs/game/adr/0061-persist-resolved-generation-context.md | Accepted contract: retain resolved generation context through reload and revisit; validation pending |
 
 ## Notes
 

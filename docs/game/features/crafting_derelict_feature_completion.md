@@ -1,10 +1,10 @@
 # Feature program: Crafting and derelict restoration completion
 
-Status: **Scope and direction agreed 2026-09-04; implementation not started.**
+Status: **Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.**
 The detailed contracts below are the reviewable implementation proposal.
 Baseline: `main` at `f4a65669`. No implementation completion is asserted here.
 Plan: [implementation program](../../superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md).
-Architecture: [ADR-0059](../adr/0059-crafting-and-derelict-restoration-transactions.md), proposed.
+Architecture: [ADR-0059](../adr/0059-crafting-and-derelict-restoration-transactions.md), accepted for implementation.
 
 ## Purpose and scope
 
@@ -223,3 +223,13 @@ Run both seeds 42 and 777 in `breach_field`/`standard`, with home and away branc
 No console spawning, `force_repair`, validation teleport, or test-only completion
 method is permitted in the final player acceptance run. Automated fixtures may
 use controlled setup, but must label that evidence separately.
+
+## Completion accounting (P01)
+
+The program register is [feature_acceptance.json](../inventory/feature_acceptance.json).
+It records scope, owner card, source/provenance, and evidence independently. A
+recorded inventory confidence or a historical `Validated` requirement status is
+not fresh FC evidence. At scope freeze, all FC evidence states are
+`not_verified`; implementation and acceptance counts are therefore zero for this
+program. Existing deferred and expected-unbuilt design scope remains in the
+whole-game register and is assigned to FC-23/P23 rather than excluded.
