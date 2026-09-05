@@ -1917,18 +1917,18 @@
         },
         {
           "path": "scripts/validation/fc_p10_process_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tools/run_p10_process_smoke.py",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tests/test_p10_process_runner.py",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],
