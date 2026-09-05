@@ -9,6 +9,7 @@ class_name InventoryState
 ## ToolPickup, and the junction gate are untouched. Round-trips via get/apply_summary.
 
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const ItemLotLedgerScript := preload("res://scripts/systems/item_lot_ledger.gd")
 
 const ITEM_DEFINITIONS_PATH: String = "res://data/items/item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
@@ -16,13 +17,21 @@ const MAX_WEIGHT: float = 50.0
 const DEFAULT_TOOL_WEIGHT: float = 2.0
 const DEFAULT_MAX_STACK: int = 99
 
-var items: Dictionary = {}          # item_id: String -> quantity: int
+var _lot_ledger                     # ItemLotLedger; sole quantity/metadata authority
+## Read-only aggregate compatibility view. A fresh dictionary prevents external
+## writes from creating a quantity state that disagrees with the lot ledger.
+var items: Dictionary:
+	get:
+		return _lot_ledger.get_quantities() if _lot_ledger != null else {}
 var bonus_capacity: float = 0.0     # added by worn containers (set by the coordinator)
 var weight_reduction: float = 0.0   # saved kg from worn containers (set by the coordinator)
 var _definitions: Dictionary = {}   # item_id -> def Dictionary (merged)
+var _holder_namespace_bound: bool = false
 
-func _init() -> void:
+func _init(holder_namespace: String = "") -> void:
 	_load_definitions()
+	_lot_ledger = ItemLotLedgerScript.new(_definitions, holder_namespace)
+	_holder_namespace_bound = not holder_namespace.is_empty()
 
 func _load_definitions() -> void:
 	_definitions = ItemDefsScript.load_definitions()
@@ -67,26 +76,46 @@ func is_over_capacity() -> bool:
 
 func get_total_weight() -> float:
 	var total: float = 0.0
-	for item_id in items:
-		total += get_weight_each(item_id) * float(items[item_id])
+	var quantities: Dictionary = items
+	for item_id in quantities:
+		total += get_weight_each(item_id) * float(quantities[item_id])
 	return total
 
 func get_quantity(item_id: String) -> int:
-	return int(items.get(item_id, 0))
+	return _lot_ledger.get_quantity(item_id)
 
 ## Adds up to qty, honoring max_stack ONLY. Weight does NOT gate (PZ soft-cap):
 ## the player may carry over capacity and suffer a Heavy Load movement penalty.
 ## Returns the quantity actually added (0 if the stack is full).
 func add_item(item_id: String, qty: int) -> int:
-	if item_id.is_empty() or qty <= 0:
-		return 0
-	var current: int = get_quantity(item_id)
-	var stack_room: int = max(0, _max_stack(item_id) - current)
-	var want: int = min(qty, stack_room)
-	if want <= 0:
-		return 0
-	items[item_id] = current + want
-	return want
+	var added: int = _lot_ledger.add_standard(item_id, qty)
+	if added > 0:
+		_holder_namespace_bound = true
+	return added
+
+## Metadata-aware deposit for crafting, salvage, transfer, and persistence paths.
+func add_lot(lot: Dictionary) -> int:
+	var added: int = _lot_ledger.add_lot(lot)
+	if added > 0:
+		_holder_namespace_bound = true
+	return added
+
+## Atomic metadata-aware removal. Explicit IDs constrain selection; an empty list
+## uses the legacy standard-quality-first ordering.
+func take_lots(item_id: String, qty: int, preferred_ids: PackedStringArray = PackedStringArray()) -> Array:
+	return _lot_ledger.take_lots(item_id, qty, preferred_ids)
+
+func get_lot_summary() -> Dictionary:
+	return _lot_ledger.get_summary()
+
+func bind_holder_namespace(holder_namespace: String) -> bool:
+	var bound: bool = _lot_ledger.bind_holder_namespace(holder_namespace)
+	if bound:
+		_holder_namespace_bound = true
+	return bound
+
+func get_holder_namespace() -> String:
+	return _lot_ledger.get_holder_namespace()
 
 ## Returns true if at least `qty` of item_id can be added without exceeding max_stack.
 ## Weight is a soft-cap (never blocks); only the per-item stack ceiling gates here. Use to
@@ -104,11 +133,8 @@ func remove_item(item_id: String, qty: int) -> int:
 	var removed: int = min(qty, current)
 	if removed <= 0:
 		return 0
-	if removed >= current:
-		items.erase(item_id)
-	else:
-		items[item_id] = current - removed
-	return removed
+	var taken: Array = _lot_ledger.take_lots(item_id, removed)
+	return removed if not taken.is_empty() else 0
 
 func get_items_by_category(category: String) -> Array:
 	var out: Array = []
@@ -124,7 +150,7 @@ func get_items_by_category(category: String) -> Array:
 	return out
 
 func reset() -> void:
-	items.clear()
+	_lot_ledger.clear()
 	_load_definitions()
 
 # --- legacy tool shims (REQ-007 consumers depend on these) ---
@@ -167,6 +193,7 @@ func get_summary() -> Dictionary:
 			})
 	return {
 		"items": items.duplicate(true),
+		"item_lots_v1": _lot_ledger.get_summary(),
 		"tool_ids": tool_ids.duplicate(),          # derived; kept for backward compat
 		"active_effects": effects,
 		"drain_multiplier": get_drain_multiplier(), # OxygenState consumes this
@@ -174,22 +201,69 @@ func get_summary() -> Dictionary:
 		"max_weight": get_max_weight(),
 	}
 
-## Accepts the new ("items") shape AND the legacy ("tool_ids"-only) shape.
-func apply_summary(summary: Dictionary) -> bool:
+## Accepts lot-aware, aggregate-only, and legacy tool-only shapes atomically.
+## material_summary is optional until P10 wires the separately persisted material
+## payload into the versioned snapshot migration.
+func apply_summary(summary: Dictionary, material_summary: Dictionary = {}, legacy_holder_namespace: String = "") -> bool:
 	if summary == null or summary.is_empty():
 		return false
-	items.clear()
-	var items_variant: Variant = summary.get("items", null)
-	if typeof(items_variant) == TYPE_DICTIONARY:
-		for item_id in (items_variant as Dictionary):
-			items[String(item_id)] = int((items_variant as Dictionary)[item_id])
+	var candidate = ItemLotLedgerScript.new(_definitions, _lot_ledger.get_holder_namespace()) \
+		if _holder_namespace_bound else ItemLotLedgerScript.new(_definitions)
+	if summary.has("item_lots_v1"):
+		var lot_payload: Variant = summary.get("item_lots_v1")
+		if not (lot_payload is Dictionary):
+			return false
+		if not candidate.apply_summary(lot_payload as Dictionary):
+			return false
+		var aggregate_variant: Variant = summary.get("items", null)
+		if aggregate_variant is Dictionary:
+			var normalized: Dictionary = _normalize_aggregate(aggregate_variant as Dictionary)
+			if not bool(normalized.get("ok", false)) \
+					or normalized.get("items", {}) != candidate.get_quantities():
+				return false
 	else:
-		# Legacy save: reconstruct tool items from tool_ids.
-		var legacy_ids: Variant = summary.get("tool_ids", [])
-		if typeof(legacy_ids) == TYPE_ARRAY:
-			for tool_id in (legacy_ids as Array):
-				items[String(tool_id)] = 1
+		var legacy_items: Dictionary = {}
+		var items_variant: Variant = summary.get("items", null)
+		if items_variant is Dictionary:
+			legacy_items = (items_variant as Dictionary).duplicate(true)
+		else:
+			var legacy_ids: Variant = summary.get("tool_ids", [])
+			if legacy_ids is Array:
+				for tool_id: Variant in legacy_ids as Array:
+					var id: String = str(tool_id)
+					if not id.is_empty():
+						legacy_items[id] = 1
+		var legacy_payload: Dictionary = {"items": legacy_items}
+		if not material_summary.is_empty():
+			legacy_payload.material_summary = material_summary
+		elif summary.get("material_quality", null) is Dictionary:
+			legacy_payload.material_quality = summary.get("material_quality")
+		var source_namespace: String = legacy_holder_namespace
+		if source_namespace.is_empty():
+			source_namespace = _lot_ledger.get_holder_namespace()
+		if not candidate.apply_summary(legacy_payload, source_namespace):
+			return false
+	_lot_ledger = candidate
+	_holder_namespace_bound = true
 	return true
+
+static func _normalize_aggregate(raw: Dictionary) -> Dictionary:
+	var normalized: Dictionary = {}
+	for raw_item_id: Variant in raw:
+		var item_id: String = str(raw_item_id)
+		var value: Variant = raw[raw_item_id]
+		var quantity: int = 0
+		if typeof(value) == TYPE_INT:
+			quantity = int(value)
+		elif typeof(value) == TYPE_FLOAT and is_finite(float(value)) \
+				and float(value) == floorf(float(value)):
+			quantity = int(value)
+		else:
+			return {"ok": false, "items": {}}
+		if item_id.is_empty() or quantity <= 0:
+			return {"ok": false, "items": {}}
+		normalized[item_id] = quantity
+	return {"ok": true, "items": normalized}
 
 func get_status_lines() -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()

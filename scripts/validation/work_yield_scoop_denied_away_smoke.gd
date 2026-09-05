@@ -40,7 +40,8 @@ func _validate() -> void:
 	if playable.inventory_state == null:
 		_fail("inventory"); return
 
-	playable.inventory_state.items["scrap_metal"] = 20
+	playable.inventory_state.remove_item("scrap_metal", playable.inventory_state.get_quantity("scrap_metal"))
+	playable.inventory_state.add_item("scrap_metal", 20)
 	playable._spawn_work_yield_drop({"scrap_metal": 2})
 	var drops: Array = playable.get_work_yield_drops_for_validation()
 	if drops.is_empty():

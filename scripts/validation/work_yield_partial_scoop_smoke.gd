@@ -37,7 +37,8 @@ func _validate() -> void:
 		_fail("inventory"); return
 
 	# --- Deny path: max_stack full → try_interact false, drop stays ---
-	playable.inventory_state.items["scrap_metal"] = 20  # max_stack for scrap_metal
+	playable.inventory_state.remove_item("scrap_metal", playable.inventory_state.get_quantity("scrap_metal"))
+	playable.inventory_state.add_item("scrap_metal", 20)  # max_stack for scrap_metal
 	playable._spawn_work_yield_drop({"scrap_metal": 3})
 	var drops: Array = playable.get_work_yield_drops_for_validation()
 	if drops.is_empty():
@@ -59,7 +60,8 @@ func _validate() -> void:
 		_fail("items mutated on deny items=%s" % str(drop.items)); return
 
 	# --- Partial scoop: room for 2 of 5; residual 3 remains tracked ---
-	playable.inventory_state.items["scrap_metal"] = 18
+	playable.inventory_state.remove_item("scrap_metal", playable.inventory_state.get_quantity("scrap_metal"))
+	playable.inventory_state.add_item("scrap_metal", 18)
 	# Clear prior drop tracking + free node so partial case is clean.
 	if is_instance_valid(drop):
 		drop.queue_free()
@@ -87,7 +89,8 @@ func _validate() -> void:
 		_fail("partial untracked residual"); return
 
 	# --- Finish residual when stack has room ---
-	playable.inventory_state.items["scrap_metal"] = 10
+	playable.inventory_state.remove_item("scrap_metal", playable.inventory_state.get_quantity("scrap_metal"))
+	playable.inventory_state.add_item("scrap_metal", 10)
 	if not drop.try_interact(playable.player):
 		_fail("finish scoop failed"); return
 	var qty_end: int = int(playable.inventory_state.get_quantity("scrap_metal"))

@@ -40,7 +40,8 @@ func _validate() -> void:
 	if playable.player == null or playable.inventory_state == null:
 		_fail("player/inventory"); return
 	var pos: Vector3 = (playable.player as Node3D).global_position
-	playable.inventory_state.items["purified_water"] = 20
+	playable.inventory_state.remove_item("purified_water", playable.inventory_state.get_quantity("purified_water"))
+	playable.inventory_state.add_item("purified_water", 20)
 
 	var hydro = ProductionStationScript.new()
 	playable.add_child(hydro)
