@@ -398,7 +398,7 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             )
             self.assertEqual(card["id"], card["plan_anchor"]["heading"])
             self.assertTrue(card["allowlist"])
-            self.assertTrue(all("/" in item["path"] or item["path"] in {"README.md", "AGENTS.md", "STATUS.md", "export_presets.cfg"} for item in card["allowlist"]))
+            self.assertTrue(all("/" in item["path"] or item["path"] in {".gitattributes", "README.md", "AGENTS.md", "STATUS.md", "export_presets.cfg"} for item in card["allowlist"]))
             self.assertTrue(card["verification"])
             for check in card["verification"]:
                 self.assertTrue(check["command"])

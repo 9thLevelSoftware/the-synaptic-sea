@@ -358,7 +358,8 @@ file is removed from the denominator merely because its implementation is missin
 
 **Depends:** P01. **Requirements:** FC-01..03.
 **Allowed files:** new runner/case manifest; `tools/build_system_inventory.py`,
-`tools/test_build_system_inventory.py`; new `tests/test_feature_completion_runner.py`,
+`tools/test_build_system_inventory.py`, `tools/classify_orphan_smokes.sh`, and
+`.gitattributes` only for the classifier's Windows/Git-Bash LF checkout rule; new `tests/test_feature_completion_runner.py`,
 `tests/test_feature_acceptance_registry.py`; `docs/game/06_validation_plan.md`.
 **Non-goals:** replacing the canonical regression or relaxing diagnostic policy.
 
@@ -369,6 +370,9 @@ file is removed from the denominator merely because its implementation is missin
   actual exit/timing/engine/commit recording, isolated user data and named profiles.
 - [ ] Extend coverage with explicit active/legacy/tooling classifications and scan
   all runtime roots. Add checks for broken evidence paths and missing active criteria.
+- [ ] Keep orphan-smoke classifications synchronized with the exact `run_clean`
+  bundle. Feature-completion cases remain standalone until fresh runner evidence;
+  other unintegrated runtime coverage remains a promotion candidate.
 - [ ] Validate canonical bundle extraction against its section boundaries and
   expected marker; a changed/unrecognized document structure must fail visibly.
 - [ ] Run `python -m pytest -q tests/test_feature_completion_runner.py

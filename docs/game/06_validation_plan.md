@@ -1335,6 +1335,9 @@ orphan below so none is silent. Dispositions:
 - **standalone-gate** — `gate1_automated_playtest`: documented to run ON TOP OF the bundle,
   deliberately not a `run_clean` entry (its runtime dwarfs every smoke). Surfaced when the
   checker was scoped to actual `run_clean` invocations (PR #65 review).
+- **standalone-feature-completion** — an `fc_pNN` case is invoked by the explicit
+  feature-completion case/profile runner, outside the legacy canonical bundle. It
+  is not acceptance evidence until that runner records a fresh passing result.
 
 The table is generated and drift-checked by `tools/classify_orphan_smokes.sh`
 (`--check` fails on any unclassified orphan or stale row; run it whenever bundle
@@ -1370,7 +1373,6 @@ membership changes).
 | `consumable_state_smoke` | promotion-candidate |
 | `container_variety_smoke` | promotion-candidate |
 | `crafting_debug_smoke` | debug-tool |
-| `crafting_recipe_list_smoke` | promotion-candidate |
 | `crafting_state_smoke` | promotion-candidate |
 | `cross_system_dependency_smoke` | promotion-candidate |
 | `cross_training_smoke` | promotion-candidate |
@@ -1404,7 +1406,6 @@ membership changes).
 | `hangar_control_smoke` | promotion-candidate |
 | `hangar_persistence_smoke` | promotion-candidate |
 | `hangar_port_smoke` | promotion-candidate |
-| `hydroponics_crop_list_smoke` | promotion-candidate |
 | `hydroponics_state_smoke` | promotion-candidate |
 | `inventory_panel_smoke` | promotion-candidate |
 | `inventory_selection_model_smoke` | promotion-candidate |
@@ -1430,9 +1431,6 @@ membership changes).
 | `main_playable_slice_capture_sequence` | legacy-capture |
 | `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
-| `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
-| `main_playable_slice_salvage_picker_smoke` | promotion-candidate |
-| `main_playable_slice_hydro_crop_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |
@@ -1461,14 +1459,12 @@ membership changes).
 | `qt_mini_smoke` | promotion-candidate |
 | `quality_tier_smoke` | promotion-candidate |
 | `rarity_tier_smoke` | promotion-candidate |
-| `recipe_picker_panel_smoke` | promotion-candidate |
 | `recipe_resource_smoke` | promotion-candidate |
 | `recursive_travel_smoke` | promotion-candidate |
 | `release_readiness_ledger_smoke` | release-audit-tool |
 | `repair_consume_smoke` | promotion-candidate |
 | `repair_loop_smoke` | promotion-candidate |
 | `rigid_pair_travel_smoke` | promotion-candidate |
-| `salvage_list_smoke` | promotion-candidate |
 | `scanner_panel_smoke` | promotion-candidate |
 | `scanner_state_smoke` | promotion-candidate |
 | `ship_access_smoke` | promotion-candidate |
@@ -1497,3 +1493,57 @@ membership changes).
 | `travel_integration_smoke` | promotion-candidate |
 | `unique_item_state_smoke` | promotion-candidate |
 | `windowed_fps_capture` | legacy-capture |
+| `builder_authored_portals_smoke` | promotion-candidate |
+| `builder_authored_runtime_fields_smoke` | promotion-candidate |
+| `builder_placed_props_smoke` | promotion-candidate |
+| `builder_playable_runtime_fields_smoke` | promotion-candidate |
+| `capture_current_topology_fixture` | legacy-capture |
+| `ceiling_fade_smoke` | promotion-candidate |
+| `collision_probe_smoke` | debug-tool |
+| `component_imported_visual_smoke` | promotion-candidate |
+| `derelict_builder_hazard_materialization_smoke` | promotion-candidate |
+| `derelict_builder_preview_contract_smoke` | promotion-candidate |
+| `derelict_builder_preview_smoke` | promotion-candidate |
+| `fc_p00_native_arc_smoke` | standalone-feature-completion |
+| `fc_p03_smoke` | standalone-feature-completion |
+| `fc_p04_floor_drop_persistence_smoke` | standalone-feature-completion |
+| `fc_p04_holder_atomicity_smoke` | standalone-feature-completion |
+| `fc_p04_objective_lots_smoke` | standalone-feature-completion |
+| `fc_p04_smoke` | standalone-feature-completion |
+| `fc_p05_smoke` | standalone-feature-completion |
+| `fc_p06_smoke` | standalone-feature-completion |
+| `fc_p07_smoke` | standalone-feature-completion |
+| `fc_p08_smoke` | standalone-feature-completion |
+| `fc_p11_live_smoke` | standalone-feature-completion |
+| `fc_p11_smoke` | standalone-feature-completion |
+| `fc_p12_smoke` | standalone-feature-completion |
+| `fc_p13_smoke` | standalone-feature-completion |
+| `fc_p16_smoke` | standalone-feature-completion |
+| `fire_compartment_resolver_smoke` | promotion-candidate |
+| `focused_nine_airlock_control_room_capture` | legacy-capture |
+| `focused_nine_comparison_capture` | legacy-capture |
+| `focused_nine_staged_derelict_capture` | legacy-capture |
+| `focused_nine_staged_structural_smoke` | promotion-candidate |
+| `integrity_visual_resolver_smoke` | promotion-candidate |
+| `ithappy_kit_smoke` | promotion-candidate |
+| `ithappy_visual_capture` | legacy-capture |
+| `meshy_asset_review_capture` | legacy-capture |
+| `nav_solid_edges_smoke` | promotion-candidate |
+| `objective_visual_binding_smoke` | promotion-candidate |
+| `playable_generated_ship_floor_collision_smoke` | promotion-candidate |
+| `procgen_structural_compiler_smoke` | promotion-candidate |
+| `procgen_structural_debug_export` | debug-tool |
+| `prop_visual_binding_smoke` | promotion-candidate |
+| `refresh_seed_000017_fixture` | legacy-capture |
+| `ship_instance_breach_environment_smoke` | promotion-candidate |
+| `sim_vector3_smoke` | promotion-candidate |
+| `top_down_harness_smoke` | promotion-candidate |
+| `top_down_readability_harness` | non-headless-harness |
+| `topdown_e2e_smoke` | promotion-candidate |
+| `topdown_threat_smoke` | promotion-candidate |
+| `topdown_vertical_slice_smoke` | promotion-candidate |
+| `worldgen_diff_probe` | debug-tool |
+| `worldgen_live_preview` | legacy-capture |
+| `worldgen_v2_import_smoke` | debug-tool |
+| `worldgen_v2_visual_probe` | legacy-capture |
+| `worldgen_wired_travel_smoke` | promotion-candidate |

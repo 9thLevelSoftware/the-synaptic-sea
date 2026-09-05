@@ -191,6 +191,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     "P02": [
         "tools/run_feature_completion.py", "data/validation/feature_completion_cases.json",
         "tools/build_system_inventory.py", "tools/test_build_system_inventory.py",
+        "tools/classify_orphan_smokes.sh", ".gitattributes",
         "tests/test_feature_completion_runner.py", "tests/test_feature_acceptance_registry.py",
         "docs/game/06_validation_plan.md",
     ],
