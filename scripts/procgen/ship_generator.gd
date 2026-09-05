@@ -19,6 +19,7 @@ const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profi
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const RoomVariantSelectorScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 const USE_WORLDGEN := true
 const WORLDGEN_VERSION: int = 2
@@ -178,6 +179,9 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	layout["kit_id"] = WORLDGEN_KIT_ID
 	layout["biome_id"] = biome_id
 	layout["difficulty_id"] = difficulty_id
+	if not _stamp_native_room_variants(layout, seed_value):
+		return null
+	layout["hazard_source"] = "runtime"
 	var biome_data: Dictionary = layout_generator._resolve_biome(biome_id)
 	var difficulty_data: Dictionary = layout_generator._resolve_difficulty(difficulty_id)
 	var biome = BiomeProfileScript.from_dict(biome_data)
@@ -260,6 +264,28 @@ static func stamp_native_component_slot_contracts(layout: Dictionary) -> bool:
 		rooms[room_index] = room
 	layout["rooms"] = rooms
 	return authored_count > 0
+
+
+func _stamp_native_room_variants(layout: Dictionary, seed_value: int) -> bool:
+	var rooms_variant: Variant = layout.get("rooms", null)
+	if not (rooms_variant is Array) or (rooms_variant as Array).is_empty():
+		push_error("SHIP GENERATOR FAIL native layout rooms missing for variant stamping")
+		return false
+	var rooms: Array = rooms_variant as Array
+	var selector = RoomVariantSelectorScript.new()
+	for room_index in range(rooms.size()):
+		var room_variant: Variant = rooms[room_index]
+		if not (room_variant is Dictionary):
+			push_error("SHIP GENERATOR FAIL native layout room %d is malformed" % room_index)
+			return false
+		var room: Dictionary = room_variant
+		var role: String = str(room.get("room_role", room.get("role", "")))
+		if role.is_empty():
+			push_error("SHIP GENERATOR FAIL native layout room %d has no role" % room_index)
+			return false
+		room["variant"] = selector.pick(role, room_index, seed_value, biome_id)
+	layout["rooms"] = rooms
+	return true
 
 
 func _load_worldgen_kit() -> Dictionary:

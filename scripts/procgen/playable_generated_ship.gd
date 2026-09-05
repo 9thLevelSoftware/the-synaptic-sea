@@ -1471,28 +1471,38 @@ func _build_runtime_nodes() -> void:
 ## first-run contract. The marker object is regenerated on every scan, so
 ## changing its seed here affects this travel request only; later travel keeps
 ## the scanner's authored marker seed and normal biome/difficulty resolution.
-func _apply_first_run_contract_to_marker(marker) -> bool:
-	if marker == null or first_run_contract == null or first_run_contract.contract.is_empty():
-		return false
-	if not visited_ships.is_empty() or String(marker.marker_id).is_empty():
-		return false
-	var layout_generator = ShipLayoutGeneratorScript.new()
-	var slice_builder = GameplaySliceBuilderScript.new()
-	var candidates: Dictionary = {}
+func _apply_first_run_contract_to_marker(marker) -> Dictionary:
+	if marker == null or not visited_ships.is_empty() or String(marker.marker_id).is_empty():
+		return {"applicable": false, "success": true, "applied": false}
+	if first_run_contract == null or first_run_contract.contract.is_empty():
+		return {"applicable": true, "success": false, "applied": false, "reason": "first_run_contract_unsatisfied"}
 	var biome_id: String = str(first_run_contract.contract.get("biome_id", ""))
 	var difficulty_id: String = str(first_run_contract.contract.get("difficulty_id", ""))
-	for seed_variant in first_run_contract.contract.get("preferred_seeds", []):
-		var seed_value: int = int(seed_variant)
-		var blueprint = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), seed_value)
-		var layout: Dictionary = layout_generator.generate_with_options(
-			blueprint, {}, biome_id, difficulty_id, true)
-		candidates[seed_value] = {
-			"layout": layout,
-			"gameplay_slice": slice_builder.build(layout),
-		}
-	var chosen_seed: int = first_run_contract.pick_seed(candidates)
+	ship_generator.configure_run_context(biome_id, difficulty_id)
+	var chosen_seed: int = first_run_contract.pick_seed(func(seed_value: int) -> Dictionary:
+		var candidate_root: Node3D = ship_generator.generate_from_seed(
+			seed_value, int(marker.size_class), int(marker.condition))
+		if candidate_root == null:
+			return {}
+		var candidate: Dictionary = {}
+		if candidate_root.has_method("get_layout_copy") \
+				and typeof(candidate_root.get("gameplay_doc")) == TYPE_DICTIONARY:
+			candidate = {
+				"layout": candidate_root.get_layout_copy(),
+				"gameplay_slice": (candidate_root.get("gameplay_doc") as Dictionary).duplicate(true),
+			}
+		candidate_root.free()
+		return candidate
+	)
+	if chosen_seed < 0:
+		return {"applicable": true, "success": false, "applied": false, "reason": "first_run_contract_unsatisfied"}
 	marker.seed_value = chosen_seed
-	return true
+	return {
+		"applicable": true,
+		"success": true,
+		"applied": true,
+		"run_context": {"biome": biome_id, "difficulty": difficulty_id},
+	}
 
 ## Configures the progression model from starting_class_id (defaults to engineer
 ## when the id is unknown). Idempotent: re-callable on reload.
@@ -7650,13 +7660,17 @@ func travel_to(marker) -> Dictionary:
 	if piloted_ship != null and current_occupancy != piloted_ship:
 		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
+	var first_run_result: Dictionary = _apply_first_run_contract_to_marker(marker)
+	if bool(first_run_result.get("applicable", false)) and not bool(first_run_result.get("success", false)):
+		_emit_travel_denied_sfx()
+		return {"success": false, "reason": str(first_run_result.get("reason", "first_run_contract_unsatisfied")), "ship": null}
+	var first_run_contract_applied: bool = bool(first_run_result.get("applied", false))
 	var player_oxygen_before_transition := float(oxygen_state.get_summary().get("oxygen", -1.0)) \
 		if oxygen_state != null else -1.0
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
 	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
-	var first_run_contract_applied: bool = _apply_first_run_contract_to_marker(marker)
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	var mid: String = String(marker.marker_id)
 	var retained_instance = visited_ships.get(mid, null)
@@ -7676,11 +7690,8 @@ func travel_to(marker) -> Dictionary:
 		marker.condition = int(retained_instance.blueprint.condition)
 	else:
 		run_ctx = _resolve_derelict_run_context(marker)
-		if first_run_contract_applied and first_run_contract != null:
-			run_ctx = {
-				"biome": str(first_run_contract.contract.get("biome_id", run_ctx.get("biome", ""))),
-				"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
-			}
+		if first_run_contract_applied:
+			run_ctx = (first_run_result.get("run_context", run_ctx) as Dictionary).duplicate(true)
 		ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)

@@ -11,6 +11,7 @@ const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -63,6 +64,28 @@ func _validate() -> void:
 		return
 	var selected_marker = in_range[0]
 	var selected_marker_id: String = String(selected_marker.marker_id)
+	# ADR-0067 fail-closed probe: the only offered candidate has a native
+	# LOCKED critical crossing. Rejection must happen before travel mutates the
+	# marker, world, ship registry, or active scene.
+	var preferred_before: Array = playable.first_run_contract.contract.get("preferred_seeds", []).duplicate()
+	playable.first_run_contract.contract["preferred_seeds"] = [777]
+	var marker_seed_before: int = int(selected_marker.seed_value)
+	var world_position_before: Vector3 = world.player_position
+	var generated_before: bool = world.is_generated(selected_marker_id)
+	var visited_before: int = playable.visited_ships.size()
+	var rejected: Dictionary = playable.travel_to(selected_marker)
+	if bool(rejected.get("success", false)) or str(rejected.get("reason", "")) != "first_run_contract_unsatisfied":
+		_fail("locked-only first-run contract was not denied explicitly: %s" % str(rejected))
+		return
+	if int(selected_marker.seed_value) != marker_seed_before \
+			or world.player_position != world_position_before \
+			or world.is_generated(selected_marker_id) != generated_before \
+			or playable.visited_ships.size() != visited_before \
+			or playable.get_current_ship() != home_ship \
+			or playable.away_from_start:
+		_fail("rejected first-run contract mutated marker/world/ship state")
+		return
+	playable.first_run_contract.contract["preferred_seeds"] = preferred_before
 	var travel_result: Dictionary = playable.travel_to_marker_id(selected_marker_id)
 	if not bool(travel_result.get("success", false)):
 		_fail("travel to derelict failed")
@@ -164,8 +187,9 @@ func _validate() -> void:
 	var condition: int = playable._ship_condition_class(cur)
 	var wreck_expected: bool = condition == ShipBlueprintScript.Condition.DAMAGED \
 		or condition == ShipBlueprintScript.Condition.WRECKED
-	if wreck_expected and not _wreck_overlay_present(layout):
-		_fail("DAMAGED/WRECKED boarded layout missing blocked_links/LOCKED overlay or wreck_applied")
+	if wreck_expected and not _wreck_evidence_present(layout, loader, selected_seed, selected_size, condition):
+		_fail("DAMAGED/WRECKED boarded layout missing preserved native breach or fallback wreck overlay condition=%d kinds=%s generator=%s" % [
+			condition, str(_structural_edge_kind_counts(layout)), str(layout.get("generator", {}))])
 		return
 	if not wreck_expected:
 		_fail("boarded condition=%d is not DAMAGED/WRECKED; wreck overlay required" % condition)
@@ -372,7 +396,102 @@ func _loot_on_interior_slot(layout: Dictionary, loot: Array) -> bool:
 	return false
 
 
-func _wreck_overlay_present(layout: Dictionary) -> bool:
+func _wreck_evidence_present(
+		layout: Dictionary,
+		loader: GeneratedShipLoader,
+		seed_value: int,
+		size: int,
+		condition: int) -> bool:
+	var generator_variant: Variant = layout.get("generator", {})
+	if generator_variant is Dictionary \
+			and str((generator_variant as Dictionary).get("name", "")) == "worldgen":
+		return _native_breach_preserved_and_loaded(layout, loader, seed_value, size, condition)
+	return _fallback_wreck_overlay_present(layout)
+
+
+func _native_breach_preserved_and_loaded(
+		layout: Dictionary,
+		loader: GeneratedShipLoader,
+		seed_value: int,
+		size: int,
+		condition: int) -> bool:
+	if not ClassDB.class_exists("DerelictGenerator"):
+		return false
+	if not ShipGeneratorScript.WORLDGEN_ARCHETYPE_BY_SIZE.has(size) \
+			or not ShipGeneratorScript.WORLDGEN_INTACTNESS_BY_CONDITION.has(condition):
+		return false
+	var generator = ClassDB.instantiate("DerelictGenerator")
+	if generator == null or not generator.has_method("export_layout_json"):
+		return false
+	var source_text: String = str(generator.export_layout_json(
+		seed_value,
+		{
+			"archetype_id": str(ShipGeneratorScript.WORLDGEN_ARCHETYPE_BY_SIZE[size]),
+			"intactness_override": int(ShipGeneratorScript.WORLDGEN_INTACTNESS_BY_CONDITION[condition]),
+		},
+		ShipGeneratorScript.WORLDGEN_KIT_ID))
+	var source_variant: Variant = JSON.parse_string(source_text)
+	if not (source_variant is Dictionary):
+		return false
+	var source_breaches: Dictionary = _structural_edges_of_kind(source_variant as Dictionary, "BREACH")
+	var loaded_breaches: Dictionary = _structural_edges_of_kind(layout, "BREACH")
+	if source_breaches.is_empty() or not source_breaches.recursive_equal(loaded_breaches, 32):
+		return false
+
+	var portal_specs_by_edge: Dictionary = {}
+	for spec_variant in loader.get_authored_portal_specs_copy():
+		if not (spec_variant is Dictionary):
+			continue
+		var spec: Dictionary = spec_variant as Dictionary
+		portal_specs_by_edge[str(spec.get("edge_key", ""))] = spec
+	var portal_nodes_by_edge: Dictionary = {}
+	for node_variant in loader.get_authored_portal_nodes():
+		if not is_instance_valid(node_variant):
+			continue
+		var portal_spec_variant: Variant = node_variant.get("portal_spec")
+		if not (portal_spec_variant is Dictionary):
+			continue
+		portal_nodes_by_edge[str((portal_spec_variant as Dictionary).get("edge_key", ""))] = node_variant
+	for edge_key_variant in source_breaches.keys():
+		var edge_key: String = str(edge_key_variant)
+		var source_edge: Dictionary = source_breaches[edge_key_variant] as Dictionary
+		var spec_variant: Variant = portal_specs_by_edge.get(edge_key, null)
+		var node_variant: Variant = portal_nodes_by_edge.get(edge_key, null)
+		if not (spec_variant is Dictionary) or not is_instance_valid(node_variant):
+			return false
+		var spec: Dictionary = spec_variant as Dictionary
+		if str(spec.get("kind", spec.get("state", ""))).to_upper() != "BREACH" \
+				or not bool(spec.get("exterior", false)) \
+				or bool(spec.get("exterior", false)) != bool(source_edge.get("exterior", false)):
+			return false
+		if str(node_variant.get("portal_kind")).to_upper() != "BREACH" \
+				or not bool(node_variant.get("is_unsafe")) \
+				or not bool(node_variant.get("is_open")) \
+				or not bool(node_variant.get("is_exterior")):
+			return false
+		var blocker_shape: CollisionShape3D = node_variant.call("get_blocker_collision_shape") as CollisionShape3D
+		if blocker_shape == null or not blocker_shape.disabled:
+			return false
+	return true
+
+
+func _structural_edges_of_kind(layout: Dictionary, required_kind: String) -> Dictionary:
+	var result: Dictionary = {}
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if not (plan_variant is Dictionary):
+		return result
+	var edges_variant: Variant = (plan_variant as Dictionary).get("edges", {})
+	if not (edges_variant is Dictionary):
+		return result
+	for edge_key_variant in (edges_variant as Dictionary).keys():
+		var edge_variant: Variant = (edges_variant as Dictionary)[edge_key_variant]
+		if edge_variant is Dictionary \
+				and str((edge_variant as Dictionary).get("kind", "")).to_upper() == required_kind:
+			result[str(edge_key_variant)] = (edge_variant as Dictionary).duplicate(true)
+	return result
+
+
+func _fallback_wreck_overlay_present(layout: Dictionary) -> bool:
 	if not bool(layout.get("wreck_applied", false)):
 		return false
 	var blocked_v: Variant = layout.get("blocked_links", [])
@@ -392,6 +511,22 @@ func _wreck_overlay_present(layout: Dictionary) -> bool:
 				if kind == "LOCKED" or kind == "BREACH":
 					return true
 	return false
+
+
+func _structural_edge_kind_counts(layout: Dictionary) -> Dictionary:
+	var counts: Dictionary = {}
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if not (plan_variant is Dictionary):
+		return counts
+	var edges_variant: Variant = (plan_variant as Dictionary).get("edges", {})
+	if not (edges_variant is Dictionary):
+		return counts
+	for edge_variant in (edges_variant as Dictionary).values():
+		if not (edge_variant is Dictionary):
+			continue
+		var kind: String = str((edge_variant as Dictionary).get("kind", "")).to_upper()
+		counts[kind] = int(counts.get(kind, 0)) + 1
+	return counts
 
 
 func _room_by_id(rooms: Array, room_id: String) -> Dictionary:

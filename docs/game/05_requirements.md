@@ -1976,7 +1976,7 @@ runtime source, and promotion is always a separate reviewed task.
 - Type: gameplay / technical
 - Priority: must
 - Status: Validated
-- Rationale: Walkability, live decay, wrapper collision, and slot fill are only play once a production `travel_to` boarding attaches `current_ship` and enters the away `_process` branch. `generate_from_seed` alone does not board.
+- Rationale: Walkability, live decay, wrapper collision, and slot fill are only play once a production `travel_to` boarding attaches `current_ship` and enters the away `_process` branch. First-away selection validates the same production-generated candidate before boarding; a fallback layout cannot certify native topology.
 - Acceptance criteria:
   - Headless `travel_to_marker_id` boarding of a generated wreck (not `coherent_ship_001`), copied from `away_branch_integrity_smoke.gd`.
   - `away_from_start` is true as a result of `_attach_derelict_active`.
