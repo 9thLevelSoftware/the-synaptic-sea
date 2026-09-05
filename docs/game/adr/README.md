@@ -48,6 +48,8 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0065 | docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md | Accepted for implementation, validation pending: exact same-module replacement, live safety/egress preflight, and mandatory APPLYING/finalize atomic scene boundary |
 | 0066 | docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md | Accepted for implementation, runtime pending P10/P13: exact-lot machinery condition, effective system health, paid intrinsic/provider repair, and audited frozen-criterion supersession |
 
+| 0067 | docs/game/adr/0067-native-first-run-candidate-authority.md | Accepted for implementation: validate first-away standing route and hazards through the actual native generation path |
+
 ## Notes
 
 - Number reuse exists in historical Task 12/13/10 ADRs (`0029`, `0031`, `0033`, `0034`, `0037`). The index keeps the file path as the identity because these ADRs were authored by separate package workers in a no-git/shared-workspace wave.

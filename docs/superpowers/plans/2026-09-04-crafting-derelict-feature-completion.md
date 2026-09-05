@@ -318,6 +318,12 @@ the selected generated ship and differ from home. Preserve enclosure, navigation
 loot, objectives, wreck and away-tick checks. Wrong-seed and home substitutions
 must still fail. Validate with its existing canonical PASS marker and clean output;
 this changes no production generation or canonical bundle membership.
+ADR-0067 additionally permits `data/procgen/slice/first_run_contract.json`,
+`scripts/procgen/first_run_contract.gd`, the native room-variant seam in
+`ship_generator.gd`, coordinator first-run candidate/travel preflight only,
+`first_run_contract_smoke.gd`, the existing boarded smoke, and its feature design
+explanation. Validate actual production candidates and deny unsatisfied contracts
+before any travel mutation; retain blocked-edge semantics and wreck damage.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
@@ -648,6 +654,15 @@ fixture supplements the real coordinator/player journey in `fc_p09_smoke.gd`.
 duplicate-completion assertions.
 **Non-goals:** expanding recipe count as a success metric.
 
+P09 also permits owner-explicit physical station construction and attach/occupancy
+binding in the coordinator. Keep each station alive under its actual attached
+ShipInstance; changing player occupancy changes interaction eligibility, not paid
+jobs or station identity. Reuse P13 action-specific access, selection, occupancy,
+generation and spatial range checks. `ship_work_context.gd` may expose an injected
+reference to the existing shared owner-keyed CraftingState; do not create a second
+scheduler or per-ship crafting authority. Stations use the exact ship/station key
+and that reference. Real away-station and remote-home denial proof is required.
+
 - [ ] Build a graph of all authored recipes, deconstruction outputs, repair BOMs, learning
   items and component forms. Identify missing IDs, unreachable prerequisites,
   self-dependencies and profitable zero-cost conversion cycles.
@@ -669,16 +684,27 @@ advanced recipes require attainable knowledge/tier upgrades, not circular prereq
 **Scoped status (ADR-0059 decisions 17-22):** architecture accepted and bounded
 implementation underway. Acceptance evidence, the strict P10 runner, independent
 review, G1 profile, canonical regression and player gates remain pending.
-**Allowed files:** ADR-0059 and the P10 implementation brief;
+**Allowed files:** ADR-0059 and the P10 implementation/repair briefs;
 `scripts/systems/{run_snapshot,world_snapshot,save_migration_service,
 save_load_service,crafting_state,craft_job_state,craft_job_scheduler,station_state,
 field_crafting_state,recipe_knowledge_state,component_placement_state,
 ship_instance,ship_runtime,pillar_persistence}.gd`; coordinator capture, detached prepare/commit,
+new `scripts/systems/save_restore_candidate.gd` for the detached owner graph;
+`scripts/main.gd` and `scripts/title_main.gd` only staged playable-instance
+replacement, owner pointer and signal reconnection seams;
+`scripts/ui/save_load_menu.gd` and `scripts/ui/menu_coordinator.gd` only modern
+world-envelope slot dispatch; existing manual/auto/quick save and migration smokes
+only for the reviewed coherent-world policy and strict legacy compatibility;
 owner binding and tick/collection enablement seams only; new `fc_p10_smoke.gd` and
 the nine approved `p10_*.json` migration fixtures under
 `tests/fixtures/feature_completion/`.
 **Non-goals:** changing save filenames or wiping historical data.
 
+- [ ] Implement ADR-0059 decisions 23-26: coherent world envelopes for modern
+  slots, legacy closed-graph adaptation, single pending authority, target-run
+  knowledge identity, global lot/receipt conservation and strict component lots.
+  Prove failure leaves the complete live world unchanged, including an injected
+  failure after scene rebuilding; Boolean propagation alone is insufficient.
 - [ ] Add real-disk fixtures for current saves and representative older supported schemas,
   plus future-version rejection. Allocate new schema IDs through accepted ADR-0059.
 - [ ] Persist lots, knowledge, station IDs, jobs, escrow, progress, pending output and

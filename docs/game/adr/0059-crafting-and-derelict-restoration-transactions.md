@@ -210,6 +210,63 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     no live owner changed. Runtime work remains limited to the files approved on
     the P10 card; P09 presentation and P13 selection/binding changes are excluded.
 
+23. Modern player-loadable manual, rotating-auto and quicksave slots persist a
+    coherent WorldSnapshot under their existing filenames and slot IDs. This
+    supersedes only the ship-only modern-write policy in ADR-0031
+    `0031-multi-slot-save-architecture.md` and decision 4 of ADR-0043
+    `0043-title-screen-permadeath-freeze-save-and-exit.md`. A field output pinned
+    to an away ship requires that ship and its pending store after a fresh-process
+    load. World v5 owns the canonical `home_pending_outputs_v1`; visited ships own
+    their stores. Do not add a duplicate pending authority to the embedded run.
+    Current run v5 is an internal world member, not an independently loadable slot;
+    reject a standalone current run as `unclosed_owner_graph`. Recognized run
+    v1-v4 slots remain readable through detached legacy adaptation only when their
+    owner graph is closed. Preserve originals, slot families and permadeath rules.
+24. All slot routes share one detached restore candidate with source hash/token,
+    effective target run ID, validated owner models and staged scene consequences.
+    The loaded world run ID determines `player:<run-id>` during preparation;
+    recognized missing legacy IDs receive one explicit candidate ID. Bound legacy
+    knowledge retains its evidence marker and remains valid after two resaves.
+    Adopt the live run ID only on successful commit. Validate every inventory,
+    equipment holder, component against the actual layout, station, job, escrow,
+    pending receipt and field pin across home and visited ships before mutation.
+    Reject duplicate authoritative lots, incompatible job/store states, missing or
+    conflicting receipts and orphan craft records; consumed history is not escrow.
+25. Restore commit must stage scene roots before swapping, or provide complete
+    whole-world rollback demonstrated by an injected post-rebuild failure. Merely
+    returning false after partially changing live owners is insufficient. Keep
+    ticks, output publication, collection and station input disabled through the
+    transaction. Recheck source identity before commit; publish a migrated sidecar
+    only after successful commit. No failed candidate may alter original bytes,
+    live quantities, ownership, scene state or receipts.
+26. P10 uses ADR-0066's component lot initialization contract:
+    `condition_authority_version: 1`, `condition_lot_sequence`, and the persistent
+    `ship:<ship-id>:components` holder namespace. Fresh generated components gain
+    exact neutral lots with `generated_component` origin through explicit owner
+    initialization. Only trusted pre-v5 migration provenance permits missing
+    historical lots to become `legacy_unrecorded_component` lots. A source already
+    labeled v5 receives no such privilege; present malformed lots always reject.
+    Prepare missing lots detached in stable slot order and advance the sequence
+    only when the candidate commits. Do not add a second provenance flag or
+    relabel fresh generated components as legacy. Current capture and second reload
+    retain the same exact lot identities and conditions.
+
+27. The P10 atomic scene boundary may stage a replacement PlayableGeneratedShip
+    from the same authored scene, then swap the owning main/title instance and
+    reconnect signals only after validation. Explicit restore-staging mode must
+    suppress startup writes, meta run/death/unlock counters, service identity
+    mutation, global input/audio registration and visible HUD/CanvasLayers, as
+    well as ticks and collection. Disabled processing alone does not suppress
+    `_ready` side effects. Failure frees only the staged candidate and leaves the
+    existing playable world and shared services intact. Verify an injected failure
+    after staged scene rebuilding before accepting this boundary.
+28. Physical crafting stations retain their actual attached ship owner and stable
+    station identity across player occupancy changes. ShipWorkContext may inject
+    the existing shared owner-keyed CraftingState reference; it does not introduce
+    per-ship duplicate schedulers. UI and interaction validate the exact owner key,
+    current binding generation, selection, occupancy, action-specific access and
+    spatial range. An off-board home station cannot act as an away fallback.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are

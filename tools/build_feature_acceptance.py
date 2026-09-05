@@ -181,6 +181,11 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/procgen_playable_ship_smoke.gd",
         "scripts/validation/procgen_loader_playable_contract_smoke.gd",
         "scripts/validation/generated_seed_boarded_slice_smoke.gd",
+        "docs/game/adr/0067-native-first-run-candidate-authority.md",
+        "docs/game/features/generated_seed_boarded_slice.md",
+        "data/procgen/slice/first_run_contract.json",
+        "scripts/procgen/first_run_contract.gd",
+        "scripts/validation/first_run_contract_smoke.gd",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
         "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
@@ -237,6 +242,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     "P06": [
         *[f"scripts/systems/{name}.gd" for name in ("crafting_state", "field_crafting_state", "recipe_knowledge_state")],
         "scripts/tools/crafting_station.gd", "scripts/ui/recipe_picker_panel.gd", COORDINATOR,
+        "scripts/systems/ship_work_context.gd",
         "data/recipes/recipe_definitions.json", "data/items/item_definitions.json",
         "data/items/loot_tables.json",
         f"{VALIDATION}fc_p06_smoke.gd",
@@ -267,6 +273,10 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     "P10": [
         "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
         ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-implementation-brief.md",
+        ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-repair-proposal.md",
+        "scripts/systems/save_restore_candidate.gd",
+        "scripts/main.gd", "scripts/title_main.gd",
+        "scripts/ui/save_load_menu.gd", "scripts/ui/menu_coordinator.gd",
         *[f"scripts/systems/{name}.gd" for name in (
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
             "crafting_state", "craft_job_state", "craft_job_scheduler", "station_state",
