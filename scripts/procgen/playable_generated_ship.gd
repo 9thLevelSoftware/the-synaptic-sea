@@ -7851,9 +7851,10 @@ func _build_lifeboat_at_home() -> void:
 
 	# Skin the lifeboat's structural modules by the run's deterministic biome
 	# (seed-based; same resolver the loot system uses). The floorplan is fixed —
-	# only the per-role module kit changes, so each run's home craft looks themed
-	# without altering the layout the player learns.
-	var lb_root: Node3D = LifeBoatBuilderScript.build(_resolve_current_loot_biome_id())
+	# only its selected kit contract changes. Kits without wrapper maps deliberately
+	# retain the v0 physical wrappers while preserving this compiled layout.
+	var lifeboat_biome: String = _resolve_current_loot_biome_id()
+	var lb_root: Node3D = LifeBoatBuilderScript.build(lifeboat_biome)
 	if lb_root == null:
 		push_error("PlayableGeneratedShip: LifeBoatBuilder.build() returned null; lifeboat not created")
 		return
@@ -7861,7 +7862,8 @@ func _build_lifeboat_at_home() -> void:
 	# Create the ShipInstance: shared systems_manager so #4 opening-damage, travel-gate,
 	# and repair semantics stay exactly as they are.
 	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
-	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
+	# Retain the same resolved biome contract used for the live lifeboat root.
+	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout(lifeboat_biome)
 	lifeboat_ship.get_access().claim(PLAYER_LOCAL_ID)
 
 	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then

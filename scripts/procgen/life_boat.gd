@@ -287,6 +287,11 @@ static func _instance_plan_records(records_variant: Variant, module_to_scene: Di
 		var wrapper: Node3D = instance as Node3D
 		var world_pos: Vector3 = _as_vector3(record.get("position", Vector3.ZERO))
 		wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
+		# Node names are placement identities; retain the compiled module and the
+		# resolved wrapper source as metadata for runtime inspection/validation.
+		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", module_id))))
+		wrapper.set_meta("structural_module_id", module_id)
+		wrapper.set_meta("structural_wrapper_path", scene_path)
 		wrapper.name = str(record.get("placement_id", record.get("id", module_id))).replace(":", "_").replace("|", "_")
 		var room_id: String = str(record.get("room_id", record.get("owner_room", "")))
 		if room_id.is_empty():
