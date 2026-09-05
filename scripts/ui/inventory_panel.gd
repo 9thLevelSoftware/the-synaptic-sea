@@ -10,6 +10,7 @@ class_name InventoryPanel
 signal panel_closed         # emitted on every close() so the coordinator restores control
 signal transfer_completed   # emitted after any state mutation so the coordinator recomputes
 signal use_requested(item_id: String, use_all: bool)
+signal use_lot_requested(item_id: String, lot_id: String, use_all: bool)
 
 const InventorySelectionModelScript := preload("res://scripts/systems/inventory_selection_model.gd")
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode
@@ -431,10 +432,10 @@ func pane_quantity(pane: String, id: String) -> int:
 ## Builds (does NOT pop) the right-click menu for a row, from context_actions.
 func _build_context_menu(pane: String, index: int) -> PopupMenu:
 	var menu := PopupMenu.new()
-	var ids: Array = _ids_for_pane(pane)
-	if index < 0 or index >= ids.size():
+	var rows: Array = _lot_rows_for_pane(pane)
+	if index < 0 or index >= rows.size() or not rows[index] is Dictionary:
 		return menu
-	var item_id: String = String(ids[index])
+	var item_id: String = str((rows[index] as Dictionary).get("item_id", ""))
 	var actions: PackedStringArray = InventorySelectionModelScript.context_actions(
 		item_id, _defs, _mode == "transfer", pane == "container", false)
 	for a in actions:
@@ -444,8 +445,8 @@ func _build_context_menu(pane: String, index: int) -> PopupMenu:
 			"split": menu.add_item("Split…", _ACT_SPLIT)
 			"equip": menu.add_item("Equip", _ACT_EQUIP)
 			"unequip": menu.add_item("Unequip", _ACT_UNEQUIP)
-			"use": menu.add_item("Use", _ACT_USE)
-			"use_all": menu.add_item("Use All", _ACT_USE_ALL)
+			"use": menu.add_item("Use This Lot", _ACT_USE)
+			"use_all": menu.add_item("Use Entire Lot", _ACT_USE_ALL)
 	return menu
 
 func _on_context_id(id: int, pane: String, index: int) -> void:
@@ -468,9 +469,12 @@ func _on_context_id(id: int, pane: String, index: int) -> void:
 			_push_tooltip_for_selection(pane)
 			equip_selected()
 	elif id == _ACT_USE or id == _ACT_USE_ALL:
-		var ids: Array = _ids_for_pane(pane)
-		if index >= 0 and index < ids.size():
-			use_requested.emit(String(ids[index]), id == _ACT_USE_ALL)
+		var rows: Array = _lot_rows_for_pane(pane)
+		if index >= 0 and index < rows.size() and rows[index] is Dictionary:
+			var row: Dictionary = rows[index] as Dictionary
+			use_lot_requested.emit(
+				str(row.get("item_id", "")), str(row.get("lot_id", "")),
+				id == _ACT_USE_ALL)
 
 ## Interaction-only (popup); split amount picker -> transfer_quantity.
 func _open_split_picker(pane: String, item_id: String) -> void:

@@ -56,14 +56,15 @@ func _load_tiers() -> void:
 ##   skill_level: int (player skill level for this recipe category)
 ##   station_level: int (station upgrade level, 0 = base)
 ##   powered: bool (station has power)
-## The score is: material_quality * 0.4 + skill_bonus * 0.35 + station_bonus * 0.25
-## Power adds a flat +0.05 when true. Result is clamped [0.0, 1.0].
+## The score is: material*0.4 + clamp(skill*0.08,0,0.35) +
+## clamp(station*0.06,0,0.25) + powered?0.05:0. Every input is monotonic,
+## and the maximum reaches 1.0 before final clamping.
 static func compute_score(material_quality: float, skill_level: int, station_level: int, powered: bool) -> float:
 	var mq: float = clampf(material_quality, 0.0, 1.0)
 	var skill_bonus: float = clampf(float(skill_level) * 0.08, 0.0, 0.35)
 	var station_bonus: float = clampf(float(station_level) * 0.06, 0.0, 0.25)
 	var power_bonus: float = 0.05 if powered else 0.0
-	return clampf(mq * 0.4 + skill_bonus * 0.35 + station_bonus * 0.25 + power_bonus, 0.0, 1.0)
+	return clampf(mq * 0.4 + skill_bonus + station_bonus + power_bonus, 0.0, 1.0)
 
 ## Returns the tier name for a given score.
 static func tier_for_score(score: float) -> String:

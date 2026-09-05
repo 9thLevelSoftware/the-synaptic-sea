@@ -12,6 +12,7 @@ signal uninstall_requested(slot_id: String, component_id: String, item_form: Str
 var _mod_state                    # ShipModificationState
 var _inventory: Dictionary = {}   # item_form -> qty (presentation bag for panel actions)
 var _catalog                       # ComponentCatalog for real-form selection
+var _install_preflight_query: Callable = Callable()
 var _open: bool = false
 var _selected: int = 0
 var _status: String = ""
@@ -95,6 +96,16 @@ func get_selected_slot_id() -> String:
 	return str((rows[_selected] as Dictionary).get("slot_id", ""))
 
 
+func select_slot_id(slot_id: String) -> bool:
+	var rows: Array = _slot_rows()
+	for index in range(rows.size()):
+		if rows[index] is Dictionary and str((rows[index] as Dictionary).get("slot_id", "")) == slot_id:
+			_selected = index
+			_render()
+			return true
+	return false
+
+
 func move_selection(delta: int) -> void:
 	var n: int = _slot_rows().size()
 	if n <= 0:
@@ -105,7 +116,8 @@ func move_selection(delta: int) -> void:
 	_render()
 
 
-## Uninstall currently selected occupied slot into panel inventory bag.
+## Request timed uninstall of the selected occupied slot. The coordinator owns
+## escrow, WorkAction progress, physical mutation, and the final inventory lot.
 func uninstall_selected() -> bool:
 	var slot_id: String = get_selected_slot_id()
 	if slot_id.is_empty() or _mod_state == null:
@@ -119,21 +131,16 @@ func uninstall_selected() -> bool:
 		return false
 	var component_id: String = str(row.get("component_id", ""))
 	var item_form: String = str(row.get("item_form", ""))
-	if not _mod_state.has_method("uninstall"):
-		return false
-	var res: Dictionary = _mod_state.call("uninstall", slot_id, _inventory)
-	if not bool(res.get("ok", false)):
-		_status = "uninstall failed: %s" % str(res.get("reason", ""))
-		_render()
-		return false
-	if item_form.is_empty():
-		item_form = str(res.get("item_form", ""))
-	if component_id.is_empty():
-		component_id = str(res.get("component_id", ""))
-	_status = "uninstalled %s" % slot_id
+	_status = "uninstall requested %s" % slot_id
 	uninstall_requested.emit(slot_id, component_id, item_form)
 	_render()
 	return true
+
+
+## Production injects an exact-lot-aware read-only query. Legacy isolated panel
+## fixtures may omit it and continue through ShipModificationState directly.
+func set_install_preflight_query(query: Callable) -> void:
+	_install_preflight_query = query
 
 
 ## Install a component into the selected empty slot (or first empty candidate).
@@ -155,17 +162,16 @@ func install_into_selected(
 		_status = "no empty slot"
 		_render()
 		return false
-	if not _mod_state.has_method("install"):
-		return false
-	var res: Dictionary = _mod_state.call("install", slot_id, component_id, item_form, _inventory)
-	if not bool(res.get("ok", false)):
-		_status = "install failed: %s" % str(res.get("reason", ""))
-		_render()
-		return false
-	_status = "installed %s -> %s" % [component_id, slot_id]
+	_status = "install requested %s -> %s" % [component_id, slot_id]
 	install_requested.emit(slot_id, component_id, item_form)
 	_render()
 	return true
+
+
+## Coordinator feedback after request admission, interruption, or commit.
+func set_request_status(message: String) -> void:
+	_status = message
+	_render()
 
 
 ## Install using the first inventory bag item that matches a known component form.
@@ -298,7 +304,7 @@ func _first_compatible_empty_slot(component_id: String, item_form: String) -> St
 		var row: Dictionary = row_v as Dictionary
 		var slot_id: String = str(row.get("slot_id", ""))
 		var preflight: Dictionary = _preflight_result(slot_id, component_id, item_form)
-		if not bool(row.get("occupied", false)) and (bool(preflight.get("ok", false)) or bool(preflight.get("physical_fit_ok", false))):
+		if not bool(row.get("occupied", false)) and bool(preflight.get("ok", false)):
 			return slot_id
 	return ""
 
@@ -308,6 +314,9 @@ func _preflight_ok(slot_id: String, component_id: String, item_form: String) -> 
 
 
 func _preflight_result(slot_id: String, component_id: String, item_form: String) -> Dictionary:
+	if _install_preflight_query.is_valid():
+		var queried: Variant = _install_preflight_query.call(slot_id, component_id, item_form)
+		return queried as Dictionary if queried is Dictionary else {"ok": false, "reason": "missing_preflight"}
 	if _mod_state == null or not _mod_state.has_method("preflight_install"):
 		return {"ok": false, "reason": "missing_preflight"}
 	return _mod_state.call("preflight_install", slot_id, component_id, item_form, _inventory)

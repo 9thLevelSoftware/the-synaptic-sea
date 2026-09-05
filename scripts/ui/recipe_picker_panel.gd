@@ -180,7 +180,18 @@ func _format_row(entry: Dictionary) -> String:
 	var ing_str: String = " ".join(ing_parts) if not ing_parts.is_empty() else "-"
 	var hint: String = str(entry.get("knowledge_hint", ""))
 	var hint_suffix: String = "  hint=%s" % hint if status == "missing_recipe_knowledge" and not hint.is_empty() else ""
-	return "[%s] %s  skill=%d  %s → %s×%d%s" % [status, name, skill, ing_str, out_id, out_qty, hint_suffix]
+	var quality_suffix: String = ""
+	if entry.has("quality_preview"):
+		var preview_v: Variant = entry.get("quality_preview", {})
+		if preview_v is Dictionary and not (preview_v as Dictionary).is_empty():
+			quality_suffix = "  predicted=%s — %s" % [
+				str((preview_v as Dictionary).get("tier", "standard")).capitalize(),
+				str((preview_v as Dictionary).get("effect_text", "")),
+			]
+		else:
+			quality_suffix = "  predicted=unavailable (exact inputs missing)"
+	return "[%s] %s  skill=%d  %s → %s×%d%s%s" % [
+		status, name, skill, ing_str, out_id, out_qty, quality_suffix, hint_suffix]
 
 func _render() -> void:
 	if _title_label != null:

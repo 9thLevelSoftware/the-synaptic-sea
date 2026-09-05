@@ -40,6 +40,8 @@ func _validate() -> void:
 	if sub == null:
 		_fail("air_recycler missing"); return
 	sub.health = 0.1
+	if playable.inventory_state.get_quantity("wrench") <= 0:
+		playable.inventory_state.add_item("wrench", 1)
 	var draw_before: float = float(playable.ship_modification_state.total_power_draw())
 	playable.inventory_state.add_item("air_recycler_unit", 1)
 	if not playable.open_ship_modification_panel_for_validation():
@@ -50,6 +52,8 @@ func _validate() -> void:
 	panel.set_inventory(playable._inventory_qty_dict_for_work())
 	if not panel.install_from_inventory(playable.component_catalog):
 		_fail("install status=%s" % "\n".join(panel.get_status_lines())); return
+	if not _complete_active_work():
+		_fail("install timed commit"); return
 	if float(sub.health) < 0.54:
 		_fail("expected restore floor got %s" % str(sub.health)); return
 	if float(sub.health) > 0.56:
@@ -63,6 +67,8 @@ func _validate() -> void:
 	panel.refresh()
 	if not panel.uninstall_selected():
 		_fail("uninstall"); return
+	if not _complete_active_work():
+		_fail("uninstall timed commit"); return
 	if float(sub.health) > 0.1:
 		_fail("expected uninstall damage got %s" % str(sub.health)); return
 	print("SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true")
@@ -80,6 +86,23 @@ func _free_first_profile_slot(profile_id: String) -> bool:
 		if not bool(slot.get("occupied", false)):
 			return true
 		return bool(playable.ship_modification_state.uninstall(str(slot.get("slot_id", "")), setup_returns).get("ok", false))
+	return false
+
+
+func _complete_active_work() -> bool:
+	if not playable.has_active_ship_work_for_validation():
+		return false
+	playable.vitals_state.stamina = playable.vitals_state.max_stamina
+	if not playable.move_player_to_active_ship_work_target_for_validation():
+		return false
+	for _step in range(200):
+		playable.advance_active_ship_work_for_validation(0.5)
+		if not playable.has_active_ship_work_for_validation():
+			var last: Dictionary = playable.get_last_ship_work_result_for_validation()
+			if not bool(last.get("ok", false)):
+				print("SHIP MOD SYSTEM EFFECT timed result=%s" % str(last))
+			return bool(last.get("ok", false))
+	print("SHIP MOD SYSTEM EFFECT timed active=%s last=%s" % [str(playable.get_active_ship_work_record_for_validation()), str(playable.get_last_ship_work_result_for_validation())])
 	return false
 
 

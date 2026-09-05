@@ -39,6 +39,8 @@ func _validate() -> void:
 	var panel = playable.ship_modification_panel
 	var state = playable.ship_modification_state
 	var placement = playable.component_placement_state
+	if playable.inventory_state.get_quantity("wrench") <= 0:
+		playable.inventory_state.add_item("wrench", 1)
 	var slots: Array = state.get_physical_slots()
 	if slots.is_empty():
 		_fail("no active-ship physical descriptors")
@@ -64,6 +66,12 @@ func _validate() -> void:
 	if not panel.uninstall_selected():
 		_fail("panel physical uninstall")
 		return
+	if not placement.is_mounted(target_id):
+		_fail("uninstall mutated placement before timed commit")
+		return
+	if not _complete_active_work():
+		_fail("uninstall timed commit")
+		return
 	await process_frame
 	if placement.is_mounted(target_id) or _has_marker(target_id):
 		_fail("uninstall left placement or marker mounted")
@@ -78,6 +86,12 @@ func _validate() -> void:
 	panel.set_inventory(playable._inventory_qty_dict_for_work())
 	if not panel.install_from_inventory(playable.component_catalog):
 		_fail("catalog-driven live install: %s" % "\n".join(panel.get_status_lines()))
+		return
+	if placement.is_mounted(target_id):
+		_fail("install mutated placement before timed commit")
+		return
+	if not _complete_active_work():
+		_fail("install timed commit")
 		return
 	await process_frame
 	var installed_entry: Dictionary = placement.get_entry(target_id)
@@ -143,6 +157,19 @@ func _has_marker(instance_id: String) -> bool:
 	for marker in playable.get_component_markers_for_validation():
 		if is_instance_valid(marker) and str(marker.get_meta("component_instance_id", "")) == instance_id:
 			return true
+	return false
+
+
+func _complete_active_work() -> bool:
+	if not playable.has_active_ship_work_for_validation():
+		return false
+	playable.vitals_state.stamina = playable.vitals_state.max_stamina
+	if not playable.move_player_to_active_ship_work_target_for_validation():
+		return false
+	for _step in range(200):
+		playable.advance_active_ship_work_for_validation(0.5)
+		if not playable.has_active_ship_work_for_validation():
+			return bool(playable.get_last_ship_work_result_for_validation().get("ok", false))
 	return false
 
 

@@ -6,6 +6,7 @@ class_name InventoryRow
 ## load()-self-reference factory so it resolves under --headless --script.
 
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const SWATCH := {
 	"part": Color(0.55, 0.70, 0.95),
@@ -22,6 +23,7 @@ var lot_id: String = ""
 var lot_quantity: int = 0
 var _defs: Dictionary = {}
 var _selected: bool = false
+var _display_text: String = ""
 
 static func create(p_panel, p_pane: String, p_index: int, p_item_id: String, p_defs: Dictionary, p_lot_id: String = "", p_lot_quantity: int = 0):
 	assert(p_panel != null, "InventoryRow.create: panel dependency must not be null")
@@ -52,9 +54,15 @@ func _ready() -> void:
 		if inv != null and inv.has_method("get_lot_summary"):
 			for lot_v in (inv.get_lot_summary().get("lots", []) as Array):
 				if lot_v is Dictionary and str((lot_v as Dictionary).get("lot_id", "")) == lot_id:
-					quality_text = "  %s  [%s]" % [str((lot_v as Dictionary).get("quality_tier", "standard")).capitalize(), lot_id]
+					var lot: Dictionary = lot_v as Dictionary
+					quality_text = "  %s — %s  [%s]" % [
+						str(lot.get("quality_tier", "standard")).capitalize(),
+						ItemQualityEffectsScript.new().effect_text_for_lot(item_id, lot),
+						lot_id,
+					]
 					break
-	lbl.text = "%s  x%d%s" % [ItemDefsScript.display_name(_defs, item_id), qty, quality_text]
+	_display_text = "%s  x%d%s" % [ItemDefsScript.display_name(_defs, item_id), qty, quality_text]
+	lbl.text = _display_text
 	h.add_child(lbl)
 	add_child(h)
 	_apply_style()
@@ -62,6 +70,10 @@ func _ready() -> void:
 func set_selected(v: bool) -> void:
 	_selected = v
 	_apply_style()
+
+
+func get_display_text() -> String:
+	return _display_text
 
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()

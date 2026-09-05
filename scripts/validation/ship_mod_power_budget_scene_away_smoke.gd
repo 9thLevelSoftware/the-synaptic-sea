@@ -37,6 +37,8 @@ func _validate() -> void:
 	if not playable.open_ship_modification_panel_for_validation():
 		_fail("open"); return
 	var panel = playable.ship_modification_panel
+	if playable.inventory_state.get_quantity("wrench") <= 0:
+		playable.inventory_state.add_item("wrench", 1)
 	var setup_returns: Dictionary = {}
 	var freed: int = 0
 	for slot_v in playable.ship_modification_state.get_physical_slots():
@@ -58,6 +60,8 @@ func _validate() -> void:
 		panel.set_inventory(playable._inventory_qty_dict_for_work())
 		var ok: bool = panel.install_from_inventory(playable.component_catalog)
 		if ok:
+			if not _complete_active_work():
+				_fail("install timed commit"); return
 			installed += 1
 		else:
 			rejected = true
@@ -87,6 +91,19 @@ func _find_playable(n: Node):
 		if f != null:
 			return f
 	return null
+
+
+func _complete_active_work() -> bool:
+	if not playable.has_active_ship_work_for_validation():
+		return false
+	playable.vitals_state.stamina = playable.vitals_state.max_stamina
+	if not playable.move_player_to_active_ship_work_target_for_validation():
+		return false
+	for _step in range(200):
+		playable.advance_active_ship_work_for_validation(0.5)
+		if not playable.has_active_ship_work_for_validation():
+			return bool(playable.get_last_ship_work_result_for_validation().get("ok", false))
+	return false
 
 
 func _fail(msg: String) -> void:

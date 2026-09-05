@@ -3,6 +3,7 @@ class_name CraftingState
 
 const StationStateScript := preload("res://scripts/systems/station_state.gd")
 const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 const CraftJobSchedulerScript := preload("res://scripts/systems/craft_job_scheduler.gd")
 
 ## Pure model for the crafting engine. Loads recipes, validates ingredient
@@ -210,7 +211,14 @@ static func derive_tier_from_components(station_kind: String, placed: Array, cat
 ##   status ("ready"|"missing_ingredients"|"insufficient_skill"|"insufficient_tier"|"output_full"),
 ##   craftable:bool
 ## station_tier optional (default 0) for PKG-B2.4b tier gating.
-func list_recipe_entries(station_kind: String, inventory, player_skill_level: int, station_tier: int = 0, knowledge = null) -> Array:
+func list_recipe_entries(
+		station_kind: String,
+		inventory,
+		player_skill_level: int,
+		station_tier: int = 0,
+		knowledge = null,
+		quality_skill_level: int = -1,
+		station_powered: bool = true) -> Array:
 	var out: Array = []
 	var recipes: Array = get_recipes_for_station(station_kind)
 	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
@@ -261,8 +269,95 @@ func list_recipe_entries(station_kind: String, inventory, player_skill_level: in
 			"status": status,
 			"craftable": status == "ready",
 		}
+		entry["quality_preview"] = _quality_preview(
+			ingredients, produces, inventory,
+			player_skill_level if quality_skill_level < 0 else quality_skill_level,
+			station_tier, station_powered)
 		out.append(entry)
 	return out
+
+
+func _quality_preview(
+		ingredients: Dictionary,
+		produces: Dictionary,
+		inventory,
+		skill_level: int,
+		station_tier: int,
+		station_powered: bool) -> Dictionary:
+	var selected_lots: Array = _preview_ingredient_lots(ingredients, inventory)
+	if selected_lots.is_empty() and not ingredients.is_empty():
+		return {}
+	var weighted: float = 0.0
+	var quantity: int = 0
+	for lot_v in selected_lots:
+		if not lot_v is Dictionary:
+			return {}
+		var lot: Dictionary = lot_v as Dictionary
+		var lot_quantity: int = maxi(0, int(lot.get("quantity", 0)))
+		weighted += clampf(float(lot.get("quality_score", 0.5)), 0.0, 1.0) * float(lot_quantity)
+		quantity += lot_quantity
+	var input_quality: float = weighted / float(quantity) if quantity > 0 else 0.5
+	var resolved: Dictionary = QualityTierResolverScript.new().resolve(
+		input_quality, skill_level, station_tier, station_powered)
+	var item_id: String = str(produces.get("item_id", ""))
+	var output_lot: Dictionary = {
+		"quality_score": float(resolved.get("score", 0.5)),
+		"quality_tier": str(resolved.get("tier", "standard")),
+	}
+	var effects = ItemQualityEffectsScript.new()
+	var input_lot_ids: Array[String] = []
+	for selected_lot_v in selected_lots:
+		if selected_lot_v is Dictionary:
+			input_lot_ids.append(str((selected_lot_v as Dictionary).get("lot_id", "")))
+	return {
+		"input_quality_score": input_quality,
+		"score": float(resolved.get("score", 0.5)),
+		"tier": str(resolved.get("tier", "standard")),
+		"multiplier": float(resolved.get("multiplier", 1.0)),
+		"consumer": effects.consumer_for(item_id),
+		"effect_text": effects.effect_text_for_lot(item_id, output_lot),
+		"input_lot_ids": input_lot_ids,
+	}
+
+func _preview_ingredient_lots(ingredients: Dictionary, inventory) -> Array:
+	if ingredients.is_empty():
+		return []
+	if inventory == null or not inventory.has_method("get_lot_summary"):
+		return []
+	var lots_v: Variant = inventory.get_lot_summary().get("lots", [])
+	if not lots_v is Array:
+		return []
+	var selected: Array = []
+	var item_ids: Array = ingredients.keys()
+	item_ids.sort()
+	for item_v in item_ids:
+		var item_id: String = str(item_v)
+		var candidates: Array = []
+		for lot_v in lots_v as Array:
+			if lot_v is Dictionary and str((lot_v as Dictionary).get("item_id", "")) == item_id:
+				candidates.append((lot_v as Dictionary).duplicate(true))
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			var a_standard: bool = str(a.get("quality_tier", "")) == "standard"
+			var b_standard: bool = str(b.get("quality_tier", "")) == "standard"
+			return a_standard if a_standard != b_standard \
+				else str(a.get("lot_id", "")) < str(b.get("lot_id", ""))
+		)
+		var remaining: int = int(ingredients[item_v])
+		for candidate_v in candidates:
+			if remaining <= 0:
+				break
+			var candidate: Dictionary = candidate_v as Dictionary
+			var amount: int = mini(remaining, int(candidate.get("quantity", 0)))
+			if amount <= 0:
+				continue
+			candidate["quantity"] = amount
+			selected.append(candidate)
+			remaining -= amount
+		if remaining > 0:
+			return []
+	return selected
+
+# --- station management ---
 
 # --- station management ---
 
@@ -280,6 +375,9 @@ func get_station(station_kind: String):
 func get_station_tier(station_kind: String) -> int:
 	var station = get_or_create_station(station_kind)
 	return int(station.effective_tier()) if station.has_method("effective_tier") else int(station.get("level"))
+
+func get_station_powered(station_kind: String) -> bool:
+	return bool(get_or_create_station(station_kind).get("powered"))
 
 
 func get_or_create_station_instance(ship_id: String, station_instance_id: String, station_kind: String):

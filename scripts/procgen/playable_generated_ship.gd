@@ -16,6 +16,7 @@ const WoundsPanelScript := preload("res://scripts/ui/wounds_panel.gd")
 const ShipModificationPanelScript := preload("res://scripts/ui/ship_modification_panel.gd")
 const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const WorkActionDriverScript := preload("res://scripts/systems/work_action_driver.gd")
+const ShipWorkTransactionScript := preload("res://scripts/systems/ship_work_transaction.gd")
 const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
@@ -220,6 +221,14 @@ var wounds_panel     # WoundsPanel (PKG-D9d)
 var ship_modification_panel  # ShipModificationPanel (PKG-D9b)
 var web_chart_state = WebChartStateScript.new()
 var work_action_driver  # WorkActionDriver (PKG-B2.2b)
+var ship_work_transactions  # ShipWorkTransaction (FC-14)
+var _ship_work_transactions_by_ship: Dictionary = {}
+var _active_ship_work_id: String = ""
+var _last_ship_work_id: String = ""
+var _last_ship_work_result: Dictionary = {}
+var _active_ship_work_target_position: Vector3 = Vector3.ZERO
+var _active_ship_work_has_position: bool = false
+var _ship_work_commit_count: int = 0
 var wound_state  # WoundState (PKG-C3.1a)
 var ship_modification_state  # ShipModificationState (PKG-D2.6)
 var component_placement_state  # ComponentPlacementState (PKG-B2.3 / D6.1)
@@ -3161,6 +3170,8 @@ func _build_repair_points() -> void:
 	if positions.is_empty():
 		return
 	var idx: int = 0
+	var work_owner_id: String = _active_ship_id_for_work()
+	var shared_work_transaction = _ship_work_transaction_for(work_owner_id)
 	for sid in mgr.system_order:
 		var system = mgr.get_system(sid)
 		if system == null:
@@ -3172,7 +3183,7 @@ func _build_repair_points() -> void:
 			idx += 1
 			var rp = RepairPointScript.new()
 			rp.configure(sid, sub.subcomponent_id, mgr, inventory_state, player_progression,
-				pos, sub.repair_seconds, sub.min_skill, 1.8)
+				pos, sub.repair_seconds, sub.min_skill, 1.8, work_owner_id, shared_work_transaction)
 			if not rp.repair_completed.is_connected(_on_repair_completed):
 				rp.repair_completed.connect(_on_repair_completed)
 			if not rp.repair_blocked.is_connected(_on_repair_blocked):
@@ -3727,7 +3738,6 @@ func get_module_integrity_map_for_validation():
 	return module_integrity_map
 
 
-## PKG-B2.2b / D9: headless WorkAction driver seams.
 func inspect_structural_rebuild_target_for_validation(module_id: String) -> Dictionary:
 	if module_integrity_map == null or not module_integrity_map.has_method("inspect_rebuild_target"):
 		return {
@@ -3737,6 +3747,8 @@ func inspect_structural_rebuild_target_for_validation(module_id: String) -> Dict
 		}
 	return module_integrity_map.call("inspect_rebuild_target", module_id)
 
+
+## PKG-B2.2b / D9: headless WorkAction driver seams.
 func get_work_action_driver_for_validation():
 	return work_action_driver
 
@@ -3771,6 +3783,576 @@ func get_component_markers_for_validation() -> Array:
 
 func get_sea_graph_for_validation():
 	return sea_graph
+
+
+func _active_ship_id_for_work() -> String:
+	if current_ship != null and not String(current_ship.ship_id).is_empty():
+		return String(current_ship.ship_id)
+	if home_ship != null and not String(home_ship.ship_id).is_empty():
+		return String(home_ship.ship_id)
+	return "ship_start"
+
+
+func _ship_work_transaction_for(owner_id: String):
+	if owner_id.is_empty():
+		return null
+	if _ship_work_transactions_by_ship.has(owner_id):
+		return _ship_work_transactions_by_ship[owner_id]
+	var transaction = ShipWorkTransactionScript.new()
+	transaction.configure(owner_id)
+	_ship_work_transactions_by_ship[owner_id] = transaction
+	return transaction
+
+
+func _ensure_ship_work_transaction_owner() -> bool:
+	var owner_id: String = _active_ship_id_for_work()
+	if owner_id.is_empty():
+		return false
+	if not _active_ship_work_id.is_empty():
+		return ship_work_transactions != null and str(ship_work_transactions.get("ship_id")) == owner_id
+	ship_work_transactions = _ship_work_transaction_for(owner_id)
+	return ship_work_transactions != null
+
+
+func _selected_lot_ids_for_requirements(requirements: Dictionary) -> PackedStringArray:
+	var selected: PackedStringArray = PackedStringArray()
+	if inventory_state == null or not inventory_state.has_method("get_lot_summary"):
+		return selected
+	var lots: Array = inventory_state.get_lot_summary().get("lots", []) as Array
+	var item_ids: Array = requirements.keys()
+	item_ids.sort()
+	for item_v in item_ids:
+		var item_id: String = str(item_v)
+		var candidates: Array = []
+		for lot_v in lots:
+			if lot_v is Dictionary and str((lot_v as Dictionary).get("item_id", "")) == item_id:
+				candidates.append(lot_v as Dictionary)
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			var a_standard: bool = str(a.get("quality_tier", "")) == "standard"
+			var b_standard: bool = str(b.get("quality_tier", "")) == "standard"
+			return a_standard if a_standard != b_standard else str(a.get("lot_id", "")) < str(b.get("lot_id", ""))
+		)
+		var remaining: int = int(requirements[item_v])
+		for lot in candidates:
+			if remaining <= 0:
+				break
+			selected.append(str((lot as Dictionary).get("lot_id", "")))
+			remaining -= int((lot as Dictionary).get("quantity", 0))
+		if remaining > 0:
+			return PackedStringArray()
+	return selected
+
+
+func _actual_work_requirements(action_id: String, payload: Dictionary = {}) -> Dictionary:
+	if action_id == "mount_component":
+		var form: String = str(payload.get("item_form", ""))
+		return {form: 1} if not form.is_empty() else {}
+	var requirements: Dictionary = {}
+	if work_action_driver == null or work_action_driver.catalog == null \
+			or not work_action_driver.catalog.has_action(action_id):
+		return requirements
+	var definition: Dictionary = work_action_driver.catalog.get_action(action_id)
+	var consumed_v: Variant = definition.get("materials_consumed", {})
+	if not (consumed_v is Dictionary):
+		return requirements
+	for logical_v in (consumed_v as Dictionary).keys():
+		var logical_id: String = str(logical_v)
+		var need: int = int((consumed_v as Dictionary)[logical_v])
+		var actual_id: String = logical_id
+		if logical_id == "hull_plate" and inventory_state != null \
+				and inventory_state.get_quantity(logical_id) < need:
+			for alias in ["plating_plate", "hull_plate_kit"]:
+				if inventory_state.get_quantity(alias) >= need:
+					actual_id = alias
+					break
+		requirements[actual_id] = int(requirements.get(actual_id, 0)) + need
+	return requirements
+
+
+func _start_transactional_work(
+		action_id: String,
+		target_id: String,
+		target_kind: String,
+		target_revision: String,
+		context: Dictionary,
+		payload: Dictionary = {},
+		target_position: Variant = null,
+		preselected_lot_ids: PackedStringArray = PackedStringArray()) -> Dictionary:
+	if not _active_ship_work_id.is_empty() or work_action_driver == null or inventory_state == null:
+		return {"ok": false, "reason": "work_busy"}
+	if vitals_state != null and float(vitals_state.stamina) <= 0.001:
+		return {"ok": false, "reason": "exhausted"}
+	if not _ensure_ship_work_transaction_owner() or target_revision.is_empty():
+		return {"ok": false, "reason": "missing_work_authority"}
+	if work_action_driver.catalog == null or not work_action_driver.catalog.has_action(action_id):
+		return {"ok": false, "reason": "unknown_action"}
+	var required_tool: String = str(work_action_driver.catalog.get_action(action_id).get("tool_class", ""))
+	if not required_tool.is_empty() and inventory_state.get_quantity(required_tool) <= 0 \
+			and inventory_state.get_quantity("tool_%s" % required_tool) <= 0:
+		return {"ok": false, "reason": "missing_tool"}
+	var requirements: Dictionary = _actual_work_requirements(action_id, payload)
+	var selected_ids: PackedStringArray = preselected_lot_ids.duplicate()
+	if selected_ids.is_empty():
+		selected_ids = _selected_lot_ids_for_requirements(requirements)
+	if not requirements.is_empty() and selected_ids.is_empty():
+		return {"ok": false, "reason": "missing_materials"}
+	var work_id: String = ship_work_transactions.create_work_id(action_id)
+	var request: Dictionary = {
+		"work_id": work_id,
+		"ship_id": _active_ship_id_for_work(),
+		"target_id": target_id,
+		"target_kind": target_kind,
+		"target_revision": target_revision,
+		"action_id": action_id,
+		"source_holder_id": inventory_state.get_holder_namespace(),
+		"selected_lot_ids": selected_ids,
+		"replacement_catalog_id": str(payload.get("component_id", "")),
+		"payload": payload.duplicate(true),
+	}
+	var prepared: Dictionary = ship_work_transactions.prepare(request, inventory_state, requirements)
+	if not bool(prepared.get("ok", false)):
+		return prepared
+	var started: Dictionary = ship_work_transactions.start(work_id, work_action_driver, context, inventory_state)
+	if not bool(started.get("ok", false)):
+		_refresh_inventory_hud()
+		return started
+	_active_ship_work_id = work_id
+	_last_ship_work_id = work_id
+	_last_ship_work_result = started.duplicate(true)
+	_active_ship_work_has_position = target_position is Vector3
+	_active_ship_work_target_position = target_position as Vector3 if target_position is Vector3 else Vector3.ZERO
+	_refresh_inventory_hud()
+	if ship_modification_panel != null:
+		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	_refresh_work_action_hud()
+	return started
+
+
+func _component_slot_revision(slot_id: String) -> String:
+	if component_placement_state == null:
+		return ""
+	var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
+	if slot.is_empty():
+		return ""
+	var entry: Dictionary = component_placement_state.get_entry(slot_id)
+	return "%s|%s|%s|%.5f|%s" % [
+		slot_id,
+		str(bool(entry.get("mounted", false))).to_lower(),
+		str(entry.get("component_id", "")),
+		float(entry.get("condition", 0.0)),
+		str(entry.get("source_lot_id", "")),
+	]
+
+
+func _module_target_revision(module_id: String) -> String:
+	if module_integrity_map == null or not module_integrity_map.has_method("get_module"):
+		return ""
+	var module = module_integrity_map.get_module(module_id)
+	if module == null:
+		return ""
+	return "%s|%s|%.5f" % [module_id, str(module.get("state")), float(module.get("integrity"))]
+
+
+func _current_work_target(record: Dictionary) -> Dictionary:
+	var kind: String = str(record.get("target_kind", ""))
+	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
+	if kind in ["component_install", "component_uninstall"]:
+		var slot_id: String = str(payload.get("slot_id", record.get("target_id", "")))
+		var revision: String = _component_slot_revision(slot_id)
+		return {"exists": not revision.is_empty(), "revision": revision}
+	if kind == "module":
+		var module_revision: String = _module_target_revision(str(record.get("target_id", "")))
+		return {"exists": not module_revision.is_empty(), "revision": module_revision}
+	return {"exists": true, "revision": str(record.get("target_revision", ""))}
+
+
+func _work_has_required_tool(record: Dictionary) -> bool:
+	if work_action_driver == null or work_action_driver.catalog == null:
+		return false
+	var action_id: String = str(record.get("action_id", ""))
+	if not work_action_driver.catalog.has_action(action_id):
+		return false
+	var tool_class: String = str(work_action_driver.catalog.get_action(action_id).get("tool_class", ""))
+	if tool_class.is_empty():
+		return true
+	if inventory_state == null:
+		return false
+	return inventory_state.get_quantity(tool_class) > 0 or inventory_state.get_quantity("tool_%s" % tool_class) > 0
+
+
+func _active_work_in_range() -> bool:
+	if not _active_ship_work_has_position:
+		return true
+	return is_instance_valid(player) and (player as Node3D).global_position.distance_to(_active_ship_work_target_position) <= WORK_ACTION_INTERACT_RANGE
+
+
+func _escrow_quantities(record: Dictionary) -> Dictionary:
+	var quantities: Dictionary = {}
+	for lot_v in record.get("escrow", []) as Array:
+		if not (lot_v is Dictionary):
+			continue
+		var lot: Dictionary = lot_v as Dictionary
+		var item_id: String = str(lot.get("item_id", ""))
+		quantities[item_id] = int(quantities.get(item_id, 0)) + int(lot.get("quantity", 0))
+	return quantities
+
+
+func _work_gate_inventory(record: Dictionary) -> Dictionary:
+	var inventory: Dictionary = _escrow_quantities(record)
+	if work_action_driver == null or work_action_driver.catalog == null:
+		return inventory
+	var action_id: String = str(record.get("action_id", ""))
+	if not work_action_driver.catalog.has_action(action_id):
+		return inventory
+	var consumed_v: Variant = work_action_driver.catalog.get_action(action_id).get("materials_consumed", {})
+	if not (consumed_v is Dictionary):
+		return inventory
+	# Alias selection happens before reservation. The driver gate still speaks in
+	# catalog IDs, so expose each already-paid requirement under that logical ID.
+	var paid_total: int = 0
+	for quantity_v in inventory.values():
+		paid_total += int(quantity_v)
+	for item_v in (consumed_v as Dictionary).keys():
+		var item_id: String = str(item_v)
+		var needed: int = int((consumed_v as Dictionary)[item_v])
+		if int(inventory.get(item_id, 0)) < needed and paid_total >= needed:
+			inventory[item_id] = needed
+	return inventory
+
+
+func _stage_ship_work(record: Dictionary) -> Dictionary:
+	var kind: String = str(record.get("target_kind", ""))
+	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
+	if kind == "component_install":
+		if component_placement_state == null or not component_placement_state.has_method("mount"):
+			return {"ok": false, "reason": "mount_authority_missing"}
+		var paid_lots: Array = record.get("escrow", []) as Array
+		if paid_lots.size() != 1 or not (paid_lots[0] is Dictionary):
+			return {"ok": false, "reason": "invalid_paid_component_lot"}
+		var paid_lot: Dictionary = paid_lots[0] as Dictionary
+		var escrow_inventory: Dictionary = _escrow_quantities(record)
+		return ship_modification_state.preflight_install(
+			str(payload.get("slot_id", "")), str(payload.get("component_id", "")),
+			str(payload.get("item_form", "")), escrow_inventory,
+			str(record.get("ship_id", "")), paid_lot)
+	if kind == "component_uninstall":
+		var item_form: String = str(payload.get("item_form", ""))
+		if item_form.is_empty() or inventory_state == null or not inventory_state.can_accept(item_form, 1):
+			return {"ok": false, "reason": "destination_full"}
+		var mounted_entry: Dictionary = component_placement_state.get_entry(str(payload.get("slot_id", ""))) \
+			if component_placement_state != null else {}
+		var source_lot_v: Variant = mounted_entry.get("source_lot", null)
+		if source_lot_v is Dictionary:
+			var source_lot_id: String = str((source_lot_v as Dictionary).get("lot_id", ""))
+			for inventory_lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
+				if inventory_lot_v is Dictionary and str((inventory_lot_v as Dictionary).get("lot_id", "")) == source_lot_id:
+					return {"ok": false, "reason": "duplicate_destination_lot"}
+	return {"ok": true}
+
+
+func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
+	var kind: String = str(record.get("target_kind", ""))
+	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
+	var escrow: Array = (record.get("escrow", []) as Array).duplicate(true)
+	var result: Dictionary = {}
+	if kind == "component_install":
+		result = ComponentMountResolverScript.resolve_mount(
+			work_action_driver.work, component_placement_state, _escrow_quantities(record), component_catalog, {
+				"room_id": str(payload.get("room_id", "")),
+				"slot_kind": str(payload.get("slot_kind", "")),
+				"slot_index": int(payload.get("slot_index", -1)),
+				"item_form": str(payload.get("item_form", "")),
+				"paid_item_lots": escrow,
+			})
+		if bool(result.get("ok", false)):
+			ship_modification_state.sync_from_placement()
+			_rebuild_component_markers()
+			_sync_current_ship_component_placement()
+			_apply_ship_mod_system_link(str(payload.get("component_id", "")), true)
+			_refresh_station_tiers_from_ship_mod()
+			_apply_ship_mod_plating_repair(str(payload.get("component_id", "")))
+	elif kind == "component_uninstall":
+		result = ComponentMountResolverScript.resolve_dismount(
+			work_action_driver.work, component_placement_state, {}, {"defer_inventory": true})
+		if bool(result.get("ok", false)):
+			var returned_lots: Array = []
+			var returned_v: Variant = result.get("item_lot", null)
+			if returned_v is Dictionary:
+				if inventory_state.add_lot(returned_v as Dictionary) != int((returned_v as Dictionary).get("quantity", 0)):
+					component_placement_state.restore_dismounted(str(result.get("instance_id", "")))
+					return {"ok": false, "reason": "return_lot_failed"}
+				returned_lots.append((returned_v as Dictionary).duplicate(true))
+			else:
+				var lot_ids_before: Dictionary = {}
+				for existing_lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
+					if existing_lot_v is Dictionary:
+						lot_ids_before[str((existing_lot_v as Dictionary).get("lot_id", ""))] = true
+				if inventory_state.add_item(str(result.get("item_form", "")), 1) != 1:
+					component_placement_state.restore_dismounted(str(result.get("instance_id", "")))
+					return {"ok": false, "reason": "return_item_failed"}
+				for deposited_lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
+					if deposited_lot_v is Dictionary \
+							and str((deposited_lot_v as Dictionary).get("item_id", "")) == str(result.get("item_form", "")) \
+							and not lot_ids_before.has(str((deposited_lot_v as Dictionary).get("lot_id", ""))):
+						returned_lots.append((deposited_lot_v as Dictionary).duplicate(true))
+						break
+			result["returned_lots"] = returned_lots
+			ship_modification_state.sync_from_placement()
+			_rebuild_component_markers()
+			_sync_current_ship_component_placement()
+			_apply_ship_mod_system_link(str(result.get("component_id", "")), false)
+			_refresh_station_tiers_from_ship_mod()
+	else:
+		result = work_action_driver.complete(module_integrity_map, {}, {
+			"materials_prepaid": true,
+			"repair_material_lots": escrow,
+		})
+		if bool(result.get("ok", false)):
+			_apply_module_integrity_state_to_scene()
+			_apply_work_yields_to_inventory_state(result, false)
+	if not bool(result.get("ok", false)):
+		return result
+	work_action_driver.last_resolve = result.duplicate(true)
+	work_action_driver.last_noise_pulse = float(result.get("noise", 0.0))
+	work_action_driver.last_xp_event = str(result.get("xp_event", ""))
+	if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
+		work_action_driver.apply_noise_to_detection(threat_manager)
+	if is_instance_valid(audio_manager):
+		var event_id: StringName = AudioEventSeamScript.sfx_for_work_verb(str(result.get("verb", "")))
+		if audio_manager.sfx_router != null:
+			work_action_driver.last_resolve["audio_event"] = String(event_id)
+			work_action_driver.emit_completion_sfx(audio_manager.sfx_router)
+		elif not String(event_id).is_empty():
+			audio_manager.play_sfx(event_id)
+	var xp_event: String = str(result.get("xp_event", ""))
+	if not xp_event.is_empty():
+		emit_training_event(xp_event, str(record.get("target_id", "")))
+	_ship_work_commit_count += 1
+	result["awarded_event_ids"] = [xp_event] if not xp_event.is_empty() else []
+	result["committed_target_revision"] = _current_work_target(record).get("revision", "")
+	_refresh_inventory_hud()
+	if ship_modification_panel != null:
+		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	return result
+
+
+func _commit_active_ship_work() -> Dictionary:
+	if _active_ship_work_id.is_empty() or ship_work_transactions == null:
+		return {"ok": false, "reason": "no_active_work"}
+	var record: Dictionary = ship_work_transactions.get_record(_active_ship_work_id)
+	var current: Dictionary = _current_work_target(record)
+	var context: Dictionary = {
+		"ship_id": _active_ship_id_for_work(),
+		"target_id": str(record.get("target_id", "")),
+		"target_exists": bool(current.get("exists", false)),
+		"target_revision": str(current.get("revision", "")),
+		"in_range": _active_work_in_range(),
+		"has_required_tool": _work_has_required_tool(record),
+		"damaged": false,
+		"stage": Callable(self, "_stage_ship_work"),
+		"commit": Callable(self, "_apply_ship_work_commit"),
+		"source_inventory": inventory_state,
+		"driver": work_action_driver,
+	}
+	var result: Dictionary = ship_work_transactions.commit(_active_ship_work_id, context)
+	_last_ship_work_id = _active_ship_work_id
+	_last_ship_work_result = result.duplicate(true)
+	if bool(result.get("ok", false)):
+		if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
+			work_action_driver.work.call("reset")
+		_active_ship_work_id = ""
+		_active_ship_work_has_position = false
+		_work_requires_hold = false
+		if ship_modification_panel != null:
+			ship_modification_panel.set_request_status("work committed")
+	elif bool(result.get("refunded", false)):
+		_active_ship_work_id = ""
+		_active_ship_work_has_position = false
+		_work_requires_hold = false
+		_refresh_inventory_hud()
+		if ship_modification_panel != null:
+			ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+			ship_modification_panel.set_request_status("work rejected: %s" % str(result.get("reason", "staging_failed")))
+	_refresh_work_action_hud()
+	return result
+
+
+func _cancel_active_ship_work(reason: String) -> Dictionary:
+	if _active_ship_work_id.is_empty() or ship_work_transactions == null or inventory_state == null:
+		return {"ok": false, "reason": "no_active_work"}
+	var work_id: String = _active_ship_work_id
+	var result: Dictionary = ship_work_transactions.cancel(work_id, inventory_state, work_action_driver, reason)
+	_last_ship_work_id = work_id
+	_last_ship_work_result = result.duplicate(true)
+	if bool(result.get("ok", false)):
+		_active_ship_work_id = ""
+		_active_ship_work_has_position = false
+		_work_requires_hold = false
+		_refresh_inventory_hud()
+		if ship_modification_panel != null:
+			ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+			ship_modification_panel.set_request_status("work cancelled: %s" % reason)
+	_refresh_work_action_hud()
+	return result
+
+
+func _pause_active_ship_work(reason: String) -> Dictionary:
+	if _active_ship_work_id.is_empty() or ship_work_transactions == null or work_action_driver == null:
+		return {"ok": false, "reason": "no_active_work"}
+	var paused: bool = false
+	if work_action_driver.get_status() == "paused":
+		paused = true
+	else:
+		paused = ship_work_transactions.pause(_active_ship_work_id, work_action_driver, reason)
+	if not paused:
+		return {"ok": false, "reason": "pause_failed", "work_id": _active_ship_work_id}
+	var result: Dictionary = {
+		"ok": true,
+		"reason": reason,
+		"work_id": _active_ship_work_id,
+		"paused": true,
+		"escrow_retained": true,
+	}
+	_last_ship_work_id = _active_ship_work_id
+	_last_ship_work_result = result.duplicate(true)
+	if ship_modification_panel != null:
+		ship_modification_panel.set_request_status("work paused: %s" % reason)
+	_refresh_work_action_hud()
+	return result
+
+
+func cancel_active_ship_work_for_validation(reason: String = "explicit_cancel") -> bool:
+	return bool(_cancel_active_ship_work(reason).get("ok", false))
+
+
+func has_active_ship_work_for_validation() -> bool:
+	return not _active_ship_work_id.is_empty()
+
+
+func get_last_ship_work_result_for_validation() -> Dictionary:
+	return _last_ship_work_result.duplicate(true)
+
+
+func get_ship_work_transaction_for_validation():
+	return ship_work_transactions
+
+
+func get_active_ship_work_record_for_validation() -> Dictionary:
+	if ship_work_transactions == null or _active_ship_work_id.is_empty():
+		return {}
+	return ship_work_transactions.get_record(_active_ship_work_id)
+
+
+func get_ship_work_commit_count_for_validation() -> int:
+	return _ship_work_commit_count
+
+
+func advance_active_ship_work_for_validation(delta: float) -> Dictionary:
+	_work_requires_hold = false
+	_tick_work_action(delta)
+	return _last_ship_work_result.duplicate(true)
+
+
+func commit_last_ship_work_for_validation() -> Dictionary:
+	if ship_work_transactions == null or _last_ship_work_id.is_empty():
+		return {"ok": false, "reason": "no_last_work"}
+	var record: Dictionary = ship_work_transactions.get_record(_last_ship_work_id)
+	var current: Dictionary = _current_work_target(record)
+	return ship_work_transactions.commit(_last_ship_work_id, {
+		"ship_id": _active_ship_id_for_work(),
+		"target_id": str(record.get("target_id", "")),
+		"target_exists": bool(current.get("exists", false)),
+		"target_revision": str(current.get("revision", "")),
+		"in_range": true,
+		"has_required_tool": true,
+		"damaged": false,
+		"stage": Callable(self, "_stage_ship_work"),
+		"commit": Callable(self, "_apply_ship_work_commit"),
+	})
+
+
+func _component_slot_world_position(slot_id: String) -> Variant:
+	if component_placement_state == null:
+		return null
+	var entry: Dictionary = component_placement_state.get_entry(slot_id)
+	if entry.is_empty():
+		var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
+		if slot.is_empty():
+			return null
+		entry = slot
+	var layout: Dictionary = _active_layout_for_work()
+	var index: int = maxi(0, component_placement_state.find_index(slot_id))
+	return _component_marker_world(layout, entry, _room_world_centers(layout), index)
+
+
+func prepare_p12_component_work_fixture_for_validation() -> Dictionary:
+	if inventory_state == null or component_placement_state == null or ship_modification_panel == null:
+		return {"ok": false, "reason": "missing_runtime"}
+	if vitals_state != null:
+		vitals_state.stamina = vitals_state.max_stamina
+	if inventory_state.get_quantity("wrench") <= 0:
+		inventory_state.add_item("wrench", 1)
+	if not ship_modification_panel.is_open() and not open_ship_modification_panel_for_validation():
+		return {"ok": false, "reason": "panel"}
+	for entry_v in component_placement_state.placed:
+		if not (entry_v is Dictionary) or not bool((entry_v as Dictionary).get("mounted", false)):
+			continue
+		var entry: Dictionary = entry_v as Dictionary
+		var slot_id: String = str(entry.get("component_instance_id", ""))
+		var position_v: Variant = _component_slot_world_position(slot_id)
+		if slot_id.is_empty() or not (position_v is Vector3):
+			continue
+		ship_modification_panel.select_slot_id(slot_id)
+		if is_instance_valid(player):
+			(player as Node3D).global_position = position_v as Vector3
+		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+		return {
+			"ok": true,
+			"slot_id": slot_id,
+			"instance_id": slot_id,
+			"item_form": str(entry.get("item_form", "")),
+			"component_id": str(entry.get("component_id", "")),
+		}
+	return {"ok": false, "reason": "no_mounted_component"}
+
+
+func begin_p12_uninstall_for_validation(slot_id: String) -> bool:
+	if inventory_state == null or ship_modification_panel == null:
+		return false
+	if vitals_state != null:
+		vitals_state.stamina = vitals_state.max_stamina
+	if inventory_state.get_quantity("wrench") <= 0:
+		inventory_state.add_item("wrench", 1)
+	var position_v: Variant = _component_slot_world_position(slot_id)
+	if position_v is Vector3 and is_instance_valid(player):
+		(player as Node3D).global_position = position_v as Vector3
+	ship_modification_panel.select_slot_id(slot_id)
+	ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	return ship_modification_panel.uninstall_selected()
+
+
+func move_player_to_active_ship_work_target_for_validation() -> bool:
+	if not _active_ship_work_has_position or not is_instance_valid(player):
+		return false
+	(player as Node3D).global_position = _active_ship_work_target_position
+	return true
+
+
+func interrupt_active_ship_work_for_validation(reason: String) -> bool:
+	if _active_ship_work_id.is_empty():
+		return false
+	match reason:
+		"missing_tool":
+			if inventory_state != null:
+				inventory_state.remove_item("wrench", inventory_state.get_quantity("wrench"))
+				inventory_state.remove_item("tool_wrench", inventory_state.get_quantity("tool_wrench"))
+		"out_of_range":
+			if is_instance_valid(player):
+				(player as Node3D).global_position = _active_ship_work_target_position + Vector3(WORK_ACTION_INTERACT_RANGE + 5.0, 0.0, 0.0)
+		"damaged":
+			return bool(_pause_active_ship_work(reason).get("ok", false))
+	_tick_work_action(0.001)
+	return work_action_driver != null and work_action_driver.get_status() == "paused"
 
 
 ## PKG-B2.3: mounted components prefer imported prop visuals and retain primitive fallback.
@@ -3878,6 +4460,7 @@ func run_work_action_for_validation(action_id: String, target_id: String, invent
 				if int(inv.get(str(mid), 0)) < int((mats as Dictionary)[mid]):
 					inv[str(mid)] = int((mats as Dictionary)[mid])
 		ctx["inventory"] = inv.duplicate(true)
+	ctx["selected_tool_lot"] = _selected_work_tool_lot(str(ctx.get("tool_class", "")))
 	if not work_action_driver.start_action(action_id, target_id, ctx):
 		return {"ok": false, "reason": "start_failed"}
 	_work_requires_hold = false
@@ -3914,6 +4497,11 @@ func _refresh_work_action_hud() -> void:
 			var sum: Dictionary = work_action_driver.work.call("get_summary")
 			var def: Dictionary = sum.get("definition", {}) if typeof(sum.get("definition", {})) == TYPE_DICTIONARY else {}
 			verb = str(def.get("verb", ""))
+	var reserved: Dictionary = {}
+	if not _active_ship_work_id.is_empty() and ship_work_transactions != null:
+		var record: Dictionary = ship_work_transactions.get_record(_active_ship_work_id)
+		reserved = _escrow_quantities(record)
+		st = str(record.get("state", st))
 	work_action_hud.set_work_state({
 		"action_id": action_id,
 		"target_id": target_id,
@@ -3921,6 +4509,7 @@ func _refresh_work_action_hud() -> void:
 		"progress": work_action_driver.progress_ratio(),
 		"status": st,
 		"noise": noise,
+		"reserved": reserved,
 	})
 
 
@@ -4058,6 +4647,35 @@ func _bind_ship_modification_panel_to_current_physical_slots(inventory: Dictiona
 	return true
 
 
+## Read-only component admission shared by the panel and its request handler.
+## The returned lot IDs use the same stable selection policy that the work
+## transaction receives for reservation; _stage_ship_work remains the commit
+## authority and validates the exact escrowed row again.
+func _ship_mod_install_preflight(slot_id: String, component_id: String, item_form: String) -> Dictionary:
+	if inventory_state == null or ship_modification_state == null:
+		return {"ok": false, "reason": "missing_state"}
+	var selected_ids: PackedStringArray = _selected_lot_ids_for_requirements({item_form: 1})
+	if selected_ids.size() != 1:
+		return {"ok": false, "reason": "missing_item"}
+	var selected_lot: Dictionary = {}
+	for lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
+		if lot_v is Dictionary and str((lot_v as Dictionary).get("lot_id", "")) == selected_ids[0]:
+			selected_lot = (lot_v as Dictionary).duplicate(true)
+			break
+	if selected_lot.is_empty():
+		return {"ok": false, "reason": "missing_item"}
+	# Admission previews the one unit that reservation will split from a stacked
+	# source lot. The transaction still receives the original lot ID and owns the
+	# authoritative split, escrow identity, and provenance used at commit.
+	selected_lot["quantity"] = 1
+	var result: Dictionary = ship_modification_state.preflight_install(
+		slot_id, component_id, item_form, _inventory_qty_dict_for_work(),
+		_active_ship_id_for_work(), selected_lot)
+	result["selected_lot_ids"] = selected_ids
+	result["selected_lot"] = selected_lot
+	return result
+
+
 ## Open web chart panel (requires web_chart in inventory) and route UI SFX.
 ## Re-press while open toggles closed.
 func open_chart_panel_for_validation() -> bool:
@@ -4084,44 +4702,72 @@ func open_chart_panel_for_validation() -> bool:
 	return chart_panel.is_open()
 
 
-## Sync panel bag → InventoryState after install (item_form already removed from bag).
-## REQ-SMOD-001: linked catalog components restore hub ship-system sub floor.
-func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item_form: String) -> void:
-	if inventory_state != null and not item_form.is_empty():
-		# Panel bag already decremented; mirror into InventoryState if it still holds the item.
-		if inventory_state.get_quantity(item_form) > 0:
-			inventory_state.remove_item(item_form, 1)
-	if ship_modification_panel != null:
-		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
-	_rebuild_component_markers()
-	_sync_current_ship_component_placement()
-	_apply_ship_mod_system_link(component_id, true)
-	_refresh_station_tiers_from_ship_mod()
-	_apply_ship_mod_plating_repair(component_id)
-	emit_training_event("ship_mod_install", component_id)
+## Panel actions are requests. Exact component lots enter escrow before the timed
+## WorkAction begins; physical placement and effects occur only in commit.
+func _on_ship_mod_install_requested(slot_id: String, component_id: String, item_form: String) -> void:
+	if inventory_state == null or component_placement_state == null or component_catalog == null:
+		return
+	var preflight: Dictionary = _ship_mod_install_preflight(slot_id, component_id, item_form)
+	if not bool(preflight.get("ok", false)):
+		ship_modification_panel.set_request_status("install denied: %s" % str(preflight.get("reason", "failed")))
+		_emit_ship_mod_action_failed_sfx()
+		return
+	var selected_ids: PackedStringArray = preflight.get("selected_lot_ids", PackedStringArray()) as PackedStringArray
+	var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
+	var position_v: Variant = _component_slot_world_position(slot_id)
+	var ctx: Dictionary = {
+		"tool_class": "wrench",
+		"skill_id": "salvage",
+		"skill_level": int(player_progression.get_skill_level("salvage")) if player_progression != null else 0,
+		"inventory": _inventory_qty_dict_for_work(),
+	}
+	var started: Dictionary = _start_transactional_work(
+		"mount_component", slot_id, "component_install", _component_slot_revision(slot_id), ctx, {
+			"slot_id": slot_id,
+			"component_id": component_id,
+			"item_form": item_form,
+			"room_id": str(slot.get("room_id", "")),
+			"slot_kind": str(slot.get("slot_kind", "")),
+			"slot_index": int(slot.get("slot_index", -1)),
+		}, position_v, selected_ids)
+	if not bool(started.get("ok", false)):
+		ship_modification_panel.set_request_status("install denied: %s" % str(started.get("reason", "failed")))
+		_emit_ship_mod_action_failed_sfx()
+		return
+	_work_requires_hold = true
+	ship_modification_panel.set_request_status("install work started")
 	if is_instance_valid(audio_manager):
-		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_INSTALL)
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 
 
-## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
-## Uninstall strips linked hub subcomponent capacity (mirror of component dismount).
-func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "", _item_form: String = "") -> void:
-	if inventory_state != null and ship_modification_panel != null:
-		var bag: Dictionary = ship_modification_panel.get_inventory_bag()
-		# Any bag qty higher than live inventory is a return from uninstall — add delta.
-		for item_id in bag.keys():
-			var bag_q: int = int(bag[item_id])
-			var live_q: int = int(inventory_state.get_quantity(str(item_id)))
-			if bag_q > live_q:
-				inventory_state.add_item(str(item_id), bag_q - live_q)
-		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
-	_rebuild_component_markers()
-	_sync_current_ship_component_placement()
-	_apply_ship_mod_system_link(component_id, false)
-	_refresh_station_tiers_from_ship_mod()
-	emit_training_event("ship_mod_uninstall", component_id)
+func _on_ship_mod_uninstall_requested(slot_id: String, component_id: String = "", item_form: String = "") -> void:
+	if inventory_state == null or component_placement_state == null:
+		return
+	var entry: Dictionary = component_placement_state.get_entry(slot_id)
+	if entry.is_empty() or not bool(entry.get("mounted", false)):
+		ship_modification_panel.set_request_status("uninstall denied: target removed")
+		return
+	var position_v: Variant = _component_slot_world_position(slot_id)
+	var ctx: Dictionary = {
+		"tool_class": "wrench",
+		"skill_id": "salvage",
+		"skill_level": int(player_progression.get_skill_level("salvage")) if player_progression != null else 0,
+		"inventory": _inventory_qty_dict_for_work(),
+	}
+	var started: Dictionary = _start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", _component_slot_revision(slot_id), ctx, {
+			"slot_id": slot_id,
+			"component_id": component_id if not component_id.is_empty() else str(entry.get("component_id", "")),
+			"item_form": item_form if not item_form.is_empty() else str(entry.get("item_form", "")),
+		}, position_v)
+	if not bool(started.get("ok", false)):
+		ship_modification_panel.set_request_status("uninstall denied: %s" % str(started.get("reason", "failed")))
+		_emit_ship_mod_action_failed_sfx()
+		return
+	_work_requires_hold = true
+	ship_modification_panel.set_request_status("uninstall work started")
 	if is_instance_valid(audio_manager):
-		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL)
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 
 
 func _sync_current_ship_component_placement() -> void:
@@ -4276,11 +4922,13 @@ func _try_work_action_interact(player_body) -> bool:
 	if player_body == null or work_action_driver == null:
 		return false
 	if work_action_driver.is_working():
-		# Second press cancels in-progress strip work.
-		if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
-			work_action_driver.work.call("interrupt")
-		_work_requires_hold = false
-		_refresh_work_action_hud()
+		# Second press explicitly cancels and returns exact reserved lots.
+		if not _active_ship_work_id.is_empty():
+			_cancel_active_ship_work("explicit_cancel")
+		else:
+			work_action_driver.interrupt()
+			_work_requires_hold = false
+			_refresh_work_action_hud()
 		return true
 	var layout: Dictionary = _active_layout_for_work()
 	if layout.is_empty():
@@ -4290,6 +4938,9 @@ func _try_work_action_interact(player_body) -> bool:
 	var action_id: String = ""
 	var tool_class: String = ""
 	var target_id: String = ""
+	var target_kind: String = "module"
+	var work_payload: Dictionary = {}
+	var target_position: Variant = player_pos
 
 	var has_wrench: bool = int(inv.get("wrench", 0)) > 0 or int(inv.get("tool_wrench", 0)) > 0
 	if has_wrench and component_placement_state != null:
@@ -4299,12 +4950,29 @@ func _try_work_action_interact(player_body) -> bool:
 			action_id = "mount_component"
 			tool_class = "wrench"
 			target_id = str(remount.get("target_id", ""))
+			target_kind = "component_install"
+			work_payload = {
+				"slot_id": str(remount.get("slot_id", "")),
+				"component_id": component_catalog.component_id_for_item_form(str(remount.get("item_form", ""))),
+				"item_form": str(remount.get("item_form", "")),
+				"room_id": str(remount.get("room_id", "")),
+				"slot_kind": str(remount.get("slot_kind", "")),
+				"slot_index": int(remount.get("slot_index", -1)),
+			}
+			target_position = remount.get("position", player_pos)
 		else:
 			var comp: Dictionary = _nearest_mounted_component(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
 			if not comp.is_empty():
 				action_id = "dismount_component"
 				tool_class = "wrench"
 				target_id = str(comp.get("component_instance_id", ""))
+				target_kind = "component_uninstall"
+				work_payload = {
+					"slot_id": target_id,
+					"component_id": str(comp.get("component_id", "")),
+					"item_form": str(comp.get("item_form", "")),
+				}
+				target_position = _component_slot_world_position(target_id)
 
 	if action_id.is_empty():
 		if module_integrity_map == null:
@@ -4369,7 +5037,12 @@ func _try_work_action_interact(player_body) -> bool:
 		"skill_level": skill_level,
 		"inventory": inv,
 	}
-	if not work_action_driver.start_action(action_id, target_id, ctx):
+	ctx["selected_tool_lot"] = _selected_work_tool_lot(tool_class)
+	var target_revision: String = _component_slot_revision(str(work_payload.get("slot_id", ""))) \
+		if target_kind in ["component_install", "component_uninstall"] else _module_target_revision(target_id)
+	var started: Dictionary = _start_transactional_work(
+		action_id, target_id, target_kind, target_revision, ctx, work_payload, target_position)
+	if not bool(started.get("ok", false)):
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
@@ -4379,6 +5052,24 @@ func _try_work_action_interact(player_body) -> bool:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	return true
+
+
+## P05: snapshot the actual compatible tool lot for work quality. An absent or
+## legacy tool leaves the existing speed unchanged; condition is not consulted.
+func _selected_work_tool_lot(tool_class: String) -> Dictionary:
+	if inventory_state == null or tool_class.is_empty() or not inventory_state.has_method("get_lot_summary"):
+		return {}
+	var choices: Array = []
+	for lot_v in (inventory_state.get_lot_summary().get("lots", []) as Array):
+		if lot_v is Dictionary and str((lot_v as Dictionary).get("item_id", "")) == tool_class:
+			choices.append(lot_v as Dictionary)
+	choices.sort_custom(func(a, b):
+		var at: String = str(a.get("quality_tier", "standard"))
+		var bt: String = str(b.get("quality_tier", "standard"))
+		if at == "standard" and bt != "standard": return true
+		if bt == "standard" and at != "standard": return false
+		return str(a.get("lot_id", "")) < str(b.get("lot_id", "")))
+	return (choices[0] as Dictionary).duplicate(true) if not choices.is_empty() else {}
 
 
 func _emit_work_tool_missing_sfx() -> void:
@@ -4456,8 +5147,13 @@ func _nearest_remount_target(
 				int(e.get("slot_index", 0)),
 				form,
 			],
+			"slot_id": str(e.get("component_instance_id", "")),
+			"room_id": rid,
+			"slot_kind": str(e.get("slot_kind", "wall")),
+			"slot_index": int(e.get("slot_index", 0)),
 			"distance": d,
 			"item_form": form,
+			"position": pos,
 		}
 		i += 1
 	return best
@@ -4807,10 +5503,30 @@ func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: floa
 func _tick_work_action(delta: float) -> void:
 	if work_action_driver == null or delta <= 0.0:
 		return
+	if not _active_ship_work_id.is_empty():
+		var active_record: Dictionary = ship_work_transactions.get_record(_active_ship_work_id)
+		if str(active_record.get("ship_id", "")) != _active_ship_id_for_work():
+			_pause_active_ship_work("wrong_ship")
+			return
+		if not _active_work_in_range():
+			_pause_active_ship_work("out_of_range")
+			return
+		if not _work_has_required_tool(active_record):
+			_pause_active_ship_work("missing_tool")
+			return
+		if work_action_driver.get_status() == "paused" and (not _work_requires_hold or Input.is_action_pressed("interact")):
+			var resume_ctx: Dictionary = {
+				"tool_class": str(work_action_driver.catalog.get_action(str(active_record.get("action_id", ""))).get("tool_class", "")),
+				"skill_id": str(work_action_driver.catalog.get_action(str(active_record.get("action_id", ""))).get("min_skill", "")),
+				"skill_level": 99,
+				"inventory": _work_gate_inventory(active_record),
+			}
+			# Resume material gates see the paid escrow as available.
+			ship_work_transactions.resume(_active_ship_work_id, work_action_driver, resume_ctx)
 	if not work_action_driver.is_working():
 		return
 	if _work_requires_hold and not Input.is_action_pressed("interact"):
-		# Freeze progress while not holding; HUD still refreshes.
+		ship_work_transactions.pause(_active_ship_work_id, work_action_driver)
 		_refresh_work_action_hud()
 		return
 	var speed: float = 1.0
@@ -4820,7 +5536,10 @@ func _tick_work_action(delta: float) -> void:
 	# Exhausted stamina interrupts active work (no free perpetual strip).
 	if vitals_state != null:
 		if float(vitals_state.stamina) <= 0.001:
-			_interrupt_work_on_damage()
+			if not _active_ship_work_id.is_empty():
+				_pause_active_ship_work("exhausted")
+			else:
+				work_action_driver.interrupt()
 			_work_requires_hold = false
 			return
 		var max_s: float = maxf(1.0, float(vitals_state.max_stamina))
@@ -4829,6 +5548,8 @@ func _tick_work_action(delta: float) -> void:
 		if vitals_state.has_method("apply_delta"):
 			vitals_state.apply_delta({"stamina": -8.0 * delta})
 	work_action_driver.tick(delta, {"work_speed_mult": speed})
+	if not _active_ship_work_id.is_empty():
+		ship_work_transactions.sync_progress(_active_ship_work_id, work_action_driver)
 	# Continuous strip noise while working (detection tension).
 	if work_action_driver.last_progress_noise > 0.0 and threat_manager != null:
 		work_action_driver.apply_noise_to_detection(threat_manager)
@@ -4838,6 +5559,11 @@ func _tick_work_action(delta: float) -> void:
 	if work_action_driver.get_status() == "completed" or (
 		work_action_driver.work != null and str(work_action_driver.work.get("status")) == "completed"
 	):
+		if not _active_ship_work_id.is_empty():
+			if ship_work_transactions.mark_completed(_active_ship_work_id, work_action_driver):
+				_commit_active_ship_work()
+			_refresh_work_action_hud()
+			return
 		var inv: Dictionary = _inventory_qty_dict_for_work()
 		var res: Dictionary = {}
 		var action_id: String = ""
@@ -4920,7 +5646,7 @@ func _tick_work_action(delta: float) -> void:
 
 ## Mirror pure-dict WorkAction yields into live InventoryState (REQ-WA-002).
 ## Cart overload (yields_applied=false) spawns a floor WorkYieldDrop instead.
-func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
+func _apply_work_yields_to_inventory_state(res: Dictionary, apply_consumed: bool = true) -> void:
 	if inventory_state == null or res.is_empty():
 		return
 	if not bool(res.get("yields_applied", true)):
@@ -4941,7 +5667,7 @@ func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
 			inventory_state.add_item(str(item_id), qty)
 	# Materials consumed from pure dict also need InventoryState mirror.
 	var consumed: Variant = res.get("consumed", {})
-	if typeof(consumed) == TYPE_DICTIONARY and inventory_state.has_method("remove_item"):
+	if apply_consumed and typeof(consumed) == TYPE_DICTIONARY and inventory_state.has_method("remove_item"):
 		for cid in (consumed as Dictionary).keys():
 			var need: int = int((consumed as Dictionary)[cid])
 			if need <= 0:
@@ -5502,10 +6228,18 @@ func apply_threat_structure_damage_for_validation(module_id: String, amount: flo
 
 
 func _interrupt_work_on_damage() -> void:
-	if work_action_driver == null or not work_action_driver.is_working():
+	var interrupted: bool = false
+	if work_action_driver != null and work_action_driver.is_working():
+		if not _active_ship_work_id.is_empty():
+			_pause_active_ship_work("damaged")
+		else:
+			work_action_driver.interrupt()
+		interrupted = true
+	for repair_point in repair_points:
+		if is_instance_valid(repair_point) and repair_point.has_method("interrupt_on_damage"):
+			interrupted = bool(repair_point.call("interrupt_on_damage")) or interrupted
+	if not interrupted:
 		return
-	if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
-		work_action_driver.work.call("interrupt")
 	# Soft cancel cue distinct from combat hit (combat path also plays SFX_COMBAT_HIT).
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
@@ -7084,10 +7818,20 @@ func _build_hud_layer() -> void:
 	# PKG-D9a / B2.2b: WorkAction progress HUD + pure driver (validation + future interact).
 	work_action_driver = WorkActionDriverScript.new()
 	work_action_driver.configure({})
+	# The ledger is owned by the ship for the full scene session, not by this HUD node.
+	# HUD rebuilds happen during reload and must not discard committed receipts or reset
+	# the per-owner sequence used to make work IDs unique.
+	if ship_work_transactions != null and not _active_ship_work_id.is_empty():
+		var active_ledger_owner: String = str(ship_work_transactions.get("ship_id"))
+		if not active_ledger_owner.is_empty() and not _ship_work_transactions_by_ship.has(active_ledger_owner):
+			_ship_work_transactions_by_ship[active_ledger_owner] = ship_work_transactions
+	else:
+		ship_work_transactions = _ship_work_transaction_for(_active_ship_id_for_work())
 	work_action_hud = WorkActionHudPanelScript.new()
 	work_action_hud.name = "WorkActionHudPanel"
 	work_action_hud.visible = false
 	hud_layer.add_child(work_action_hud)
+	work_action_hud.cancel_requested.connect(func(): cancel_active_ship_work_for_validation("explicit_cancel"))
 	# PKG-C3.1a / D9d: wounds model + treatment panel.
 	wound_state = WoundStateScript.new()
 	wound_state.configure({})
@@ -7107,6 +7851,7 @@ func _build_hud_layer() -> void:
 	ship_modification_panel.visible = false
 	hud_layer.add_child(ship_modification_panel)
 	ship_modification_panel.bind(ship_modification_state, {})
+	ship_modification_panel.set_install_preflight_query(Callable(self, "_ship_mod_install_preflight"))
 	ship_modification_panel.panel_closed.connect(_on_ship_modification_panel_closed)
 	# PKG-B2.3 / D6.1: component placement for current ship (home at boot).
 	component_catalog = ComponentCatalogScript.new()
@@ -7128,6 +7873,8 @@ func _build_hud_layer() -> void:
 	inventory_panel.panel_closed.connect(_on_inventory_panel_closed)
 	inventory_panel.transfer_completed.connect(_on_inventory_transfer_completed)
 	inventory_panel.use_requested.connect(_on_inventory_use_requested)
+	if inventory_panel.has_signal("use_lot_requested"):
+		inventory_panel.use_lot_requested.connect(_on_inventory_lot_use_requested)
 	menu_coordinator = MenuCoordinatorScript.new()
 	menu_coordinator.name = "MenuCoordinator"
 	hud_layer.add_child(menu_coordinator)
@@ -7222,7 +7969,10 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 	if station_kind == "field_crafting":
 		if field_crafting_state == null:
 			return []
-		return field_crafting_state.list_recipe_entries(inventory_state, recipe_knowledge_state)
+		var field_skill: int = int(player_progression.get_skill_level("fabrication")) \
+			if player_progression != null and player_progression.has_method("get_skill_level") else 0
+		return field_crafting_state.list_recipe_entries(
+			inventory_state, recipe_knowledge_state, field_skill)
 	if station_kind == "salvage":
 		if deconstruction_resolver == null:
 			return []
@@ -7237,9 +7987,11 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("fabrication"))
-	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill, crafting_state.get_station_tier(station_kind), recipe_knowledge_state)
+	return crafting_state.list_recipe_entries(
+		station_kind, inventory_state, skill, crafting_state.get_station_tier(station_kind),
+		recipe_knowledge_state, skill, crafting_state.get_station_powered(station_kind))
 
-## REQ-CS-016 / 017 / 018: panel confirm handler.
+
 func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
 	if recipe_id.is_empty() or station_kind.is_empty():
 		_on_craft_blocked(station_kind if not station_kind.is_empty() else "unknown", "bad_args")
@@ -7323,6 +8075,14 @@ func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
 		_read_recipe_book(str(definition.get("book_id", item_id)))
 		return
 	_use_consumable_item(item_id, use_all)
+
+
+func _on_inventory_lot_use_requested(item_id: String, lot_id: String, use_all: bool) -> void:
+	var definition: Dictionary = ItemDefsScript.get_definition(ItemDefsScript.load_definitions(), item_id)
+	if str(definition.get("use_kind", "")) == "read_skill_book":
+		_read_recipe_book(str(definition.get("book_id", item_id)))
+		return
+	_use_consumable_item(item_id, use_all, lot_id)
 
 ## Actual inventory Use action for authored skill books. Books remain readable
 ## reference items; PlayerProgressionState owns the existing once-only read rule.
@@ -7867,10 +8627,14 @@ func _ensure_consumable_hotbar_assignments() -> void:
 		if current.is_empty() or inventory_state.get_quantity(current) <= 0 or not consumable_state.has_use_action(current):
 			consumable_state.assign_hotbar_slot(slot_index, usable[slot_index] if slot_index < usable.size() else "")
 
-func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
+func _use_consumable_item(
+		item_id: String,
+		use_all: bool = false,
+		selected_lot_id: String = "") -> Dictionary:
 	if consumable_state == null or inventory_state == null:
 		return {"ok": false, "reason": "consumable_pipeline_missing"}
-	var result: Dictionary = consumable_state.use_item(item_id, inventory_state, _consumable_pipeline_context(), use_all)
+	var result: Dictionary = consumable_state.use_item(
+		item_id, inventory_state, _consumable_pipeline_context(), use_all, selected_lot_id)
 	if bool(result.get("ok", false)):
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
@@ -12295,8 +13059,11 @@ func _input(event: InputEvent) -> void:
 		request_load()
 		get_viewport().set_input_as_handled()
 
-func use_inventory_item_for_validation(item_id: String, use_all: bool = false) -> Dictionary:
-	return _use_consumable_item(item_id, use_all)
+func use_inventory_item_for_validation(
+		item_id: String,
+		use_all: bool = false,
+		selected_lot_id: String = "") -> Dictionary:
+	return _use_consumable_item(item_id, use_all, selected_lot_id)
 
 func assign_hotbar_slot_for_validation(slot_index: int, item_id: String) -> bool:
 	if consumable_state == null:

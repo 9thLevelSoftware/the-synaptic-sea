@@ -8,6 +8,7 @@ class_name ConsumableState
 const HOTBAR_SLOT_COUNT: int = 3
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 const FoodStateScript := preload("res://scripts/systems/food_state.gd")
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 
 var definitions: Dictionary = {}
 var hotbar_slots: Array[String] = []
@@ -42,7 +43,12 @@ func use_hotbar_slot(slot_index: int, inventory_state, pipeline_context: Diction
 		return {"ok": false, "reason": "bad_slot"}
 	return use_item(hotbar_slots[slot_index], inventory_state, pipeline_context, false)
 
-func use_item(item_id: String, inventory_state, pipeline_context: Dictionary, use_all: bool = false) -> Dictionary:
+func use_item(
+		item_id: String,
+		inventory_state,
+		pipeline_context: Dictionary,
+		use_all: bool = false,
+		selected_lot_id: String = "") -> Dictionary:
 	if item_id.is_empty() or inventory_state == null:
 		return {"ok": false, "reason": "missing_item"}
 	var quantity: int = int(inventory_state.get_quantity(item_id))
@@ -52,14 +58,20 @@ func use_item(item_id: String, inventory_state, pipeline_context: Dictionary, us
 	if definition.is_empty():
 		return {"ok": false, "reason": "unknown_definition", "item_id": item_id}
 	var category: String = str(definition.get("category", ""))
-	var iterations: int = quantity if use_all else 1
+	# A per-lot row's Use Entire Lot action is constrained to that rendered
+	# identity. Legacy/hotbar Use All without an identity retains aggregate use.
+	var selected_quantity: int = _lot_quantity(inventory_state, item_id, selected_lot_id)
+	if not selected_lot_id.is_empty() and selected_quantity <= 0:
+		return {"ok": false, "reason": "missing_selected_lot", "item_id": item_id}
+	var iterations: int = (selected_quantity if not selected_lot_id.is_empty() else quantity) if use_all else 1
 	iterations = max(1, iterations)
 	var successes: int = 0
 	var results: Array = []
 	for _i in range(iterations):
 		if int(inventory_state.get_quantity(item_id)) <= 0:
 			break
-		var result: Dictionary = _use_once(item_id, category, definition, inventory_state, pipeline_context)
+		var result: Dictionary = _use_once(
+			item_id, category, definition, inventory_state, pipeline_context, selected_lot_id)
 		results.append(result)
 		if not bool(result.get("ok", false)):
 			break
@@ -68,6 +80,7 @@ func use_item(item_id: String, inventory_state, pipeline_context: Dictionary, us
 		"item_id": item_id,
 		"category": category,
 		"use_all": use_all,
+		"selected_lot_id": selected_lot_id,
 		"used": successes,
 		"results": results.duplicate(true),
 	}
@@ -96,24 +109,40 @@ func get_status_lines() -> PackedStringArray:
 			lines.append("Hotbar %d: %s" % [i + 1, ItemDefsScript.display_name(definitions, item_id)])
 	return lines
 
-func _use_once(item_id: String, category: String, definition: Dictionary, inventory_state, pipeline_context: Dictionary) -> Dictionary:
+func _use_once(
+		item_id: String,
+		category: String,
+		definition: Dictionary,
+		inventory_state,
+		pipeline_context: Dictionary,
+		selected_lot_id: String = "") -> Dictionary:
 	var dispatcher = pipeline_context.get("effect_dispatcher", null)
 	match category:
 		"medicine":
 			var med = pipeline_context.get("medicine_state", null)
 			if med == null or dispatcher == null:
 				return {"ok": false, "reason": "medicine_pipeline_missing"}
-			var med_result: Dictionary = med.use_medicine(item_id, definition, dispatcher, pipeline_context)
+			var med_lot: Dictionary = _take_consumed_lot(inventory_state, item_id, selected_lot_id)
+			if med_lot.is_empty(): return {"ok": false, "reason":"missing_quantity"}
+			var med_context: Dictionary = pipeline_context.duplicate(true)
+			med_context["quality_potency_mult"] = ItemQualityEffectsScript.new().multiplier_for_lot(item_id, med_lot)
+			var med_result: Dictionary = med.use_medicine(item_id, definition, dispatcher, med_context)
 			if bool(med_result.get("ok", false)):
-				inventory_state.remove_item(item_id, 1)
+				med_result["quality_potency_mult"] = med_context["quality_potency_mult"]
+			else: inventory_state.add_lot(med_lot)
 			return med_result
 		"stimulant":
 			var stim = pipeline_context.get("stimulant_state", null)
 			if stim == null or dispatcher == null:
 				return {"ok": false, "reason": "stimulant_pipeline_missing"}
-			var stim_result: Dictionary = stim.use_stimulant(item_id, definition, dispatcher, pipeline_context.get("addiction_state", null), pipeline_context)
+			var stim_lot: Dictionary = _take_consumed_lot(inventory_state, item_id, selected_lot_id)
+			if stim_lot.is_empty(): return {"ok": false, "reason":"missing_quantity"}
+			var stim_context: Dictionary = pipeline_context.duplicate(true)
+			stim_context["quality_potency_mult"] = ItemQualityEffectsScript.new().multiplier_for_lot(item_id, stim_lot)
+			var stim_result: Dictionary = stim.use_stimulant(item_id, definition, dispatcher, pipeline_context.get("addiction_state", null), stim_context)
 			if bool(stim_result.get("ok", false)):
-				inventory_state.remove_item(item_id, 1)
+				stim_result["quality_potency_mult"] = stim_context["quality_potency_mult"]
+			else: inventory_state.add_lot(stim_lot)
 			return stim_result
 		"ammo":
 			# Domain 5: ammo reserve lives in inventory; the magazine (AmmoState) is
@@ -122,6 +151,9 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 			# are never consumed via the hotbar — only the reload path touches them.
 			if dispatcher == null:
 				return {"ok": false, "reason": "effect_dispatcher_missing"}
+			var ammo_lot: Dictionary = _take_consumed_lot(inventory_state, item_id, selected_lot_id)
+			if ammo_lot.is_empty():
+				return {"ok": false, "reason": "missing_quantity"}
 			var effects: Variant = definition.get("effects", [])
 			var ammo_results: Array = []
 			var any_ok: bool = false
@@ -132,17 +164,19 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 					if bool(er.get("ok", false)):
 						any_ok = true
 			if any_ok:
-				if inventory_state != null:
-					inventory_state.remove_item(item_id, 1)
 				return {"ok": true, "item_id": item_id, "results": ammo_results}
+			inventory_state.add_lot(ammo_lot)
 			return {"ok": false, "reason": "ammo_no_effect"}
 		"utility":
 			var utility = pipeline_context.get("utility_state", null)
 			if utility == null or dispatcher == null:
 				return {"ok": false, "reason": "utility_pipeline_missing"}
+			var utility_lot: Dictionary = _take_consumed_lot(inventory_state, item_id, selected_lot_id)
+			if utility_lot.is_empty():
+				return {"ok": false, "reason": "missing_quantity"}
 			var utility_result: Dictionary = utility.use_item(item_id, definition, dispatcher, pipeline_context)
-			if bool(utility_result.get("ok", false)):
-				inventory_state.remove_item(item_id, 1)
+			if not bool(utility_result.get("ok", false)):
+				inventory_state.add_lot(utility_lot)
 			return utility_result
 		"food", "drink":
 			if dispatcher == null:
@@ -156,10 +190,14 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 			# Food items carry hunger_restore/thirst_restore/sanity_restore (not an effects
 			# array), so without this, eating food was a no-op. Routed through FoodState so the
 			# spoilage multiplier is honoured (FRESH baseline until per-stack stage is threaded).
-			var restored: Dictionary = _apply_food_restores(item_id, definition, pipeline_context)
-			inventory_state.remove_item(item_id, 1)
+			var lot: Dictionary = _take_consumed_lot(inventory_state, item_id, selected_lot_id)
+			if lot.is_empty():
+				return {"ok": false, "reason": "missing_quantity"}
+			var potency: float = ItemQualityEffectsScript.new().multiplier_for_lot(item_id, lot)
+			var restored: Dictionary = _apply_food_restores(item_id, definition, pipeline_context, potency)
 			return {
 				"ok": true, "item_id": item_id, "category": category,
+				"quality_potency_mult": potency,
 				"hunger_restored": float(restored.get("hunger", 0.0)),
 				"thirst_restored": float(restored.get("thirst", 0.0)),
 				"sanity_restored": float(restored.get("sanity", 0.0)),
@@ -172,7 +210,34 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 ## the live eat path). Falls back to FRESH stage when the item has no tracked entry or
 ## spoilage_state is absent in the context.
 ## Returns the applied {hunger, thirst, sanity} amounts.
-func _apply_food_restores(item_id: String, definition: Dictionary, pipeline_context: Dictionary) -> Dictionary:
+func _take_consumed_lot(inventory_state, item_id: String, selected_lot_id: String = "") -> Dictionary:
+	if inventory_state != null and inventory_state.has_method("take_lots"):
+		var preferred := PackedStringArray()
+		if not selected_lot_id.is_empty():
+			preferred.append(selected_lot_id)
+		var lots: Array = inventory_state.take_lots(item_id, 1, preferred)
+		return lots[0] as Dictionary if not lots.is_empty() else {}
+	if inventory_state != null and inventory_state.remove_item(item_id, 1) == 1:
+		return {"item_id": item_id, "quality_score": 0.5, "quality_tier": "standard"}
+	return {}
+
+
+func _lot_quantity(inventory_state, item_id: String, lot_id: String) -> int:
+	if lot_id.is_empty():
+		return int(inventory_state.get_quantity(item_id)) if inventory_state != null else 0
+	if inventory_state == null or not inventory_state.has_method("get_lot_summary"):
+		return 0
+	var lots_v: Variant = inventory_state.get_lot_summary().get("lots", [])
+	if not lots_v is Array:
+		return 0
+	for lot_v in lots_v as Array:
+		if lot_v is Dictionary \
+				and str((lot_v as Dictionary).get("lot_id", "")) == lot_id \
+				and str((lot_v as Dictionary).get("item_id", "")) == item_id:
+			return maxi(0, int((lot_v as Dictionary).get("quantity", 0)))
+	return 0
+
+func _apply_food_restores(item_id: String, definition: Dictionary, pipeline_context: Dictionary, potency: float = 1.0) -> Dictionary:
 	# Always configure from the item definition so base restore values are correct.
 	var food = FoodStateScript.new()
 	food.configure(definition)
@@ -185,9 +250,12 @@ func _apply_food_restores(item_id: String, definition: Dictionary, pipeline_cont
 		if tracked != null:
 			food.stage = tracked.stage
 	var r: Dictionary = food.get_effective_restores()
-	var hunger: float = float(r.get("hunger", 0.0))
-	var thirst: float = float(r.get("thirst", 0.0))
-	var sanity: float = float(r.get("sanity", 0.0))
+	var base_hunger: float = float(r.get("hunger", 0.0))
+	var base_thirst: float = float(r.get("thirst", 0.0))
+	var base_sanity: float = float(r.get("sanity", 0.0))
+	var hunger: float = base_hunger * potency if base_hunger > 0.0 else base_hunger
+	var thirst: float = base_thirst * potency if base_thirst > 0.0 else base_thirst
+	var sanity: float = base_sanity * potency if base_sanity > 0.0 else base_sanity
 	var vitals = pipeline_context.get("vitals_state", null)
 	if vitals != null and vitals.has_method("apply_delta") and (hunger != 0.0 or thirst != 0.0):
 		vitals.apply_delta({"hunger": hunger, "thirst": thirst})

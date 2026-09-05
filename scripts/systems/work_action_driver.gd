@@ -12,6 +12,7 @@ const WorkActionResolverScript := preload("res://scripts/systems/work_action_res
 const SkillEffectsResolverScript := preload("res://scripts/systems/skill_effects_resolver.gd")
 const PillarPersistenceScript := preload("res://scripts/systems/pillar_persistence.gd")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 
 var catalog: RefCounted = null
 var skill_effects: RefCounted = null
@@ -26,6 +27,7 @@ var overloaded: bool = false
 ## Progress-noise accumulator (loud strip verbs pulse while working).
 var _progress_noise_acc: float = 0.0
 var last_progress_noise: float = 0.0
+var _active_start_speed_mult: float = 1.0
 const PROGRESS_NOISE_INTERVAL: float = 1.0
 const PROGRESS_NOISE_FRACTION: float = 0.35  # fraction of verb noise per pulse
 
@@ -45,6 +47,7 @@ func configure(config: Dictionary = {}) -> void:
 	overloaded = cart_mass > cart_capacity
 	_progress_noise_acc = 0.0
 	last_progress_noise = 0.0
+	_active_start_speed_mult = 1.0
 
 
 func is_working() -> bool:
@@ -73,7 +76,8 @@ func build_context(
 		inventory: Dictionary,
 		progression = null,
 		class_id: String = "",
-		damaged: bool = false) -> Dictionary:
+		damaged: bool = false,
+		selected_tool_lot: Dictionary = {}) -> Dictionary:
 	var verb: String = ""
 	var ctx: Dictionary = {
 		"tool_class": tool_class,
@@ -93,6 +97,16 @@ func build_context(
 		ctx["work_speed_mult"] = float(frag.get("work_speed_mult", 1.0))
 		if int(frag.get("skill_level", 0)) > skill_level:
 			ctx["skill_level"] = int(frag["skill_level"])
+	# Callers that selected a concrete tool lot may supply it here; aggregate tool
+	# IDs intentionally do not invent a quality value. start_action is the single
+	# authority that applies its multiplier so build_context -> start_action cannot
+	# square the quality curve.
+	var selected_lot: Variant = selected_tool_lot
+	if selected_lot is Dictionary:
+		var selected_id: String = str((selected_lot as Dictionary).get("item_id", ""))
+		if not selected_id.is_empty() \
+				and ItemQualityEffectsScript.new().consumer_for(selected_id) == "tool_work_speed":
+			ctx["selected_tool_lot"] = (selected_lot as Dictionary).duplicate(true)
 	return ctx
 
 
@@ -124,7 +138,18 @@ func start_action(action_id: String, target_id: String, context: Dictionary = {}
 		)
 		if not start_ctx.has("work_speed_mult"):
 			start_ctx["work_speed_mult"] = float(frag.get("work_speed_mult", 1.0))
-	return bool(work.call("start", target_id, start_ctx))
+	var selected_tool_quality_mult: float = 1.0
+	if start_ctx.get("selected_tool_lot", null) is Dictionary:
+		var lot: Dictionary = start_ctx["selected_tool_lot"] as Dictionary
+		var quality = ItemQualityEffectsScript.new()
+		if quality.consumer_for(str(lot.get("item_id", ""))) == "tool_work_speed":
+			selected_tool_quality_mult = quality.multiplier_for_lot(str(lot.get("item_id", "")), lot)
+	var started: bool = bool(work.call("start", target_id, start_ctx))
+	# Runtime contexts continue to own wounds/skill/stamina speed. Persist only
+	# the selected tool's frozen quality so callers that pass build_context back
+	# into tick cannot apply their base speed twice.
+	_active_start_speed_mult = maxf(0.05, selected_tool_quality_mult) if started else 1.0
+	return started
 
 
 ## Tick active work. Returns status string.
@@ -134,7 +159,10 @@ func tick(delta: float, context: Dictionary = {}) -> String:
 	last_progress_noise = 0.0
 	if work == null:
 		return WorkActionStateScript.STATUS_IDLE
-	var st: String = str(work.call("tick", delta, context))
+	var tick_context: Dictionary = context.duplicate(true)
+	tick_context["work_speed_mult"] = maxf(
+		0.05, float(tick_context.get("work_speed_mult", 1.0))) * _active_start_speed_mult
+	var st: String = str(work.call("tick", delta, tick_context))
 	if st == WorkActionStateScript.STATUS_ACTIVE and delta > 0.0:
 		var verb: String = ""
 		var noise: float = 0.0
@@ -159,7 +187,7 @@ func tick(delta: float, context: Dictionary = {}) -> String:
 
 
 ## Complete against module map + simple inventory Dictionary. Returns resolve dict.
-func complete(module_map: RefCounted = null, inventory: Dictionary = {}) -> Dictionary:
+func complete(module_map: RefCounted = null, inventory: Dictionary = {}, completion_context: Dictionary = {}) -> Dictionary:
 	last_resolve = {}
 	last_noise_pulse = 0.0
 	last_xp_event = ""
@@ -171,11 +199,16 @@ func complete(module_map: RefCounted = null, inventory: Dictionary = {}) -> Dict
 	var target_id: String = str(work.get("target_id"))
 	# Consume materials first (if any)
 	var consumed: Dictionary = work.call("materials_consumed") if work.has_method("materials_consumed") else {}
-	if not consumed.is_empty():
+	var materials_prepaid: bool = bool(completion_context.get("materials_prepaid", false))
+	if not consumed.is_empty() and not materials_prepaid:
 		if not WorkActionResolverScript.consume_from_inventory(inventory, consumed):
 			work.call("reset")
 			return {"ok": false, "reason": "consume_failed"}
-	var res: Dictionary = WorkActionResolverScript.resolve_completion(work, module_map, target_id)
+	var repair_lots: Array = completion_context.get("repair_material_lots", []) as Array \
+		if completion_context.get("repair_material_lots", []) is Array else []
+	var repair_multiplier: float = float(completion_context.get("repair_quality_multiplier", 1.0))
+	var res: Dictionary = WorkActionResolverScript.resolve_completion(
+		work, module_map, target_id, repair_multiplier, repair_lots)
 	if not bool(res.get("ok", false)):
 		return res
 	var yields: Dictionary = res.get("yields", {}) if typeof(res.get("yields", {})) == TYPE_DICTIONARY else {}
@@ -220,6 +253,14 @@ func interrupt() -> void:
 		work.call("interrupt")
 
 
+func pause() -> bool:
+	return work != null and work.has_method("pause") and bool(work.call("pause"))
+
+
+func resume(context: Dictionary = {}) -> bool:
+	return work != null and work.has_method("resume") and bool(work.call("resume", context))
+
+
 func reset() -> void:
 	if work != null and work.has_method("reset"):
 		work.call("reset")
@@ -227,6 +268,11 @@ func reset() -> void:
 	last_resolve = {}
 	last_noise_pulse = 0.0
 	last_xp_event = ""
+	_active_start_speed_mult = 1.0
+
+
+func get_active_start_speed_multiplier() -> float:
+	return _active_start_speed_mult
 
 
 ## Apply noise pulse into DetectionState / ThreatManager-like object.

@@ -24,8 +24,9 @@ func get_field_recipes() -> Array:
 ## Field crafting is intentionally skill-ungated for start (skill only affects
 ## quality), so entries use a high skill level for status and only report
 ## missing_ingredients / output_full as blockers.
-func list_recipe_entries(inventory, knowledge = null) -> Array:
-	return _crafting_state.list_recipe_entries("field_crafting", inventory, 999, 0, knowledge)
+func list_recipe_entries(inventory, knowledge = null, player_skill_level: int = 0) -> Array:
+	return _crafting_state.list_recipe_entries(
+		"field_crafting", inventory, 999, 0, knowledge, player_skill_level, false)
 
 func first_ready_recipe_id(inventory, knowledge = null) -> String:
 	for entry in list_recipe_entries(inventory, knowledge):

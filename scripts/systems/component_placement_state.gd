@@ -6,6 +6,7 @@ class_name ComponentPlacementState
 
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
+const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 
 const MAX_WALL_FILLS: int = 3
 const MAX_CENTER_FILLS: int = 1
@@ -583,7 +584,7 @@ func _entry_from_saved(slot: Dictionary, saved: Dictionary, catalog: RefCounted)
 	if catalog == null or not catalog.has_method("has_component") or not bool(catalog.call("has_component", component_id)):
 		return {}
 	var definition: Dictionary = catalog.call("get_component", component_id)
-	return {
+	var entry: Dictionary = {
 		"component_instance_id": str(slot.get("slot_id", "")),
 		"component_id": component_id,
 		"room_id": str(slot.get("room_id", "")),
@@ -603,6 +604,12 @@ func _entry_from_saved(slot: Dictionary, saved: Dictionary, catalog: RefCounted)
 		"mounted": bool(saved.get("mounted", true)),
 		"ship_mod_managed": bool(saved.get("ship_mod_managed", false)),
 	}
+	var source_lot_v: Variant = saved.get("source_lot", null)
+	if source_lot_v is Dictionary and _valid_source_lot(source_lot_v as Dictionary, str(entry.get("item_form", ""))):
+		entry["source_lot"] = (source_lot_v as Dictionary).duplicate(true)
+		entry["source_lot_id"] = str((source_lot_v as Dictionary).get("lot_id", ""))
+		entry["condition"] = float((source_lot_v as Dictionary).get("condition", entry.get("condition", 1.0)))
+	return entry
 
 
 ## Converts generated/authored placement records into stable physical-slot
@@ -697,7 +704,24 @@ func dismount(instance_id: String) -> Dictionary:
 	out["component_id"] = str(e.get("component_id", ""))
 	out["linked_system"] = str(e.get("linked_system", ""))
 	out["linked_subcomponent"] = str(e.get("linked_subcomponent", ""))
+	var source_lot_v: Variant = e.get("source_lot", null)
+	if source_lot_v is Dictionary and _valid_source_lot(source_lot_v as Dictionary, item_form):
+		out["item_lot"] = (source_lot_v as Dictionary).duplicate(true)
 	return out
+
+
+## Roll back a coordinator-side destination failure without reconstructing or
+## replacing the authoritative mounted record.
+func restore_dismounted(instance_id: String) -> bool:
+	var idx: int = find_index(instance_id)
+	if idx < 0:
+		return false
+	var entry: Dictionary = placed[idx]
+	if bool(entry.get("mounted", true)):
+		return false
+	entry["mounted"] = true
+	placed[idx] = entry
+	return true
 
 
 ## Remount into a free or previously emptied slot. Consumes one item_form from inventory dict.
@@ -708,16 +732,18 @@ func mount(
 		slot_kind: String,
 		slot_index: int,
 		inventory: Dictionary,
-		catalog: RefCounted = null) -> Dictionary:
+		catalog: RefCounted = null,
+		source_lot: Dictionary = {}) -> Dictionary:
 	return mount_by_slot_id(
-		"%s_%s_%d" % [room_id, slot_kind, slot_index], item_form, inventory, catalog)
+		"%s_%s_%d" % [room_id, slot_kind, slot_index], item_form, inventory, catalog, source_lot)
 
 
 func mount_by_slot_id(
 		slot_id: String,
 		item_form: String,
 		inventory: Dictionary,
-		catalog: RefCounted) -> Dictionary:
+		catalog: RefCounted,
+		source_lot: Dictionary = {}) -> Dictionary:
 	var out: Dictionary = {
 		"ok": false,
 		"reason": "",
@@ -749,6 +775,9 @@ func mount_by_slot_id(
 	if int(inventory.get(item_form, 0)) < 1:
 		out["reason"] = "missing_item"
 		return out
+	if not source_lot.is_empty() and not _valid_source_lot(source_lot, item_form):
+		out["reason"] = "invalid_source_lot"
+		return out
 	# Prefer remounting an existing dismounted entry in this slot.
 	var target_idx: int = -1
 	for i in range(placed.size()):
@@ -773,6 +802,10 @@ func mount_by_slot_id(
 	if mounted.is_empty():
 		out["reason"] = "unknown_component"
 		return out
+	if not source_lot.is_empty():
+		mounted["source_lot"] = source_lot.duplicate(true)
+		mounted["source_lot_id"] = str(source_lot.get("lot_id", ""))
+		mounted["condition"] = float(source_lot.get("condition", mounted.get("condition", 1.0)))
 	if target_idx >= 0:
 		placed[target_idx] = mounted
 	else:
@@ -784,6 +817,24 @@ func mount_by_slot_id(
 	out["instance_id"] = slot_id
 	out["component_id"] = component_id
 	return out
+
+
+static func _valid_source_lot(lot: Dictionary, expected_item_form: String) -> bool:
+	if str(lot.get("lot_id", "")).is_empty() or str(lot.get("item_id", "")) != expected_item_form \
+			or int(lot.get("quantity", 0)) != 1 or str(lot.get("quality_tier", "")).is_empty():
+		return false
+	if not (lot.get("origin", null) is Dictionary):
+		return false
+	var score_v: Variant = lot.get("quality_score", null)
+	var condition_v: Variant = lot.get("condition", null)
+	if (typeof(score_v) not in [TYPE_INT, TYPE_FLOAT]) or (typeof(condition_v) not in [TYPE_INT, TYPE_FLOAT]):
+		return false
+	var score: float = float(score_v)
+	var condition: float = float(condition_v)
+	if not is_finite(score) or score < 0.0 or score > 1.0 \
+			or not is_finite(condition) or condition < 0.0 or condition > 1.0:
+		return false
+	return str(lot.get("quality_tier")) == QualityTierResolverScript.tier_for_score(score)
 
 
 func mounted_count() -> int:

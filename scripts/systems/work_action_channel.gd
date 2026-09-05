@@ -71,6 +71,18 @@ func is_interrupted() -> bool:
 	return str(work.get("status")) == WorkActionStateScript.STATUS_INTERRUPTED
 
 
+func is_paused() -> bool:
+	return work != null and str(work.get("status")) == WorkActionStateScript.STATUS_PAUSED
+
+
+func pause() -> bool:
+	return work != null and work.has_method("pause") and bool(work.call("pause"))
+
+
+func resume(context: Dictionary = {}) -> bool:
+	return work != null and work.has_method("resume") and bool(work.call("resume", context))
+
+
 func cancel() -> void:
 	if work != null and work.has_method("reset"):
 		work.call("reset")

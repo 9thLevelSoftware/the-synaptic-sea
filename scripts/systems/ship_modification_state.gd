@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShipModificationState
 
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
+
 ## PKG-D2.6: pure hub/ship component install manifest + power budget gate.
 ## Installs consume inventory item_form and add to ship slots; power budget
 ## constraints bite when demand exceeds supply. Never touches scene tree.
@@ -104,11 +106,12 @@ func sync_from_placement() -> void:
 		var definition: Dictionary = _catalog.call("get_component", component_id)
 		if definition.is_empty():
 			continue
+		var source_lot: Dictionary = entry.get("source_lot", {}) as Dictionary
 		installed.append({
 			"slot_id": str(entry.get("component_instance_id", "")),
 			"component_id": component_id,
 			"item_form": str(definition.get("item_form", component_id)),
-			"power_draw": maxf(0.0, float(definition.get("power_draw", 0.0))),
+			"power_draw": effective_power_draw(component_id, source_lot),
 			"mass": maxf(0.0, float(definition.get("mass", 0.0))),
 			"source_ship": _ship_id,
 			"plating": bool(definition.get("plating", false)),
@@ -172,6 +175,22 @@ func can_install(component_id: String, power_draw: float) -> Dictionary:
 	return out
 
 
+## One prospective/committed power authority. A missing source lot is the
+## supported legacy neutral-quality path.
+func effective_power_draw(component_id: String, source_lot: Dictionary = {}) -> float:
+	if _catalog == null or not _catalog.has_method("get_component"):
+		return 0.0
+	var definition: Dictionary = _catalog.call("get_component", component_id)
+	if definition.is_empty():
+		return 0.0
+	var base_draw: float = maxf(0.0, float(definition.get("power_draw", 0.0)))
+	if source_lot.is_empty():
+		return base_draw
+	var item_form: String = str(definition.get("item_form", component_id))
+	var multiplier: float = ItemQualityEffectsScript.new().multiplier_for_lot(item_form, source_lot)
+	return base_draw / maxf(0.1, multiplier)
+
+
 ## Shared preflight for panel and direct mutation APIs.  It completes every
 ## identity/catalog/physical-fit check before inventory or power can change.
 func preflight_install(
@@ -179,7 +198,8 @@ func preflight_install(
 		component_id: String,
 		item_form: String,
 		inventory: Dictionary,
-		target_ship_id: String = "") -> Dictionary:
+		target_ship_id: String = "",
+		source_lot: Dictionary = {}) -> Dictionary:
 	var out: Dictionary = {"ok": false, "reason": "", "slot_id": slot_id}
 	if target_ship_id != "" and target_ship_id != _ship_id:
 		out["reason"] = "wrong_ship"
@@ -197,6 +217,11 @@ func preflight_install(
 	if item_form != str(definition.get("item_form", component_id)):
 		out["reason"] = "incompatible_item_form"
 		return out
+	if not source_lot.is_empty() and (
+			str(source_lot.get("item_id", "")) != item_form
+			or int(source_lot.get("quantity", 0)) != 1):
+		out["reason"] = "invalid_source_lot"
+		return out
 	var slot: Dictionary = _find_physical_slot(slot_id)
 	if slot.is_empty():
 		out["reason"] = "unknown_slot"
@@ -212,12 +237,14 @@ func preflight_install(
 	if int(inventory.get(item_form, 0)) < 1:
 		out["reason"] = "missing_item"
 		return out
-	var power_gate: Dictionary = can_install(component_id, float(definition.get("power_draw", 0.0)))
+	var prospective_draw: float = effective_power_draw(component_id, source_lot)
+	var power_gate: Dictionary = can_install(component_id, prospective_draw)
 	if not bool(power_gate.get("ok", false)):
 		out["reason"] = str(power_gate.get("reason", "blocked"))
 		return out
 	out["ok"] = true
 	out["definition"] = definition
+	out["effective_power_draw"] = prospective_draw
 	return out
 
 

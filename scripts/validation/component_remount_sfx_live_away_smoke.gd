@@ -1,12 +1,10 @@
 extends SceneTree
 
-## Live remount WorkAction stamps mount SFX and routes via audio_manager.
-## Marker: COMPONENT REMOUNT SFX LIVE AWAY PASS remount=true sfx=true
+## Live timed remount commit stamps mount SFX and routes it through audio_manager.
+## Marker: COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
-const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
-const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const TIMEOUT_FRAMES: int = 600
 
 var main_node: Node
@@ -37,62 +35,39 @@ func _on_frame() -> void:
 			_fail("playable not ready")
 		return
 	match phase:
-		"wait":
-			_setup()
-		"dismount_tick":
-			_tick_until("after_dismount")
-		"after_dismount":
-			_start_remount()
-		"remount_tick":
-			_tick_until("done")
-		"done":
-			_finish()
+		"wait": _setup()
+		"dismount_tick": _tick_until("after_dismount")
+		"after_dismount": _start_remount()
+		"remount_tick": _tick_until("done")
+		"done": _finish()
 
 
 func _setup() -> void:
 	playable.away_from_start = true
 	if playable.threat_manager != null:
 		playable.threat_manager.threats.clear()
-	var cat = ComponentCatalogScript.new()
-	if not cat.load_default():
-		_fail("catalog"); return
-	var live: Dictionary = playable._active_layout_for_work()
-	if live.is_empty():
-		_fail("layout"); return
-	var rooms: Array = live.get("rooms", [])
-	if rooms.is_empty():
-		_fail("rooms"); return
-	var r0: Dictionary = (rooms[0] as Dictionary).duplicate(true)
-	r0["wall_slots"] = [{"against_wall": true, "cell": "(0,0)"}]
-	r0["room_role"] = "engineering"
-	rooms[0] = r0
-	live["rooms"] = rooms
-	playable.current_ship.built_layout = live
-	var place = ComponentPlacementStateScript.new()
-	if place.populate(live, cat, 77) < 1:
-		_fail("populate"); return
-	instance_id = str(place.placed[0].get("component_instance_id", ""))
-	item_form = str(place.placed[0].get("item_form", ""))
-	playable.component_placement_state = place
-	playable.inventory_state.add_item("wrench", 1)
-	playable.vitals_state.stamina = 100.0
-	playable._work_requires_hold = false
-	if playable.player.has_method("teleport_to"):
-		playable.player.teleport_to(Vector3(0.5, 0.0, 0.5))
+	var fixture: Dictionary = playable.prepare_p12_component_work_fixture_for_validation()
+	if not bool(fixture.get("ok", false)):
+		_fail("fixture: %s" % str(fixture.get("reason", ""))); return
+	instance_id = str(fixture.get("instance_id", ""))
+	item_form = str(fixture.get("item_form", ""))
+	var panel = playable.get_ship_modification_panel_for_validation()
+	if panel != null and panel.is_open():
+		panel.close()
 	if not playable.try_work_action_interact_for_validation():
 		_fail("dismount start"); return
+	if not playable.has_active_ship_work_for_validation() or playable.work_action_driver.work == null:
+		_fail("dismount transaction missing"); return
 	instance_id = str(playable.work_action_driver.work.get("target_id"))
-	var entry0: Dictionary = playable.component_placement_state.get_entry(instance_id)
-	item_form = str(entry0.get("item_form", item_form))
+	item_form = str(playable.component_placement_state.get_entry(instance_id).get("item_form", item_form))
 	phase = "dismount_tick"
-	tick_accum = 0.0
 
 
 func _tick_until(next_phase: String) -> void:
 	playable.away_from_start = true
-	playable._process(0.5)
+	playable.advance_active_ship_work_for_validation(0.5)
 	tick_accum += 0.5
-	if playable.work_action_driver.is_working():
+	if playable.has_active_ship_work_for_validation():
 		if tick_accum > 40.0:
 			_fail("timeout %s" % next_phase)
 		return
@@ -101,28 +76,28 @@ func _tick_until(next_phase: String) -> void:
 
 
 func _start_remount() -> void:
-	playable.away_from_start = true
 	if playable.inventory_state.get_quantity(item_form) < 1:
-		playable.inventory_state.add_item(item_form, 1)
-	playable.vitals_state.stamina = 100.0
+		_fail("dismount lot missing"); return
+	playable.vitals_state.stamina = playable.vitals_state.max_stamina
 	if playable.audio_manager == null or playable.audio_manager.sfx_router == null:
 		_fail("audio"); return
 	playable.audio_manager.sfx_router.configure({})
 	sfx_before = int(playable.audio_manager.sfx_router.get_routed_count(AudioEventSeamScript.SFX_WORK_MOUNT))
 	if not playable.try_work_action_interact_for_validation():
 		_fail("remount start"); return
-	var aid: String = str(playable.work_action_driver.work.get("action_id"))
-	if aid != "mount_component":
-		_fail("expected mount got %s" % aid); return
+	if not playable.has_active_ship_work_for_validation() or playable.work_action_driver.work == null:
+		_fail("remount transaction missing"); return
+	if str(playable.work_action_driver.work.get("action_id")) != "mount_component":
+		_fail("expected mount"); return
 	phase = "remount_tick"
-	tick_accum = 0.0
 
 
 func _finish() -> void:
+	if not playable.component_placement_state.is_mounted(instance_id):
+		_fail("component not remounted"); return
 	var after: int = int(playable.audio_manager.sfx_router.get_routed_count(AudioEventSeamScript.SFX_WORK_MOUNT))
 	if after <= sfx_before:
-		var lr: Dictionary = playable.work_action_driver.last_resolve if playable.work_action_driver != null else {}
-		_fail("mount sfx not routed before=%d after=%d last=%s" % [sfx_before, after, str(lr.get("audio_event", ""))]); return
+		_fail("mount sfx not routed before=%d after=%d" % [sfx_before, after]); return
 	if not bool(playable.away_from_start):
 		_fail("away cleared"); return
 	print("COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true")

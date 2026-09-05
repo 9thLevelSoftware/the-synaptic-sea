@@ -19,7 +19,8 @@ func use_stimulant(item_id: String, definition: Dictionary, dispatcher, addictio
 	last_used_item = item_id
 	var tolerance: float = addiction_state.get_tolerance(item_id) if addiction_state != null else 0.0
 	var duration_scale: float = clampf(1.0 - tolerance * 0.08, 0.45, 1.0)
-	var duration: float = maxf(1.0, float(definition.get("stim_duration", 20.0)) * duration_scale)
+	var quality_mult: float = maxf(0.1, float(context.get("quality_potency_mult", 1.0)))
+	var duration: float = maxf(1.0, float(definition.get("stim_duration", 20.0)) * duration_scale * quality_mult)
 	var applied: Array[String] = []
 	var effects: Variant = definition.get("effects", [])
 	if effects is Array:
@@ -37,7 +38,7 @@ func use_stimulant(item_id: String, definition: Dictionary, dispatcher, addictio
 	})
 	if addiction_state != null:
 		addiction_state.record_dose(item_id, definition)
-	return {"ok": true, "item_id": item_id, "duration": duration, "effects": applied}
+	return {"ok": true, "item_id": item_id, "duration": duration, "quality_potency_mult": quality_mult, "effects": applied}
 
 func tick(delta_seconds: float, addiction_state, context: Dictionary) -> bool:
 	if delta_seconds <= 0.0:
