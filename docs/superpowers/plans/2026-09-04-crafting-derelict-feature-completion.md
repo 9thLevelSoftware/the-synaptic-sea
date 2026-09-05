@@ -564,7 +564,9 @@ non-destructive output/refund peek and exact-receipt acknowledgement APIs;
 `ship_instance.gd`, `inventory_state.gd`, `ship_inventory.gd`, and `world_snapshot.gd`
 under systems; `crafting_station.gd`, `work_yield_drop.gd` under tools; coordinator
 completion, station-destruction, and whole-world holder preflight seams; new
-`fc_p08_smoke.gd`; `fc_p07_smoke.gd` only exact escrow-mass reservation assertions.
+`fc_p08_smoke.gd`; `fc_p07_smoke.gd` only exact escrow-mass reservation assertions
+and physical station fixture bindings to a ship-owned `PendingOutputStore`, required
+to prove missing-store completion fails closed.
 The scheduler job escrow is the single serialized reservation authority. Source holders
 read exact unstarted escrow through a nonserialized authority binding so reserved lots
 remain unavailable while their mass still counts for player load and hard cargo capacity.
@@ -733,8 +735,19 @@ noise completion and XP once. A changed target revision returns `stale_target`.
 
 **Depends:** P07, P12. **Requirements:** FC-15.
 **Allowed files:** new `ship_work_context.gd`; `ship_runtime.gd`, `ship_instance.gd`,
-`ship_access_state.gd`; coordinator ownership/binding/attach/detach seams;
+`ship_access_state.gd`; `ship_modification_panel.gd` only storing/exposing its bound
+ship ID and emitting that ID with install/uninstall requests; coordinator
+ownership/binding/attach/detach seams;
 new `fc_p13_smoke.gd`. **Non-goals:** multiplayer authority or unrelated extraction.
+
+Known physically reachable unclaimed ships may be selected without ownership;
+access remains action-specific. Permanent install/remove requires access, while
+ordinary salvage/repair retains its existing policy. New-run home ownership may
+claim `player_local`; legacy restore may claim only an absent owner and never
+overwrite a modern foreign owner. ComponentPlacementState is the sole durable
+installed authority; ShipModificationState is derived. Nonserialized binding
+generations reject stale panel callbacks. P19 recovery of persisted paid work must
+revalidate owner and target before rebinding to the current generation.
 
 - [ ] Create home and away ships with distinguishable damage, slots and station
   tiers. Attempt the same operation on each and compare untouched ship state.

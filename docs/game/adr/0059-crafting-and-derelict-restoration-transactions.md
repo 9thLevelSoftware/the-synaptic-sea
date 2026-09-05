@@ -108,6 +108,20 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     branches use the same gate, so an end-run transition cannot advance the job later
     in the same frame.
 
+15. Ship selection and mutation authority are separate decisions. The player may
+    select a known, physically reachable, unclaimed ship without first owning it;
+    access is checked by the requested action. Permanent component install/remove
+    requires the applicable ship access, while ordinary salvage and repair retain
+    their existing action-specific rules. A new-run home ship may claim
+    `player_local`; legacy restore may do so only when owner data is absent, and
+    neither path may overwrite a modern foreign owner. `ComponentPlacementState`
+    remains the sole durable installed-component authority and
+    `ShipModificationState` remains derived, with no second serialized component
+    summary. UI bindings carry a nonserialized generation token so a stale panel
+    callback cannot target an earlier ship binding. P19 may recover persisted paid
+    work only after explicit owner/target revalidation and rebinding to the current
+    generation.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are

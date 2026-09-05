@@ -291,7 +291,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     ],
     "P13": [
         *[f"scripts/systems/{name}.gd" for name in ("ship_work_context", "ship_runtime", "ship_instance", "ship_access_state")],
-        COORDINATOR, f"{VALIDATION}fc_p13_smoke.gd",
+        "scripts/ui/ship_modification_panel.gd", COORDINATOR, f"{VALIDATION}fc_p13_smoke.gd",
     ],
     "P14": [
         *[f"scripts/systems/{name}.gd" for name in ("ship_modification_state", "component_mount_resolver", "ship_systems_manager", "crafting_state")],
