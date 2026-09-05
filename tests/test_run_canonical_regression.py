@@ -48,12 +48,21 @@ def test_executable_final_echo_marker_is_accepted():
     )
 
 
-def test_count_marker_inside_uninvoked_function_fails_closed():
+@pytest.mark.parametrize(
+    "layout",
+    [
+        "function f {\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\n}",
+        "function f() {\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\n}",
+        "if false\nthen\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\nfi",
+        "while false\ndo\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\ndone",
+    ],
+)
+def test_count_marker_inside_unsupported_multiline_layout_fails_closed(layout):
     text = document().replace(
         "echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'",
-        "f() {\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\n}",
+        layout,
     )
-    with pytest.raises(ValueError, match="executable"):
+    with pytest.raises(ValueError, match="executable|unsupported"):
         extract_bundle(text)
 
 

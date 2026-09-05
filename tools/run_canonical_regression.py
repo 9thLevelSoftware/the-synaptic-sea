@@ -15,7 +15,13 @@ _COUNT_MARKER_RE = re.compile(
 _EXECUTABLE_COUNT_MARKER_RE = re.compile(
     r"""^echo\s+(?P<quote>['"])(?P<marker>SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true)(?P=quote)$"""
 )
-_SHELL_FUNCTION_START_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{\s*$")
+_SHELL_FUNCTION_START_RE = re.compile(
+    r"^(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\(\s*\))?\s*\{\s*$"
+)
+_SHELL_FUNCTION_DECL_RE = re.compile(
+    r"^(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\(\s*\))?\s*\{"
+)
+_SHELL_CONTROL_START_RE = re.compile(r"^(?:if|for|while|until|case|select)\b")
 
 
 def _strip_shell_comment(line: str) -> str:
@@ -79,9 +85,15 @@ def extract_bundle(document: str) -> str:
             if code in ("}", "};"):
                 function_depth -= 1
             continue
-        if _SHELL_FUNCTION_START_RE.fullmatch(code):
+        if _SHELL_FUNCTION_DECL_RE.match(code):
+            if not _SHELL_FUNCTION_START_RE.fullmatch(code):
+                raise ValueError("unsupported shell function layout")
             function_depth = 1
             continue
+        if _SHELL_CONTROL_START_RE.match(code) and not re.search(
+            r"\b(?:then|do|in)\b", code
+        ):
+            raise ValueError("unsupported shell control-flow layout")
         if code and _EXECUTABLE_COUNT_MARKER_RE.fullmatch(code) and control_depth == 0:
             executable_markers += 1
         control_depth = _shell_control_depth(code, control_depth)
