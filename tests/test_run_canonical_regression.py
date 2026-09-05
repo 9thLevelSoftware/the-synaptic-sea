@@ -48,6 +48,15 @@ def test_executable_final_echo_marker_is_accepted():
     )
 
 
+def test_count_marker_inside_uninvoked_function_fails_closed():
+    text = document().replace(
+        "echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'",
+        "f() {\n  echo 'SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true'\n}",
+    )
+    with pytest.raises(ValueError, match="executable"):
+        extract_bundle(text)
+
+
 def test_objectdb_teardown_warning_is_exactly_allowlisted():
     from pathlib import Path
 
