@@ -4,6 +4,7 @@
   "scope_frozen": {
     "frozen_on": "2026-09-05",
     "source_leaf_set_fingerprint": "8041e481680152f85fe2d3617491880a5268d89dcb63a59608590711edef48d0",
+    "reviewed_supersession_set_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
     "reviewer": "root_coordinator",
     "review_disposition": "approved_source_leaves_and_reviewed_equivalence_map"
   },
@@ -29,6 +30,46 @@
   },
   "board": "synaptic-sea-stage-gate",
   "card_manifest": "data/validation/feature_completion_cards.json",
+  "criterion_supersession_source": {
+    "path": "data/validation/reviewed_criterion_supersessions_v1.json",
+    "schema_version": "reviewed-criterion-supersessions-v1",
+    "source_present": true,
+    "reviewed_mapping_count": 1,
+    "reviewed_mapping_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df"
+  },
+  "criterion_supersession_review": [
+    {
+      "stable_criterion_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+      "source": {
+        "path": "docs/game/05_requirements.md",
+        "heading": "REQ-SMOD-001"
+      },
+      "original": {
+        "criterion": "Catalog-linked installs restore hub ship-system sub floor; uninstall damages the sub.",
+        "natural_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "criterion_fingerprint": "ca2c7292b2639e65d66a3ccb3f6dfeda65a924a1b16c6f411f33b4b6454996cc"
+      },
+      "replacement": {
+        "criterion": "Catalog-linked installs connect the installed lot's preserved condition to the hub ship-system subcomponent; dismounting the last provider disconnects it without changing intrinsic health or item condition.",
+        "natural_id": "REQ-SMOD-001::acceptance-24253a746be5",
+        "criterion_fingerprint": "a4d1e10d64d29fbfe185be8cb8fac3cf95c98f2748a943f453739001caa1fea2"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-05"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "requirement",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "denominator_delta": 0
+      }
+    }
+  ],
   "accounting": {
     "denominator_status": "frozen",
     "recorded": 668,
@@ -20911,7 +20952,7 @@
       "verification_source": [
         "`scripts/validation/ship_modification_smoke.gd`",
         "`scripts/validation/ship_mod_install_key_smoke.gd` marker `SHIP MOD INSTALL KEY PASS`",
-        "`scripts/validation/ship_mod_system_effect_smoke.gd` marker `SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true`"
+        "`scripts/validation/fc_p14_smoke.gd` marker `FC P14 PASS` (planned; runtime implementation pending ADR-0066)"
       ],
       "domain": "smod",
       "feature": "`features/ship_modification.md`",
@@ -20946,7 +20987,7 @@
       "verification_source": [
         "`scripts/validation/ship_modification_smoke.gd`",
         "`scripts/validation/ship_mod_install_key_smoke.gd` marker `SHIP MOD INSTALL KEY PASS`",
-        "`scripts/validation/ship_mod_system_effect_smoke.gd` marker `SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true`"
+        "`scripts/validation/fc_p14_smoke.gd` marker `FC P14 PASS` (planned; runtime implementation pending ADR-0066)"
       ],
       "domain": "smod",
       "feature": "`features/ship_modification.md`",
@@ -20971,8 +21012,8 @@
     {
       "id": "REQ-SMOD-001::acceptance-cc93b99b2016",
       "requirement_id": "REQ-SMOD-001",
-      "criterion": "Catalog-linked installs restore hub ship-system sub floor; uninstall damages the sub.",
-      "criterion_fingerprint": "ca2c7292b2639e65d66a3ccb3f6dfeda65a924a1b16c6f411f33b4b6454996cc",
+      "criterion": "Catalog-linked installs connect the installed lot's preserved condition to the hub ship-system subcomponent; dismounting the last provider disconnects it without changing intrinsic health or item condition.",
+      "criterion_fingerprint": "a4d1e10d64d29fbfe185be8cb8fac3cf95c98f2748a943f453739001caa1fea2",
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-SMOD-001",
@@ -20981,7 +21022,7 @@
       "verification_source": [
         "`scripts/validation/ship_modification_smoke.gd`",
         "`scripts/validation/ship_mod_install_key_smoke.gd` marker `SHIP MOD INSTALL KEY PASS`",
-        "`scripts/validation/ship_mod_system_effect_smoke.gd` marker `SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true`"
+        "`scripts/validation/fc_p14_smoke.gd` marker `FC P14 PASS` (planned; runtime implementation pending ADR-0066)"
       ],
       "domain": "smod",
       "feature": "`features/ship_modification.md`",
@@ -20996,6 +21037,11 @@
         "player_accepted": false,
         "state": "not_verified",
         "refs": []
+      },
+      "criterion_supersession": {
+        "mapping_path": "data/validation/reviewed_criterion_supersessions_v1.json",
+        "stable_criterion_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "replacement_natural_id": "REQ-SMOD-001::acceptance-24253a746be5"
       },
       "metric_equivalence": {
         "group_id": "distinct-232856b20759",

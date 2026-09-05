@@ -20,12 +20,14 @@ REQUIREMENTS_REL = Path("docs/game/05_requirements.md")
 FEATURES_REL = Path("docs/game/features")
 REGISTRY_REL = Path("docs/game/inventory/feature_acceptance.json")
 CARDS_REL = Path("data/validation/feature_completion_cards.json")
+SUPERSESSIONS_REL = Path("data/validation/reviewed_criterion_supersessions_v1.json")
 PLAN_REL = Path("docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md")
 
 REQUIREMENTS = ROOT / REQUIREMENTS_REL
 REGISTRY = ROOT / REGISTRY_REL
 CARDS = ROOT / CARDS_REL
 PLAN = ROOT / PLAN_REL
+SUPERSESSIONS_SCHEMA = "reviewed-criterion-supersessions-v1"
 
 EVIDENCE_STATES = {
     "not_verified",
@@ -61,6 +63,7 @@ REVIEWED_EQUIVALENT_PACKAGE_CRITERIA = {
 FROZEN_SCOPE_CONTRACT: dict[str, str] = {
     "frozen_on": "2026-09-05",
     "source_leaf_set_fingerprint": "8041e481680152f85fe2d3617491880a5268d89dcb63a59608590711edef48d0",
+    "reviewed_supersession_set_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
     "reviewer": "root_coordinator",
     "review_disposition": "approved_source_leaves_and_reviewed_equivalence_map",
 }
@@ -177,6 +180,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/procgen_layout_stress_smoke.gd",
         "scripts/validation/procgen_playable_ship_smoke.gd",
         "scripts/validation/procgen_loader_playable_contract_smoke.gd",
+        "scripts/validation/generated_seed_boarded_slice_smoke.gd",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
         "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
@@ -314,9 +318,28 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "component_remount_sfx_live_away_smoke")],
     ],
     "P14": [
-        *[f"scripts/systems/{name}.gd" for name in ("ship_modification_state", "component_mount_resolver", "ship_systems_manager", "crafting_state")],
-        COMPONENT_CATALOG, "data/ship_systems/power_budget_tables.json", COORDINATOR,
-        f"{VALIDATION}fc_p14_smoke.gd",
+        "docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md",
+        "docs/game/adr/README.md",
+        ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P14-implementation-brief.md",
+        "docs/game/05_requirements.md", str(SUPERSESSIONS_REL).replace("\\", "/"),
+        str(REGISTRY_REL).replace("\\", "/"), str(CARDS_REL).replace("\\", "/"),
+        str(PLAN_REL).replace("\\", "/"), "tools/build_feature_acceptance.py",
+        "tests/test_feature_acceptance_registry.py", "tests/test_p14_health_authority.py",
+        *[f"scripts/systems/{name}.gd" for name in (
+            "component_placement_state", "component_mount_resolver", "ship_systems_manager",
+            "ship_system", "ship_subcomponent", "ship_modification_state", "crafting_state",
+        )],
+        "scripts/tools/repair_point.gd", COORDINATOR,
+        *[f"{VALIDATION}{name}.gd" for name in (
+            "fc_p14_smoke", "ship_systems_manager_smoke",
+            "ship_systems_manager_force_repair_smoke", "component_mount_dismount_smoke",
+            "dismount_system_damage_smoke", "remount_system_restore_smoke",
+            "ship_mod_system_effect_smoke", "ship_mod_system_effect_away_smoke",
+            "ship_mod_restore_effects_smoke", "ship_mod_restore_effects_away_smoke",
+            "ship_mod_plating_repair_smoke", "ship_mod_plating_repair_away_smoke",
+            "ship_mod_station_tier_smoke", "ship_mod_station_tier_away_smoke",
+            "ship_mod_run_snapshot_smoke",
+        )],
     ],
     "P15": [
         *[f"scripts/systems/{name}.gd" for name in ("module_integrity_state", "module_integrity_map", "work_action_resolver", "ship_subcomponent")],
@@ -411,7 +434,10 @@ CARD_SMOKES = {
     "P11": ["component_slot_population_smoke.gd", "component_system_link_smoke.gd", "ship_modification_panel_smoke.gd", "ship_modification_smoke.gd"],
     "P12": ["repair_unification_smoke.gd", "repair_blocked_consume_smoke.gd", "work_action_driver_smoke.gd", "component_mount_dismount_smoke.gd"],
     "P13": ["component_mount_interact_away_smoke.gd", "ship_mod_inventory_sync_away_smoke.gd", "component_remount_sfx_live_away_smoke.gd", "pillar_revisit_persistence_smoke.gd"],
-    "P14": ["ship_mod_overbudget_power_smoke.gd", "ship_mod_station_tier_away_smoke.gd", "ship_mod_restore_effects_smoke.gd"],
+    "P14": [
+        "fc_p14_smoke.gd", "ship_mod_overbudget_power_smoke.gd",
+        "ship_mod_station_tier_away_smoke.gd", "ship_mod_run_snapshot_smoke.gd",
+    ],
     "P15": ["repair_loop_smoke.gd", "module_integrity_consequences_smoke.gd", "ship_mod_plating_repair_away_smoke.gd"],
     "P16": ["module_integrity_smoke.gd", "nav_solid_edges_smoke.gd"],
     "P18": ["module_integrity_consequences_smoke.gd", "ship_nav_graph_smoke.gd", "slice_atmosphere_smoke.gd", "physical_travel_smoke.gd"],
@@ -464,6 +490,224 @@ def _domain(identifier: str) -> str:
 def _digest(*parts: str) -> str:
     payload = "\x1f".join(_normalized(part) for part in parts)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _require_exact_keys(value: dict[str, Any], expected: set[str], label: str) -> None:
+    actual = set(value)
+    assert actual == expected, (
+        f"{label} keys mismatch; missing={sorted(expected - actual)} "
+        f"unexpected={sorted(actual - expected)}"
+    )
+
+
+def _natural_requirement_criterion_id(requirement_id: str, criterion: str) -> str:
+    return f"{requirement_id}::acceptance-{_digest(requirement_id, criterion)[:12]}"
+
+
+def _load_reviewed_supersessions(root: Path) -> dict[str, Any]:
+    path = root / SUPERSESSIONS_REL
+    if not path.exists():
+        return {
+            "schema_version": SUPERSESSIONS_SCHEMA,
+            "program": "crafting-derelict-feature-completion",
+            "reviewed_supersessions": [],
+            "source_present": False,
+        }
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise AssertionError(f"invalid reviewed supersession JSON: {error}") from error
+    assert isinstance(document, dict), "reviewed supersession document must be an object"
+    _require_exact_keys(
+        document,
+        {"schema_version", "program", "reviewed_supersessions"},
+        "reviewed supersession document",
+    )
+    assert document["schema_version"] == SUPERSESSIONS_SCHEMA, "unexpected reviewed supersession schema"
+    assert document["program"] == "crafting-derelict-feature-completion", "reviewed supersession program mismatch"
+    rows = document["reviewed_supersessions"]
+    assert isinstance(rows, list), "reviewed supersessions must be an array"
+    stable_ids: list[str] = []
+    replacement_ids: list[str] = []
+    normalized_rows: list[dict[str, Any]] = []
+    for index, raw in enumerate(rows):
+        label = f"reviewed supersession[{index}]"
+        assert isinstance(raw, dict), f"{label} must be an object"
+        _require_exact_keys(
+            raw,
+            {
+                "stable_criterion_id", "source", "original", "replacement",
+                "review", "accounting",
+            },
+            label,
+        )
+        source = raw["source"]
+        original = raw["original"]
+        replacement = raw["replacement"]
+        review = raw["review"]
+        accounting = raw["accounting"]
+        for child, keys in (
+            (source, {"path", "heading"}),
+            (original, {"criterion", "natural_id", "criterion_fingerprint"}),
+            (replacement, {"criterion", "natural_id", "criterion_fingerprint"}),
+            (review, {"status", "adr", "reviewer", "reviewed_on"}),
+            (
+                accounting,
+                {
+                    "metric_disposition", "acceptance_kind", "deferred",
+                    "counts_toward_proposed_denominator", "representative_id",
+                    "denominator_delta",
+                },
+            ),
+        ):
+            assert isinstance(child, dict), f"{label} contains a non-object section"
+            _require_exact_keys(child, keys, label)
+        stable_id = raw["stable_criterion_id"]
+        source_path = source["path"]
+        heading = source["heading"]
+        assert all(isinstance(value, str) and value for value in (stable_id, source_path, heading)), (
+            f"{label} identity fields must be nonempty strings"
+        )
+        assert source_path == REQUIREMENTS_REL.as_posix(), f"{label} source path is outside the requirement register"
+        assert re.fullmatch(r"REQ-[A-Z0-9-]+", heading), f"{label} source heading is not a requirement ID"
+        assert stable_id.startswith(f"{heading}::acceptance-"), f"{label} stable ID crosses requirement scope"
+        for side_name, side in (("original", original), ("replacement", replacement)):
+            assert all(isinstance(side[key], str) and side[key] for key in side), (
+                f"{label} {side_name} fields must be nonempty strings"
+            )
+            expected_id = _natural_requirement_criterion_id(heading, _clean_markdown(side["criterion"]))
+            expected_fingerprint = _digest(source_path, heading, _clean_markdown(side["criterion"]))
+            assert side["natural_id"] == expected_id, f"{label} {side_name} natural ID mismatch"
+            assert side["criterion_fingerprint"] == expected_fingerprint, (
+                f"{label} {side_name} criterion fingerprint mismatch"
+            )
+        assert stable_id == original["natural_id"], f"{label} stable ID must preserve the original natural ID"
+        assert original["criterion"] != replacement["criterion"], f"{label} does not change criterion text"
+        assert original["natural_id"] != replacement["natural_id"], f"{label} does not change natural ID"
+        assert review["status"] == "accepted", f"{label} is not accepted"
+        assert review["reviewer"] == "root_coordinator", f"{label} reviewer is not authoritative"
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", review["reviewed_on"]), f"{label} review date is invalid"
+        assert isinstance(review["adr"], str) and review["adr"], f"{label} ADR is missing"
+        assert (root / review["adr"]).is_file(), f"{label} ADR does not exist"
+        assert accounting["metric_disposition"] == "one_for_one_active_leaf", (
+            f"{label} has unsupported metric disposition"
+        )
+        assert accounting["acceptance_kind"] == "requirement", f"{label} changes acceptance kind"
+        assert accounting["deferred"] is False, f"{label} changes deferred accounting"
+        assert accounting["counts_toward_proposed_denominator"] is True, (
+            f"{label} excludes the replacement from the denominator"
+        )
+        assert accounting["representative_id"] == stable_id, f"{label} changes metric representative"
+        assert type(accounting["denominator_delta"]) is int and accounting["denominator_delta"] == 0, (
+            f"{label} changes the frozen denominator"
+        )
+        stable_ids.append(stable_id)
+        replacement_ids.append(replacement["natural_id"])
+        normalized_rows.append(raw)
+    assert len(stable_ids) == len(set(stable_ids)), "duplicate reviewed supersession stable IDs"
+    assert len(replacement_ids) == len(set(replacement_ids)), "duplicate reviewed supersession replacement IDs"
+    graph = {
+        row["stable_criterion_id"]: row["replacement"]["natural_id"]
+        for row in normalized_rows
+    }
+    for start in graph:
+        visiting: set[str] = set()
+        current = start
+        while current in graph:
+            assert current not in visiting, "cyclic reviewed criterion supersession mapping"
+            visiting.add(current)
+            current = graph[current]
+    assert not (set(stable_ids) & set(replacement_ids)), (
+        "chained reviewed criterion supersessions require a new reviewed schema"
+    )
+    return {
+        "schema_version": document["schema_version"],
+        "program": document["program"],
+        "reviewed_supersessions": normalized_rows,
+        "source_present": True,
+    }
+
+
+def _apply_reviewed_supersessions(
+    criteria: list[dict[str, Any]],
+    coverage: list[dict[str, Any]],
+    supersessions: list[dict[str, Any]],
+) -> None:
+    by_id = {entry["id"]: entry for entry in criteria}
+    assert len(by_id) == len(criteria), "duplicate natural criterion IDs before supersession review"
+    for mapping in supersessions:
+        stable_id = mapping["stable_criterion_id"]
+        replacement_id = mapping["replacement"]["natural_id"]
+        assert stable_id not in by_id, f"reviewed supersession original still present: {stable_id}"
+        assert replacement_id in by_id, f"reviewed supersession target missing: {replacement_id}"
+        entry = by_id.pop(replacement_id)
+        assert entry["source"]["path"] == mapping["source"]["path"], (
+            f"reviewed supersession source path mismatch: {stable_id}"
+        )
+        assert entry["source"]["heading"] == mapping["source"]["heading"], (
+            f"reviewed supersession source heading mismatch: {stable_id}"
+        )
+        assert entry["criterion"] == mapping["replacement"]["criterion"], (
+            f"reviewed supersession replacement text mismatch: {stable_id}"
+        )
+        assert entry["criterion_fingerprint"] == mapping["replacement"]["criterion_fingerprint"], (
+            f"reviewed supersession replacement fingerprint mismatch: {stable_id}"
+        )
+        accounting = mapping["accounting"]
+        assert entry["acceptance_kind"] == accounting["acceptance_kind"], (
+            f"reviewed supersession acceptance kind drift: {stable_id}"
+        )
+        assert entry["deferred"] is accounting["deferred"], (
+            f"reviewed supersession deferred accounting drift: {stable_id}"
+        )
+        entry["id"] = stable_id
+        entry["criterion_supersession"] = {
+            "mapping_path": SUPERSESSIONS_REL.as_posix(),
+            "stable_criterion_id": stable_id,
+            "replacement_natural_id": replacement_id,
+        }
+        by_id[stable_id] = entry
+        matched_coverage = 0
+        for item in coverage:
+            if item["criterion_ids"] == [replacement_id]:
+                item["criterion_ids"] = [stable_id]
+                matched_coverage += 1
+        assert matched_coverage == 1, f"reviewed supersession coverage mismatch: {stable_id}"
+
+
+def _supersession_set_fingerprint(supersessions: Iterable[dict[str, Any]]) -> str:
+    payload = json.dumps(
+        list(supersessions),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _validate_supersession_metric_contract(
+    criteria: list[dict[str, Any]],
+    supersessions: Iterable[dict[str, Any]],
+) -> None:
+    by_id = {entry["id"]: entry for entry in criteria}
+    for mapping in supersessions:
+        stable_id = mapping["stable_criterion_id"]
+        assert stable_id in by_id, f"reviewed supersession stable row missing: {stable_id}"
+        entry = by_id[stable_id]
+        accounting = mapping["accounting"]
+        equivalence = entry.get("metric_equivalence", {})
+        assert entry["acceptance_kind"] == accounting["acceptance_kind"], (
+            f"reviewed supersession acceptance kind drift: {stable_id}"
+        )
+        assert entry["deferred"] is accounting["deferred"], (
+            f"reviewed supersession deferred accounting drift: {stable_id}"
+        )
+        assert equivalence.get("counts_toward_proposed_denominator") is accounting["counts_toward_proposed_denominator"], (
+            f"reviewed supersession denominator membership drift: {stable_id}"
+        )
+        assert equivalence.get("representative_id") == accounting["representative_id"], (
+            f"reviewed supersession representative drift: {stable_id}"
+        )
 
 
 def _criterion(
@@ -821,18 +1065,36 @@ def _apply_reviewed_equivalence(criteria: list[dict[str, Any]]) -> list[dict[str
 def _scope_contract_fingerprint(
     criteria: list[dict[str, Any]],
     source_documents: list[dict[str, Any]],
+    supersessions: Iterable[dict[str, Any]] = (),
 ) -> str:
+    supersessions_by_id = {
+        row["stable_criterion_id"]: row
+        for row in supersessions
+    }
+    normalized_criteria: list[dict[str, Any]] = []
+    for entry in sorted(criteria, key=lambda item: item["id"]):
+        fingerprint = entry["criterion_fingerprint"]
+        mapping = supersessions_by_id.get(entry["id"])
+        if mapping is not None:
+            assert entry["criterion"] == mapping["replacement"]["criterion"], (
+                f"reviewed supersession scope text mismatch: {entry['id']}"
+            )
+            assert fingerprint == mapping["replacement"]["criterion_fingerprint"], (
+                f"reviewed supersession scope fingerprint mismatch: {entry['id']}"
+            )
+            assert entry.get("criterion_supersession", {}).get("replacement_natural_id") == mapping["replacement"]["natural_id"], (
+                f"reviewed supersession scope annotation mismatch: {entry['id']}"
+            )
+            fingerprint = mapping["original"]["criterion_fingerprint"]
+        normalized_criteria.append({
+            "id": entry["id"],
+            "fingerprint": fingerprint,
+            "deferred": entry["deferred"],
+            "kind": entry["acceptance_kind"],
+            "metric_equivalence": entry["metric_equivalence"],
+        })
     contract = {
-        "criteria": [
-            {
-                "id": entry["id"],
-                "fingerprint": entry["criterion_fingerprint"],
-                "deferred": entry["deferred"],
-                "kind": entry["acceptance_kind"],
-                "metric_equivalence": entry["metric_equivalence"],
-            }
-            for entry in sorted(criteria, key=lambda item: item["id"])
-        ],
+        "criteria": normalized_criteria,
         "sources": [
             {
                 "path": source["path"],
@@ -855,7 +1117,13 @@ def build(
     root = Path(root)
     if frozen_scope_contract is _DEFAULT_FREEZE:
         frozen_scope_contract = FROZEN_SCOPE_CONTRACT if root.resolve() == ROOT.resolve() else None
+    supersession_document = _load_reviewed_supersessions(root)
+    supersessions = supersession_document["reviewed_supersessions"]
+    if root.resolve() == ROOT.resolve():
+        assert supersession_document["source_present"], "reviewed supersession registry is missing"
+    supersession_set_fingerprint = _supersession_set_fingerprint(supersessions)
     requirements, requirement_source, requirement_coverage, requirement_blockers = _extract_requirements(root)
+    _apply_reviewed_supersessions(requirements, requirement_coverage, supersessions)
     features, feature_sources, feature_coverage, feature_blockers = _extract_feature_sources(root)
     known_requirement_ids = {entry["requirement_id"] for entry in requirements}
     for source in feature_sources:
@@ -879,20 +1147,31 @@ def build(
     old = {entry.get("id"): entry for entry in prior.get("criteria", []) if isinstance(entry, dict)}
     for entry in criteria:
         previous = old.get(entry["id"])
+        same_supersession = (
+            "criterion_supersession" not in entry
+            or previous is not None
+            and previous.get("criterion_supersession") == entry["criterion_supersession"]
+        )
         if (
             previous
             and previous.get("criterion_fingerprint") == entry["criterion_fingerprint"]
+            and same_supersession
             and _valid_evidence(previous.get("evidence"))
         ):
             entry["evidence"] = previous["evidence"]
 
     blockers = sorted(set(requirement_blockers + feature_blockers))
     duplicate_review = _apply_reviewed_equivalence(criteria)
+    _validate_supersession_metric_contract(criteria, supersessions)
     source_documents = [requirement_source, *feature_sources]
-    scope_fingerprint = _scope_contract_fingerprint(criteria, source_documents)
+    scope_fingerprint = _scope_contract_fingerprint(criteria, source_documents, supersessions)
     if frozen_scope_contract is not None:
         assert isinstance(frozen_scope_contract, dict), "invalid frozen scope contract"
         assert not blockers, "cannot freeze scope with source mapping blockers"
+        if supersessions or "reviewed_supersession_set_fingerprint" in frozen_scope_contract:
+            assert frozen_scope_contract.get("reviewed_supersession_set_fingerprint") == supersession_set_fingerprint, (
+                "reviewed supersession set drift; coordinator review is required before regeneration"
+            )
         assert frozen_scope_contract.get("source_leaf_set_fingerprint") == scope_fingerprint, (
             "frozen scope drift; coordinator review is required before regeneration"
         )
@@ -965,6 +1244,14 @@ def build(
         },
         "board": "synaptic-sea-stage-gate",
         "card_manifest": CARDS_REL.as_posix(),
+        "criterion_supersession_source": {
+            "path": SUPERSESSIONS_REL.as_posix(),
+            "schema_version": supersession_document["schema_version"],
+            "source_present": supersession_document["source_present"],
+            "reviewed_mapping_count": len(supersessions),
+            "reviewed_mapping_fingerprint": supersession_set_fingerprint,
+        },
+        "criterion_supersession_review": supersessions,
         "accounting": {
             "denominator_status": (
                 "incomplete_unassessed_sources"
@@ -1192,6 +1479,8 @@ def write_card_manifest(root: Path = ROOT) -> dict[str, Any]:
 
 def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root: Path = ROOT) -> None:
     root = Path(root)
+    supersession_document = _load_reviewed_supersessions(root)
+    supersessions = supersession_document["reviewed_supersessions"]
     assert registry["schema_version"] == "feature-acceptance-v5", "unexpected acceptance schema"
     identifiers = [entry["id"] for entry in registry["criteria"]]
     assert len(identifiers) == len(set(identifiers)), "duplicate criterion IDs"
@@ -1199,6 +1488,16 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
     assert len([identifier for identifier in identifiers if identifier.startswith("REQ-")]) >= 130, "requirement acceptance leaves not represented"
     assert registry["accounting"]["recorded"] == len(registry["criteria"]), "recorded denominator mismatch"
     assert registry["accounting"]["active"] + registry["accounting"]["deferred"] == len(registry["criteria"]), "active/deferred accounting mismatch"
+    assert registry.get("criterion_supersession_source") == {
+        "path": SUPERSESSIONS_REL.as_posix(),
+        "schema_version": supersession_document["schema_version"],
+        "source_present": supersession_document["source_present"],
+        "reviewed_mapping_count": len(supersessions),
+        "reviewed_mapping_fingerprint": _supersession_set_fingerprint(supersessions),
+    }, "reviewed supersession source metadata mismatch"
+    assert registry.get("criterion_supersession_review") == supersessions, (
+        "reviewed supersession history mismatch"
+    )
     expected_source_paths = {REQUIREMENTS_REL.as_posix()} | {
         path.relative_to(root).as_posix() for path in (root / FEATURES_REL).glob("*.md")
     }
@@ -1233,6 +1532,45 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
     assert registry["accounting"]["active_metric_denominator"] == proposed_count, "active metric denominator mismatch"
     assert registry["accounting"]["equivalence_alias_count"] == registry["accounting"]["active"] - proposed_count, "equivalence alias accounting mismatch"
     entries_by_id = {entry["id"]: entry for entry in registry["criteria"]}
+    expected_superseded_ids: set[str] = set()
+    for mapping in supersessions:
+        stable_id = mapping["stable_criterion_id"]
+        replacement_id = mapping["replacement"]["natural_id"]
+        expected_superseded_ids.add(stable_id)
+        assert stable_id in entries_by_id, f"reviewed supersession stable row missing: {stable_id}"
+        assert replacement_id not in entries_by_id, f"reviewed supersession emitted an extra replacement row: {stable_id}"
+        entry = entries_by_id[stable_id]
+        assert entry["criterion"] == mapping["replacement"]["criterion"], (
+            f"reviewed supersession current text mismatch: {stable_id}"
+        )
+        assert entry["criterion_fingerprint"] == mapping["replacement"]["criterion_fingerprint"], (
+            f"reviewed supersession current fingerprint mismatch: {stable_id}"
+        )
+        assert entry.get("criterion_supersession") == {
+            "mapping_path": SUPERSESSIONS_REL.as_posix(),
+            "stable_criterion_id": stable_id,
+            "replacement_natural_id": replacement_id,
+        }, f"reviewed supersession row annotation mismatch: {stable_id}"
+        accounting = mapping["accounting"]
+        equivalence = entry["metric_equivalence"]
+        assert entry["acceptance_kind"] == accounting["acceptance_kind"], (
+            f"reviewed supersession acceptance kind mismatch: {stable_id}"
+        )
+        assert entry["deferred"] is accounting["deferred"], (
+            f"reviewed supersession deferred accounting mismatch: {stable_id}"
+        )
+        assert equivalence["counts_toward_proposed_denominator"] is accounting["counts_toward_proposed_denominator"], (
+            f"reviewed supersession denominator membership mismatch: {stable_id}"
+        )
+        assert equivalence["representative_id"] == accounting["representative_id"], (
+            f"reviewed supersession representative mismatch: {stable_id}"
+        )
+    annotated_ids = {
+        entry["id"]
+        for entry in registry["criteria"]
+        if "criterion_supersession" in entry
+    }
+    assert annotated_ids == expected_superseded_ids, "unreviewed criterion supersession annotation"
     for group in registry["duplicate_criterion_review"]:
         assert group["review"]["reviewer"] and group["review"]["reviewed_on"], "duplicate review provenance missing"
         if group["disposition"] == "reviewed_equivalent_same_package_boilerplate":
@@ -1255,7 +1593,7 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
                 assert equivalence["counts_toward_proposed_denominator"], "distinct-scope criterion excluded from denominator"
     candidate = registry["scope_freeze_candidate"]
     assert candidate["source_leaf_set_fingerprint"] == _scope_contract_fingerprint(
-        registry["criteria"], registry["source_documents"]
+        registry["criteria"], registry["source_documents"], supersessions
     ), "scope-freeze candidate fingerprint mismatch"
     assert candidate["source_row_count"] == len(registry["criteria"]), "scope-freeze candidate row count mismatch"
     assert candidate["proposed_active_denominator"] == proposed_count, "scope-freeze candidate denominator mismatch"
@@ -1265,6 +1603,10 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
         assert all(value is None for value in registry["accounting"]["percentages"].values()), "unfrozen denominator published percentages"
     else:
         assert registry["scope_frozen"]["source_leaf_set_fingerprint"] == candidate["source_leaf_set_fingerprint"], "frozen scope fingerprint mismatch"
+        if supersessions:
+            assert registry["scope_frozen"].get("reviewed_supersession_set_fingerprint") == _supersession_set_fingerprint(supersessions), (
+                "frozen reviewed supersession set fingerprint mismatch"
+            )
         assert registry["scope_review"]["status"] == "frozen", "frozen scope review state mismatch"
     if registry["accounting"]["metric_blockers"]:
         assert all(value is None for value in registry["accounting"]["percentages"].values()), "incomplete denominator published percentages"

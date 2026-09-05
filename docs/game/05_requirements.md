@@ -1224,11 +1224,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Acceptance criteria:
   - Salvaged components install into ship slots under power budget constraints.
   - Hub growth is physical (components/modules), not a separate hub scene.
-  - Catalog-linked installs restore hub ship-system sub floor; uninstall damages the sub.
+  - Catalog-linked installs connect the installed lot's preserved condition to the hub ship-system subcomponent; dismounting the last provider disconnects it without changing intrinsic health or item condition.
 - Verification:
   - `scripts/validation/ship_modification_smoke.gd`
   - `scripts/validation/ship_mod_install_key_smoke.gd` marker `SHIP MOD INSTALL KEY PASS`
-  - `scripts/validation/ship_mod_system_effect_smoke.gd` marker `SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true`
+  - `scripts/validation/fc_p14_smoke.gd` marker `FC P14 PASS` (planned; runtime implementation pending ADR-0066)
 
 ## REQ-ARCH-001: SimKeys contract for tick context
 

@@ -6,6 +6,10 @@ from pathlib import Path
 
 from tools.build_feature_acceptance import (
     PLAN,
+    SUPERSESSIONS_REL,
+    _digest,
+    _natural_requirement_criterion_id,
+    _supersession_set_fingerprint,
     build,
     build_card_manifest,
     validate,
@@ -19,6 +23,7 @@ class TemporaryAcceptanceSources:
         self.requirements = root / "docs/game/05_requirements.md"
         self.features = root / "docs/game/features"
         self.registry = root / "docs/game/inventory/feature_acceptance.json"
+        self.supersessions = root / SUPERSESSIONS_REL
         self.features.mkdir(parents=True)
         self.registry.parent.mkdir(parents=True)
         self.requirements.write_text(
@@ -111,6 +116,63 @@ Mapped 1:1 to REQ-TEST-001..003 in `docs/game/05_requirements.md`.
             encoding="utf-8",
         )
 
+    def reviewed_supersession(
+        self,
+        original: str,
+        replacement: str,
+        requirement_id: str = "REQ-TEST-001",
+    ) -> dict:
+        source_path = "docs/game/05_requirements.md"
+        stable_id = _natural_requirement_criterion_id(requirement_id, original)
+        replacement_id = _natural_requirement_criterion_id(requirement_id, replacement)
+        adr_path = "docs/game/adr/0066-test-supersession.md"
+        adr = self.root / adr_path
+        adr.parent.mkdir(parents=True, exist_ok=True)
+        adr.write_text("# Test supersession authority\n", encoding="utf-8")
+        return {
+            "stable_criterion_id": stable_id,
+            "source": {"path": source_path, "heading": requirement_id},
+            "original": {
+                "criterion": original,
+                "natural_id": stable_id,
+                "criterion_fingerprint": _digest(source_path, requirement_id, original),
+            },
+            "replacement": {
+                "criterion": replacement,
+                "natural_id": replacement_id,
+                "criterion_fingerprint": _digest(source_path, requirement_id, replacement),
+            },
+            "review": {
+                "status": "accepted",
+                "adr": adr_path,
+                "reviewer": "root_coordinator",
+                "reviewed_on": "2026-09-05",
+            },
+            "accounting": {
+                "metric_disposition": "one_for_one_active_leaf",
+                "acceptance_kind": "requirement",
+                "deferred": False,
+                "counts_toward_proposed_denominator": True,
+                "representative_id": stable_id,
+                "denominator_delta": 0,
+            },
+        }
+
+    def write_supersessions(self, rows: list[dict]) -> None:
+        self.supersessions.parent.mkdir(parents=True, exist_ok=True)
+        self.supersessions.write_text(
+            json.dumps(
+                {
+                    "schema_version": "reviewed-criterion-supersessions-v1",
+                    "program": "crafting-derelict-feature-completion",
+                    "reviewed_supersessions": rows,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
 
 class FeatureAcceptanceRegistryTests(unittest.TestCase):
     def setUp(self):
@@ -175,6 +237,143 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertNotEqual(alpha["criterion_fingerprint"], replacement["criterion_fingerprint"])
         self.assertEqual("not_verified", replacement["evidence"]["state"])
         self.assertEqual([], replacement["evidence"]["refs"])
+
+    def test_reviewed_supersession_preserves_stable_scope_and_resets_old_evidence(self):
+        original_text = "Alpha remains observable."
+        replacement_text = "Alpha remains observable after reviewed replacement."
+        (self.sources.features / "missing_acceptance.md").unlink()
+        initial = write_registry(self.root)
+        initial_count = initial["accounting"]["active_metric_denominator"]
+        frozen_fingerprint = initial["scope_freeze_candidate"]["source_leaf_set_fingerprint"]
+        original = self._criterion(initial, original_text)
+        original["evidence"] = {
+            "implemented": True,
+            "production_reachable": True,
+            "fresh_validation": True,
+            "player_accepted": True,
+            "state": "accepted",
+            "refs": ["artifacts/accepted-old-claim.log"],
+        }
+        self.sources.registry.write_text(json.dumps(initial, indent=2) + "\n", encoding="utf-8")
+        mapping = self.sources.reviewed_supersession(original_text, replacement_text)
+        self.sources.write_supersessions([mapping])
+        self.sources.requirements.write_text(
+            self.sources.requirements.read_text(encoding="utf-8").replace(
+                original_text,
+                replacement_text,
+            ),
+            encoding="utf-8",
+        )
+        frozen = {
+            "frozen_on": "2026-09-05",
+            "source_leaf_set_fingerprint": frozen_fingerprint,
+            "reviewed_supersession_set_fingerprint": _supersession_set_fingerprint([mapping]),
+        }
+
+        changed = write_registry(self.root, frozen_scope_contract=frozen)
+        replacement = self._criterion(changed, replacement_text)
+
+        self.assertEqual(original["id"], replacement["id"])
+        self.assertEqual(mapping["replacement"]["criterion_fingerprint"], replacement["criterion_fingerprint"])
+        self.assertEqual(mapping["replacement"]["natural_id"], replacement["criterion_supersession"]["replacement_natural_id"])
+        self.assertEqual("not_verified", replacement["evidence"]["state"])
+        self.assertEqual([], replacement["evidence"]["refs"])
+        self.assertEqual([mapping], changed["criterion_supersession_review"])
+        self.assertEqual(initial_count, changed["accounting"]["active_metric_denominator"])
+        self.assertEqual(frozen_fingerprint, changed["scope_freeze_candidate"]["source_leaf_set_fingerprint"])
+        self.assertFalse(any(entry["id"] == mapping["replacement"]["natural_id"] for entry in changed["criteria"]))
+
+        before_reversion = self.sources.registry.read_bytes()
+        self.sources.supersessions.unlink()
+        self.sources.requirements.write_text(
+            self.sources.requirements.read_text(encoding="utf-8").replace(
+                replacement_text,
+                original_text,
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(AssertionError, "reviewed supersession set drift"):
+            write_registry(self.root, frozen_scope_contract=frozen)
+        self.assertEqual(before_reversion, self.sources.registry.read_bytes())
+
+    def test_reviewed_supersession_rejects_unapproved_third_wording_before_write(self):
+        original_text = "Alpha remains observable."
+        replacement_text = "Alpha remains observable after reviewed replacement."
+        initial = write_registry(self.root)
+        before = self.sources.registry.read_bytes()
+        self.sources.write_supersessions([
+            self.sources.reviewed_supersession(original_text, replacement_text)
+        ])
+        self.sources.requirements.write_text(
+            self.sources.requirements.read_text(encoding="utf-8").replace(
+                original_text,
+                "Alpha has unreviewed third wording.",
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(AssertionError, "reviewed supersession target missing"):
+            write_registry(self.root)
+        self.assertEqual(before, self.sources.registry.read_bytes())
+        self.assertTrue(initial["criteria"])
+
+    def test_reviewed_supersession_rejects_missing_target_before_write(self):
+        original_text = "Alpha remains observable."
+        replacement_text = "Alpha remains observable after reviewed replacement."
+        write_registry(self.root)
+        before = self.sources.registry.read_bytes()
+        self.sources.write_supersessions([
+            self.sources.reviewed_supersession(original_text, replacement_text)
+        ])
+        self.sources.requirements.write_text(
+            self.sources.requirements.read_text(encoding="utf-8").replace(
+                f"  - {original_text}\n",
+                "",
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(AssertionError, "reviewed supersession target missing"):
+            write_registry(self.root)
+        self.assertEqual(before, self.sources.registry.read_bytes())
+
+    def test_reviewed_supersession_rejects_duplicate_cycle_and_accounting_drift(self):
+        alpha = "Alpha remains observable."
+        beta = "Beta remains observable."
+        gamma = "Gamma is the reviewed replacement."
+        alpha_to_beta = self.sources.reviewed_supersession(alpha, beta)
+        beta_to_alpha = self.sources.reviewed_supersession(beta, alpha)
+
+        with self.subTest("duplicate"):
+            self.sources.write_supersessions([alpha_to_beta, copy.deepcopy(alpha_to_beta)])
+            with self.assertRaisesRegex(AssertionError, "duplicate reviewed supersession stable IDs"):
+                build(self.root)
+
+        with self.subTest("duplicate replacement"):
+            alpha_to_gamma = self.sources.reviewed_supersession(alpha, gamma)
+            beta_to_gamma = self.sources.reviewed_supersession(beta, gamma)
+            self.sources.write_supersessions([alpha_to_gamma, beta_to_gamma])
+            with self.assertRaisesRegex(AssertionError, "duplicate reviewed supersession replacement IDs"):
+                build(self.root)
+
+        with self.subTest("cycle"):
+            self.sources.write_supersessions([alpha_to_beta, beta_to_alpha])
+            with self.assertRaisesRegex(AssertionError, "cyclic reviewed criterion supersession mapping"):
+                build(self.root)
+
+        with self.subTest("fingerprint"):
+            tampered = copy.deepcopy(alpha_to_beta)
+            tampered["replacement"]["criterion_fingerprint"] = "0" * 64
+            self.sources.write_supersessions([tampered])
+            with self.assertRaisesRegex(AssertionError, "replacement criterion fingerprint mismatch"):
+                build(self.root)
+
+        with self.subTest("accounting"):
+            drifted = copy.deepcopy(alpha_to_beta)
+            drifted["accounting"]["denominator_delta"] = 1
+            self.sources.write_supersessions([drifted])
+            with self.assertRaisesRegex(AssertionError, "changes the frozen denominator"):
+                build(self.root)
 
     def test_source_leaf_addition_and_removal_update_the_denominator(self):
         initial = write_registry(self.root)
@@ -273,6 +472,10 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertEqual("2026-09-05", registry["scope_frozen"]["frozen_on"])
         self.assertEqual("root_coordinator", registry["scope_frozen"]["reviewer"])
         self.assertEqual(
+            "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
+            registry["scope_frozen"]["reviewed_supersession_set_fingerprint"],
+        )
+        self.assertEqual(
             registry["scope_frozen"]["source_leaf_set_fingerprint"],
             registry["scope_freeze_candidate"]["source_leaf_set_fingerprint"],
         )
@@ -289,6 +492,26 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertEqual(14, dispositions.count("reviewed_equivalent_same_package_boilerplate"))
         self.assertEqual(3, dispositions.count("reviewed_same_text_distinct_scope"))
         self.assertTrue(all(group["review"]["reviewer"] == "root_coordinator" for group in registry["duplicate_criterion_review"]))
+        superseded = next(
+            entry
+            for entry in registry["criteria"]
+            if entry["id"] == "REQ-SMOD-001::acceptance-cc93b99b2016"
+        )
+        self.assertEqual(
+            "Catalog-linked installs connect the installed lot's preserved condition to the hub ship-system subcomponent; dismounting the last provider disconnects it without changing intrinsic health or item condition.",
+            superseded["criterion"],
+        )
+        self.assertEqual(
+            "a4d1e10d64d29fbfe185be8cb8fac3cf95c98f2748a943f453739001caa1fea2",
+            superseded["criterion_fingerprint"],
+        )
+        self.assertEqual("not_verified", superseded["evidence"]["state"])
+        self.assertEqual([], superseded["evidence"]["refs"])
+        self.assertEqual(1, registry["criterion_supersession_source"]["reviewed_mapping_count"])
+        self.assertEqual(
+            "ca2c7292b2639e65d66a3ccb3f6dfeda65a924a1b16c6f411f33b4b6454996cc",
+            registry["criterion_supersession_review"][0]["original"]["criterion_fingerprint"],
+        )
 
         expected_maps = {
             "docs/game/features/crafting_materials_recipes.md": ["REQ-CS-001", "REQ-CS-005", "REQ-CS-014"],
@@ -348,6 +571,14 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         damaged = copy.deepcopy(registry)
         damaged["accounting"]["active_metric_denominator"] += 1
         with self.assertRaisesRegex(AssertionError, "active metric denominator mismatch"):
+            validate(damaged, cards)
+
+    def test_validation_rejects_tampered_supersession_history(self):
+        registry = build()
+        cards = build_card_manifest()
+        damaged = copy.deepcopy(registry)
+        damaged["criterion_supersession_review"][0]["review"]["reviewer"] = "unreviewed"
+        with self.assertRaisesRegex(AssertionError, "reviewed supersession history mismatch"):
             validate(damaged, cards)
 
     def test_frozen_scope_drift_fails_before_stored_evidence_is_rewritten(self):
@@ -502,6 +733,24 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "scripts/systems/component_placement_state.gd",
         ):
             self.assertIn(expected_path, [entry["path"] for entry in p12["allowlist"]])
+        p14 = next(card for card in manifest["cards"] if card["id"] == "P14")
+        for expected_path in (
+            "docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md",
+            "docs/game/05_requirements.md",
+            "data/validation/reviewed_criterion_supersessions_v1.json",
+            "docs/game/inventory/feature_acceptance.json",
+            "tools/build_feature_acceptance.py",
+            "tests/test_feature_acceptance_registry.py",
+            "scripts/systems/component_placement_state.gd",
+            "scripts/systems/ship_systems_manager.gd",
+            "scripts/tools/repair_point.gd",
+            "scripts/validation/fc_p14_smoke.gd",
+            "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+        ):
+            self.assertIn(expected_path, [entry["path"] for entry in p14["allowlist"]])
+        p14_commands = [check["command"] for check in p14["verification"]]
+        self.assertTrue(any("fc_p14_smoke.gd" in command for command in p14_commands))
+        self.assertFalse(any("ship_mod_restore_effects_smoke.gd" in command for command in p14_commands))
         p16 = next(card for card in manifest["cards"] if card["id"] == "P16")
         self.assertIn(
             "scripts/procgen/playable_generated_ship.gd",

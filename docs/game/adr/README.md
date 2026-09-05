@@ -46,6 +46,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
 | 0064 | docs/game/adr/0064-versioned-current-topology-parity-fixture.md | Accepted contract: version current topology parity as a reviewed fixture; candidate validation and implementation pending |
 | 0065 | docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md | Accepted for implementation, validation pending: exact same-module replacement, live safety/egress preflight, and mandatory APPLYING/finalize atomic scene boundary |
+| 0066 | docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md | Accepted for implementation, runtime pending P10/P13: exact-lot machinery condition, effective system health, paid intrinsic/provider repair, and audited frozen-criterion supersession |
 
 ## Notes
 

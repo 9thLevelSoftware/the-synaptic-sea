@@ -309,6 +309,15 @@ The same reviewed fixture migration permits
 current `149ed476` one-objective `bridge_07:reach_goal` fixture contract and its
 225 collision, 70 edge, and 52 floor markers. This adds no production behavior
 and does not alter the canonical bundle.
+The native boarding regression also permits
+`scripts/validation/generated_seed_boarded_slice_smoke.gd`: replace the obsolete
+fallback-only `procgen-` identity assertion with current native generator version,
+blueprint seed, archetype and exact program identity checks. Capture the home and
+selected marker before travel and verify the boarded owner and loader agree with
+the selected generated ship and differ from home. Preserve enclosure, navigation,
+loot, objectives, wreck and away-tick checks. Wrong-seed and home substitutions
+must still fail. Validate with its existing canonical PASS marker and clean output;
+this changes no production generation or canonical bundle membership.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
@@ -829,11 +838,30 @@ two ships never collide because identity includes ship ID.
 ### P14 — Make machinery upgrades reversible and economically sound
 
 **Depends:** P05, P12-P13. **Requirements:** FC-16.
-**Allowed files:** `ship_modification_state.gd`, `component_mount_resolver.gd`,
-`ship_systems_manager.gd`, `crafting_state.gd`; component/power catalogs;
-coordinator upgrade-effect seams; new `fc_p14_smoke.gd`.
+**Allowed files:** `docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md`,
+`docs/game/adr/README.md`,
+`.superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P14-implementation-brief.md`,
+`docs/game/05_requirements.md`,
+`data/validation/reviewed_criterion_supersessions_v1.json`,
+`tools/build_feature_acceptance.py`, `tests/test_feature_acceptance_registry.py`,
+`tests/test_p14_health_authority.py`, `docs/game/inventory/feature_acceptance.json`,
+`data/validation/feature_completion_cards.json`; `component_placement_state.gd`,
+`component_mount_resolver.gd`, `ship_systems_manager.gd`, `ship_system.gd`,
+`ship_subcomponent.gd`, `ship_modification_state.gd`, `crafting_state.gd`,
+`repair_point.gd`, coordinator upgrade/effective-health seams;
+`fc_p14_smoke.gd`, `ship_systems_manager_smoke.gd`,
+`ship_systems_manager_force_repair_smoke.gd`, `component_mount_dismount_smoke.gd`,
+`dismount_system_damage_smoke.gd`, `remount_system_restore_smoke.gd`,
+`ship_mod_system_effect_smoke.gd`, `ship_mod_system_effect_away_smoke.gd`,
+`ship_mod_restore_effects_smoke.gd`, `ship_mod_restore_effects_away_smoke.gd`,
+`ship_mod_plating_repair_smoke.gd`, `ship_mod_plating_repair_away_smoke.gd`,
+`ship_mod_station_tier_smoke.gd`, `ship_mod_station_tier_away_smoke.gd`, and
+`ship_mod_run_snapshot_smoke.gd`.
 **Non-goals:** free repair on install or balance inflation.
 
+- [x] Record the exact reviewed REQ-SMOD-001 supersession while retaining its
+  stable ID, historical fingerprint and frozen denominator. Runtime remains pending
+  stable P10/P13 integration.
 - [ ] Reproduce repeated install/uninstall and saved-manifest reapply; assert no
   health, tier, power supply or inventory accumulation.
 - [ ] Compute capacity/tier/power from the actual installed manifest and condition;
