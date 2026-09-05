@@ -74,6 +74,16 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     steps, preserve every old step, and test future-version rejection before either
     identifier becomes an implemented save format. This ADR authorizes that bounded
     extension; it does not permit silent reinterpretation of existing fields.
+12. Treat recoverable floor yield as a ship-owned lot holder rather than transient
+    scene decoration. `ShipInstance` owns the authoritative drop descriptors and a
+    persistent allocation sequence. Each descriptor carries a ship-scoped stable
+    drop ID, the owning ship ID, a ship-local transform and an exact `item_lots_v1`
+    summary, including the holder ledger sequence. The coordinator materializes
+    descriptors only while their ship scene is attached and writes partial scoop
+    results back to the owner before travel or save. Current-format malformed drop
+    data fails the enclosing restore before live state changes; absence migrates as
+    an empty legacy collection. P04 adds this nested holder state without changing
+    the existing `world-4` outer version reserved for P10's ordered v5 migration.
 
 ## Locked transaction payloads
 
@@ -90,6 +100,7 @@ rename these keys without a superseding ADR.
 | `recipe_knowledge_v1` | current-run player | `owner_id`, `known_recipe_ids`, `event_receipt_ids` |
 | `work_transactions_v1` | selected ship | `work_id`, `ship_id`, `target_id`, `target_revision`, `state`, `escrow`, `commit_receipt_id` |
 | `structural_rebuild_v1` | ShipInstance/pillar persistence | `replacement_id`, `module_id`, `layout_revision`, `wrapper_id`, `transform`, `footprint`, `sockets`, `state` |
+| `floor_drops_v1` | ShipInstance | `ship_id`, `sequence`, and drop records containing `drop_id`, ship-local `transform`, and exact `item_lots_v1` summaries |
 
 `job_id`, `work_id`, and every receipt ID are idempotency keys. Retrying an already
 committed ID is a no-op; an incomplete transaction retains recoverable escrow.

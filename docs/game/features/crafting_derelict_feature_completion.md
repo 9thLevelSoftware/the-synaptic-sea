@@ -1,6 +1,6 @@
 # Feature program: Crafting and derelict restoration completion
 
-Status: **Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.**
+Status: **Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.**
 The detailed contracts below are the reviewable implementation proposal.
 Baseline: `main` at `f4a65669`. No implementation completion is asserted here.
 Plan: [implementation program](../../superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md).

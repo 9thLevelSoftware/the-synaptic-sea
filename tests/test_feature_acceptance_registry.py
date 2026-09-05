@@ -421,15 +421,53 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         )
         for expected_path in (
             "docs/game/adr/0061-persist-resolved-generation-context.md",
+            "docs/game/adr/0063-lifeboat-compiled-biome-contract.md",
+            "docs/game/adr/0064-versioned-current-topology-parity-fixture.md",
+            "data/procgen/golden/compact_seed17_current/**",
             "scripts/procgen/ship_blueprint.gd",
+            "scripts/procgen/life_boat.gd",
             "scripts/validation/derelict_arc_smoke.gd",
+            "scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd",
+            "scripts/validation/item_economy_smoke.gd",
+            "scripts/validation/main_playable_item_economy_smoke.gd",
+            "scripts/validation/main_playable_survival_stakes_smoke.gd",
         ):
             self.assertIn(expected_path, [entry["path"] for entry in p00["allowlist"]])
+        self.assertTrue(any("main_playable_survival_stakes_smoke.gd" in check["command"] for check in p00["verification"]))
         p04 = next(card for card in manifest["cards"] if card["id"] == "P04")
-        self.assertIn("scripts/systems/ship_instance.gd", [entry["path"] for entry in p04["allowlist"]])
+        for expected_path in (
+            "scripts/systems/ship_instance.gd",
+            "scripts/systems/world_snapshot.gd",
+            "scripts/tools/crafting_station.gd",
+            "scripts/validation/fc_p04_holder_atomicity_smoke.gd",
+            "scripts/validation/fc_p04_floor_drop_persistence_smoke.gd",
+            "scripts/validation/fc_p04_objective_lots_smoke.gd",
+            "scripts/validation/equipment_carts_smoke.gd",
+            "scripts/validation/main_playable_slice_inventory_ui_smoke.gd",
+            "scripts/validation/crafting_quality_knowledge_smoke.gd",
+        ):
+            self.assertIn(expected_path, [entry["path"] for entry in p04["allowlist"]])
+        p04_commands = [check["command"] for check in p04["verification"]]
+        self.assertTrue(any("fc_p04_holder_atomicity_smoke.gd" in command for command in p04_commands))
+        self.assertTrue(any("fc_p04_floor_drop_persistence_smoke.gd" in command for command in p04_commands))
+        self.assertTrue(any("fc_p04_objective_lots_smoke.gd" in command for command in p04_commands))
+        self.assertTrue(any("crafting_quality_knowledge_smoke.gd" in command for command in p04_commands))
+        p05 = next(card for card in manifest["cards"] if card["id"] == "P05")
+        for expected_path in (
+            "scripts/systems/work_action_driver.gd",
+            "scripts/procgen/playable_generated_ship.gd",
+            "docs/game/balance/crafting_materials_tuning.md",
+            "scripts/systems/medicine_state.gd",
+            "scripts/systems/stimulant_state.gd",
+            "scripts/systems/effect_dispatcher.gd",
+        ):
+            self.assertIn(expected_path, [entry["path"] for entry in p05["allowlist"]])
         p07 = next(card for card in manifest["cards"] if card["id"] == "P07")
         self.assertIn("scripts/tools/crafting_station.gd", [entry["path"] for entry in p07["allowlist"]])
         self.assertIn("scripts/procgen/playable_generated_ship.gd", [entry["path"] for entry in p07["allowlist"]])
+        self.assertIn("scripts/validation/station_tiers_batch_smoke.gd", [entry["path"] for entry in p07["allowlist"]])
+        self.assertIn("scripts/validation/fc_p06_smoke.gd", [entry["path"] for entry in p07["allowlist"]])
+        self.assertTrue(any("fc_p06_smoke.gd" in check["command"] for check in p07["verification"]))
         p11 = next(card for card in manifest["cards"] if card["id"] == "P11")
         for expected_path in (
             "scripts/procgen/wall_door_resolver.gd",
@@ -442,6 +480,24 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "data/procgen/golden/coherent_ship_002/layout.json",
         ):
             self.assertIn(golden_path, [entry["path"] for entry in p11["allowlist"]])
+        for fixture_path in (
+            "scripts/validation/fc_p11_live_smoke.gd",
+            "scripts/validation/ship_modification_panel_smoke.gd",
+            "scripts/validation/ship_mod_power_budget_scene_away_smoke.gd",
+            "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+            "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+        ):
+            self.assertIn(fixture_path, [entry["path"] for entry in p11["allowlist"]])
+        p12 = next(card for card in manifest["cards"] if card["id"] == "P12")
+        for expected_path in (
+            "scripts/procgen/playable_generated_ship.gd",
+            "scripts/validation/fc_p11_live_smoke.gd",
+            "scripts/validation/ship_modification_panel_smoke.gd",
+            "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+            "scripts/validation/ship_mod_power_budget_scene_away_smoke.gd",
+            "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+        ):
+            self.assertIn(expected_path, [entry["path"] for entry in p12["allowlist"]])
         p16 = next(card for card in manifest["cards"] if card["id"] == "P16")
         self.assertIn(
             "scripts/procgen/playable_generated_ship.gd",

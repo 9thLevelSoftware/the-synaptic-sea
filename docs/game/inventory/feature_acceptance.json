@@ -7779,7 +7779,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P01",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7809,7 +7809,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P00",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7839,7 +7839,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P02",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7869,7 +7869,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P06",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7899,7 +7899,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P03",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7929,7 +7929,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P05",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7959,7 +7959,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P07",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -7989,7 +7989,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P07",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8019,7 +8019,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P08",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8049,7 +8049,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P09",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8079,7 +8079,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P09",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8109,7 +8109,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P10",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8139,7 +8139,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P11",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8169,7 +8169,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P12",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8199,7 +8199,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P13",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8229,7 +8229,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P14",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8259,7 +8259,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P15",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8289,7 +8289,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P16",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8319,7 +8319,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P17",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8349,7 +8349,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P18",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8379,7 +8379,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P20",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8409,7 +8409,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P19",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8439,7 +8439,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P23",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {
@@ -8469,7 +8469,7 @@
       "domain": "crafting_derelict",
       "feature": "crafting_derelict_feature_completion",
       "owner_card": "P24",
-      "declared_status": "Scope frozen 2026-09-04; ADR-0059 accepted for implementation; runtime work not started.",
+      "declared_status": "Source accounting frozen 2026-09-05; ADR-0059 accepted; runtime implementation underway; full acceptance pending.",
       "acceptance_kind": "program_outcome",
       "deferred": false,
       "evidence": {

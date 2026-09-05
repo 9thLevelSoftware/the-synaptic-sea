@@ -267,7 +267,23 @@ persisted arc IDs address the rebuilt geometry. ADR-0061 additionally permits
 capture and `_apply_run_context_from_blueprint` seams to serialize and restore the
 actual resolved biome/difficulty, including first-run overrides. The optional
 versioned blueprint context must round-trip; malformed present context is distinct
-from absent legacy data. **Non-goals:** unrelated
+from absent legacy data. ADR-0063 additionally permits `scripts/procgen/life_boat.gd`,
+the coordinator's matching-biome lifeboat `build_layout` call, and
+`scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd` to validate the
+current compiled enclosure contract. Preserve occupancy/socket geometry; compare
+actual wrapper identities and paths with compiled records across all three biomes.
+Report deliberate v0 fallback honestly; this is not acceptance of distinct themed
+visuals under P23. The reproduced item-economy failure also permits the
+coordinator's incremental breach-seal-point projection, force-breach helper and
+post-runtime hull synchronization seam, plus `main_playable_item_economy_smoke.gd`
+and a focused projection regression. Newly opened live breaches become
+interactable, closed stale points disappear, and unrelated open channels survive
+repeated synchronization. Tests retain actual player dispatch and resource gates.
+The canonical survival-stakes scene fixture may be corrected in
+`scripts/validation/main_playable_survival_stakes_smoke.gd` to expect the current
+Hermite encumbrance curve with its 0.35 minimum multiplier, replacing only the
+stale pre-PKG-C3.1b half-speed cliff expectation while preserving the scenario.
+**Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
 - [ ] Record HEAD, clean/dirty paths, engine path/version, native extension load,
@@ -394,7 +410,10 @@ binding seams; `scripts/systems/ship_instance.gd` cargo/cart identity and persis
 floor-holder binding; `scripts/systems/world_snapshot.gd` only floor-holder payload
 validation if needed; `scripts/tools/crafting_station.gd` only lot-aware salvage
 deposits, preserving P06 receipts and P07 job ownership;
-new `fc_p04_smoke.gd`.
+new `fc_p04_smoke.gd`, `fc_p04_holder_atomicity_smoke.gd`, and
+`fc_p04_floor_drop_persistence_smoke.gd`; existing `equipment_carts_smoke.gd`
+and `main_playable_slice_inventory_ui_smoke.gd` gain exact-lot production-path
+coverage while retaining their existing assertions.
 **Non-goals:** changing transfer distance, encumbrance or cargo weight policy.
 
 - [ ] Enumerate every inventory mutation caller with `rg`; assign lot-aware source
@@ -416,8 +435,22 @@ consumption is invariant. Capacity rejection cannot delete a source item.
 **Depends:** P03-P04. **Requirements:** FC-06.
 **Allowed files:** new `item_quality_effects.gd`, `data/items/quality_effects.json`;
 `quality_tier_resolver.gd`, `work_action_resolver.gd`, `consumable_state.gd`,
+`medicine_state.gd` and `stimulant_state.gd` only exact-lot potency context and
+effect application, preserving independent skill/tolerance behavior;
+`effect_dispatcher.gd` only medicine positive-health restoration potency, with
+standard multiplier 1 when no quality context is supplied;
 `component_mount_resolver.gd` in systems; `inventory_row.gd`, `recipe_picker_panel.gd`
-in UI; new `fc_p05_smoke.gd`. **Non-goals:** random stat rerolls or new item IDs.
+in UI; `scripts/systems/work_action_driver.gd` only selected tool/repair lot effect context;
+`scripts/procgen/playable_generated_ship.gd` only its two WorkActionDriver start
+context seams and adjacent lot-selection helper, using actually held compatible
+tool lots and paid repair-material snapshots;
+`docs/game/balance/crafting_materials_tuning.md` for the exact deterministic score
+formula; new `fc_p05_smoke.gd`. **Non-goals:** random stat rerolls or new item IDs.
+
+The authored skill and station bonus caps are contributions, applied once:
+`clamp(material_quality * 0.40 + clamp(skill_level * 0.08, 0, 0.35) +
+clamp(station_level * 0.06, 0, 0.25) + powered_bonus, 0, 1)`.
+Verify monotonicity and tier reachability; do not double-weight the capped bonuses.
 
 - [ ] Inventory all produced item categories; assign actual consumers or explicit
   quantity-only rules. Tie effects to existing data multipliers before tuning.
@@ -466,8 +499,16 @@ the real learning event unlocks it; replaying that event does not award twice.
 `crafting_state.gd`, `station_state.gd`, `ship_runtime.gd` under systems;
 new `fc_p07_smoke.gd`; `scripts/tools/crafting_station.gd` only production station
 identity/job ownership calls; `scripts/procgen/playable_generated_ship.gd` only
-`_build_crafting_stations` and its adjacent stable-identity helper. IDs use the
-actual owning ship and stable authored local placement, never station kind alone
+`_build_crafting_stations`, its adjacent stable-identity helper, and the existing
+ShipRuntime configuration/tick/snapshot seams needed to bind the real scheduler
+with exactly one advancement authority.
+The coordinator `_refresh_station_tiers_from_ship_mod` seam and CraftingState tier
+refresh accept explicit actual home-station owner IDs; refresh targets only those
+physical stations and never broadcasts a same-kind tier across owners. The picker's
+generic tier projection remains a compatibility view; P13 owns selected-ship UX.
+`station_tiers_batch_smoke.gd` may migrate its fixture to paid scheduler requests
+while retaining tier/batch assertions. IDs use the actual owning ship and stable
+authored local placement, never station kind alone
 or a transient iteration counter. **Non-goals:** queue UI or changing station power balance.
 
 - [ ] Promote the one-payment/two-output probe into a regression; add concurrent
@@ -572,6 +613,15 @@ a derived view. Saved fit policy must never override current layout/catalog data
 slot metadata without changing room geometry, module keys or placement order.
 The same metadata-only change is allowed in `coherent_ship_002/layout.json` only
 if its actual runtime/regression references require the same physical-slot path.
+Validation scope includes new `fc_p11_live_smoke.gd` and fixture-only updates in
+`ship_modification_panel_smoke.gd`, `component_slot_population_smoke.gd`,
+`component_system_link_smoke.gd`, `component_mount_dismount_smoke.gd`,
+`pillar_revisit_persistence_smoke.gd`, and `ship_mod_power_budget_scene{,_away}_smoke.gd`.
+The same explicit-profile fixture adaptation covers `ship_mod_run_snapshot_smoke.gd`,
+`ship_mod_restore_effects{,_away}_smoke.gd`, `hull_plating_resist_smoke.gd`,
+`fire_plating_resist_smoke.gd`, and `ship_mod_system_effect{,_away}_smoke.gd`.
+These fixtures must use explicit physical profiles and real compatible slots;
+retain their existing behavioral assertions rather than bypassing fit validation.
 **Non-goals:** timing changes until P12 or synthetic replacement slots.
 
 - [ ] Reproduce purified-water installation using the real catalog; add unknown
@@ -595,6 +645,15 @@ unchanged; a compatible catalogued component in the same slot passes preflight.
 `work_action_driver.gd`, `work_action_channel.gd`, `work_action_resolver.gd`,
 `component_mount_resolver.gd`; `repair_point.gd`, `ship_modification_panel.gd`,
 `work_action_hud_panel.gd`; work-action catalog; new `fc_p12_smoke.gd`.
+Production scope includes `scripts/procgen/playable_generated_ship.gd` only its
+work start/tick/commit, inventory-payment mirror, and ship-mod action-request
+seams. Exact paid lot escrow must precede physical mutation; pass that snapshot's
+quality effect into the P05 repair resolver without a second material charge.
+`ship_modification_panel_smoke.gd` changes its fixture to request-only behavior
+while preserving fit/selection assertions. Existing `fc_p11_live_smoke.gd` and
+`ship_mod_{system_effect,power_budget_scene,restore_effects}{,_away}_smoke.gd`
+may wait for actual timed coordinator completion before their original effect
+assertions; they must not bypass the transaction to force an immediate mutation.
 **Non-goals:** replacing the whole interaction system.
 
 - [ ] Assert that install/removal has no immediate effect and cannot commit twice.
