@@ -56,6 +56,33 @@ func repair(amount: float) -> String:
 	return _recompute_state()
 
 
+## Applies an explicitly authored initial state when no numeric damage amount is
+## available. Runtime damage and ordinary repair continue through their existing
+## amount-based methods.
+func apply_authored_state(authored_state: String, authored_integrity: float = -1.0) -> bool:
+	if authored_state not in [STATE_INTACT, STATE_DAMAGED, STATE_BREACHED, STATE_DESTROYED]:
+		return false
+	var next_integrity: float = authored_integrity
+	if next_integrity < 0.0:
+		match authored_state:
+			STATE_INTACT:
+				next_integrity = base_integrity
+			STATE_DAMAGED:
+				next_integrity = base_integrity * THRESHOLD_DAMAGED
+			STATE_BREACHED:
+				next_integrity = base_integrity * THRESHOLD_BREACHED
+			STATE_DESTROYED:
+				next_integrity = base_integrity * THRESHOLD_DESTROYED
+	var previous_integrity: float = integrity
+	var previous_state: String = state
+	integrity = clampf(next_integrity, 0.0, base_integrity)
+	if _recompute_state() != authored_state:
+		integrity = previous_integrity
+		state = previous_state
+		return false
+	return true
+
+
 func _recompute_state() -> String:
 	var ratio: float = integrity / base_integrity if base_integrity > 0.0 else 0.0
 	if ratio <= THRESHOLD_DESTROYED:

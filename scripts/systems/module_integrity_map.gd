@@ -5,13 +5,16 @@ class_name ModuleIntegrityMap
 ## Only non-pristine (or explicitly registered) modules are stored for persistence.
 
 const ModuleIntegrityStateScript: GDScript = preload("res://scripts/systems/module_integrity_state.gd")
+const StructuralRebuildStateScript: GDScript = preload("res://scripts/systems/structural_rebuild_state.gd")
 
 ## module_id -> ModuleIntegrityState
 var _modules: Dictionary = {}
+var _structural_rebuild_state: RefCounted = StructuralRebuildStateScript.new()
 
 
 func clear() -> void:
 	_modules.clear()
+	_structural_rebuild_state.call("clear")
 
 
 func size() -> int:
@@ -48,6 +51,36 @@ func ensure_module(module_id: String, kind: String = "", composition: Dictionary
 func apply_damage(module_id: String, amount: float, kind: String = "") -> String:
 	var m: RefCounted = ensure_module(module_id, kind)
 	return str(m.call("apply_damage", amount))
+
+
+## Bind immutable loader-authored data to the integrity identity without placing
+## descriptor payloads inside sparse damage persistence.
+func register_original_descriptor(descriptor: Dictionary) -> bool:
+	if not bool(_structural_rebuild_state.call("register_original", descriptor)):
+		return false
+	return _seed_module_from_descriptor(descriptor) != null
+
+
+func apply_authored_state(module_id: String, authored_state: String, kind: String = "") -> bool:
+	var module: RefCounted = ensure_module(module_id, kind)
+	if not module.has_method("apply_authored_state") \
+			or not bool(module.call("apply_authored_state", authored_state)):
+		return false
+	return true
+
+
+func get_structural_rebuild_state() -> RefCounted:
+	return _structural_rebuild_state
+
+
+func inspect_rebuild_target(module_id: String) -> Dictionary:
+	var result: Dictionary = _structural_rebuild_state.call("inspect_target", module_id)
+	if not bool(result.get("ok", false)):
+		return result
+	var live_state: String = get_state(module_id)
+	result["state"] = live_state
+	result["replaceable"] = live_state == ModuleIntegrityStateScript.STATE_DESTROYED
+	return result
 
 
 func get_state(module_id: String) -> String:
@@ -98,9 +131,34 @@ func apply_summary(summary: Dictionary) -> bool:
 	var deltas: Variant = summary.get("deltas", [])
 	if typeof(deltas) != TYPE_ARRAY:
 		return false
-	clear()
+	# The loader's authored descriptors outlive sparse integrity reloads. Rebuild
+	# the pristine module baseline before applying deltas so omitted modules keep
+	# their structural kind and exact authored room ownership.
+	_modules.clear()
+	for descriptor_variant in _structural_rebuild_state.call("get_original_descriptors"):
+		if descriptor_variant is Dictionary:
+			_seed_module_from_descriptor(descriptor_variant as Dictionary)
 	apply_sparse_deltas(deltas as Array)
 	return true
+
+
+func _seed_module_from_descriptor(descriptor: Dictionary) -> RefCounted:
+	var module_id: String = str(descriptor.get("module_id", ""))
+	var structural_kind: String = str(descriptor.get("structural_module_id", ""))
+	var room_bindings: Array = descriptor.get("room_bindings", []) if descriptor.get("room_bindings", []) is Array else []
+	var primary_room: String = ""
+	var owners: PackedStringArray = PackedStringArray()
+	for room_variant in room_bindings:
+		var room_id: String = str(room_variant)
+		if room_id.is_empty():
+			continue
+		if primary_room.is_empty():
+			primary_room = room_id
+		if not owners.has(room_id):
+			owners.append(room_id)
+	var module: RefCounted = ensure_module(module_id, structural_kind, {}, primary_room)
+	module.set("owner_rooms", owners)
+	return module
 
 
 ## Determinism helper: sorted module ids + states.

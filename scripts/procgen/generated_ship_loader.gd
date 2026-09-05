@@ -12,6 +12,8 @@ const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_pro
 const PropVisualBindingCatalogScript := preload("res://scripts/systems/prop_visual_binding_catalog.gd")
 const RuntimePropVisualBinderScript := preload("res://scripts/procgen/runtime_prop_visual_binder.gd")
 const AuthoredPortalRuntimeScript := preload("res://scripts/interaction/authored_portal_runtime.gd")
+const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
+const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
 
 const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
 
@@ -57,6 +59,7 @@ var goal_position: Vector3 = Vector3.INF
 var structural_root: Node3D
 var objective_root: Node3D
 var room_variant_descriptors: Dictionary = {}  # room_id -> {"variant": String, "dressing": String}
+var module_integrity_map: RefCounted = ModuleIntegrityMapScript.new()
 const RoomVariantSelectorDressScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 
@@ -95,6 +98,7 @@ func clear_loaded_ship() -> void:
 	structural_root = null
 	objective_root = null
 	room_variant_descriptors = {}
+	module_integrity_map.call("clear")
 
 
 func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String, is_away: bool = false) -> bool:
@@ -203,6 +207,10 @@ func load_from_documents(
 	if instantiated_count < 0:
 		clear_loaded_ship()
 		return _fail_load("failed to instantiate structural wrapper scenes")
+	var descriptor_count: int = _register_original_structural_descriptors(layout_doc, kit_doc, module_to_scene)
+	if descriptor_count != instantiated_count:
+		clear_loaded_ship()
+		return _fail_load("failed to register original structural descriptors")
 	_apply_module_damage_visuals(layout_doc, structural_root)
 
 	var nav_region: NavigationRegion3D = _build_navigation_region(rooms, structural_root)
@@ -240,6 +248,7 @@ func load_from_documents(
 			"kit_path": kit_abs,
 			"gameplay_slice_path": gameplay_slice_abs,
 			"instantiated_count": instantiated_count,
+			"structural_descriptor_count": descriptor_count,
 			"vertical_link_count": vertical_link_count,
 			"objective_count": objective_specs.size(),
 			"start_position": start_position,
@@ -277,6 +286,32 @@ func has_loaded_ship() -> bool:
 
 func get_layout_copy() -> Dictionary:
 	return layout_doc.duplicate(true)
+
+
+func get_structural_rebuild_state() -> RefCounted:
+	return module_integrity_map.call("get_structural_rebuild_state")
+
+
+func get_module_integrity_map() -> RefCounted:
+	return module_integrity_map
+
+
+func inspect_rebuild_target(module_id: String) -> Dictionary:
+	return module_integrity_map.call("inspect_rebuild_target", module_id)
+
+
+## Applies the current pure integrity state to one real generated wrapper. This is
+## a destruction consequence seam only; reconstruction is owned by later cards.
+func apply_module_integrity_state(module_id: String) -> bool:
+	if structural_root == null or module_id.is_empty() or not module_integrity_map.call("has_module", module_id):
+		return false
+	var wrapper: Node3D = _find_structural_wrapper(structural_root, module_id)
+	if wrapper == null:
+		return false
+	var state: String = str(module_integrity_map.call("get_state", module_id))
+	IntegrityVisualResolverScript.apply_visual_state(wrapper, state)
+	ModuleIntegrityConsequencesScript.apply_to_node(wrapper, state)
+	return true
 
 
 func get_start_transform() -> Transform3D:
@@ -692,6 +727,171 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 	return pending.size()
 
 
+## Capture authored placement and kit contracts before initial damage consequences.
+## Runtime damage is deliberately excluded from the layout fingerprint.
+func _register_original_structural_descriptors(
+		source_layout: Dictionary,
+		source_kit: Dictionary,
+		module_to_scene: Dictionary) -> int:
+	var plan_variant: Variant = source_layout.get("structural_plan", null)
+	if not plan_variant is Dictionary:
+		return -1
+	var plan: Dictionary = plan_variant
+	var kit_records: Dictionary = _build_kit_module_record_map(source_kit)
+	var descriptors: Array = []
+	if not _append_original_descriptors(descriptors, plan.get("placements", []), "edge", kit_records, module_to_scene):
+		return -1
+	if not _append_original_descriptors(descriptors, plan.get("floor_placements", []), "floor", kit_records, module_to_scene):
+		return -1
+	if not _append_original_descriptors(descriptors, plan.get("ceiling_placements", []), "ceiling", kit_records, module_to_scene):
+		return -1
+	var identity: Dictionary = derive_structural_layout_identity(source_layout, descriptors)
+	var fingerprint: String = str(identity.get("layout_fingerprint", ""))
+	var revision: String = str(identity.get("layout_revision", ""))
+	var revision_source: String = str(identity.get("layout_revision_source", ""))
+	var registered: int = 0
+	for descriptor_variant in descriptors:
+		var descriptor: Dictionary = (descriptor_variant as Dictionary).duplicate(true)
+		descriptor["layout_revision"] = revision
+		descriptor["layout_revision_source"] = revision_source
+		descriptor["layout_fingerprint"] = fingerprint
+		if not bool(module_integrity_map.call("register_original_descriptor", descriptor)):
+			return -1
+		registered += 1
+	return registered
+
+
+## Stable identity over authored geometry only. Caller-provided descriptor arrays
+## may include registry annotations; they are stripped before canonical hashing.
+func derive_structural_layout_identity(source_layout: Dictionary, descriptors: Array) -> Dictionary:
+	var canonical_descriptors: Array = []
+	for descriptor_variant in descriptors:
+		if not descriptor_variant is Dictionary:
+			continue
+		var descriptor: Dictionary = (descriptor_variant as Dictionary).duplicate(true)
+		descriptor.erase("layout_revision")
+		descriptor.erase("layout_revision_source")
+		descriptor.erase("layout_fingerprint")
+		canonical_descriptors.append(descriptor)
+	canonical_descriptors.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("module_id", "")) < str(b.get("module_id", "")))
+	var generator_variant: Variant = source_layout.get("generator", {})
+	var generator: Dictionary = generator_variant if generator_variant is Dictionary else {}
+	var seed_value: Variant = generator.get("seed", source_layout.get("seed_value", null))
+	var fingerprint_payload: Dictionary = {
+		"schema_version": source_layout.get("schema_version", null),
+		"generator_version": generator.get("generator_version", null),
+		"generator_seed": seed_value,
+		"placements": canonical_descriptors,
+	}
+	var fingerprint: String = JSON.stringify(fingerprint_payload, "", true).sha256_text()
+	var explicit_revision: String = str(source_layout.get("layout_revision", "")).strip_edges()
+	return {
+		"layout_revision": explicit_revision if not explicit_revision.is_empty() else "derived:%s" % fingerprint,
+		"layout_revision_source": "explicit" if not explicit_revision.is_empty() else "derived_structural_fingerprint",
+		"layout_fingerprint": fingerprint,
+	}
+
+
+func _append_original_descriptors(
+		out: Array,
+		records_variant: Variant,
+		layer: String,
+		kit_records: Dictionary,
+		module_to_scene: Dictionary) -> bool:
+	if not records_variant is Array:
+		return layer == "ceiling"
+	for record_variant in (records_variant as Array):
+		if not record_variant is Dictionary:
+			return false
+		var record: Dictionary = record_variant
+		var structural_module_id: String = str(record.get("module_id", ""))
+		var target_id: String = _structural_target_id(record, layer)
+		if target_id.is_empty() or structural_module_id.is_empty() \
+				or not kit_records.has(structural_module_id) \
+				or not module_to_scene.has(structural_module_id):
+			return false
+		var kit_record: Dictionary = kit_records[structural_module_id]
+		var placement_position: Array = _read_placement_position(record)
+		if placement_position.size() < 3:
+			return false
+		var room_bindings: Array = []
+		var room_ids_variant: Variant = record.get("room_ids", null)
+		if room_ids_variant is Array:
+			room_bindings = (room_ids_variant as Array).duplicate(true)
+		elif record.has("room_id"):
+			room_bindings = [str(record.get("room_id", ""))]
+		var edge_binding: Dictionary = {}
+		if layer == "edge":
+			for key in [
+				"edge_key", "source_cells", "direction", "opposite_direction",
+				"owner_room", "other_room", "exterior", "portal",
+			]:
+				if record.has(key):
+					edge_binding[key] = _duplicate_variant(record[key])
+			# Structural-plan state/kind describe authored edge topology. Rename
+			# both at capture so later integrity overlays cannot be mistaken for
+			# original geometry identity.
+			if record.has("kind"):
+				edge_binding["topology_kind"] = _duplicate_variant(record["kind"])
+			if record.has("state"):
+				edge_binding["topology_state"] = _duplicate_variant(record["state"])
+		out.append({
+			"module_id": target_id,
+			"structural_module_id": structural_module_id,
+			"placement_id": str(record.get("placement_id", record.get("id", ""))),
+			"layout_layer": layer,
+			"wrapper_id": str(module_to_scene[structural_module_id]),
+			"transform": {
+				"position": placement_position.duplicate(true),
+				"yaw_degrees": float(record.get("yaw_degrees", 0.0)),
+			},
+			"footprint": _array_field(kit_record, "footprint_cells"),
+			"sockets": _array_field(kit_record, "socket_names"),
+			"socket_bindings": _array_field(record, "socket_bindings"),
+			"room_bindings": room_bindings,
+			"edge_binding": edge_binding,
+			"component_bindings": _array_field(record, "component_bindings"),
+			"system_links": _array_field(record, "system_links"),
+		})
+	return true
+
+
+func _build_kit_module_record_map(source_kit: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var modules_variant: Variant = source_kit.get("modules", [])
+	if not modules_variant is Array:
+		return out
+	for module_variant in (modules_variant as Array):
+		if not module_variant is Dictionary:
+			continue
+		var module: Dictionary = module_variant
+		var module_id: String = str(module.get("module_id", ""))
+		if not module_id.is_empty():
+			out[module_id] = module
+	return out
+
+
+func _structural_target_id(record: Dictionary, layer: String) -> String:
+	var key_part: String = str(record.get("edge_key", record.get("key", ""))) if layer == "edge" else str(record.get("cell_key", ""))
+	if key_part.is_empty():
+		return ""
+	return "%s/%s" % [layer, key_part]
+
+
+func _array_field(source: Dictionary, key: String) -> Array:
+	var value: Variant = source.get(key, [])
+	return (value as Array).duplicate(true) if value is Array else []
+
+
+func _duplicate_variant(value: Variant) -> Variant:
+	if value is Dictionary:
+		return (value as Dictionary).duplicate(true)
+	if value is Array:
+		return (value as Array).duplicate(true)
+	return value
+
+
 func _free_cached_prototypes(scene_cache: Dictionary) -> void:
 	for key_variant in scene_cache.keys():
 		var key: String = str(key_variant)
@@ -777,6 +977,7 @@ func _instantiate_structural_record(
 		var room_ids: Array = record.get("room_ids", []) if typeof(record.get("room_ids", [])) == TYPE_ARRAY else []
 		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
 	wrapper.set_meta("integrity_state", "intact")
+	wrapper.set_meta("original_descriptor_id", str(wrapper.get_meta("module_key", "")))
 	return wrapper
 
 
@@ -819,14 +1020,31 @@ func _apply_module_damage_visuals_in_tree(node: Node, lookup: Dictionary) -> voi
 			placement_id = str(node.get_meta("structural_ceiling_placement_id"))
 		var row_v: Variant = lookup.get(module_key, lookup.get(placement_id, {}))
 		if row_v is Dictionary and not (row_v as Dictionary).is_empty():
-			var state: String = str((row_v as Dictionary).get("state", "intact"))
-			if state.is_empty():
-				state = "intact"
+			var row: Dictionary = row_v
+			var state: String = "intact"
+			var amount: float = float(row.get("amount", 0.0))
+			if amount > 0.0:
+				state = str(module_integrity_map.call("apply_damage", module_key, amount, str(row.get("kind", ""))))
+			var declared_state: String = str(row.get("state", "")).strip_edges()
+			if not declared_state.is_empty() and declared_state != state \
+					and bool(module_integrity_map.call("apply_authored_state", module_key, declared_state, str(row.get("kind", "")))):
+				state = declared_state
 			(node as Node3D).set_meta("integrity_state", state)
 			if state != "intact":
 				IntegrityVisualResolverScript.apply_visual_state(node as Node3D, state)
+				ModuleIntegrityConsequencesScript.apply_to_node(node as Node3D, state)
 	for child in node.get_children():
 		_apply_module_damage_visuals_in_tree(child, lookup)
+
+
+func _find_structural_wrapper(node: Node, module_id: String) -> Node3D:
+	if node is Node3D and str(node.get_meta("module_key", "")) == module_id:
+		return node as Node3D
+	for child in node.get_children():
+		var found: Node3D = _find_structural_wrapper(child, module_id)
+		if found != null:
+			return found
+	return null
 
 
 func _parse_prefixed_int(value: String, prefix: String) -> int:

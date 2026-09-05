@@ -1559,7 +1559,10 @@ func _configure_expanded_ship_system_models() -> void:
 	life_support_expanded_state.configure(tuning.get("life_support", {}))
 	fire_suppression_state = FireSuppressionStateScript.new()
 	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
-	module_integrity_map = ModuleIntegrityMapScript.new()
+	# The generated loader captures original structure and owns its integrity map.
+	# Bind that same object before runtime damage systems are configured.
+	if not _bind_module_integrity_owner_from_active_loader():
+		module_integrity_map = ModuleIntegrityMapScript.new()
 	extinguisher_state = ExtinguisherStateScript.new()
 	extinguisher_state.configure(tuning.get("extinguisher", {}))
 	propulsion_expanded_state = PropulsionExpandedStateScript.new()
@@ -3660,6 +3663,15 @@ func get_module_integrity_map_for_validation():
 
 
 ## PKG-B2.2b / D9: headless WorkAction driver seams.
+func inspect_structural_rebuild_target_for_validation(module_id: String) -> Dictionary:
+	if module_integrity_map == null or not module_integrity_map.has_method("inspect_rebuild_target"):
+		return {
+			"ok": false,
+			"reason": "missing_original_descriptor",
+			"module_id": module_id,
+		}
+	return module_integrity_map.call("inspect_rebuild_target", module_id)
+
 func get_work_action_driver_for_validation():
 	return work_action_driver
 
@@ -7231,7 +7243,9 @@ func _sync_current_ship_pillar_summaries() -> void:
 
 ## PKG-D6.1: restore per-ship integrity after attach/home return (empty = pristine).
 func _restore_module_integrity_for_current_ship() -> void:
-	module_integrity_map = ModuleIntegrityMapScript.new()
+	var bound_to_loader: bool = _bind_module_integrity_owner_from_active_loader()
+	if not bound_to_loader:
+		module_integrity_map = ModuleIntegrityMapScript.new()
 	if current_ship == null:
 		return
 	var layout: Dictionary = {}
@@ -7241,16 +7255,35 @@ func _restore_module_integrity_for_current_ship() -> void:
 		layout = loader.get_layout_copy()
 	var packed: Dictionary = current_ship.module_integrity_summary
 	var has_deltas: bool = typeof(packed) == TYPE_DICTIONARY and not packed.is_empty()
-	if not layout.is_empty():
+	if has_deltas and module_integrity_map.has_method("apply_summary"):
+		module_integrity_map.apply_summary(packed)
+	elif not bound_to_loader and not layout.is_empty():
 		# Revisit: register every compiled module, skip wreck restamp so
 		# persisted deltas win. First visit applies layout.module_damage.
 		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
 			module_integrity_map, layout, not has_deltas)
-	if has_deltas and module_integrity_map.has_method("apply_sparse_deltas"):
-		var deltas_v: Variant = packed.get("deltas", [])
-		if deltas_v is Array:
-			module_integrity_map.apply_sparse_deltas(deltas_v as Array)
 	_apply_module_integrity_state_to_scene()
+
+## Resolve the active GeneratedShipLoader and share its integrity map with every
+## coordinator damage/work/repair call. Away ships own their loader through
+## ShipInstance.scene_root; the home ship uses the coordinator loader field.
+func _bind_module_integrity_owner_from_active_loader() -> bool:
+	var active_loader: Node = null
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root.has_method("get_module_integrity_map"):
+		active_loader = current_ship.scene_root
+	elif is_instance_valid(loader) and loader.has_method("get_module_integrity_map"):
+		active_loader = loader
+	elif current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root.has_method("get_module_integrity_map"):
+		active_loader = current_ship.scene_root
+	if active_loader == null:
+		return false
+	var active_map: Variant = active_loader.call("get_module_integrity_map")
+	if active_map == null:
+		return false
+	module_integrity_map = active_map
+	return true
 
 
 ## PKG-B2.3 / D6.1: restore component placement or populate from layout slots.
@@ -7722,6 +7755,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
 		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
 		_build_lifeboat_at_home()
+	_bind_module_integrity_owner_from_active_loader()
 	_configure_threat_runtime_for_current_ship()
 	_build_interactables()
 	_build_slice_affordance_labels()
@@ -10684,27 +10718,28 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if utility_item_state != null and not snapshot.utility_summary.is_empty():
 		utility_item_state.apply_summary(snapshot.utility_summary)
 	# PKG-D6.1 / D2.6 / D8: restore pillar + ship-mod models after reload rebuild.
-	# apply_summary() clears then restores sparse deltas; seed compiled first so
-	# fire/decomp still find pristine walls in the same room.
+	# Apply the summary through the loader-owned map so an empty delta set resets
+	# authored modules to pristine. Then seed any legacy layout-only modules that
+	# do not have P16 descriptors so fire/decomp can still find them.
 	if module_integrity_map != null:
 		var snap_layout: Dictionary = {}
 		if current_ship != null and current_ship.built_layout is Dictionary:
 			snap_layout = current_ship.built_layout
 		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
 			snap_layout = loader.get_layout_copy()
-		if not snap_layout.is_empty():
-			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
-				module_integrity_map, snap_layout, false)
 		if not snapshot.module_integrity_summary.is_empty():
 			var packed: Dictionary = snapshot.module_integrity_summary
-			var deltas_v: Variant = packed.get("deltas", [])
-			if module_integrity_map.has_method("apply_sparse_deltas") and deltas_v is Array:
-				module_integrity_map.apply_sparse_deltas(deltas_v as Array)
-			else:
+			if module_integrity_map.has_method("apply_summary"):
 				module_integrity_map.apply_summary(packed)
+			if not snap_layout.is_empty():
+				ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+					module_integrity_map, snap_layout, false)
 			_apply_module_integrity_state_to_scene()
 			if current_ship != null:
 				current_ship.module_integrity_summary = packed.duplicate(true)
+		elif not snap_layout.is_empty() and module_integrity_map.size() == 0:
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+				module_integrity_map, snap_layout, false)
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
 		component_placement_state.apply_summary(snapshot.component_placement_summary)
 		if current_ship != null:
