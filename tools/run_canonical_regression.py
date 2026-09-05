@@ -9,8 +9,11 @@ import re
 import subprocess
 
 
-_COUNT_MARKER_RE = re.compile(
-    r"SYNAPTIC_SEA REGRESSION PASS commands=(?P<count>\d+) clean_output=true\b"
+_MARKER_TEXT_RE = re.compile(
+    r"SYNAPTIC_SEA REGRESSION PASS commands=(?P<count>\d+) clean_output=true"
+)
+_CANONICAL_MARKER_LINE_RE = re.compile(
+    r"^[ \t]*echo 'SYNAPTIC_SEA REGRESSION PASS commands=(?P<count>\d+) clean_output=true'$"
 )
 _EXECUTABLE_COUNT_MARKER_RE = re.compile(
     r"""^echo\s+(?P<quote>['"])(?P<marker>SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true)(?P=quote)$"""
@@ -66,9 +69,29 @@ def extract_bundle(document: str) -> str:
     if len(blocks) != 1:
         raise ValueError("expected exactly one bash regression block")
     script = blocks[0]
-    claimed = list(_COUNT_MARKER_RE.finditer(script))
-    if len(claimed) != 1:
-        raise ValueError("expected exactly one regression count marker")
+
+    marker_texts = list(_MARKER_TEXT_RE.finditer(script))
+    if len(marker_texts) != 1:
+        raise ValueError("expected exactly one canonical regression marker")
+
+    marker_line_index = -1
+    marker_line_match = None
+    for index, raw_line in enumerate(script.splitlines()):
+        match = _CANONICAL_MARKER_LINE_RE.fullmatch(raw_line)
+        if match is not None:
+            if marker_line_index != -1:
+                raise ValueError("expected exactly one canonical regression marker line")
+            marker_line_index = index
+            marker_line_match = match
+    if marker_line_match is None:
+        raise ValueError("expected exactly one canonical executable echo marker")
+    if marker_line_match.group("count") != marker_texts[0].group("count"):
+        raise ValueError("canonical regression marker text mismatch")
+
+    for raw_line in script.splitlines()[marker_line_index + 1 :]:
+        code = raw_line.strip()
+        if code and not code.startswith("#"):
+            raise ValueError("canonical regression marker must be the last executable line")
 
     executable_markers = 0
     control_depth = 0
@@ -89,8 +112,10 @@ def extract_bundle(document: str) -> str:
         raise ValueError("expected exactly one executable top-level echo count marker")
 
     actual = sum(line.lstrip().startswith("run_clean ") for line in script.splitlines())
-    if actual < 1 or actual != int(claimed[0].group("count")):
-        raise ValueError(f"regression count mismatch: registered={actual}, claimed={claimed[0].group('count')}")
+    if actual < 1 or actual != int(marker_texts[0].group("count")):
+        raise ValueError(
+            f"regression count mismatch: registered={actual}, claimed={marker_texts[0].group('count')}"
+        )
     return script if script.endswith("\n") else script + "\n"
 
 
