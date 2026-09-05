@@ -1539,6 +1539,8 @@ membership changes).
 | `refresh_seed_000017_fixture` | legacy-capture |
 | `ship_instance_breach_environment_smoke` | promotion-candidate |
 | `sim_vector3_smoke` | promotion-candidate |
+| `runtime_physical_volume_smoke` | standalone-feature-completion |
+| `structural_rebuild_collision_query_smoke` | standalone-feature-completion |
 | `structural_rebuild_policy_smoke` | standalone-feature-completion |
 | `top_down_harness_smoke` | promotion-candidate |
 | `top_down_readability_harness` | non-headless-harness |
