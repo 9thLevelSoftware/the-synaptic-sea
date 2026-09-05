@@ -11,11 +11,13 @@ signal uninstall_requested(slot_id: String, component_id: String, item_form: Str
 
 var _mod_state                    # ShipModificationState
 var _inventory: Dictionary = {}   # item_form -> qty (presentation bag for panel actions)
+var _catalog                       # ComponentCatalog for real-form selection
 var _open: bool = false
 var _selected: int = 0
 var _status: String = ""
-## Candidate empty slots the panel can install into (coordinator may set).
-var candidate_slots: PackedStringArray = PackedStringArray(["hub_slot_0", "hub_slot_1", "hub_slot_2"])
+## Deprecated compatibility surface.  P11 intentionally never reads it: rows are
+## supplied by selected-ship physical descriptors, never synthetic hub slots.
+var candidate_slots: PackedStringArray = PackedStringArray()
 
 var _title_label: Label
 var _list_label: Label
@@ -39,9 +41,12 @@ func _ready() -> void:
 	_render()
 
 
-func bind(mod_state, inventory: Dictionary = {}) -> void:
+func bind(mod_state, inventory: Dictionary = {}, catalog = null, physical_slots: Array = [], ship_id: String = "", placement_owner = null) -> void:
 	_mod_state = mod_state
 	_inventory = inventory.duplicate(true)
+	_catalog = catalog
+	if _mod_state != null and catalog != null and not physical_slots.is_empty() and _mod_state.has_method("bind_physical_slots"):
+		_mod_state.call("bind_physical_slots", ship_id, physical_slots, catalog, placement_owner)
 	_render()
 
 
@@ -123,6 +128,8 @@ func uninstall_selected() -> bool:
 		return false
 	if item_form.is_empty():
 		item_form = str(res.get("item_form", ""))
+	if component_id.is_empty():
+		component_id = str(res.get("component_id", ""))
 	_status = "uninstalled %s" % slot_id
 	uninstall_requested.emit(slot_id, component_id, item_form)
 	_render()
@@ -142,18 +149,15 @@ func install_into_selected(
 		return false
 	var slot_id: String = get_selected_slot_id()
 	var row: Dictionary = _row_for_slot(slot_id)
-	if bool(row.get("occupied", false)):
-		# Prefer first empty candidate.
-		slot_id = _first_empty_slot()
+	if bool(row.get("occupied", false)) or not _preflight_ok(slot_id, component_id, item_form):
+		slot_id = _first_compatible_empty_slot(component_id, item_form)
 	if slot_id.is_empty():
 		_status = "no empty slot"
 		_render()
 		return false
 	if not _mod_state.has_method("install"):
 		return false
-	var res: Dictionary = _mod_state.call(
-		"install", slot_id, component_id, item_form, _inventory, power_draw, mass, "hub", plating
-	)
+	var res: Dictionary = _mod_state.call("install", slot_id, component_id, item_form, _inventory)
 	if not bool(res.get("ok", false)):
 		_status = "install failed: %s" % str(res.get("reason", ""))
 		_render()
@@ -168,46 +172,30 @@ func install_into_selected(
 ## catalog: ComponentCatalog with get_component / components dict optional.
 func install_from_inventory(
 		catalog = null,
-		preferred_forms: PackedStringArray = PackedStringArray([
-			"console_unit", "reactor_console", "nav_console", "pump_assembly",
-			"conduit_segment", "plating_plate", "air_recycler_unit", "thruster_control", "sensor_rack",
-		])) -> bool:
+		_preferred_forms: PackedStringArray = PackedStringArray()) -> bool:
 	if _inventory.is_empty():
 		_status = "empty inventory"
 		_render()
 		return false
-	var form: String = ""
-	for f in preferred_forms:
-		if int(_inventory.get(str(f), 0)) > 0:
-			form = str(f)
-			break
-	if form.is_empty():
-		# Any stackable item as last resort
-		for k in _inventory.keys():
-			if int(_inventory[k]) > 0:
-				form = str(k)
-				break
-	if form.is_empty():
-		_status = "no installable item"
+	if catalog != null:
+		_catalog = catalog
+	if _catalog == null or not _catalog.has_method("catalogued_inventory_components"):
+		_status = "no catalogued component"
 		_render()
 		return false
-	var component_id: String = form
-	var power_draw: float = 5.0
-	var mass: float = 10.0
-	var plating: bool = form.find("plating") >= 0 or form.find("plate") >= 0
-	if catalog != null:
-		if catalog.has_method("component_id_for_item_form"):
-			var cid: String = str(catalog.call("component_id_for_item_form", form))
-			if not cid.is_empty():
-				component_id = cid
-		if catalog.has_method("get_component"):
-			var def: Dictionary = catalog.call("get_component", component_id)
-			if not def.is_empty():
-				power_draw = float(def.get("power_draw", power_draw))
-				mass = float(def.get("mass", mass))
-				if def.has("plating"):
-					plating = bool(def.get("plating", plating))
-	return install_into_selected(component_id, form, power_draw, mass, plating)
+	var candidates: Array = _catalog.call("catalogued_inventory_components", _inventory)
+	for candidate_v in candidates:
+		if not (candidate_v is Dictionary):
+			continue
+		var candidate: Dictionary = candidate_v as Dictionary
+		var component_id: String = str(candidate.get("component_id", ""))
+		var item_form: String = str(candidate.get("item_form", ""))
+		if _first_compatible_empty_slot(component_id, item_form).is_empty():
+			continue
+		return install_into_selected(component_id, item_form)
+	_status = "no compatible physical slot"
+	_render()
+	return false
 
 
 func get_status_lines() -> PackedStringArray:
@@ -258,24 +246,31 @@ func get_inventory_bag() -> Dictionary:
 
 func _slot_rows() -> Array:
 	var rows: Array = []
-	var seen: Dictionary = {}
-	if _mod_state != null:
-		var installed: Array = _mod_state.get("installed") as Array if typeof(_mod_state.get("installed")) == TYPE_ARRAY else []
-		for e in installed:
-			if typeof(e) != TYPE_DICTIONARY:
-				continue
-			var row: Dictionary = (e as Dictionary).duplicate(true)
-			row["occupied"] = true
-			var sid: String = str(row.get("slot_id", ""))
-			if sid.is_empty():
-				continue
-			seen[sid] = true
-			rows.append(row)
-	for sid in candidate_slots:
-		var s: String = str(sid)
-		if seen.has(s):
+	if _mod_state == null or not _mod_state.has_method("get_physical_slots"):
+		return rows
+	var installed_by_slot: Dictionary = {}
+	var installed: Array = _mod_state.get("installed") as Array if typeof(_mod_state.get("installed")) == TYPE_ARRAY else []
+	for installed_v in installed:
+		if typeof(installed_v) == TYPE_DICTIONARY:
+			var installed_row: Dictionary = installed_v as Dictionary
+			installed_by_slot[str(installed_row.get("slot_id", ""))] = installed_row
+	for descriptor_v in _mod_state.call("get_physical_slots"):
+		if typeof(descriptor_v) != TYPE_DICTIONARY:
 			continue
-		rows.append({"slot_id": s, "occupied": false})
+		var row: Dictionary = (descriptor_v as Dictionary).duplicate(true)
+		var slot_id: String = str(row.get("slot_id", ""))
+		if slot_id.is_empty():
+			continue
+		if installed_by_slot.has(slot_id):
+			var installed_row: Dictionary = (installed_by_slot[slot_id] as Dictionary).duplicate(true)
+			for key in row.keys():
+				if not installed_row.has(key):
+					installed_row[key] = row[key]
+			installed_row["occupied"] = true
+			rows.append(installed_row)
+		else:
+			row["occupied"] = bool(row.get("occupied", false))
+			rows.append(row)
 	return rows
 
 
@@ -294,6 +289,28 @@ func _first_empty_slot() -> String:
 		if not bool(row.get("occupied", true)):
 			return str(row.get("slot_id", ""))
 	return ""
+
+
+func _first_compatible_empty_slot(component_id: String, item_form: String) -> String:
+	for row_v in _slot_rows():
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v as Dictionary
+		var slot_id: String = str(row.get("slot_id", ""))
+		var preflight: Dictionary = _preflight_result(slot_id, component_id, item_form)
+		if not bool(row.get("occupied", false)) and (bool(preflight.get("ok", false)) or bool(preflight.get("physical_fit_ok", false))):
+			return slot_id
+	return ""
+
+
+func _preflight_ok(slot_id: String, component_id: String, item_form: String) -> bool:
+	return bool(_preflight_result(slot_id, component_id, item_form).get("ok", false))
+
+
+func _preflight_result(slot_id: String, component_id: String, item_form: String) -> Dictionary:
+	if _mod_state == null or not _mod_state.has_method("preflight_install"):
+		return {"ok": false, "reason": "missing_preflight"}
+	return _mod_state.call("preflight_install", slot_id, component_id, item_form, _inventory)
 
 
 func _render() -> void:

@@ -6,6 +6,8 @@ extends SceneTree
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
+const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
+const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 
 
 func _initialize() -> void:
@@ -28,8 +30,24 @@ func _initialize() -> void:
 	ModuleIntegrityConsequencesScript.apply_fire_damage(map1, layout, burning, roles, 1.0, full_rate)
 	var mod = ShipModificationStateScript.new()
 	mod.configure({"power_supply": 200.0})
-	var inv: Dictionary = {"hull_plate_kit": 1}
-	mod.install("p0", "hull_plating", "hull_plate_kit", inv, 0.0, 5.0, "hub", true)
+	var catalog = ComponentCatalogScript.new()
+	if not catalog.load_default():
+		_fail("catalog"); return
+	var placement_layout: Dictionary = {"rooms": [{
+		"id": "cargo",
+		"room_role": "cargo",
+		"wall_slots": [{"cell": [0, 0], "component_slot_profile_id": "wall_utility_mount_v1"}],
+		"center_slots": [],
+	}]}
+	var placement = ComponentPlacementStateScript.new()
+	placement.populate(placement_layout, catalog, 1)
+	placement.dismount("cargo_wall_0")
+	if not mod.bind_physical_slots("hub", placement.get_physical_slot_descriptors("hub"), catalog, placement):
+		_fail("bind"); return
+	var inv: Dictionary = {"plating_plate": 1}
+	var install: Dictionary = mod.install("cargo_wall_0", "hull_plating", "plating_plate", inv)
+	if not bool(install.get("ok", false)):
+		_fail("install"); return
 	var resist: float = mod.structure_damage_resist()
 	if resist < 0.09:
 		_fail("resist"); return

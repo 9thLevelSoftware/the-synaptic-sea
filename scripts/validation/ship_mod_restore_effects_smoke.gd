@@ -37,6 +37,8 @@ func _validate() -> void:
 	if not playable.open_ship_modification_panel_for_validation():
 		_fail("open"); return
 	var panel = playable.ship_modification_panel
+	if not _free_first_profile_slot("wall_console_mount_v1"):
+		_fail("no real console slot"); return
 	panel.set_inventory(playable._inventory_qty_dict_for_work())
 	if not panel.install_from_inventory(playable.component_catalog):
 		_fail("install"); return
@@ -51,6 +53,8 @@ func _validate() -> void:
 	st.level = 0
 	# Simulate load: apply_summary then reapply effects.
 	playable.ship_modification_state.apply_summary(sum)
+	if not playable._bind_ship_modification_panel_to_current_physical_slots(playable._inventory_qty_dict_for_work()):
+		_fail("restore bind"); return
 	playable._reapply_ship_mod_runtime_effects()
 	if float(sub.health) < 0.54:
 		_fail("system not restored got %s" % str(sub.health)); return
@@ -59,6 +63,20 @@ func _validate() -> void:
 		_fail("tier not restored got %d" % tier); return
 	print("SHIP MOD RESTORE EFFECTS PASS restore=true tier=true system=true")
 	quit(0)
+
+
+func _free_first_profile_slot(profile_id: String) -> bool:
+	var setup_returns: Dictionary = {}
+	for slot_v in playable.ship_modification_state.get_physical_slots():
+		if not (slot_v is Dictionary):
+			continue
+		var slot: Dictionary = slot_v as Dictionary
+		if str(slot.get("component_slot_profile_id", "")) != profile_id:
+			continue
+		if not bool(slot.get("occupied", false)):
+			return true
+		return bool(playable.ship_modification_state.uninstall(str(slot.get("slot_id", "")), setup_returns).get("ok", false))
+	return false
 
 
 func _find_playable(n: Node):

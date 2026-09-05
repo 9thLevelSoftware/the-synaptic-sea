@@ -8,6 +8,11 @@ class_name WallDoorResolver
 const StructuralEdgeCompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript: GDScript = preload("res://scripts/procgen/structural_plan_validator.gd")
 
+const WALL_CONSOLE_PROFILE: String = "wall_console_mount_v1"
+const WALL_UTILITY_PROFILE: String = "wall_utility_mount_v1"
+const DECK_MACHINERY_PROFILE: String = "deck_machinery_mount_v1"
+const DECK_CONSOLE_PROFILE: String = "deck_console_mount_v1"
+
 
 func resolve(cell_grid: Dictionary, room_plan: Array[Dictionary]) -> Dictionary:
 	var layout: Dictionary = _legacy_cell_grid_to_layout(cell_grid, room_plan)
@@ -112,6 +117,7 @@ func _adapt_validated_plan_to_legacy_geometry(plan: Dictionary, layout: Dictiona
 			"walls": [],
 			"portals": [],
 			"reserved": [],
+			"room_role": str(room.get("room_role", room.get("role", "default"))),
 		}
 		for cell_variant in (room.get("cells", []) as Array):
 			var cell_info: Dictionary = _legacy_cell(cell_variant)
@@ -156,13 +162,22 @@ func _adapt_validated_plan_to_legacy_geometry(plan: Dictionary, layout: Dictiona
 		var reserved_cells: Array = state["reserved"]
 		var wall_slot_cells: Array = []
 		var center_cells: Array = []
+		var room_role: String = str(state.get("room_role", "default"))
 		for cell_variant in (room_cells.get(room_id, []) as Array):
 			var has_wall: bool = _has_cell_record(wall_segments, cell_variant)
 			var has_portal: bool = _has_cell_record(portals, cell_variant, "from_cell")
 			if has_wall and not has_portal:
-				wall_slot_cells.append({"cell": cell_variant, "against_wall": true})
+				wall_slot_cells.append({
+					"cell": cell_variant,
+					"against_wall": true,
+					"component_slot_profile_id": component_slot_profile_for(room_role, "wall", wall_slot_cells.size()),
+				})
 			elif not has_wall and not has_portal:
-				center_cells.append(cell_variant)
+				center_cells.append({
+					"cell": cell_variant,
+					"against_wall": false,
+					"component_slot_profile_id": component_slot_profile_for(room_role, "center", center_cells.size()),
+				})
 		geometry[room_id] = {
 			"wall_segments": wall_segments,
 			"portals": portals,
@@ -173,6 +188,21 @@ func _adapt_validated_plan_to_legacy_geometry(plan: Dictionary, layout: Dictiona
 			},
 		}
 	return geometry
+
+
+## Generator-owned authoring rule. Every emitted component slot records the
+## chosen contract ID; placement never infers permission from wall/center alone.
+static func component_slot_profile_for(room_role: String, slot_kind: String, slot_index: int) -> String:
+	var role: String = room_role.to_lower()
+	if slot_kind == "center":
+		return DECK_CONSOLE_PROFILE if role in ["bridge", "cockpit"] else DECK_MACHINERY_PROFILE
+	if slot_kind != "wall":
+		return ""
+	if role in ["cargo", "storage", "airlock", "medical", "corridor", "hydroponics"]:
+		return WALL_UTILITY_PROFILE
+	if role in ["engineering", "reactor", "bridge", "cockpit"]:
+		return WALL_CONSOLE_PROFILE
+	return WALL_CONSOLE_PROFILE if slot_index % 2 == 0 else WALL_UTILITY_PROFILE
 
 
 func _legacy_wall(edge: Dictionary, room_id: String) -> Dictionary:

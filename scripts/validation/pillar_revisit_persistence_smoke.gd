@@ -34,7 +34,7 @@ func _initialize() -> void:
 		"rooms": [{
 			"id": "eng_1",
 			"room_role": "engineering",
-			"wall_slots": [{"against_wall": true, "cell": "(0,0)"}],
+			"wall_slots": [{"against_wall": true, "cell": "(0,0)", "component_slot_profile_id": "wall_console_mount_v1"}],
 			"center_slots": [],
 		}],
 	}, cat, 42)

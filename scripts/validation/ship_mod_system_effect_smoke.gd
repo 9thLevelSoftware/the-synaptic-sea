@@ -45,6 +45,8 @@ func _validate() -> void:
 	if not playable.open_ship_modification_panel_for_validation():
 		_fail("open"); return
 	var panel = playable.ship_modification_panel
+	if not _free_first_profile_slot("deck_machinery_mount_v1"):
+		_fail("no real machinery slot"); return
 	panel.set_inventory(playable._inventory_qty_dict_for_work())
 	if not panel.install_from_inventory(playable.component_catalog):
 		_fail("install status=%s" % "\n".join(panel.get_status_lines())); return
@@ -65,6 +67,20 @@ func _validate() -> void:
 		_fail("expected uninstall damage got %s" % str(sub.health)); return
 	print("SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true")
 	quit(0)
+
+
+func _free_first_profile_slot(profile_id: String) -> bool:
+	var setup_returns: Dictionary = {}
+	for slot_v in playable.ship_modification_state.get_physical_slots():
+		if not (slot_v is Dictionary):
+			continue
+		var slot: Dictionary = slot_v as Dictionary
+		if str(slot.get("component_slot_profile_id", "")) != profile_id:
+			continue
+		if not bool(slot.get("occupied", false)):
+			return true
+		return bool(playable.ship_modification_state.uninstall(str(slot.get("slot_id", "")), setup_returns).get("ok", false))
+	return false
 
 
 func _find_playable(n: Node):

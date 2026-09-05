@@ -13,6 +13,7 @@ const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_ge
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const WallDoorResolverScript := preload("res://scripts/procgen/wall_door_resolver.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
@@ -160,6 +161,9 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 		push_error("SHIP GENERATOR FAIL worldgen layout export was not a Dictionary")
 		return null
 	var layout: Dictionary = (layout_variant as Dictionary).duplicate(true)
+	if not stamp_native_component_slot_contracts(layout):
+		push_error("SHIP GENERATOR FAIL native layout has no component slot contracts")
+		return null
 
 	var gameplay_text: String = str(generator.export_gameplay_slice_json(seed_value, params))
 	if gameplay_text.is_empty():
@@ -211,6 +215,51 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 		return null
 	loader.name = "GeneratedShip"
 	return loader
+
+
+## Native worldgen already chooses the exact room cells used as wall/center
+## component slots. Stamp the generator-authored fit profile on those records so
+## downstream placement consumes an explicit decision rather than guessing from
+## broad slot_kind. Returns false when no physical component slots exist.
+static func stamp_native_component_slot_contracts(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if not (rooms_v is Array):
+		return false
+	var authored_count: int = 0
+	var rooms: Array = rooms_v as Array
+	for room_index in range(rooms.size()):
+		if not (rooms[room_index] is Dictionary):
+			continue
+		var room: Dictionary = (rooms[room_index] as Dictionary).duplicate(true)
+		var role: String = str(room.get("room_role", room.get("role", "default")))
+		var interior: Dictionary = {}
+		var interior_v: Variant = room.get("interior_zones", {})
+		if interior_v is Dictionary:
+			interior = (interior_v as Dictionary).duplicate(true)
+		for slot_key in ["wall_slots", "center_slots"]:
+			var raw_v: Variant = interior.get(slot_key, room.get(slot_key, []))
+			if not (raw_v is Array):
+				continue
+			var slot_kind: String = "wall" if slot_key == "wall_slots" else "center"
+			var contracted: Array = []
+			for slot_index in range((raw_v as Array).size()):
+				var raw_slot: Variant = (raw_v as Array)[slot_index]
+				var record: Dictionary = (raw_slot as Dictionary).duplicate(true) if raw_slot is Dictionary else {"cell": raw_slot}
+				if not record.has("cell"):
+					continue
+				var profile_id: String = WallDoorResolverScript.component_slot_profile_for(role, slot_kind, slot_index)
+				if profile_id.is_empty():
+					continue
+				record["against_wall"] = slot_kind == "wall"
+				record["component_slot_profile_id"] = profile_id
+				contracted.append(record)
+				authored_count += 1
+			interior[slot_key] = contracted
+			room[slot_key] = contracted.duplicate(true)
+		room["interior_zones"] = interior
+		rooms[room_index] = room
+	layout["rooms"] = rooms
+	return authored_count > 0
 
 
 func _load_worldgen_kit() -> Dictionary:

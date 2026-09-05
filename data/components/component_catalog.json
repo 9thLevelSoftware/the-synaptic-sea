@@ -3,13 +3,19 @@
   "components": {
     "console_generic": {
       "item_form": "console_unit",
+      "footprint_cells": [1, 1],
+      "socket_types": ["wall_mount", "deck_mount"],
+      "component_type": "console",
       "mass": 12.0,
       "power_draw": 4.0,
-      "slot": "wall",
+      "slot": "any",
       "condition_default": 1.0
     },
     "conduit_run": {
       "item_form": "conduit_segment",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "conduit",
       "mass": 6.0,
       "power_draw": 2.0,
       "slot": "wall",
@@ -17,6 +23,9 @@
     },
     "pump_assembly": {
       "item_form": "pump_assembly",
+      "footprint_cells": [1, 1],
+      "socket_type": "deck_mount",
+      "component_type": "machinery",
       "mass": 18.0,
       "power_draw": 8.0,
       "slot": "center",
@@ -24,6 +33,9 @@
     },
     "locker_wall": {
       "item_form": "wall_locker",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "storage",
       "mass": 8.0,
       "power_draw": 0.0,
       "slot": "wall",
@@ -31,6 +43,9 @@
     },
     "machinery_block": {
       "item_form": "machinery_block",
+      "footprint_cells": [1, 1],
+      "socket_type": "deck_mount",
+      "component_type": "machinery",
       "mass": 25.0,
       "power_draw": 12.0,
       "slot": "center",
@@ -40,6 +55,9 @@
     },
     "reactor_console": {
       "item_form": "reactor_console",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "console",
       "mass": 15.0,
       "power_draw": 6.0,
       "slot": "wall",
@@ -51,6 +69,9 @@
     },
     "air_recycler_unit": {
       "item_form": "air_recycler_unit",
+      "footprint_cells": [1, 1],
+      "socket_type": "deck_mount",
+      "component_type": "machinery",
       "mass": 22.0,
       "power_draw": 10.0,
       "slot": "center",
@@ -60,6 +81,9 @@
     },
     "nav_console": {
       "item_form": "nav_console",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "console",
       "mass": 14.0,
       "power_draw": 5.0,
       "slot": "wall",
@@ -69,6 +93,9 @@
     },
     "thruster_control": {
       "item_form": "thruster_control",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "console",
       "mass": 16.0,
       "power_draw": 7.0,
       "slot": "wall",
@@ -78,6 +105,9 @@
     },
     "sensor_rack": {
       "item_form": "sensor_rack",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "console",
       "mass": 11.0,
       "power_draw": 5.0,
       "slot": "wall",
@@ -87,12 +117,37 @@
     },
     "hull_plating": {
       "item_form": "plating_plate",
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "component_type": "armor",
       "mass": 8.0,
       "power_draw": 0.0,
       "slot": "wall",
       "condition_default": 1.0,
       "plating": true,
       "station_tier_bonus": 0
+    }
+  },
+  "slot_profiles": {
+    "wall_console_mount_v1": {
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "allowed_component_types": ["console", "conduit"]
+    },
+    "wall_utility_mount_v1": {
+      "footprint_cells": [1, 1],
+      "socket_type": "wall_mount",
+      "allowed_component_types": ["storage", "armor"]
+    },
+    "deck_machinery_mount_v1": {
+      "footprint_cells": [1, 1],
+      "socket_type": "deck_mount",
+      "allowed_component_types": ["machinery"]
+    },
+    "deck_console_mount_v1": {
+      "footprint_cells": [1, 1],
+      "socket_type": "deck_mount",
+      "allowed_component_types": ["console"]
     }
   },
   "role_sets": {

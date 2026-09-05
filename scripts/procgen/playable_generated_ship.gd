@@ -3957,7 +3957,10 @@ func open_ship_modification_panel_for_validation() -> bool:
 		else:
 			ship_modification_panel.visible = false
 		return false
-	ship_modification_panel.bind(ship_modification_state, _inventory_qty_dict_for_work())
+	# FC-13: a live panel receives only the current ship's generated/authored
+	# placement descriptors.  Do not revive legacy synthetic hub slots.
+	if not _bind_ship_modification_panel_to_current_physical_slots(_inventory_qty_dict_for_work()):
+		return false
 	if not ship_modification_panel.install_requested.is_connected(_on_ship_mod_install_requested):
 		ship_modification_panel.install_requested.connect(_on_ship_mod_install_requested)
 	if not ship_modification_panel.uninstall_requested.is_connected(_on_ship_mod_uninstall_requested):
@@ -3967,6 +3970,27 @@ func open_ship_modification_panel_for_validation() -> bool:
 	if not was_open and is_instance_valid(audio_manager):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_OPEN)
 	return ship_modification_panel.is_open()
+
+
+## Binds P11's pure state/panel to the active ship's actual placement owner.
+## P13 will generalize ownership across all ships; this intentionally has no
+## home-ship fallback and fails closed if the active layout lacks descriptors.
+func _bind_ship_modification_panel_to_current_physical_slots(inventory: Dictionary) -> bool:
+	if ship_modification_state == null or ship_modification_panel == null \
+		or component_placement_state == null or component_catalog == null or current_ship == null:
+		return false
+	if not component_placement_state.has_method("get_physical_slot_descriptors"):
+		return false
+	var ship_id: String = String(current_ship.ship_id)
+	if ship_id.is_empty():
+		return false
+	var descriptors: Array = component_placement_state.call("get_physical_slot_descriptors", ship_id)
+	if descriptors.is_empty():
+		return false
+	if not ship_modification_state.bind_physical_slots(ship_id, descriptors, component_catalog, component_placement_state):
+		return false
+	ship_modification_panel.bind(ship_modification_state, inventory, component_catalog, descriptors, ship_id, component_placement_state)
+	return true
 
 
 ## Open web chart panel (requires web_chart in inventory) and route UI SFX.
@@ -4004,6 +4028,8 @@ func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item
 			inventory_state.remove_item(item_form, 1)
 	if ship_modification_panel != null:
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	_rebuild_component_markers()
+	_sync_current_ship_component_placement()
 	_apply_ship_mod_system_link(component_id, true)
 	_refresh_station_tiers_from_ship_mod()
 	_apply_ship_mod_plating_repair(component_id)
@@ -4024,11 +4050,19 @@ func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "
 			if bag_q > live_q:
 				inventory_state.add_item(str(item_id), bag_q - live_q)
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	_rebuild_component_markers()
+	_sync_current_ship_component_placement()
 	_apply_ship_mod_system_link(component_id, false)
 	_refresh_station_tiers_from_ship_mod()
 	emit_training_event("ship_mod_uninstall", component_id)
 	if is_instance_valid(audio_manager):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL)
+
+
+func _sync_current_ship_component_placement() -> void:
+	if current_ship == null or component_placement_state == null or not component_placement_state.has_method("get_summary"):
+		return
+	current_ship.component_placement_summary = component_placement_state.get_summary().duplicate(true)
 
 
 ## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
@@ -7234,12 +7268,9 @@ func _sync_current_ship_pillar_summaries() -> void:
 		# treated as a first visit (which would restamp layout.module_damage).
 		current_ship.module_integrity_summary = module_integrity_map.get_summary().duplicate(true)
 	if component_placement_state != null and component_placement_state.has_method("get_summary"):
-		var cp: Dictionary = component_placement_state.get_summary()
-		var placed: Array = cp.get("placed", []) as Array if typeof(cp.get("placed", [])) == TYPE_ARRAY else []
-		if placed.is_empty():
-			current_ship.component_placement_summary = {}
-		else:
-			current_ship.component_placement_summary = cp.duplicate(true)
+		# An empty active placement list can still carry quarantined stale contents.
+		# Persist the whole dynamic summary so later recovery work can surface it.
+		current_ship.component_placement_summary = component_placement_state.get_summary().duplicate(true)
 
 ## PKG-D6.1: restore per-ship integrity after attach/home return (empty = pristine).
 func _restore_module_integrity_for_current_ship() -> void:
@@ -7293,8 +7324,17 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 		component_catalog.load_default()
 	component_placement_state = ComponentPlacementStateScript.new()
 	if current_ship != null and not current_ship.component_placement_summary.is_empty():
-		if component_placement_state.has_method("apply_summary"):
+		var current_layout: Dictionary = _active_layout_for_work()
+		if not current_layout.is_empty() and component_placement_state.has_method("restore_from_layout"):
+			component_placement_state.restore_from_layout(
+				current_layout,
+				component_catalog,
+				_component_placement_seed_for_current_ship(),
+				current_ship.component_placement_summary,
+				_slot_occupancy_from_loader())
+		else:
 			component_placement_state.apply_summary(current_ship.component_placement_summary)
+		_sync_current_ship_component_placement()
 		_rebuild_component_markers()
 		return
 	var layout: Dictionary = _active_layout_for_work()
@@ -10743,9 +10783,18 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
 				module_integrity_map, snap_layout, false)
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
-		component_placement_state.apply_summary(snapshot.component_placement_summary)
+		var component_layout: Dictionary = _active_layout_for_work()
+		if not component_layout.is_empty() and component_placement_state.has_method("restore_from_layout"):
+			component_placement_state.restore_from_layout(
+				component_layout,
+				component_catalog,
+				_component_placement_seed_for_current_ship(),
+				snapshot.component_placement_summary,
+				_slot_occupancy_from_loader())
+		else:
+			component_placement_state.apply_summary(snapshot.component_placement_summary)
 		if current_ship != null:
-			current_ship.component_placement_summary = snapshot.component_placement_summary.duplicate(true)
+			current_ship.component_placement_summary = component_placement_state.get_summary().duplicate(true)
 		_rebuild_component_markers()
 	if work_action_driver != null and not snapshot.work_action_summary.is_empty():
 		var wa_pack: Dictionary = snapshot.work_action_summary
@@ -10757,6 +10806,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 				_work_requires_hold = false  # restored mid-work continues without re-hold
 	if ship_modification_state != null and not snapshot.ship_modification_summary.is_empty():
 		ship_modification_state.apply_summary(snapshot.ship_modification_summary)
+		_bind_ship_modification_panel_to_current_physical_slots(_inventory_qty_dict_for_work())
 		# Re-apply mechanical effects of installed components after load.
 		_reapply_ship_mod_runtime_effects()
 	_ensure_consumable_hotbar_assignments()

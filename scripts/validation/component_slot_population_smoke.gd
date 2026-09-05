@@ -22,18 +22,18 @@ func _initialize() -> void:
 				"id": "eng_1",
 				"room_role": "engineering",
 				"wall_slots": [
-					{"against_wall": true, "cell": "(0, 0)"},
-					{"against_wall": true, "cell": "(0, 1)"},
+					{"against_wall": true, "cell": "(0, 0)", "component_slot_profile_id": "wall_console_mount_v1"},
+					{"against_wall": true, "cell": "(0, 1)", "component_slot_profile_id": "wall_console_mount_v1"},
 				],
 				"center_slots": [
-					{"against_wall": false, "cell": "(0, 0)"},
+					{"against_wall": false, "cell": "(0, 0)", "component_slot_profile_id": "deck_machinery_mount_v1"},
 				],
 			},
 			{
 				"id": "br_1",
 				"room_role": "bridge",
 				"wall_slots": [
-					{"against_wall": true, "cell": "(1, 0)"},
+					{"against_wall": true, "cell": "(1, 0)", "component_slot_profile_id": "wall_console_mount_v1"},
 				],
 				"center_slots": [],
 			},
@@ -41,7 +41,7 @@ func _initialize() -> void:
 				"id": "cor_1",
 				"room_role": "corridor",
 				"wall_slots": [
-					{"against_wall": true, "cell": "(2, 0)"},
+					{"against_wall": true, "cell": "(2, 0)", "component_slot_profile_id": "wall_utility_mount_v1"},
 				],
 				"center_slots": [],
 			},

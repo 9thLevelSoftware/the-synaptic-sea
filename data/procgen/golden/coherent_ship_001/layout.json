@@ -10,6 +10,25 @@
       "id": "airlock_01",
       "room_role": "airlock",
       "deck": 0,
+      "interior_zones": {
+        "reserved_cells": [
+          [
+            1,
+            0
+          ]
+        ],
+        "center_slots": [
+          {
+            "cell": [
+              0,
+              1
+            ],
+            "against_wall": false,
+            "component_slot_profile_id": "deck_machinery_mount_v1"
+          }
+        ],
+        "wall_slots": []
+      },
       "structural_placements": [
         {
           "name": "floor_cell_x0_z0",
@@ -149,6 +168,37 @@
       "id": "spine_01",
       "room_role": "main_spine",
       "deck": 1,
+      "interior_zones": {
+        "reserved_cells": [
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            8,
+            0
+          ]
+        ],
+        "center_slots": [],
+        "wall_slots": [
+          {
+            "cell": [
+              6,
+              0
+            ],
+            "against_wall": true,
+            "component_slot_profile_id": "wall_console_mount_v1"
+          }
+        ]
+      },
       "structural_placements": [
         {
           "name": "floor_cell_d1_x4_z0",
@@ -227,6 +277,33 @@
       "id": "cargo_01",
       "room_role": "cargo",
       "deck": 1,
+      "interior_zones": {
+        "reserved_cells": [
+          [
+            5,
+            -1
+          ],
+          [
+            6,
+            -1
+          ],
+          [
+            6,
+            -2
+          ]
+        ],
+        "center_slots": [],
+        "wall_slots": [
+          {
+            "cell": [
+              5,
+              -2
+            ],
+            "against_wall": true,
+            "component_slot_profile_id": "wall_utility_mount_v1"
+          }
+        ]
+      },
       "structural_placements": [
         {
           "name": "floor_cell_d1_x5_z-1",
@@ -396,6 +473,33 @@
       "id": "reactor_01",
       "room_role": "reactor",
       "deck": 1,
+      "interior_zones": {
+        "reserved_cells": [
+          [
+            9,
+            0
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "center_slots": [],
+        "wall_slots": [
+          {
+            "cell": [
+              10,
+              0
+            ],
+            "against_wall": true,
+            "component_slot_profile_id": "wall_console_mount_v1"
+          }
+        ]
+      },
       "structural_placements": [
         {
           "name": "floor_cell_d1_x9_z0",

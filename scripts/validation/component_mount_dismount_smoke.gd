@@ -26,11 +26,11 @@ func _initialize() -> void:
 				"id": "eng_1",
 				"room_role": "engineering",
 				"wall_slots": [
-					{"against_wall": true, "cell": "(0, 0)"},
-					{"against_wall": true, "cell": "(0, 1)"},
+					{"against_wall": true, "cell": "(0, 0)", "component_slot_profile_id": "wall_console_mount_v1"},
+					{"against_wall": true, "cell": "(0, 1)", "component_slot_profile_id": "wall_console_mount_v1"},
 				],
 				"center_slots": [
-					{"against_wall": false, "cell": "(0, 0)"},
+					{"against_wall": false, "cell": "(0, 0)", "component_slot_profile_id": "deck_machinery_mount_v1"},
 				],
 			},
 		]

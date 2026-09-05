@@ -37,20 +37,26 @@ func _validate() -> void:
 	if not playable.open_ship_modification_panel_for_validation():
 		_fail("open"); return
 	var panel = playable.ship_modification_panel
-	# Expand candidate slots so we can fill budget.
-	panel.candidate_slots = PackedStringArray()
-	for i in range(20):
-		panel.candidate_slots.append("hub_slot_%d" % i)
-	# Heavy power components: machinery_block draws 12
-	playable.inventory_state.add_item("machinery_block", 20)
+	var setup_returns: Dictionary = {}
+	var freed: int = 0
+	for slot_v in playable.ship_modification_state.get_physical_slots():
+		if not (slot_v is Dictionary):
+			continue
+		var slot: Dictionary = slot_v as Dictionary
+		if str(slot.get("component_slot_profile_id", "")) != "wall_console_mount_v1" \
+				or not bool(slot.get("occupied", false)):
+			continue
+		if bool(playable.ship_modification_state.uninstall(str(slot.get("slot_id", "")), setup_returns).get("ok", false)):
+			freed += 1
+	if freed < 2:
+		_fail("need two real console slots"); return
+	playable.ship_modification_state.power_supply = playable.ship_modification_state.power_demand_baseline + 6.5
+	playable.inventory_state.add_item("reactor_console", 2)
 	var installed: int = 0
 	var rejected: bool = false
-	for _i in range(20):
+	for _i in range(2):
 		panel.set_inventory(playable._inventory_qty_dict_for_work())
-		var ok: bool = panel.install_from_inventory(
-			playable.component_catalog,
-			PackedStringArray(["machinery_block"])
-		)
+		var ok: bool = panel.install_from_inventory(playable.component_catalog)
 		if ok:
 			installed += 1
 		else:
@@ -65,7 +71,7 @@ func _validate() -> void:
 			str(playable.ship_modification_state.power_supply),
 		]); return
 	# Rejected install should leave inventory stack for the blocked item.
-	if playable.inventory_state.get_quantity("machinery_block") < 1:
+	if playable.inventory_state.get_quantity("reactor_console") < 1:
 		_fail("inventory should retain item on reject"); return
 	if playable != null and not bool(playable.away_from_start):
 		_fail("away cleared"); return
