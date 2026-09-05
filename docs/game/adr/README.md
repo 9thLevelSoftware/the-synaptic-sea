@@ -45,6 +45,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0062 | docs/game/adr/0062-ship-owned-pending-output-receipts.md | Accepted P08 contract: ship-owned immutable pending receipts supersede only ADR-0059's pending-output placeholder; focused validation pending |
 | 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
 | 0064 | docs/game/adr/0064-versioned-current-topology-parity-fixture.md | Accepted contract: version current topology parity as a reviewed fixture; candidate validation and implementation pending |
+| 0065 | docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md | Accepted for implementation, validation pending: exact same-module replacement, live safety/egress preflight, and mandatory APPLYING/finalize atomic scene boundary |
 
 ## Notes
 

@@ -298,6 +298,12 @@ The focused `procgen_layout_stress_smoke.gd` may replace its stale filled-rectan
 assumption with ADR-0053's actual contract: non-empty unique integer cells, exact
 bounding box and 4-connected topology, while retaining floor, portal and room-
 ownership checks.
+The reviewed P00 current-objective fixture migration also permits
+`scripts/validation/procgen_playable_ship_smoke.gd` only: update the stale
+`149ed476` fixture to the current one-objective identity bridge
+`bridge_07:reach_goal`, and align the documented runtime-demo marker count from 4/4 to
+1/1. This is fixture/assertion maintenance only and changes no production
+generation or objective behavior.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
@@ -615,9 +621,13 @@ returns zero transferred and retains every lot.
 and economy-cycle addendum; new
 `tools/check_crafting_economy.py`, `tests/test_crafting_economy.py`;
 `crafting_station.gd`, `recipe_picker_panel.gd`, coordinator input seams;
-new `fc_p09_smoke.gd`. **Non-goals:** expanding recipe count as a success metric.
+new `fc_p09_smoke.gd`; `fc_p05_smoke.gd` tool-consumer regression only.
+`fc_p12_smoke.gd` is allowed only for the P09-compatible max-stack-one
+`console_unit` reentrant setup; it must preserve the P12 exact refund and
+duplicate-completion assertions.
+**Non-goals:** expanding recipe count as a success metric.
 
-- [ ] Build a graph of all 60 recipes, deconstruction outputs, repair BOMs, learning
+- [ ] Build a graph of all authored recipes, deconstruction outputs, repair BOMs, learning
   items and component forms. Identify missing IDs, unreachable prerequisites,
   self-dependencies and profitable zero-cost conversion cycles.
 - [ ] Reconcile `plating` versus `plating_plate` by an authored conversion/use rule;
@@ -635,17 +645,33 @@ advanced recipes require attainable knowledge/tier upgrades, not circular prereq
 ### P10 — Migrate and persist crafting at transaction boundaries
 
 **Depends:** P03-P09. **Requirements:** FC-12.
-**Allowed files:** `scripts/systems/{run_snapshot,world_snapshot,save_migration_service,
-save_load_service,pillar_persistence,ship_instance}.gd`; coordinator capture/restore;
-new `fc_p10_smoke.gd` and migration fixtures under `tests/fixtures/feature_completion/`.
+**Scoped status (ADR-0059 decisions 17-22):** architecture accepted and bounded
+implementation underway. Acceptance evidence, the strict P10 runner, independent
+review, G1 profile, canonical regression and player gates remain pending.
+**Allowed files:** ADR-0059 and the P10 implementation brief;
+`scripts/systems/{run_snapshot,world_snapshot,save_migration_service,
+save_load_service,crafting_state,craft_job_state,craft_job_scheduler,station_state,
+field_crafting_state,recipe_knowledge_state,component_placement_state,
+ship_instance,ship_runtime,pillar_persistence}.gd`; coordinator capture, detached prepare/commit,
+owner binding and tick/collection enablement seams only; new `fc_p10_smoke.gd` and
+the nine approved `p10_*.json` migration fixtures under
+`tests/fixtures/feature_completion/`.
 **Non-goals:** changing save filenames or wiping historical data.
 
-- [ ] Add fixtures for current saves and representative older supported schemas,
+- [ ] Add real-disk fixtures for current saves and representative older supported schemas,
   plus future-version rejection. Allocate new schema IDs through accepted ADR-0059.
 - [ ] Persist lots, knowledge, station IDs, jobs, escrow, progress, pending output and
   receipt IDs together. Restore owners before tick or player collection is enabled.
 - [ ] Convert the old single active craft without recharging paid inputs; migrate
   queued legacy IDs into blocked/unreserved entries requiring valid admission.
+- [ ] Require modern v5 transaction and knowledge payloads, including explicit
+  schema-valid empty states. Reject absent or malformed modern fields before live
+  apply; preserve the original save bytes/path and do not write a migrated sidecar.
+- [ ] Carry P13 `home_access_v1` unchanged through world v5. Validate the entire
+  home/visited-ship candidate detached before one live owner changes.
+- [ ] Preserve current `component_placement_v2` in pillar persistence; migrate only
+  recognized v1 payloads and reject malformed present payloads when strict apply
+  fails.
 - [ ] Save before/after enqueue, start, completion and partial collection; reload
   twice and compare quantity, quality, progress and receipts exactly.
 - [ ] Run P10, `save_migration_service_smoke.gd`, `save_migration_world_smoke.gd`,
@@ -753,11 +779,14 @@ noise completion and XP once. A changed target revision returns `stale_target`.
 created physical station owner;
 `ship_access_state.gd`; `ship_modification_panel.gd` only storing/exposing its bound
 ship ID and binding generation and emitting them with install/uninstall requests; coordinator
-ownership/binding/attach/detach seams;
+ownership/binding/attach/detach seams; `world_snapshot.gd` only additive strict-present
+`home_access_v1` serialization for the home owner's exact access summary;
 new `fc_p13_smoke.gd`; timed physical-slot fixture migration in
 `ship_mod_inventory_sync_away_smoke.gd` and both home/away
 `ship_mod_system_effect` smokes; bound-ship and generation callback assertions in
-`ship_modification_panel_smoke.gd`. **Non-goals:** multiplayer authority or unrelated
+`ship_modification_panel_smoke.gd`; `component_remount_sfx_live_away_smoke.gd`
+only for actual boarded/selected/claimed away-owner setup and a fail-once/timeout
+guard. **Non-goals:** multiplayer authority or unrelated
 extraction.
 
 Known physically reachable unclaimed ships may be selected without ownership;
@@ -775,10 +804,15 @@ revalidate owner and target before rebinding to the current generation.
   owners; inject that context into UI and work. Reject missing/foreign targets.
 - [ ] Refresh bindings on docking, boarding, pilot switching and load; a stale
   panel/action cannot mutate a previous ship after the player changes location.
+- [ ] Round-trip a modern foreign home owner through the real world JSON path;
+  reject malformed-present access atomically and claim locally only when the
+  recognized legacy world payload omits the field.
 - [ ] Tick owned station jobs through ShipRuntime; physical work remains attended.
   Test away catch-up without applying the home ship's power state.
 - [ ] Run P13, `component_mount_interact_away_smoke.gd`,
-  `ship_mod_inventory_sync_away_smoke.gd`, `pillar_revisit_persistence_smoke.gd`.
+  `ship_mod_inventory_sync_away_smoke.gd`,
+  `component_remount_sfx_live_away_smoke.gd`,
+  `pillar_revisit_persistence_smoke.gd`.
 
 **Assertion:** only the target ship's snapshot changes. Equal local slot IDs on
 two ships never collide because identity includes ship ID.
@@ -852,44 +886,74 @@ new `fc_p16_smoke.gd`. **Non-goals:** reconstruction or altered room generation.
 **Assertion:** descriptor identity is identical before destruction and after
 regeneration from the same seed/version; destruction does not erase repairability data.
 
-### P17 — Define paid structural replacement and safety preflight
+### P17 — Define paid structural replacement and live safety preflight
 
-**Depends:** P12-P13, P16. **Requirements:** FC-18..19.
+**Depends:** P09, P12-P13, P16. **Requirements:** FC-18..19.
 **Allowed files:** `structural_rebuild_state.gd`, `ship_work_transaction.gd`,
-`work_action_catalog.gd`, `work_action_resolver.gd`; new rebuild catalog and
-`tools/check_structural_rebuild_catalog.py`, `tests/test_structural_rebuild_catalog.py`;
-work-action definitions; new `fc_p17_smoke.gd`.
-**Non-goals:** placing modules outside the original footprint.
+`work_action_catalog.gd`, `work_action_resolver.gd`; new
+`structural_rebuild_preflight.gd`; narrow kit/contract/registered-endpoint seams
+in `generated_ship_loader.gd`, `modular_socket_catalog.gd`, `dock_ports.gd`,
+`docking_manager.gd`, `ship_instance.gd`, `ship_nav_graph.gd`, and the playable
+coordinator; new rebuild catalog, catalog checker/tests, work-action definitions,
+and compatible-action metadata in `data/tools/tool_definitions.json` plus only
+the `welder.compatible_work_action_ids` `rebuild_structure` entry in
+`data/items/item_definitions.json`; new `fc_p17_smoke.gd` and exact kit/contract
+assertions in `fc_p16_smoke.gd`.
+**Non-goals:** geometry/nav/air mutation, component displacement, replacement
+outside the original transform/footprint, arbitrary rotation/substitution,
+auto-undocking, and persistence.
 
-- [ ] Define compatible replacement BOMs for each restorable structural kind,
-  including floor/wall/door/ramp distinctions; validate every referenced item/wrapper.
-- [ ] Implement replacement eligibility for destroyed targets, compatible sockets,
-  tools/skill, quantity, actor/cargo occupancy, docking ports and required egress.
-- [ ] Reserve exact materials through existing work transactions; reject unsafe or
-  stale completions without consumption. Keep unsupported kinds visibly blocked.
-- [ ] Add interrupted/double-complete/occupied-after-start/shared-boundary cases.
-- [ ] Run P17 and catalog Python tests; every active restorable module kind must
-  have a valid acquisition route and tested safety policy before G3.
+- [ ] Add exact layout-kit, structural-kit, and structural-contract identity to
+  every original descriptor/fingerprint. The active source matrix is biomatter
+  authored hive template plus hazard/industrial/lifeboat v0 resolution; ithappy
+  is supported catalog data, not active. This observation does not prove
+  production reachability.
+- [ ] Author explicit same-original-module rows for all 15 active IDs across every
+  active layout/contract tuple. The catalog is the sole BOM/tool/skill/duration
+  authority; each row configures a new `rebuild_structure` action using the
+  existing WorkAction model and contains no fallback. P09's structured result is consumed, not replaced by a
+  second solver; P09 review remains an acceptance blocker.
+- [ ] Implement pure eligibility and a scene-owned, read-only candidate preflight
+  for actual actor, parked/grabbed cart, mounted component, physical cargo,
+  registered dock identity, and candidate-result egress. Revalidate on timed
+  completion; stale/occupied work changes nothing and has no net spend.
+- [ ] Reserve exact lots only through P12. Keep scene application blocked until
+  P18 consumes the immutable plan. Test shared edge/both rooms, interruption,
+  duplicate completion, active docking, missing contract, recovery availability,
+  and accessible starter/wreck acquisition through the live path.
+- [ ] Run P17/catalog/P09/P12/P13/P16 plus docking/cart/component/socket/nav/loader
+  regressions. Synthetic safety dictionaries do not satisfy FC-19 acceptance.
 
 **Assertion:** ordinary `repair()` still leaves a destroyed wall destroyed;
-`evaluate_replace` allows its compatible paid replacement and rejects wrong footprint.
+`evaluate_replace` allows only its exact paid same-module candidate when the
+current ship, geometry, docking, and candidate egress checks pass.
 
 ### P18 — Restore actual geometry, navigation and atmosphere
 
 **Depends:** P17. **Requirements:** FC-20.
-**Allowed files:** new `structural_rebuild_applier.gd`; `generated_ship_loader.gd`,
+**Allowed files:** new `structural_rebuild_applier.gd`; `ship_work_transaction.gd`, `generated_ship_loader.gd`,
 `slice_atmosphere_applier.gd`; `module_integrity_consequences.gd`, `ship_nav_graph.gd`,
 `structural_rebuild_state.gd`; coordinator scene-commit seams; new `fc_p18_smoke.gd`.
 **Non-goals:** visual-only replacement or rewriting native generation.
 
-- [ ] Start from a destroyed real wrapper, record player/threat traversal and oxygen
-  behavior, then stage a replacement without exposing half-committed state.
-- [ ] Validate resource load and occupancy; instantiate/reactivate at ship-local
-  transform and correct parent. Commit transaction only after reversible staging.
-- [ ] Apply collision, navigation, atmosphere, integrity and component-slot changes
-  together. On failure, remove stage and preserve the destroyed state/escrow.
+- [ ] Use the proposed coordinator-owned `begin_stage`, `poll_stage`,
+  `discard_stage`, `begin_apply`, `finalize_success`, and `finalize_rollback`
+  lifecycle. It is a contract proposal, not an implementation claim.
+- [ ] A ready P17 token enters APPLYING with retained escrow and no receipt. Before
+  mutation, barrier the affected/docked ships' movement, WorkActions, actor/cart
+  simulation, and save capture while physics syncs; revalidate current context.
+- [ ] Journal and atomically apply wrapper, integrity/rebuild state, one shared
+  edge/both rooms, exact-lot component recovery, current portal state, collision,
+  nav, structural air/enclosure, and markers. Preserve portal state and do not
+  seal unrelated breaches/objectives or grant unlocks.
+- [ ] Poll collision/navigation-server/air readiness before exactly one success
+  finalization and P12 receipt. On any failure, restore and verify old coherence,
+  return READY with retained escrow, then release the barrier. Reject duplicate or
+  re-entrant finalize/cancel/restore/disposal and retain rollback assets through
+  finalization.
 - [ ] Test rotated/moved/docked ships, shared walls, floor/ramp support, doorway state,
-  trapped actors and resource-load failure. No first post-load tick may see stale air.
+  trapped actors and resource/nav/air failures. No post-commit/load tick may see
+  mixed air/nav/collision state.
 - [ ] Run P18, `module_integrity_consequences_smoke.gd`, `ship_nav_graph_smoke.gd`,
   `slice_atmosphere_smoke.gd`, `physical_travel_smoke.gd`.
 
@@ -906,6 +970,12 @@ coordinator capture/restore/revisit; new `fc_p19_smoke.gd` and historical fixtur
 
 - [ ] Persist replacement descriptors independently from integrity deltas, plus
   work escrow/receipts and condition-bearing component placement.
+- [ ] Never serialize an APPLYING state or P18 token/Node/RID. Save waits or returns
+  busy; recovery restores the last committed snapshot's inventory/escrow ownership
+  without inferring completion, double-charging, or duplicating output.
+  Legacy identity reconstruction requires verified baseline equality of stable
+  module ID, wrapper, transform, footprint, sockets, and layout/contract identity;
+  any mismatch rejects restore without guessing or overwriting the save.
 - [ ] Restore in order: generated originals -> replacements -> integrity -> components
   -> systems/ship effects -> derived navigation/atmosphere -> active simulation.
 - [ ] Handle stale IDs/version mismatch as an explicit load/recovery failure that

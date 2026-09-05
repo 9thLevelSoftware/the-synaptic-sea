@@ -120,7 +120,13 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     summary. UI bindings carry a nonserialized generation token so a stale panel
     callback cannot target an earlier ship binding. P19 may recover persisted paid
     work only after explicit owner/target revalidation and rebinding to the current
-    generation.
+    generation. The additive world-4 `home_access_v1` field carries the home
+    `ShipAccessState` summary because `RunSnapshot` has no home-access authority.
+    When present it is validated strictly and restored before the home load callback;
+    absence alone identifies the recognized legacy bootstrap that may claim locally.
+    A modern foreign owner is preserved through disk JSON and is never inferred from
+    or replaced by the process-local pre-load home handle. P10 carries this field
+    semantically unchanged through world-5 detached validation.
 
 16. Recipe-economy closure uses authored identities and quantity balance. Similar
     IDs are never implicit aliases. A crafted tool may satisfy timed work only
@@ -137,6 +143,72 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     remain valid and visible. Production systems such as hydroponics and water
     recycling count only when their actual input, system, power, seed and station
     prerequisites are reachable.
+
+### P10 migration addendum accepted for implementation
+
+The coordinator accepted the following source-backed P10 decisions on 2026-09-05.
+They authorize the bounded P10 implementation, preserve the payload names above,
+and preserve the P19 recovery boundary. Acceptance evidence remains pending.
+
+17. Implement the reserved versions as one ordered forward step:
+    `gate2-current-run-4` to `gate2-current-run-5`, and `world-4` to `world-5`.
+    World migration must migrate and validate its embedded home run through the
+    run chain before producing `world-5`; it may not relabel an unvalidated inner
+    snapshot. Missing fields in an older recognized version use that migration
+    step's documented defaults. A present malformed current field, an unknown
+    version, or a future version is rejected before live state changes. Rejection
+    leaves the original save bytes and path unchanged and writes no migrated
+    sidecar. A migrated sidecar may be written only after the complete detached
+    v5 snapshot has passed outer and nested validation.
+18. `gate2-current-run-5` adds the current player's exact
+    `recipe_knowledge_v1` summary and makes the crafting, field-crafting and
+    component-placement summaries strict when present. `recipe_knowledge_v1`
+    carries `owner_id`, `known_recipe_ids`, `event_receipt_ids`,
+    `event_sequence`, and `dismantle_counts`. A recognized older run that has no
+    knowledge payload seeds only recipes authored as starter knowledge and records
+    `migration_origin: "legacy_unrecorded"`; it cannot infer book, codex,
+    reverse-engineering progress, or event receipts that the old save never held.
+19. Historical single-active crafting is converted as paid history because the
+    old implementation consumed recipe quantities before serializing
+    `active_craft`. The converted job carries `legacy_consumed_history_v1` with
+    its source version, historical quality decision, required ingredient item IDs
+    and quantities, and `lot_metadata_reconstructable: false`. Deterministic
+    history-only lot IDs use neutral migration provenance and the documented
+    default quality/condition; they are never returned to inventory, counted as
+    escrow, or exposed as newly acquired lots. The job preserves its historical
+    progress, required time, quality score/tier/multiplier, and paid status and
+    completes without another inventory charge. Legacy station queue IDs were not
+    paid; each becomes an ordered `blocked_unreserved` job with no escrow, no
+    reserved mass and no refund value. Only current admission may reserve its exact
+    lots and make it runnable. This P10 conversion is not P19's player-facing paid
+    work recovery policy.
+20. Migration must not guess a current physical station from a historical station
+    kind. A converted paid active job receives a deterministic migration-only
+    station identity under its ship owner, retains the historical station kind,
+    and may finish through the bounded legacy executor. That identity cannot admit
+    new work. Current v5 jobs retain their authored stable physical station IDs and
+    must agree with their restored current station projection. Conflicting active
+    craft/station records, duplicate owners or job IDs, and invalid current owner
+    projections reject the snapshot rather than selecting a home or same-kind
+    station implicitly.
+21. Restore is a detached prepare/commit transaction. Validate run/world envelopes,
+    inventories and exact lots, job/station projections, pending-output stores,
+    field receipt pins, recipe knowledge, equipment and component placement for
+    every ship before mutating a live owner or enabling tick/collection. A field
+    receipt already pinned to a destination ship remains there across reload; an
+    unpublished completed field job has no destination until the current attached
+    occupancy supplies one. A present `source_lot` in component placement must be
+    a strict valid lot for the installed item or the enclosing restore fails
+    atomically. Only absence in a recognized legacy record means unknown source
+    identity; a malformed present value is never normalized away.
+22. P10 acceptance uses checked-in historical and current JSON fixtures read and
+    written through `SaveLoadService`, not dictionary-only model probes. It covers
+    the old paid active/unpaid queue distinction, recipe knowledge receipts,
+    current station and field pin identity, partial pending collection, nested
+    world restore, double reload, malformed-present rejection, and unknown/future
+    version rejection. Rejection checks the original file byte for byte and proves
+    no live owner changed. Runtime work remains limited to the files approved on
+    the P10 card; P09 presentation and P13 selection/binding changes are excluded.
 
 ## Locked transaction payloads
 

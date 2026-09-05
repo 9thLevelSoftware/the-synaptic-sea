@@ -144,6 +144,11 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/procgen_playable_ship_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
           "source_exists": true,
           "scope_state": "present"
@@ -452,7 +457,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P01",
-        "line": 323
+        "line": 329
       }
     },
     {
@@ -557,7 +562,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P02",
-        "line": 351
+        "line": 357
       }
     },
     {
@@ -760,7 +765,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P03",
-        "line": 376
+        "line": 382
       }
     },
     {
@@ -1008,7 +1013,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P04",
-        "line": 417
+        "line": 423
       }
     },
     {
@@ -1156,7 +1161,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P05",
-        "line": 452
+        "line": 458
       }
     },
     {
@@ -1269,7 +1274,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P06",
-        "line": 495
+        "line": 501
       }
     },
     {
@@ -1397,7 +1402,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P07",
-        "line": 524
+        "line": 530
       }
     },
     {
@@ -1541,7 +1546,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P08",
-        "line": 561
+        "line": 567
       }
     },
     {
@@ -1621,6 +1626,16 @@
           "path": "scripts/validation/fc_p09_smoke.gd",
           "source_exists": false,
           "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/fc_p05_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p12_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],
@@ -1682,7 +1697,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P09",
-        "line": 610
+        "line": 616
       }
     },
     {
@@ -1700,6 +1715,16 @@
         "P09"
       ],
       "allowlist": [
+        {
+          "path": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-implementation-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
         {
           "path": "scripts/systems/run_snapshot.gd",
           "source_exists": true,
@@ -1721,12 +1746,52 @@
           "scope_state": "present"
         },
         {
-          "path": "scripts/systems/pillar_persistence.gd",
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_scheduler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/station_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/field_crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/recipe_knowledge_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_placement_state.gd",
           "source_exists": true,
           "scope_state": "present"
         },
         {
           "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_runtime.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/pillar_persistence.gd",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -1823,7 +1888,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P10",
-        "line": 635
+        "line": 645
       }
     },
     {
@@ -2059,7 +2124,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 657
+        "line": 683
       }
     },
     {
@@ -2295,7 +2360,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 704
+        "line": 730
       }
     },
     {
@@ -2334,6 +2399,11 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/ui/ship_modification_panel.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -2365,6 +2435,11 @@
         },
         {
           "path": "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_remount_sfx_live_away_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
         }
@@ -2415,6 +2490,20 @@
           }
         },
         {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/component_remount_sfx_live_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
           "command": "& $Godot --headless --path . --script res://scripts/validation/pillar_revisit_persistence_smoke.gd",
           "success": {
             "exit_code": 0,
@@ -2432,7 +2521,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 748
+        "line": 774
       }
     },
     {
@@ -2550,7 +2639,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 786
+        "line": 820
       }
     },
     {
@@ -2669,7 +2758,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 808
+        "line": 842
       }
     },
     {
@@ -2762,7 +2851,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 830
+        "line": 864
       }
     },
     {
@@ -2772,6 +2861,7 @@
         "FC-19"
       ],
       "depends_on": [
+        "P09",
         "P12",
         "P13",
         "P16"
@@ -2798,9 +2888,59 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/procgen/structural_rebuild_preflight.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/procgen/generated_ship_loader.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/modular_socket_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/dock_ports.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/docking_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_nav_graph.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "data/construction/structural_rebuild_catalog.json",
           "source_exists": false,
           "scope_state": "planned_missing"
+        },
+        {
+          "path": "data/tools/tool_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/item_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tools/check_structural_rebuild_catalog.py",
@@ -2821,6 +2961,11 @@
           "path": "scripts/validation/fc_p17_smoke.gd",
           "source_exists": false,
           "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/fc_p16_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],
@@ -2854,7 +2999,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 855
+        "line": 889
       }
     },
     {
@@ -2893,6 +3038,11 @@
         },
         {
           "path": "scripts/systems/structural_rebuild_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_transaction.gd",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -2984,7 +3134,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 877
+        "line": 931
       }
     },
     {
@@ -3122,7 +3272,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 899
+        "line": 963
       }
     },
     {
@@ -3269,7 +3419,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 921
+        "line": 991
       }
     },
     {
@@ -3355,7 +3505,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 943
+        "line": 1013
       }
     },
     {
@@ -3448,7 +3598,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 967
+        "line": 1037
       }
     },
     {
@@ -3574,7 +3724,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 989
+        "line": 1059
       }
     },
     {
@@ -3697,7 +3847,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1014
+        "line": 1084
       }
     }
   ]
