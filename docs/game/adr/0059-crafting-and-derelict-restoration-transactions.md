@@ -266,6 +266,27 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     per-ship duplicate schedulers. UI and interaction validate the exact owner key,
     current binding generation, selection, occupancy, action-specific access and
     spatial range. An off-board home station cannot act as an away fallback.
+29. Staged restore must successfully apply every persisted authoritative subsystem
+    summary and recapture the complete prepared world before publication. Reject
+    malformed present summaries and any authoritative mismatch; valid defaults in
+    a recaptured candidate do not excuse discarded saved values. Normalization is
+    limited to explicitly documented derived fields, never inventory, progression,
+    settings, system condition, ownership or receipt content. Prove nondefault
+    roundtrips and malformed audio, settings and ship-system denials.
+30. Recoverable terminal receipts retain exact producer history after escrow is
+    released. Validate original lots, producer identity, terminal outcome and
+    sequence against that history, including field outputs and cancellation
+    refunds. Syntactically valid forged content or future receipt sequences must
+    reject before publication. Historical unmounted component records are not
+    additional live lot authorities; immutable lot origin describes creation,
+    while current placement describes its present slot. Legitimate same-ship and
+    cross-ship moves preserve that origin and survive two reloads.
+31. Restore each visited crafting owner's exact inventory, station and pending
+    bindings before its first elapsed-time catch-up. An unavailable context must
+    not silently advance the owner's last simulation timestamp and discard work.
+    Verify a restored inactive derelict's first revisit completes due work once,
+    retains its pending output, and permits exact-once player collection across
+    two reloads.
 
 ## Locked transaction payloads
 

@@ -231,9 +231,11 @@ After P02, every task uses the same exact runner contract:
 & $Python tools/run_feature_completion.py --godot $Godot --profile all --evidence-dir artifacts/feature-completion/G4
 ```
 
-These runner commands are **planned interfaces** until P02 is implemented. The
-canonical full regression source remains the `Regression bundle` section of
-`docs/game/06_validation_plan.md` (currently ending with a 633-command marker).
+These runner interfaces are implemented by `tools/run_feature_completion.py`.
+The canonical full regression source remains the `Regression bundle` section of
+`docs/game/06_validation_plan.md`. The accepted P00 baseline at `3b601e39` passed
+all 652 documented commands on the exact Windows runtime accepted by ADR-0060.
+That baseline does not certify subsequent feature changes or player acceptance.
 Do not substitute `tools/synaptic_sea_gate4_regression.sh`, whose current paths and
 engine are historical. P02 extracts/checks the documented bundle into a temporary
 script, supplies ROOT/GODOT, runs it through verified Bash, and records the actual
@@ -739,6 +741,11 @@ the nine approved `p10_*.json` migration fixtures under
   twice and compare quantity, quality, progress and receipts exactly.
 - [ ] Run P10, `save_migration_service_smoke.gd`, `save_migration_world_smoke.gd`,
   `save_load_service_smoke.gd`, then G1 profile and full regression.
+- [ ] Close ADR-0059 decisions 29-31: reject forged terminal refund/field receipts,
+  preserve moved component lot origins across two reloads, bind restored inactive
+  crafting owners before catch-up, and compare the full authoritative staged
+  recapture with the prepared world. Include malformed subsystem summaries and
+  valid nondefault roundtrips; no broad normalization may hide lost saved state.
 
 **G1 exit:** FC-04..12 evidence is complete; the player can obtain, craft, queue,
 interrupt, collect and use differentiated output through normal controls.
