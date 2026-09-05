@@ -1017,7 +1017,7 @@ regeneration from the same seed/version; destruction does not erase repairabilit
 `runtime_physical_volume_catalog.gd`, `runtime_physical_volume.gd`, and
 `structural_rebuild_collision_query.gd`; `ship_work_transaction.gd`,
 `docs/game/06_validation_plan.md` and `tools/classify_orphan_smokes.sh` only for
-the two foundation smokes' standalone membership and exact PASS-marker rows;
+the preparatory smokes' standalone membership and exact PASS-marker rows;
 `work_action_catalog.gd`, `work_action_resolver.gd`; narrow source-kit/module/
 contract and registered-endpoint seams in `generated_ship_loader.gd`,
 `modular_socket_catalog.gd`, `dock_ports.gd`,
@@ -1030,7 +1030,8 @@ the `welder.compatible_work_action_ids` `rebuild_structure` entry in
 endpoint, route, and live-safety smokes; new `fc_p17_smoke.gd` and exact kit/contract
 assertions in `fc_p16_smoke.gd`; `structural_rebuild_policy_smoke.gd`, a
 preparatory P17 policy/loader proof that does
-not emit an `FC P17 PASS` marker.
+not emit an `FC P17 PASS` marker; preparatory
+`structural_rebuild_candidate_nav_smoke.gd` for the bounded pure edge/path helper.
 **Non-goals:** geometry/nav/air mutation, component displacement, replacement
 outside the original transform/footprint, arbitrary rotation/substitution,
 auto-undocking, persistence, or adding cart push/motion behavior in the
@@ -1049,6 +1050,14 @@ within their existing allowlist. Cart/drop/component projections, mount anchors,
 and player collision-mask changes additionally require reviewed file-scope
 additions. The foundation authorization does not permit those product edits.
 
+**P17 foundation slice B:** add only a pure, untrusted, per-ship edge projection
+and path evaluator to `ShipNavGraph`. It consumes explicit classified topology,
+base-clearance, portal, registered-endpoint, and local connection-side DTOs and
+always returns `scene_authorized: false`. Exterior boundaries are not registered
+exits; exterior targets and floor/ceiling targets remain unsupported. The later
+bound scene preflight must authenticate every DTO, evaluate each connected ship
+separately, and combine this result with candidate collision evidence.
+
 - [ ] Author the ADR-0065 reviewed cart/drop/component box dimensions and exact
   local transforms as canonical data. Reserve layer bit 2 with mask 0 for passive
   projections; use private-space layer bit 1 for the isolated candidate. Reject
@@ -1063,6 +1072,12 @@ additions. The foundation authorization does not permit those product edits.
   Godot primitive/query smokes. The initial gameplay dimensions require scene
   clearance validation before later live integration; synthetic fixture-only
   boxes do not certify the authored profile data.
+- [ ] Prove the bounded pure navigation helper with
+  `structural_rebuild_candidate_nav_smoke.gd` and marker
+  `STRUCTURAL REBUILD CANDIDATE NAV PASS`. Classify plan topology as internal
+  pairs, vertical pairs, exterior boundaries, or unresolved; preserve closed
+  portals and independent blockers; test local-side-only connection paths and
+  legitimate seed-17 exterior records. This proof does not satisfy FC-19.
 - [ ] Add exact layout-kit, structural-kit, and structural-contract identity to
   every original descriptor/fingerprint. The active source matrix is biomatter
   authored hive template plus hazard/industrial/lifeboat v0 resolution; ithappy

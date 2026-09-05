@@ -389,6 +389,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         f"{VALIDATION}structural_rebuild_policy_smoke.gd",
         f"{VALIDATION}runtime_physical_volume_smoke.gd",
         f"{VALIDATION}structural_rebuild_collision_query_smoke.gd",
+        f"{VALIDATION}structural_rebuild_candidate_nav_smoke.gd",
     ],
     "P18": [
         "scripts/procgen/structural_rebuild_applier.gd", "scripts/procgen/generated_ship_loader.gd",
@@ -471,6 +472,7 @@ CARD_SMOKES = {
     "P17": [
         "runtime_physical_volume_smoke.gd",
         "structural_rebuild_collision_query_smoke.gd",
+        "structural_rebuild_candidate_nav_smoke.gd",
     ],
     "P18": ["module_integrity_consequences_smoke.gd", "ship_nav_graph_smoke.gd", "slice_atmosphere_smoke.gd", "physical_travel_smoke.gd"],
     "P19": ["pillar_persistence_smoke.gd", "pillar_revisit_persistence_smoke.gd", "world_persist_restore_smoke.gd", "docking_persistence_smoke.gd"],

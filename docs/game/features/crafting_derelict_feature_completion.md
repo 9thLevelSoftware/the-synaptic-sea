@@ -162,6 +162,13 @@ save/load or repeated callbacks.
   do not satisfy FC-19 until real scene bindings, existing-world clearance and
   registered exit/connection routes are verified. Interaction radii and imported
   visual bounds never authorize structural placement.
+  A bounded pure navigation helper may evaluate explicit edge, base-clearance,
+  portal, endpoint, and local connection-side projections, but its inputs are not
+  owner-authenticated and its result is never scene authorization. Closed portals
+  remain blocked; an exterior structural boundary is not a registered exit; and
+  each connected ship's local side must be evaluated against that ship's graph.
+  Exterior-edge replacement and floor/ceiling support topology remain outside
+  that preparatory helper and must stay visibly unsupported until integrated.
 - A successful replacement restores geometry, collision, navigable edge state,
   atmosphere enclosure, component-slot availability, and structural health as one
   committed operation. Intact restoration must close the hole it replaces.

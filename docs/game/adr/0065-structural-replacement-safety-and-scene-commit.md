@@ -336,6 +336,30 @@ preflight separately checks existing-world clearance and candidate-only
 continuous collision sweep for each returned segment. Neither path query mutates
 the live graph.
 
+The first navigation slice is deliberately a pure, untrusted, per-ship helper.
+It classifies each authored record as an internal pair, vertical pair, exterior
+boundary, or unresolved record, then combines live structural eligibility with
+base clearance that excludes only the destroyed target and detached candidate.
+It retains independent blockers and momentary portal state, so a closed portal
+blocks even when unlocked. A target overlay cannot turn false base clearance
+true. The helper returns `scene_authorized: false`; later scene preflight binds
+the exact ship/map/layout/graph/portal/clearance revisions before using it.
+
+The native seed-17 fixture has four legitimate non-solid exterior boundaries:
+`0|h|3|5`, `0|h|7|6`, `0|v|3|4`, and `0|v|3|9`. They have one occupied side and
+must classify as exterior boundaries without manufacturing an internal node.
+Conversely, coherent fixture 002 edge `0|h|-1|2` is non-exterior and unresolved;
+the helper reports it as unsupported internal data rather than silently passing.
+
+An exterior boundary record does not register an exit. Actor egress requires a
+separate exact registered endpoint DTO; missing registration remains
+`missing_registered_exit`. The bounded helper denies an exterior target and
+floor/ceiling target as unsupported. It checks only connection sides local to its
+one graph; a remote ship/endpoint identity is required but never resolved against
+local nodes. The coordinator must evaluate the remote ship's graph separately
+and require both local-side results. Its standalone preparatory smoke cannot emit
+or satisfy `FC P17 PASS`.
+
 ### 6. P18 APPLYING/finalize scene lifecycle
 
 Detached preparation remains outside P12. Existing simple P12 actions retain
