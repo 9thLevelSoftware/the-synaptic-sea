@@ -251,6 +251,8 @@ One merged automated-review warning remains worth an explicit human contract dec
 
 The reviewer should confirm whether the product contract requires every post-damage unlocked door to start closed. If so, address it as a separate TDD change; do not silently fold that policy change into the paused biomass work. The review's helper-deduplication suggestions are non-blocking cleanup.
 
+Late RCA delegation `deleg_76a35821` independently identified the original v5 derelict-arc regression at the game integration boundary: raw worldgen layout data can contain an empty `arc_zones` array while `GameplaySliceBuilder.build()` derives the authoritative safe-side-link arcs, but `GeneratedShipLoader` reads hazard markers from the layout document. That finding was already resolved in technical snapshot ancestor `5ee96219` at `scripts/procgen/ship_generator.gd:297-303`: when layout arcs are missing or empty and builder arcs are non-empty, `_generate_via_worldgen()` deep-copies the builder arcs into the layout before loading; explicit authored layout arcs remain authoritative. A fresh focused run of `derelict_arc_smoke.gd` at handoff HEAD passes boarding, collision blocking, save/load, and revisit persistence (`DERELICT ARC PASS ... reload_preserved=true revisit_preserved=true`). The RCA requires no further source change.
+
 ## Recommended developer review
 
 1. Confirm `09eb2584` is an ancestor and the only descendant change is this handoff document:
