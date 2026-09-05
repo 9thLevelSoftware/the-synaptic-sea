@@ -3280,19 +3280,19 @@
       ]
     },
     {
-      "anchor": "docs/game/features/generated_seed_boarded_slice.md:71",
+      "anchor": "docs/game/features/generated_seed_boarded_slice.md:74",
       "criterion_ids": [
         "FEATURE::docs/game/features/generated_seed_boarded_slice.md::f57342dd120c"
       ]
     },
     {
-      "anchor": "docs/game/features/generated_seed_boarded_slice.md:72",
+      "anchor": "docs/game/features/generated_seed_boarded_slice.md:75",
       "criterion_ids": [
         "FEATURE::docs/game/features/generated_seed_boarded_slice.md::35e34f893efc"
       ]
     },
     {
-      "anchor": "docs/game/features/generated_seed_boarded_slice.md:73",
+      "anchor": "docs/game/features/generated_seed_boarded_slice.md:76",
       "criterion_ids": [
         "FEATURE::docs/game/features/generated_seed_boarded_slice.md::25685802fbc3"
       ]
@@ -9884,7 +9884,7 @@
       "source": {
         "path": "docs/game/features/generated_seed_boarded_slice.md",
         "heading": "Acceptance criteria",
-        "line": 71
+        "line": 74
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -9914,7 +9914,7 @@
       "source": {
         "path": "docs/game/features/generated_seed_boarded_slice.md",
         "heading": "Acceptance criteria",
-        "line": 72
+        "line": 75
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -9944,7 +9944,7 @@
       "source": {
         "path": "docs/game/features/generated_seed_boarded_slice.md",
         "heading": "Acceptance criteria",
-        "line": 73
+        "line": 76
       },
       "verification_source": [],
       "domain": "feature_spec",
