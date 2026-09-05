@@ -114,6 +114,15 @@ verified current baseline and matching the saved stable module ID, wrapper,
 transform, footprint, sockets and layout identity. A mismatch rejects restore;
 it does not guess a kit or rewrite the save.
 
+Rebuild authorization is separate from loading existing structure. A wrapper-valid
+placement with absent or conflicting rebuild contract metadata must retain its
+physical wrapper and P16 original descriptor from the actual authored placement
+and kit fields. Record the unavailable contract explicitly and deny replacement;
+do not abort the whole ship load or invent a fallback contract. Invalid geometry
+and invalid placement data still follow the existing loader rejection policy.
+Regression tests must exercise `load_from_documents()` for these unsupported
+contract cases, not only the contract-resolution helper.
+
 #### 2A. Exact integrity ownership
 
 Each `StructuralRebuildState` binds once to the exact `ModuleIntegrityMap` that

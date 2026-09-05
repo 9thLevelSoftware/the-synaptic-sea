@@ -980,7 +980,8 @@ coordinator; new rebuild catalog, catalog checker/tests, work-action definitions
 and compatible-action metadata in `data/tools/tool_definitions.json` plus only
 the `welder.compatible_work_action_ids` `rebuild_structure` entry in
 `data/items/item_definitions.json`; new `fc_p17_smoke.gd` and exact kit/contract
-assertions in `fc_p16_smoke.gd`; a preparatory P17 policy/loader proof that does
+assertions in `fc_p16_smoke.gd`; `structural_rebuild_policy_smoke.gd`, a
+preparatory P17 policy/loader proof that does
 not emit an `FC P17 PASS` marker.
 **Non-goals:** geometry/nav/air mutation, component displacement, replacement
 outside the original transform/footprint, arbitrary rotation/substitution,
@@ -1003,6 +1004,10 @@ auto-undocking, and persistence.
   `ModuleIntegrityMap` through a weak owner reference. Resolve original
   descriptors from that registry and live damage only from that exact map;
   method-compatible adapters and rebound owners fail closed.
+- [ ] Keep wrapper-valid existing ships loadable and inspectable when rebuild
+  contract metadata is missing or conflicting. Prove this through the real loader:
+  the physical wrapper and original descriptor survive, and replacement is denied
+  as unsupported without a guessed contract or changed geometry validation.
 - [ ] Prove all 60 active tuples against independent production identity: actual
   layout and structural-kit module records, loader resolution, and loaded
   contract resources on one side, canonical catalog expectations on the other.

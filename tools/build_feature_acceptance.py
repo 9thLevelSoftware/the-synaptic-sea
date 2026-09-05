@@ -376,6 +376,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "data/items/item_definitions.json",
         "tools/check_structural_rebuild_catalog.py", "tests/test_structural_rebuild_catalog.py",
         WORK_ACTION_CATALOG, f"{VALIDATION}fc_p17_smoke.gd", f"{VALIDATION}fc_p16_smoke.gd",
+        f"{VALIDATION}structural_rebuild_policy_smoke.gd",
     ],
     "P18": [
         "scripts/procgen/structural_rebuild_applier.gd", "scripts/procgen/generated_ship_loader.gd",
