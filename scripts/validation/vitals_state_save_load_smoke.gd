@@ -48,6 +48,17 @@ func _setup() -> void:
 	# vitals before the snapshot assertion if those threats remain active.
 	if playable.threat_manager != null:
 		playable.threat_manager.threats.clear()
+	# The bootstrap can also leave an active fire at the player's spawn.  This
+	# persistence fixture owns the vitals values it snapshots, so clear that
+	# independent live hazard through the same model-level pattern used by the
+	# fire smokes; the coordinator and its real process ticks keep running.
+	var active_fire = playable.get_active_fire_state_for_validation()
+	if active_fire == null:
+		_fail("active fire state missing")
+		return
+	active_fire.active_fires.clear()
+	active_fire.ignition_progress.clear()
+	active_fire.spread_progress.clear()
 	# Set non-default vitals state; zero drain rates so background ticks
 	# do not drift values during the settle frames.
 	playable.vitals_state.configure({
