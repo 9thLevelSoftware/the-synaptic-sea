@@ -174,6 +174,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/room_assigner_smoke.gd",
         "scripts/validation/capture_current_topology_fixture.gd",
         "scripts/validation/procgen_golden_parity_smoke.gd",
+        "scripts/validation/procgen_layout_stress_smoke.gd",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
         "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
@@ -241,7 +242,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     ],
     "P08": [
         "docs/game/adr/0062-ship-owned-pending-output-receipts.md",
-        *[f"scripts/systems/{name}.gd" for name in ("pending_output_store", "craft_job_scheduler", "crafting_state", "field_crafting_state", "deconstruction_resolver", "ship_instance", "inventory_state", "ship_inventory", "world_snapshot")],
+        *[f"scripts/systems/{name}.gd" for name in ("pending_output_store", "craft_job_scheduler", "crafting_state", "station_state", "field_crafting_state", "deconstruction_resolver", "ship_instance", "inventory_state", "ship_inventory", "world_snapshot")],
         "scripts/tools/crafting_station.gd", "scripts/tools/work_yield_drop.gd", COORDINATOR,
         f"{VALIDATION}fc_p08_smoke.gd", f"{VALIDATION}fc_p07_smoke.gd",
     ],
@@ -292,8 +293,12 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         )],
     ],
     "P13": [
-        *[f"scripts/systems/{name}.gd" for name in ("ship_work_context", "ship_runtime", "ship_instance", "ship_access_state")],
+        *[f"scripts/systems/{name}.gd" for name in (
+            "ship_work_context", "ship_runtime", "ship_instance", "ship_access_state", "crafting_state")],
         "scripts/ui/ship_modification_panel.gd", COORDINATOR, f"{VALIDATION}fc_p13_smoke.gd",
+        *[f"{VALIDATION}{name}.gd" for name in (
+            "ship_mod_inventory_sync_away_smoke", "ship_modification_panel_smoke",
+            "ship_mod_system_effect_smoke", "ship_mod_system_effect_away_smoke")],
     ],
     "P14": [
         *[f"scripts/systems/{name}.gd" for name in ("ship_modification_state", "component_mount_resolver", "ship_systems_manager", "crafting_state")],

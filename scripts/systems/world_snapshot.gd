@@ -18,6 +18,7 @@ var home_looted_containers: Array = []          # home ship's searched loot-cont
 var home_ship_inventory: Dictionary = {}        # home ship's ShipInventory.get_summary()
 var home_ship_carts: Array = []                  # home ship's [CartState.get_summary()...]
 var home_floor_drops_v1: Dictionary = {}         # home ShipInstance.get_floor_drop_summary()
+var home_pending_outputs_v1: Dictionary = {}     # home ShipInstance PendingOutputStore summary
 var home_breach_environment: Dictionary = {}     # home ShipInstance breach environment only
 var player_equipment: Dictionary = {}           # EquipmentState.get_summary()
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
@@ -68,6 +69,8 @@ func to_dict() -> Dictionary:
 		result["home_ship_inventory"] = home_ship_inventory.duplicate(true)
 	if not home_floor_drops_v1.is_empty():
 		result["home_floor_drops_v1"] = home_floor_drops_v1.duplicate(true)
+	if not home_pending_outputs_v1.is_empty():
+		result["home_pending_outputs_v1"] = home_pending_outputs_v1.duplicate(true)
 	if not player_equipment.is_empty():
 		result["player_equipment"] = player_equipment.duplicate(true)
 	return result
@@ -112,6 +115,11 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		if not (dict["home_floor_drops_v1"] is Dictionary) or (dict["home_floor_drops_v1"] as Dictionary).is_empty():
 			return null
 	ws.home_floor_drops_v1 = _deep_copy_dict(dict.get("home_floor_drops_v1", {}))
+	if dict.has("home_pending_outputs_v1"):
+		if not (dict["home_pending_outputs_v1"] is Dictionary) \
+				or (dict["home_pending_outputs_v1"] as Dictionary).is_empty():
+			return null
+	ws.home_pending_outputs_v1 = _deep_copy_dict(dict.get("home_pending_outputs_v1", {}))
 	ws.home_breach_environment = _deep_copy_dict(dict.get("home_breach_environment", {}))
 	if dict.has("player_equipment"):
 		if not (dict["player_equipment"] is Dictionary) or (dict["player_equipment"] as Dictionary).is_empty():

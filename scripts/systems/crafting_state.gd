@@ -5,6 +5,7 @@ const StationStateScript := preload("res://scripts/systems/station_state.gd")
 const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 const CraftJobSchedulerScript := preload("res://scripts/systems/craft_job_scheduler.gd")
+const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
 
 ## Pure model for the crafting engine. Loads recipes, validates ingredient
 ## availability against an InventoryState, resolves output quality via
@@ -218,7 +219,8 @@ func list_recipe_entries(
 		station_tier: int = 0,
 		knowledge = null,
 		quality_skill_level: int = -1,
-		station_powered: bool = true) -> Array:
+		station_powered: bool = true,
+		allow_pending_output: bool = false) -> Array:
 	var out: Array = []
 	var recipes: Array = get_recipes_for_station(station_kind)
 	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
@@ -249,7 +251,7 @@ func list_recipe_entries(
 			status = "insufficient_tier"
 		elif not can_craft(rid, inventory, knowledge, station_tier):
 			status = "missing_ingredients"
-		elif inventory != null and inventory.has_method("can_accept"):
+		elif not allow_pending_output and inventory != null and inventory.has_method("can_accept"):
 			var out_id: String = str(produces.get("item_id", ""))
 			var out_qty: int = int(produces.get("quantity", 0))
 			if not out_id.is_empty() and out_qty > 0 and not inventory.can_accept(out_id, out_qty):
@@ -277,6 +279,9 @@ func list_recipe_entries(
 	return out
 
 
+## Read-only prediction from the same stable lot order used by ItemLotLedger.
+## Missing exact lot metadata produces no estimate rather than falling back to a
+## stale MaterialState average.
 func _quality_preview(
 		ingredients: Dictionary,
 		produces: Dictionary,
@@ -319,6 +324,7 @@ func _quality_preview(
 		"input_lot_ids": input_lot_ids,
 	}
 
+
 func _preview_ingredient_lots(ingredients: Dictionary, inventory) -> Array:
 	if ingredients.is_empty():
 		return []
@@ -359,8 +365,6 @@ func _preview_ingredient_lots(ingredients: Dictionary, inventory) -> Array:
 
 # --- station management ---
 
-# --- station management ---
-
 func get_or_create_station(station_kind: String):
 	if _station_states.has(station_kind):
 		return _station_states[station_kind]
@@ -375,6 +379,7 @@ func get_station(station_kind: String):
 func get_station_tier(station_kind: String) -> int:
 	var station = get_or_create_station(station_kind)
 	return int(station.effective_tier()) if station.has_method("effective_tier") else int(station.get("level"))
+
 
 func get_station_powered(station_kind: String) -> bool:
 	return bool(get_or_create_station(station_kind).get("powered"))
@@ -452,7 +457,8 @@ func bind_station_runtime_context(
 		station_kind: String,
 		inventory,
 		knowledge = null,
-		player_progression = null) -> bool:
+		player_progression = null,
+		pending_output_store = null) -> bool:
 	if ship_id.is_empty() or station_instance_id.is_empty() or not inventory is RefCounted:
 		return false
 	var station = get_or_create_station_instance(ship_id, station_instance_id, station_kind)
@@ -463,7 +469,10 @@ func bind_station_runtime_context(
 		"source_inventory": inventory,
 		"knowledge": knowledge,
 		"player_progression": player_progression,
+		"pending_output_store": pending_output_store,
 	}
+	if inventory.has_method("bind_craft_reservation_authority"):
+		inventory.call("bind_craft_reservation_authority", _craft_job_scheduler)
 	return true
 
 func remove_station(station_kind: String) -> void:
@@ -503,6 +512,8 @@ func begin_craft(
 	local_context["knowledge"] = knowledge
 	local_context["player_skill_level"] = player_skill_level
 	_job_contexts[owner_key] = local_context
+	if inventory.has_method("bind_craft_reservation_authority"):
+		inventory.call("bind_craft_reservation_authority", _craft_job_scheduler)
 	var holder_id: String = str(inventory.call("get_holder_namespace")) \
 		if inventory.has_method("get_holder_namespace") else ""
 	var result: Dictionary = _craft_job_scheduler.call("enqueue", {
@@ -557,6 +568,8 @@ func enqueue_craft(
 	local_context["knowledge"] = knowledge
 	local_context["player_skill_level"] = player_skill_level
 	_job_contexts[owner_key] = local_context
+	if inventory.has_method("bind_craft_reservation_authority"):
+		inventory.call("bind_craft_reservation_authority", _craft_job_scheduler)
 	var holder_id: String = str(inventory.call("get_holder_namespace")) \
 		if inventory.has_method("get_holder_namespace") else ""
 	var accepted: int = 0
@@ -623,7 +636,7 @@ func finish_craft() -> Dictionary:
 	if job_id.is_empty():
 		job_id = str(_active_craft.get("job_id", ""))
 	if not job_id.is_empty():
-		var claimed: Dictionary = _craft_job_scheduler.call("claim_output", job_id)
+		var claimed: Dictionary = _settle_job_output(job_id)
 		if not bool(claimed.get("ok", false)):
 			return {}
 		_remove_completion_receipt(job_id)
@@ -643,6 +656,7 @@ func finish_craft() -> Dictionary:
 			"job_id": job_id,
 			"receipt_id": str(claimed.get("receipt_id", "")),
 			"output_lot": lot.duplicate(true),
+			"pending": bool(claimed.get("pending", false)),
 		}
 		if str(_active_craft.get("job_id", "")) == job_id:
 			var ship_id: String = str(_active_craft.get("ship_id", ""))
@@ -710,6 +724,8 @@ func cancel_craft() -> Dictionary:
 		context["station_instance_id"] = str(
 			_active_craft.get("station_instance_id", ""))
 		var result: Dictionary = _craft_job_scheduler.call("cancel", job_id, context)
+		if not bool(result.get("ok", false)) and str(result.get("reason", "")) == "refund_destination_full":
+			result = _recover_job_refund(job_id, context)
 		if bool(result.get("ok", false)):
 			_active_craft.clear()
 		return result
@@ -731,6 +747,8 @@ func cancel_job(job_id: String, ship_id: String = "", station_instance_id: Strin
 	context["ship_id"] = ship_id
 	context["station_instance_id"] = station_instance_id
 	var result: Dictionary = _craft_job_scheduler.call("cancel", job_id, context)
+	if not bool(result.get("ok", false)) and str(result.get("reason", "")) == "refund_destination_full":
+		result = _recover_job_refund(job_id, context)
 	if bool(result.get("ok", false)) and str(_active_craft.get("job_id", "")) == job_id:
 		_active_craft.clear()
 	return result
@@ -769,7 +787,7 @@ func _apply_current_summary(summary: Dictionary) -> bool:
 	]:
 		if not summary.has(key):
 			return false
-	if typeof(summary.recipe_count) != TYPE_INT or int(summary.recipe_count) < 0 \
+	if not _is_nonnegative_json_integer(summary.recipe_count) \
 			or not summary.active_craft is Dictionary \
 			or not summary.station_summaries is Dictionary \
 			or not summary.physical_station_summaries is Dictionary \
@@ -835,6 +853,114 @@ func _apply_current_summary(summary: Dictionary) -> bool:
 	_completion_receipts.clear()
 	_collect_completion_receipts(_craft_job_scheduler.call("get_ready_receipts"))
 	return true
+
+
+func _settle_job_output(job_id: String) -> Dictionary:
+	var peeked: Dictionary = _craft_job_scheduler.call("peek_output", job_id)
+	if not bool(peeked.get("ok", false)):
+		return peeked
+	var store: RefCounted = _pending_store_for_job(peeked)
+	if store == null:
+		# Only the synthetic default owner used by isolated pre-P07 model callers
+		# may retain destructive claim compatibility. A physical or restored owner
+		# without its ShipInstance store binding must keep output_ready intact.
+		if _is_explicit_legacy_job(peeked):
+			return _craft_job_scheduler.call("claim_output", job_id)
+		return {"ok": false, "reason": "missing_pending_output_store"}
+	var receipt_id: String = str(peeked.get("receipt_id", ""))
+	var lots: Array = peeked.get("output_lots", []) as Array
+	var metadata: Dictionary = {
+		"station_instance_id": str(peeked.get("station_instance_id", "")),
+		"producer_kind": "craft_job",
+		"producer_id": job_id,
+		"purpose": "output",
+		"source_holder_id": "",
+	}
+	var deposited: bool = bool(store.call("deposit_once", receipt_id, lots, metadata))
+	if not deposited and not bool(store.call("receipt_matches", receipt_id, lots, metadata)):
+		return {"ok": false, "reason": "pending_receipt_conflict"}
+	var acknowledged: Dictionary = _craft_job_scheduler.call(
+		"acknowledge_output", job_id, receipt_id)
+	if not bool(acknowledged.get("ok", false)):
+		return acknowledged
+	return peeked.merged({"ok": true, "reason": "", "pending": true}, true)
+
+
+func _recover_job_refund(job_id: String, context: Dictionary) -> Dictionary:
+	var peeked: Dictionary = _craft_job_scheduler.call(
+		"peek_recoverable_refund", job_id, context)
+	if not bool(peeked.get("ok", false)):
+		return peeked
+	var store: RefCounted = _pending_store_for_job(peeked)
+	if store == null:
+		return {"ok": false, "reason": "missing_pending_output_store"}
+	var receipt_id: String = str(peeked.get("receipt_id", ""))
+	var lots: Array = peeked.get("refund_lots", []) as Array
+	var metadata: Dictionary = {
+		"station_instance_id": str(peeked.get("station_instance_id", "")),
+		"producer_kind": "craft_job",
+		"producer_id": job_id,
+		"purpose": "refund",
+		"source_holder_id": str(peeked.get("source_holder_id", "")),
+	}
+	var deposited: bool = bool(store.call("deposit_once", receipt_id, lots, metadata))
+	if not deposited and not bool(store.call("receipt_matches", receipt_id, lots, metadata)):
+		return {"ok": false, "reason": "pending_receipt_conflict"}
+	return _craft_job_scheduler.call(
+		"acknowledge_refund_recovery", job_id, receipt_id, context)
+
+
+func _pending_store_for_job(job_or_receipt: Dictionary) -> RefCounted:
+	var owner_key: String = _owner_key(
+		str(job_or_receipt.get("ship_id", "")),
+		str(job_or_receipt.get("station_instance_id", "")))
+	var context: Dictionary = _job_contexts.get(owner_key, {}) as Dictionary
+	var store: Variant = context.get("pending_output_store", null)
+	return store as RefCounted if store is RefCounted else null
+
+
+static func _is_explicit_legacy_job(job_or_receipt: Dictionary) -> bool:
+	return str(job_or_receipt.get("ship_id", "")) == "legacy-crafting" \
+		and str(job_or_receipt.get("station_instance_id", "")).begins_with("legacy:")
+
+
+func settle_station_pending(ship_id: String, station_instance_id: String) -> Dictionary:
+	var settled_outputs: int = 0
+	var settled_refunds: int = 0
+	var scheduler_summary: Dictionary = _craft_job_scheduler.call("get_summary")
+	for job_variant in scheduler_summary.get("jobs", []) as Array:
+		var job: Dictionary = job_variant
+		if str(job.get("ship_id", "")) != ship_id \
+				or str(job.get("station_instance_id", "")) != station_instance_id:
+			continue
+		var phase: String = str(job.get("state", ""))
+		if phase == "output_ready":
+			var output_result: Dictionary = _settle_job_output(str(job.get("job_id", "")))
+			if not bool(output_result.get("ok", false)):
+				return output_result
+			settled_outputs += 1
+		elif phase in ["queued", "blocked"]:
+			var context: Dictionary = _scheduler_context()
+			context["ship_id"] = ship_id
+			context["station_instance_id"] = station_instance_id
+			var refund_result: Dictionary = _craft_job_scheduler.call(
+				"cancel", str(job.get("job_id", "")), context)
+			if not bool(refund_result.get("ok", false)) \
+					and str(refund_result.get("reason", "")) == "refund_destination_full":
+				refund_result = _recover_job_refund(str(job.get("job_id", "")), context)
+			if not bool(refund_result.get("ok", false)):
+				return refund_result
+			settled_refunds += 1
+		elif phase in ["running", "paused_power"]:
+			# A started job has already consumed its escrow and cannot be moved to
+			# another physical owner. Keep the station until the player completes
+			# or explicitly cancels it; otherwise its eventual receipt is orphaned
+			# behind a removed station ID.
+			return {"ok": false, "reason": "station_busy"}
+	return {
+		"ok": true, "reason": "", "settled_outputs": settled_outputs,
+		"settled_refunds": settled_refunds,
+	}
 
 
 func _apply_legacy_summary(summary: Dictionary) -> bool:
@@ -1010,6 +1136,14 @@ func _set_active_from_job(job_id: String) -> void:
 
 func _owner_key(ship_id: String, station_instance_id: String) -> String:
 	return JSON.stringify([ship_id, station_instance_id], "", true)
+
+
+static func _is_nonnegative_json_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return is_finite(number) and number >= 0.0 \
+		and number <= MAX_SAFE_JSON_INTEGER and number == floor(number)
 
 func get_status_lines() -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()

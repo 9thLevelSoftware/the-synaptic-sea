@@ -17,6 +17,8 @@ signal craft_started(station_kind: String, recipe_id: String)
 signal salvage_completed(item_id: String, yields: Dictionary)
 signal reverse_engineered(component_id: String, event_receipt_id: String)
 signal craft_blocked(station_kind: String, reason: String)
+signal pending_output_collected(station_kind: String, result: Dictionary)
+signal station_destruction_requested(ship_id: String, station_instance_id: String, local_position: Vector3)
 ## REQ-CS-016: non-salvage interact opens the coordinator recipe picker for this kind.
 signal recipe_picker_requested(station_kind: String)
 
@@ -31,6 +33,7 @@ var inventory_state                      # InventoryState
 var deconstruction_resolver              # DeconstructionResolver
 var player_progression                   # PlayerProgressionState | null
 var recipe_knowledge                     # RecipeKnowledgeState | null
+var pending_output_store                 # PendingOutputStore | null
 ## Optional coordinator ref for medbay surgery (Stream F). When set and
 ## station_kind == "medbay", try_interact prefers try_medbay_surgery first.
 var surgery_provider = null
@@ -52,7 +55,7 @@ func _ready() -> void:
 	if not body_exited.is_connected(_on_body_exited):
 		body_exited.connect(_on_body_exited)
 
-func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8, p_recipe_knowledge = null, p_ship_id: String = "", p_station_instance_id: String = "") -> void:
+func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8, p_recipe_knowledge = null, p_ship_id: String = "", p_station_instance_id: String = "", p_pending_output_store = null) -> void:
 	# Debug-build guards for the required dependencies (player_progression is intentionally
 	# optional — _player_skill() null-guards it, mirroring repair_point.gd).
 	assert(p_crafting_state != null, "p_crafting_state must not be null")
@@ -69,6 +72,7 @@ func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inv
 	deconstruction_resolver = p_deconstruction_resolver
 	player_progression = p_player_progression
 	recipe_knowledge = p_recipe_knowledge
+	pending_output_store = p_pending_output_store
 	interaction_radius = radius
 	candidate_player = null
 	position = world_position
@@ -81,7 +85,7 @@ func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inv
 			and crafting_state.has_method("bind_station_runtime_context"):
 		crafting_state.call(
 			"bind_station_runtime_context", ship_id, station_instance_id, station_kind,
-			inventory_state, recipe_knowledge, player_progression)
+			inventory_state, recipe_knowledge, player_progression, pending_output_store)
 	_ensure_collision(radius)
 	_ensure_marker(radius)
 
@@ -114,6 +118,11 @@ func try_interact(player_body: Node) -> bool:
 		return false
 	if not _is_player_in_direct_range(player_body):
 		return false
+	if _has_pending_output():
+		var collected: Dictionary = collect_pending_output()
+		if int(collected.get("transferred", 0)) <= 0:
+			emit_signal("craft_blocked", station_kind, "output_full")
+		return true
 	# Single active craft (CraftingState holds one global _active_craft): if one is already
 	# running, this station blocks with feedback and consumes interact (no fall-through).
 	if _is_this_station_busy():
@@ -153,10 +162,6 @@ func try_craft_recipe(recipe_id: String) -> bool:
 	if crafting_state.get_required_skill_level(recipe_id) > _player_skill():
 		emit_signal("craft_blocked", station_kind, "insufficient_skill")
 		return false
-	var produces: Dictionary = crafting_state.get_produces(recipe_id)
-	if not inventory_state.can_accept(str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
-		emit_signal("craft_blocked", station_kind, "output_full")
-		return false
 	if crafting_state.begin_craft(
 			recipe_id, inventory_state, material_state, _player_skill(), recipe_knowledge,
 			ship_id, station_instance_id):
@@ -164,6 +169,64 @@ func try_craft_recipe(recipe_id: String) -> bool:
 		return true
 	emit_signal("craft_blocked", station_kind, "begin_failed")
 	return false
+
+
+func _has_pending_output() -> bool:
+	return pending_output_store != null \
+		and pending_output_store.has_method("list_records_for_station") \
+		and not (pending_output_store.call(
+			"list_records_for_station", station_instance_id) as Array).is_empty()
+
+
+func collect_pending_output() -> Dictionary:
+	if pending_output_store == null or inventory_state == null:
+		return {"ok": false, "reason": "missing_pending_output_store", "transferred": 0}
+	var transferred: int = 0
+	var lots: Array = []
+	var remaining_records: int = 0
+	var records: Array = pending_output_store.call(
+		"list_records_for_station", station_instance_id) as Array
+	for record_variant in records:
+		var receipt_id: String = str((record_variant as Dictionary).get("receipt_id", ""))
+		var result: Dictionary = pending_output_store.call(
+			"collect_receipt", receipt_id, inventory_state)
+		if not bool(result.get("ok", false)):
+			return result
+		transferred += int(result.get("transferred", 0))
+		lots.append_array(result.get("lots", []) as Array)
+		if not (result.get("remaining_lots", []) as Array).is_empty():
+			remaining_records += 1
+	var combined: Dictionary = {
+		"ok": true,
+		"reason": "" if transferred > 0 else "destination_full",
+		"transferred": transferred,
+		"lots": lots,
+		"remaining_records": remaining_records,
+	}
+	emit_signal("pending_output_collected", station_kind, combined)
+	return combined
+
+
+func get_pending_output_mass() -> float:
+	if pending_output_store == null or inventory_state == null \
+			or not pending_output_store.has_method("get_pending_mass_for_station"):
+		return 0.0
+	return float(pending_output_store.call(
+		"get_pending_mass_for_station", station_instance_id, inventory_state))
+
+
+## The coordinator owns removal and must materialize pending records before it
+## frees this node. This method only settles producer state and emits the stable
+## owner/position request.
+func request_destruction() -> Dictionary:
+	if ship_id.is_empty() or station_instance_id.is_empty() or crafting_state == null:
+		return {"ok": false, "reason": "missing_owner"}
+	var settled: Dictionary = crafting_state.call(
+		"settle_station_pending", ship_id, station_instance_id)
+	if not bool(settled.get("ok", false)):
+		return settled
+	emit_signal("station_destruction_requested", ship_id, station_instance_id, position)
+	return {"ok": true, "reason": ""}
 
 ## First ready recipe for this station (validation / auto-smoke path). Empty if none.
 func first_ready_recipe_id() -> String:
@@ -174,7 +237,8 @@ func first_ready_recipe_id() -> String:
 	if not crafting_state.has_method("list_recipe_entries"):
 		return ""
 	var entries: Array = crafting_state.list_recipe_entries(
-		station_kind, inventory_state, _player_skill(), _station_tier(), recipe_knowledge)
+		station_kind, inventory_state, _player_skill(), _station_tier(), recipe_knowledge,
+		_player_skill(), powered, pending_output_store != null)
 	for entry in entries:
 		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
 			return str((entry as Dictionary).get("recipe_id", ""))
@@ -184,7 +248,8 @@ func first_ready_salvage_id() -> String:
 	if deconstruction_resolver == null or inventory_state == null:
 		return ""
 	if deconstruction_resolver.has_method("first_ready_salvage_id"):
-		return deconstruction_resolver.first_ready_salvage_id(inventory_state)
+		return deconstruction_resolver.first_ready_salvage_id(
+			inventory_state, pending_output_store != null)
 	return ""
 
 ## REQ-CS-017: execute a chosen salvage target (deconstruct recipe_id or junk:<item>).
@@ -199,11 +264,17 @@ func try_salvage_target(target_id: String) -> bool:
 		emit_signal("craft_blocked", station_kind, "no_resolver")
 		return false
 	var produced: Dictionary = deconstruction_resolver.execute_salvage_target(
-		target_id, inventory_state, material_state)
+		target_id, inventory_state, material_state, {
+			"ship_id": ship_id,
+			"station_instance_id": station_instance_id,
+			"pending_output_store": pending_output_store,
+		})
 	if produced.is_empty():
 		emit_signal("craft_blocked", station_kind, "nothing_to_salvage")
 		return false
 	var out_id: String = str(produced.get("item_id", ""))
+	if bool(produced.get("pending", false)):
+		collect_pending_output()
 	# The resolver commits source consumption and all yields as one inventory
 	# transaction. The station must not deliver the same output a second time.
 	# The resolver has already consumed the target. Allocate the durable operation

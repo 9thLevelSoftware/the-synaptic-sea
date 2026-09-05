@@ -27,6 +27,8 @@ var bonus_capacity: float = 0.0     # added by worn containers (set by the coord
 var weight_reduction: float = 0.0   # saved kg from worn containers (set by the coordinator)
 var _definitions: Dictionary = {}   # item_id -> def Dictionary (merged)
 var _holder_namespace_bound: bool = false
+var _craft_reservation_authority: WeakRef = null
+var _reservation_credit_job_id: String = ""
 
 func _init(holder_namespace: String = "") -> void:
 	_load_definitions()
@@ -79,7 +81,75 @@ func get_total_weight() -> float:
 	var quantities: Dictionary = items
 	for item_id in quantities:
 		total += get_weight_each(item_id) * float(quantities[item_id])
+	for lot_variant in _reserved_craft_lots(_reservation_credit_job_id):
+		var lot: Dictionary = lot_variant
+		total += get_weight_each(str(lot.get("item_id", ""))) * float(lot.get("quantity", 0))
 	return total
+
+
+func bind_craft_reservation_authority(authority: RefCounted) -> bool:
+	if authority == null or not authority.has_method("get_reserved_lots_for_holder") \
+			or not authority.has_method("get_reservation_lots"):
+		return false
+	_craft_reservation_authority = weakref(authority)
+	return true
+
+
+func get_reserved_craft_lots() -> Array:
+	return _reserved_craft_lots("")
+
+
+func can_restore_craft_reservation(job_id: String, lots: Array, authority: RefCounted) -> bool:
+	if not _reservation_matches(job_id, lots, authority):
+		return false
+	var totals: Dictionary = items.duplicate(true)
+	var existing_ids: Dictionary = {}
+	for existing_variant in get_lot_summary().get("lots", []) as Array:
+		existing_ids[str((existing_variant as Dictionary).get("lot_id", ""))] = true
+	for lot_variant in lots:
+		if not lot_variant is Dictionary:
+			return false
+		var lot: Dictionary = lot_variant
+		var item_id: String = str(lot.get("item_id", ""))
+		var quantity: int = int(lot.get("quantity", 0))
+		if item_id.is_empty() or quantity <= 0 or existing_ids.has(str(lot.get("lot_id", ""))):
+			return false
+		totals[item_id] = int(totals.get(item_id, 0)) + quantity
+		if int(totals[item_id]) > _max_stack(item_id):
+			return false
+	return true
+
+
+func restore_craft_reservation(job_id: String, lots: Array, authority: RefCounted) -> bool:
+	if not can_restore_craft_reservation(job_id, lots, authority):
+		return false
+	var before: Dictionary = get_summary()
+	_reservation_credit_job_id = job_id
+	for lot_variant in lots:
+		var lot: Dictionary = lot_variant
+		if add_lot(lot) != int(lot.get("quantity", 0)):
+			_reservation_credit_job_id = ""
+			apply_summary(before)
+			return false
+	_reservation_credit_job_id = ""
+	return true
+
+
+func _reserved_craft_lots(excluding_job_id: String) -> Array:
+	if _craft_reservation_authority == null:
+		return []
+	var authority: Variant = _craft_reservation_authority.get_ref()
+	if not authority is RefCounted:
+		return []
+	return (authority as RefCounted).call(
+		"get_reserved_lots_for_holder", get_holder_namespace(), excluding_job_id) as Array
+
+
+func _reservation_matches(job_id: String, lots: Array, authority: RefCounted) -> bool:
+	if authority == null or _craft_reservation_authority == null \
+			or _craft_reservation_authority.get_ref() != authority:
+		return false
+	return authority.call("get_reservation_lots", job_id, get_holder_namespace()) == lots
 
 func get_quantity(item_id: String) -> int:
 	return _lot_ledger.get_quantity(item_id)

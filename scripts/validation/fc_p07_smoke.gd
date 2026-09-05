@@ -7,8 +7,10 @@ const CraftJobSchedulerScript := preload("res://scripts/systems/craft_job_schedu
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
+const PendingOutputStoreScript := preload("res://scripts/systems/pending_output_store.gd")
 const RecipeKnowledgeStateScript := preload("res://scripts/systems/recipe_knowledge_state.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
+const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
 const ShipRuntimeScript := preload("res://scripts/systems/ship_runtime.gd")
 const StationStateScript := preload("res://scripts/systems/station_state.gd")
 const CraftingStationScript := preload("res://scripts/tools/crafting_station.gd")
@@ -42,6 +44,8 @@ func _initialize() -> void:
 		return
 	if not _test_capacity(crafting):
 		return
+	if not _test_escrow_mass_accounting(crafting):
+		return
 	if not _test_ship_runtime_catch_up(crafting):
 		return
 	if not _test_shared_scheduler_ship_snapshots(crafting):
@@ -56,6 +60,39 @@ func _initialize() -> void:
 		return
 	print("FC P07 PASS")
 	quit(0)
+
+
+func _test_escrow_mass_accounting(crafting: RefCounted) -> bool:
+	var scheduler = CraftJobSchedulerScript.new()
+	var cargo = ShipInventoryScript.create(500.0, "ship:p07-mass:cargo")
+	_add_standard_inputs(cargo, 2)
+	var exact_full_mass: float = cargo.get_total_weight()
+	cargo.max_weight = exact_full_mass
+	var station_a = _station("ship-mass", "fabricator-mass-a", 0, true)
+	var station_b = _station("ship-mass", "fabricator-mass-b", 0, true)
+	var context: Dictionary = _context(
+		crafting, cargo, {"a": station_a, "b": station_b}, 2)
+	var a: Dictionary = scheduler.enqueue(
+		_request("ship-mass", "fabricator-mass-a", cargo), context)
+	var b: Dictionary = scheduler.enqueue(
+		_request("ship-mass", "fabricator-mass-b", cargo), context)
+	if not bool(a.get("ok", false)) or not bool(b.get("ok", false)):
+		return _fail_bool("mass fixtures could not reserve two jobs")
+	if absf(cargo.get_total_weight() - exact_full_mass) > 0.0001 \
+			or cargo.get_acceptable_quantity("scrap_metal", 1) != 0:
+		return _fail_bool("escrow mass left its source cargo capacity")
+	var cancel_a: Dictionary = scheduler.cancel(str(a.job_id), context)
+	if not bool(cancel_a.get("ok", false)) \
+			or absf(cargo.get_total_weight() - exact_full_mass) > 0.0001:
+		return _fail_bool("own-reservation refund did not fit exactly-full cargo")
+	var other_reserved: Array = scheduler.get_reservation_lots(
+		str(b.job_id), cargo.get_holder_namespace())
+	if other_reserved.is_empty() or cargo.get_acceptable_quantity("scrap_metal", 1) != 0:
+		return _fail_bool("refund credit excluded another job's reserved mass")
+	scheduler.advance(0.0, context)
+	if cargo.get_total_weight() >= exact_full_mass:
+		return _fail_bool("starting the remaining job did not consume reserved mass")
+	return true
 
 
 func _test_one_payment_one_receipt(crafting: RefCounted) -> bool:
@@ -467,10 +504,12 @@ func _test_physical_station_nodes() -> bool:
 	var skill = SkillFixture.new()
 	var station_a = CraftingStationScript.new()
 	var station_b = CraftingStationScript.new()
+	var pending_store = PendingOutputStoreScript.new()
+	pending_store.configure("ship-home")
 	station_a.configure("fabricator", crafting, material, inventory, RefCounted.new(), skill,
-		Vector3(1.0, 0.6, 2.0), 1.8, null, "ship-home", station_a_id)
+		Vector3(1.0, 0.6, 2.0), 1.8, null, "ship-home", station_a_id, pending_store)
 	station_b.configure("fabricator", crafting, material, inventory, RefCounted.new(), skill,
-		Vector3(3.0, 0.6, 2.0), 1.8, null, "ship-home", station_b_id)
+		Vector3(3.0, 0.6, 2.0), 1.8, null, "ship-home", station_b_id, pending_store)
 	if not station_a.try_craft_recipe(RECIPE_ID) or not station_b.try_craft_recipe(RECIPE_ID):
 		station_a.free()
 		station_b.free()
@@ -499,7 +538,8 @@ func _test_production_runtime_binding() -> bool:
 	var station_id: String = str(playable.call(
 		"_crafting_station_instance_id", "fabricator", Vector3(2.0, 0.6, 4.0)))
 	crafting.bind_station_runtime_context(
-		ship.ship_id, station_id, "fabricator", inventory, null, SkillFixture.new())
+		ship.ship_id, station_id, "fabricator", inventory, null, SkillFixture.new(),
+		ship.get_pending_output_store())
 	if not crafting.begin_craft(
 			RECIPE_ID, inventory, MaterialStateScript.new(), 6, null, ship.ship_id, station_id):
 		playable.free()

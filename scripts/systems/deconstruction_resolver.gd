@@ -65,10 +65,10 @@ func deconstruct(recipe_id: String, inventory, material_state, context: Dictiona
 	var produces: Dictionary = _crafting_state.get_produces(recipe_id)
 	var out_id: String = str(produces.get("item_id", ""))
 	var out_qty: int = int(produces.get("quantity", 0))
-	if out_id.is_empty() or out_qty <= 0 or not candidate.can_accept(out_id, out_qty):
+	if out_id.is_empty() or out_qty <= 0:
 		return {}
 	var salvage_lot_id: String = _yield_lot_id("deconstruct:%s" % recipe_id, str(source_lot.lot_id), 0, out_id)
-	if candidate.add_lot({
+	var output_lot: Dictionary = {
 		"lot_id": salvage_lot_id,
 		"item_id": out_id,
 		"quantity": out_qty,
@@ -76,10 +76,20 @@ func deconstruct(recipe_id: String, inventory, material_state, context: Dictiona
 		"quality_tier": QualityTierResolverScript.tier_for_score(out_quality),
 		"condition": 1.0,
 		"origin": {"salvage_target": recipe_id, "source_lot_id": str(source_lot.lot_id)},
-	}) != out_qty:
-		return {}
-	if not inventory.apply_summary(candidate.get_summary()):
-		return {}
+	}
+	var pending: RefCounted = context.get("pending_output_store", null) as RefCounted
+	if pending != null:
+		var receipt_id: String = _salvage_receipt_id(
+			str(context.get("ship_id", "")), str(context.get("station_instance_id", "")),
+			recipe_id, str(source_lot.lot_id))
+		if not _commit_pending_salvage(
+			pending, receipt_id, [output_lot], inventory, candidate,
+			str(context.get("station_instance_id", "")), str(inventory.get_holder_namespace())):
+			return {}
+	else:
+		if not candidate.can_accept(out_id, out_qty) or candidate.add_lot(output_lot) != out_qty \
+				or not inventory.apply_summary(candidate.get_summary()):
+			return {}
 	if material_state != null and material_state.has_method("has_definition") \
 			and material_state.has_definition(out_id) and material_state.has_method("set_quality"):
 		material_state.set_quality(out_id, out_quality)
@@ -87,7 +97,9 @@ func deconstruct(recipe_id: String, inventory, material_state, context: Dictiona
 	result["quality"] = out_quality
 	result["source_quality"] = source_quality
 	result["salvage_lot_id"] = salvage_lot_id
-	result["deposited"] = true
+	result["deposited"] = pending == null
+	result["pending"] = pending != null
+	result["output_lots"] = [output_lot]
 	return result
 
 
@@ -128,7 +140,7 @@ func auto_deconstruct(item_id: String, inventory, material_state) -> Dictionary:
 ## RecipePickerPanel can reuse them (recipe_id is the selection key).
 ##   deconstruct: recipe_id = catalog id
 ##   junk:        recipe_id = "junk:<source_item_id>"
-func list_salvage_entries(inventory) -> Array:
+func list_salvage_entries(inventory, allow_pending_output: bool = false) -> Array:
 	var out: Array = []
 	if inventory == null:
 		return out
@@ -157,7 +169,8 @@ func list_salvage_entries(inventory) -> Array:
 		else:
 			var out_id: String = str(produces.get("item_id", ""))
 			var out_qty: int = int(produces.get("quantity", 0))
-			if not out_id.is_empty() and out_qty > 0 and inventory.has_method("can_accept") \
+			if not allow_pending_output and not out_id.is_empty() and out_qty > 0 \
+					and inventory.has_method("can_accept") \
 					and not inventory.can_accept(out_id, out_qty):
 				status = "output_full"
 		out.append({
@@ -198,7 +211,8 @@ func list_salvage_entries(inventory) -> Array:
 			if first_id.is_empty():
 				first_id = mid
 				first_qty = qty
-			if inventory.has_method("can_accept") and not inventory.can_accept(mid, qty):
+			if not allow_pending_output and inventory.has_method("can_accept") \
+					and not inventory.can_accept(mid, qty):
 				can_all = false
 		if first_id.is_empty():
 			continue
@@ -221,20 +235,20 @@ func list_salvage_entries(inventory) -> Array:
 	out.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
 	return out
 
-func first_ready_salvage_id(inventory) -> String:
-	for entry in list_salvage_entries(inventory):
+func first_ready_salvage_id(inventory, allow_pending_output: bool = false) -> String:
+	for entry in list_salvage_entries(inventory, allow_pending_output):
 		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
 			return str((entry as Dictionary).get("recipe_id", ""))
 	return ""
 
 ## Execute a listed salvage target id (recipe_id from list_salvage_entries).
-func execute_salvage_target(target_id: String, inventory, material_state) -> Dictionary:
+func execute_salvage_target(target_id: String, inventory, material_state, context: Dictionary = {}) -> Dictionary:
 	if target_id.is_empty() or inventory == null:
 		return {}
 	if target_id.begins_with("junk:"):
 		var junk_id: String = target_id.substr(5)
-		return salvage_junk_item(junk_id, inventory, material_state)
-	var produced: Dictionary = deconstruct(target_id, inventory, material_state)
+		return salvage_junk_item(junk_id, inventory, material_state, context)
+	var produced: Dictionary = deconstruct(target_id, inventory, material_state, context)
 	return produced
 
 ## Stream E: salvage the first inventory junk item that has a JunkYieldResolver
@@ -260,7 +274,7 @@ func salvage_junk(inventory, material_state) -> Dictionary:
 	return {}
 
 ## Stream E + REQ-CS-017: salvage one specific junk item_id if catalogued.
-func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary:
+func salvage_junk_item(item_id: String, inventory, material_state, context: Dictionary = {}) -> Dictionary:
 	if item_id.is_empty() or inventory == null:
 		return {}
 	if inventory.get_quantity(item_id) <= 0:
@@ -287,10 +301,8 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 		if material_id.is_empty() or quantity <= 0:
 			return {}
 		totals[material_id] = int(totals.get(material_id, 0)) + quantity
-	for material_id in totals:
-		if not candidate.can_accept(str(material_id), int(totals[material_id])):
-			return {}
 	var materials: Dictionary = {}
+	var output_lots: Array = []
 	var first_id: String = ""
 	var first_qty: int = 0
 	var quality: float = _resolve_yield_quality(float(source_lot.quality_score), 0, 1.0)
@@ -298,20 +310,36 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 		var y: Dictionary = yields[yield_index] as Dictionary
 		var mid2: String = str(y.get("material_id", ""))
 		var qty2: int = int(y.get("quantity", 0))
-		var added: int = candidate.add_lot({
+		var output_lot: Dictionary = {
 			"lot_id": _yield_lot_id("junk:%s" % item_id, str(source_lot.lot_id), yield_index, mid2),
 			"item_id": mid2, "quantity": qty2, "quality_score": quality,
 			"quality_tier": QualityTierResolverScript.tier_for_score(quality), "condition": 1.0,
 			"origin": {"junk_source": item_id, "source_lot_id": str(source_lot.lot_id)},
-		})
-		if added != qty2:
-			return {}
+		}
+		output_lots.append(output_lot)
 		materials[mid2] = int(materials.get(mid2, 0)) + qty2
 		if first_id.is_empty():
 			first_id = mid2
 			first_qty = qty2
-	if first_id.is_empty() or not inventory.apply_summary(candidate.get_summary()):
+	if first_id.is_empty():
 		return {}
+	var pending: RefCounted = context.get("pending_output_store", null) as RefCounted
+	if pending != null:
+		var receipt_id: String = _salvage_receipt_id(
+			str(context.get("ship_id", "")), str(context.get("station_instance_id", "")),
+			"junk:%s" % item_id, str(source_lot.lot_id))
+		if not _commit_pending_salvage(
+			pending, receipt_id, output_lots, inventory, candidate,
+			str(context.get("station_instance_id", "")), str(inventory.get_holder_namespace())):
+			return {}
+	else:
+		for output_lot_variant in output_lots:
+			var output_lot: Dictionary = output_lot_variant
+			if not candidate.can_accept(str(output_lot.item_id), int(output_lot.quantity)) \
+					or candidate.add_lot(output_lot) != int(output_lot.quantity):
+				return {}
+		if not inventory.apply_summary(candidate.get_summary()):
+			return {}
 	for material_id in materials:
 		if material_state != null and material_state.has_method("has_definition") \
 				and material_state.has_definition(str(material_id)) \
@@ -323,7 +351,49 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 		"source_junk": item_id,
 		"materials": materials,
 		"multi_yield": materials.size() > 1,
+		"pending": pending != null,
+		"deposited": pending == null,
+		"output_lots": output_lots,
 	}
+
+
+func _commit_pending_salvage(
+		store: RefCounted,
+		receipt_id: String,
+		lots: Array,
+		inventory: RefCounted,
+		inventory_candidate: RefCounted,
+		station_instance_id: String,
+		source_holder_id: String) -> bool:
+	if receipt_id.is_empty() or station_instance_id.is_empty() \
+			or not store.has_method("deposit_once") or not store.has_method("apply_summary"):
+		return false
+	var store_before: Dictionary = store.call("get_summary")
+	var inventory_before: Dictionary = inventory.call("get_summary")
+	var metadata: Dictionary = {
+		"station_instance_id": station_instance_id,
+		"producer_kind": "salvage",
+		"producer_id": receipt_id,
+		"purpose": "output",
+		"source_holder_id": source_holder_id,
+	}
+	# Existing receipts are terminal idempotency authority. Never consume a
+	# source again even if a crash left the source visible after publication.
+	if not bool(store.call("deposit_once", receipt_id, lots, metadata)):
+		return false
+	if inventory.call("apply_summary", inventory_candidate.call("get_summary")):
+		return true
+	# Both sides roll back when source publication fails.
+	store.call("apply_summary", store_before)
+	inventory.call("apply_summary", inventory_before)
+	return false
+
+
+static func _salvage_receipt_id(
+		ship_id: String, station_instance_id: String, target_id: String, source_lot_id: String) -> String:
+	if ship_id.is_empty() or station_instance_id.is_empty() or source_lot_id.is_empty():
+		return ""
+	return "%s/%s/salvage:%s:source=%s" % [ship_id, station_instance_id, target_id, source_lot_id]
 
 func _inventory_candidate(inventory):
 	if inventory == null or not inventory.has_method("get_summary") \

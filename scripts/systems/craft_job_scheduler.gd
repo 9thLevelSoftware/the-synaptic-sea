@@ -119,6 +119,8 @@ func enqueue(request: Dictionary, context: Dictionary) -> Dictionary:
 	queue.append(job_id)
 	_owner_queues[owner_key] = queue
 	_jobs[job_id] = job
+	if inventory.has_method("bind_craft_reservation_authority"):
+		inventory.call("bind_craft_reservation_authority", self)
 	return {"ok": true, "reason": "", "job_id": job_id, "state": job.phase}
 
 
@@ -219,13 +221,20 @@ func cancel(job_id: String, context: Dictionary) -> Dictionary:
 				and str(inventory.call("get_holder_namespace")) != str(job.get("source_holder_id")):
 			return _denied("source_holder_mismatch")
 		var escrow: Array = job.get("ingredient_escrow") as Array
-		if not _can_restore_all(inventory, escrow):
+		var can_restore: bool = bool(inventory.call(
+			"can_restore_craft_reservation", job_id, escrow, self)) \
+			if inventory.has_method("can_restore_craft_reservation") else _can_restore_all(inventory, escrow)
+		if not can_restore:
 			return {
 				"ok": false,
 				"reason": "refund_destination_full",
+				"receipt_id": "%s/refund" % job_id,
 				"recoverable_refund": escrow.duplicate(true),
 			}
-		if not _restore_lots(inventory, escrow):
+		var restored: bool = bool(inventory.call(
+			"restore_craft_reservation", job_id, escrow, self)) \
+			if inventory.has_method("restore_craft_reservation") else _restore_lots(inventory, escrow)
+		if not restored:
 			return _denied("refund_failed")
 		job.set("ingredient_escrow", [])
 		job.set("blocked_reason", "")
@@ -242,6 +251,8 @@ func cancel(job_id: String, context: Dictionary) -> Dictionary:
 
 
 func claim_output(job_id: String) -> Dictionary:
+	# Compatibility API for isolated legacy callers. Live completion uses
+	# peek_output -> PendingOutputStore.deposit_once -> acknowledge_output.
 	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
 	if job == null:
 		return _denied("unknown_job")
@@ -251,6 +262,103 @@ func claim_output(job_id: String) -> Dictionary:
 		return _denied("output_not_ready")
 	job.set("phase", CraftJobStateScript.PHASE_COLLECTED)
 	return _completion_receipt(job).merged({"ok": true, "reason": ""}, true)
+
+
+func peek_output(job_id: String) -> Dictionary:
+	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
+	if job == null:
+		return _denied("unknown_job")
+	if str(job.get("phase")) == CraftJobStateScript.PHASE_COLLECTED:
+		return {"ok": false, "reason": "already_collected", "receipt_id": str(job.get("output_receipt_id"))}
+	if str(job.get("phase")) != CraftJobStateScript.PHASE_OUTPUT_READY:
+		return _denied("output_not_ready")
+	return _completion_receipt(job).merged({"ok": true, "reason": ""}, true)
+
+
+func acknowledge_output(job_id: String, receipt_id: String) -> Dictionary:
+	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
+	if job == null:
+		return _denied("unknown_job")
+	if receipt_id.is_empty() or receipt_id != str(job.get("output_receipt_id")):
+		return _denied("receipt_mismatch")
+	if str(job.get("phase")) == CraftJobStateScript.PHASE_COLLECTED:
+		return {"ok": true, "reason": "", "already_acknowledged": true, "receipt_id": receipt_id}
+	if str(job.get("phase")) != CraftJobStateScript.PHASE_OUTPUT_READY:
+		return _denied("output_not_ready")
+	job.set("phase", CraftJobStateScript.PHASE_COLLECTED)
+	return {"ok": true, "reason": "", "already_acknowledged": false, "receipt_id": receipt_id}
+
+
+func peek_recoverable_refund(job_id: String, context: Dictionary) -> Dictionary:
+	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
+	if job == null:
+		return _denied("unknown_job")
+	if not bool(job.call("is_unstarted")):
+		return _denied("refund_not_available")
+	var owner_context: Dictionary = _context_for_station(
+		str(job.get("ship_id")), str(job.get("station_instance_id")), context)
+	var station: RefCounted = _station_state(str(job.get("station_instance_id")), owner_context)
+	var owner_check: Dictionary = _validate_owner_context(
+		str(job.get("ship_id")), str(job.get("station_instance_id")), station, owner_context)
+	if not bool(owner_check.get("ok", false)):
+		return owner_check
+	var lots: Array = (job.get("ingredient_escrow") as Array).duplicate(true)
+	if lots.is_empty():
+		return _denied("refund_not_available")
+	return {
+		"ok": true,
+		"reason": "",
+		"job_id": job_id,
+		"ship_id": str(job.get("ship_id")),
+		"station_instance_id": str(job.get("station_instance_id")),
+		"source_holder_id": str(job.get("source_holder_id")),
+		"receipt_id": "%s/refund" % job_id,
+		"refund_lots": lots,
+	}
+
+
+func acknowledge_refund_recovery(job_id: String, receipt_id: String, context: Dictionary) -> Dictionary:
+	var peeked: Dictionary = peek_recoverable_refund(job_id, context)
+	if not bool(peeked.get("ok", false)):
+		return peeked
+	if receipt_id != str(peeked.get("receipt_id", "")):
+		return _denied("receipt_mismatch")
+	var job: RefCounted = _jobs[job_id]
+	job.set("ingredient_escrow", [])
+	job.set("blocked_reason", "")
+	job.set("phase", CraftJobStateScript.PHASE_CANCELLED)
+	_remove_from_owner_queue(job)
+	var local: Dictionary = _context_for_station(
+		str(job.get("ship_id")), str(job.get("station_instance_id")), context)
+	_sync_station_projection(_station_state(str(job.get("station_instance_id")), local), null)
+	return {"ok": true, "reason": "", "receipt_id": receipt_id, "result": "recoverable_refund"}
+
+
+## Exact, nonserialized source-holder reservations. Ingredient escrow remains the
+## sole authority; holders use this read path for mass/capacity only.
+func get_reserved_lots_for_holder(holder_id: String, excluding_job_id: String = "") -> Array:
+	if holder_id.is_empty():
+		return []
+	var lots: Array = []
+	var job_ids: Array = _jobs.keys()
+	job_ids.sort()
+	for job_id_variant in job_ids:
+		var job_id: String = str(job_id_variant)
+		if job_id == excluding_job_id:
+			continue
+		var job: RefCounted = _jobs[job_id]
+		if bool(job.call("is_unstarted")) and str(job.get("source_holder_id")) == holder_id:
+			for lot_variant in job.get("ingredient_escrow") as Array:
+				lots.append((lot_variant as Dictionary).duplicate(true))
+	return lots
+
+
+func get_reservation_lots(job_id: String, holder_id: String) -> Array:
+	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
+	if job == null or not bool(job.call("is_unstarted")) \
+			or str(job.get("source_holder_id")) != holder_id:
+		return []
+	return (job.get("ingredient_escrow") as Array).duplicate(true)
 
 
 func get_job(job_id: String) -> Dictionary:

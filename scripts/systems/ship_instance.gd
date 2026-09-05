@@ -19,6 +19,7 @@ const ItemLotLedgerScript := preload("res://scripts/systems/item_lot_ledger.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
+const PendingOutputStoreScript := preload("res://scripts/systems/pending_output_store.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -64,6 +65,9 @@ var carts: Array = []                    # Array[CartState]
 # plus a ship-local Transform3D payload.
 var floor_drop_sequence: int = 0
 var floor_drop_descriptors: Dictionary = {}
+
+# P08: ship-owned registry for physical station outputs and recoverable refunds.
+var pending_outputs = null                # PendingOutputStore | null
 
 # Sub-project #2: per-derelict objective loop state. Lazily created; null for the
 # home ship (which uses the coordinator's singleton loop, not this controller).
@@ -145,6 +149,7 @@ static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_system
 	inst.scene_root = p_scene_root
 	return inst
 
+
 func get_summary() -> Dictionary:
 	var bp_dict: Dictionary = {}
 	if blueprint != null and blueprint.has_method("to_dict"):
@@ -185,6 +190,10 @@ func get_summary() -> Dictionary:
 		result["carts"] = cart_dicts
 	if floor_drop_sequence > 0 or not floor_drop_descriptors.is_empty():
 		result["floor_drops_v1"] = get_floor_drop_summary()
+	if pending_outputs != null and pending_outputs.has_method("get_summary"):
+		var pending_summary: Dictionary = pending_outputs.get_summary()
+		if not (pending_summary.get("records", []) as Array).is_empty():
+			result["pending_outputs_v1"] = pending_summary
 	# Persist whenever seeded or vented, not only while something still burns.
 	# A vents-only / extinguished derelict keeps fire_seeded=true; omitting the
 	# blob would skip seed on load and drop vented_compartments.
@@ -247,6 +256,14 @@ func apply_summary(summary) -> bool:
 		restored_floor = _validated_floor_drop_summary(summary["floor_drops_v1"], restored_ship_id)
 		if not bool(restored_floor.get("ok", false)):
 			return false
+	var restored_pending = PendingOutputStoreScript.new()
+	if not restored_pending.configure(restored_ship_id):
+		return false
+	if summary.has("pending_outputs_v1"):
+		var pending_variant: Variant = summary.get("pending_outputs_v1")
+		if not pending_variant is Dictionary \
+				or not restored_pending.apply_summary(pending_variant as Dictionary):
+			return false
 	ship_id = restored_ship_id
 	marker_id = str(summary.get("marker_id", marker_id))
 	var bp_dict: Variant = summary.get("blueprint", null)
@@ -302,6 +319,7 @@ func apply_summary(summary) -> bool:
 	carts = restored_carts
 	floor_drop_sequence = int(restored_floor.sequence)
 	floor_drop_descriptors = (restored_floor.drops as Dictionary).duplicate(true)
+	pending_outputs = restored_pending
 	var fire_summary: Variant = summary.get("fire", null)
 	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
 		get_fire().apply_summary(fire_summary as Dictionary)
@@ -358,6 +376,13 @@ func get_inventory():
 	if inventory == null:
 		inventory = ShipInventoryScript.create(ShipInventoryScript.MAX_WEIGHT_DEFAULT, _cargo_namespace(ship_id))
 	return inventory
+
+
+func get_pending_output_store():
+	if pending_outputs == null:
+		pending_outputs = PendingOutputStoreScript.new()
+		pending_outputs.configure(ship_id)
+	return pending_outputs
 
 ## True iff this ship's hold exists and holds at least one item.
 func has_cargo() -> bool:
@@ -428,6 +453,15 @@ func get_floor_drop_summary() -> Dictionary:
 		"drops": drops,
 	}
 
+
+func apply_floor_drop_summary(summary: Dictionary) -> bool:
+	var restored: Dictionary = _validated_floor_drop_summary(summary, ship_id)
+	if not bool(restored.get("ok", false)):
+		return false
+	floor_drop_sequence = int(restored.sequence)
+	floor_drop_descriptors = (restored.drops as Dictionary).duplicate(true)
+	return true
+
 static func transform_to_summary(value: Transform3D) -> Array:
 	return [
 		value.basis.x.x, value.basis.x.y, value.basis.x.z,
@@ -483,12 +517,16 @@ static func _validated_floor_drop_descriptor(raw: Dictionary, owner_ship_id: Str
 	if not ledger.apply_summary(lots as Dictionary, "floor:%s" % drop_id) \
 			or ledger.get_quantities().is_empty():
 		return {}
-	return {
+	var result: Dictionary = {
 		"drop_id": drop_id,
 		"ship_id": owner_ship_id,
 		"transform": (transform_summary as Array).duplicate(),
 		"item_lots_v1": ledger.get_summary(),
 	}
+	var pending_receipt_id: String = str(raw.get("pending_receipt_id", ""))
+	if not pending_receipt_id.is_empty():
+		result["pending_receipt_id"] = pending_receipt_id
+	return result
 
 static func _is_transform_summary(value: Variant) -> bool:
 	if not (value is Array) or (value as Array).size() != 12:

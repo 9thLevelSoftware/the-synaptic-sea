@@ -59,11 +59,32 @@ current-format field does not advance the outer `world-4` schema. P10 still owns
 the reserved ordered `world-5` migration, historical save fixtures, and any
 future change to the outer save version.
 
+JSON serializes integer quantities and receipt sequences as numbers that parse
+back as floating-point values in Godot. Current readers therefore accept only
+finite, exactly integral numeric values within the IEEE-754 safe integer range,
+then canonicalize them to integers. Strings, fractions, infinities, NaN, and
+values above `2^53 - 1` are malformed. Identifier fields remain actual strings;
+readers do not coerce numbers into IDs.
+
+Portable field work has no station owner while it follows the attended player.
+Its additive `field_pending_v1` summary retains the player-run-stable
+`active_receipt_id` and `receipt_sequence`, plus
+`pinned_destination_ship_id` and `pinned_local_position`. The pinned fields are
+empty until first publication. At that boundary the coordinator requires the
+player's current physical occupancy to be an attached `ShipInstance`, transforms
+the player position into that ship's local coordinates, and pins that ship and
+position before depositing. Once pinned, every retry, reload, orphan projection,
+and collection uses that same ship. Movement to another ship cannot rebind or
+teleport an existing receipt. If no attached occupied ship exists, the completed
+producer remains intact and retries after a valid occupancy appears.
+
 ## Consequences
 
 - Partial collection can prove exact conservation against immutable originals.
 - Station destruction can move remaining lots to a ship-owned floor descriptor
   and retain the receipt tombstone without creating a second authority.
 - Persisted data is larger because original lots and tombstones are retained.
+- A paid portable job may cross ships before publication; after publication its
+  physical receipt remains with the ship where completion was first published.
 - Any later rename or reinterpretation of these keys requires another
   superseding ADR and explicit migration evidence.

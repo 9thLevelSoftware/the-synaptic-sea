@@ -14,6 +14,7 @@ enum Status {
 }
 
 const DEFAULT_MAX_QUEUE: int = 8
+const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
 
 var station_kind: String = ""       # e.g. "fabricator", "workbench", "kitchen"
 var ship_id: String = ""            # physical owning ship for scheduled work
@@ -271,7 +272,7 @@ func _normalize_strict_summary(summary: Dictionary) -> Dictionary:
 		if typeof(summary.get(key, null)) != TYPE_STRING:
 			return {}
 	for key in ["level", "tier", "max_queue", "status"]:
-		if typeof(summary.get(key, null)) != TYPE_INT:
+		if not _is_nonnegative_json_integer(summary.get(key, null)):
 			return {}
 	if typeof(summary.get("powered", null)) != TYPE_BOOL \
 			or not summary.get("queue", null) is Array:
@@ -333,6 +334,14 @@ func _normalize_strict_summary(summary: Dictionary) -> Dictionary:
 		"status": next_status,
 		"queue": next_queue,
 	}
+
+
+static func _is_nonnegative_json_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return is_finite(number) and number >= 0.0 \
+		and number <= MAX_SAFE_JSON_INTEGER and number == floor(number)
 
 
 ## Read-only projection of the scheduler authority for existing station UI/status.

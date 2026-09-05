@@ -69,3 +69,20 @@ records both hashes and the reason for the change.
 The reusable capture utility must refuse existing outputs and protected
 historical/golden directories, including relative, traversal and Windows case
 variants. Future captures remain candidates until separately reviewed.
+
+## Connector-grown room footprint clarification (2026-09-05)
+
+ADR-0053 and REQ-ENC-001 define room occupancy as nonempty, four-connected
+integer cell sets. Since `f27c5b92`, connector growth may produce nonrectangular
+sets; a room's `footprint` records their bounding-box dimensions, not a promise
+that every cell in that box is occupied. For example, bifurcated seed 17 has a
+five-cell corridor inside a 2-by-3 box. Generation, serialization and structural
+compilation must preserve the actual occupied cells, including the unfilled cell.
+
+The earlier stress assertion from `eec54287` equating bounding-box area with
+cell count predates that contract. Its replacement must validate nonempty unique
+integer cells, four-connectivity and the exact derived bounding box while
+retaining floor ownership, portal and structural-compiler checks. Disconnected
+cells, duplicates and false bounding boxes must fail. This authorizes a focused
+fixture correction, not a change to generation or automatic acceptance of its
+implementation; independent review and fresh stress validation remain required.

@@ -294,6 +294,10 @@ to isolate its persistence case from ambient fire, and `room_assigner.gd` with
 Under ADR-0064, `capture_current_topology_fixture.gd` and
 `procgen_golden_parity_smoke.gd` may capture and compare the versioned current
 topology fixture without treating an unreviewed capture as acceptance evidence.
+The focused `procgen_layout_stress_smoke.gd` may replace its stale filled-rectangle
+assumption with ADR-0053's actual contract: non-empty unique integer cells, exact
+bounding box and 4-connected topology, while retaining floor, portal and room-
+ownership checks.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 
@@ -560,7 +564,8 @@ different stations never overwrite another station's active job.
 **Allowed files:** ADR-0062 for the reviewed `pending_outputs_v1` correction; new
 `pending_output_store.gd`; `craft_job_scheduler.gd` only its
 non-destructive output/refund peek and exact-receipt acknowledgement APIs;
-`crafting_state.gd`, `field_crafting_state.gd`, `deconstruction_resolver.gd`,
+`crafting_state.gd`, `station_state.gd` only strict JSON-safe integral restore,
+`field_crafting_state.gd`, `deconstruction_resolver.gd`,
 `ship_instance.gd`, `inventory_state.gd`, `ship_inventory.gd`, and `world_snapshot.gd`
 under systems; `crafting_station.gd`, `work_yield_drop.gd` under tools; coordinator
 completion, station-destruction, and whole-world holder preflight seams; new
@@ -576,6 +581,11 @@ gate only while the run is active, the player exists and is not incapacitated, a
 is above the established `0.001` work threshold. Losing attendance pauses the same paid
 job; UI input capture does not pause it. **Non-goals:** infinite hidden player storage,
 field station-radius or hold-input requirements.
+Before first publication, a paid field job follows the attended player across ships.
+At first publication it pins the current attached physical occupancy plus the player's
+ship-local position in `field_pending_v1`; retries, JSON reload, orphan recovery and
+collection cannot rebind that receipt. With no attached occupied ship, completed output
+stays at the producer until a valid owner exists and never falls back to home.
 
 - [ ] Fill output stacks after work starts; reproduce any craft/deconstruction loss.
   Test multi-output salvage with only one destination having room.
@@ -587,7 +597,9 @@ field station-radius or hold-input requirements.
   after station destruction; never place it in inaccessible removed geometry.
 - [ ] Exercise the actual home and away coordinator process paths: exhausted,
   incapacitated, or ended runs preserve field-job progress and payment; recovered
-  attendance resumes it, including while a UI panel captures movement input.
+  attendance resumes it, including while a UI panel captures movement input. Start at
+  home, complete on an attached away ship, then reload/revisit/collect the pinned exact
+  receipt once; repeated retries must neither rebind it nor duplicate value.
 - [ ] Run P08, `main_playable_slice_station_craft_smoke.gd`,
   `main_playable_slice_salvage_picker_smoke.gd`; test save/revisit/partial collection.
 
@@ -737,10 +749,16 @@ noise completion and XP once. A changed target revision returns `stale_target`.
 
 **Depends:** P07, P12. **Requirements:** FC-15.
 **Allowed files:** new `ship_work_context.gd`; `ship_runtime.gd`, `ship_instance.gd`,
+`crafting_state.gd` only preventing the generic picker tier from seeding a newly
+created physical station owner;
 `ship_access_state.gd`; `ship_modification_panel.gd` only storing/exposing its bound
-ship ID and emitting that ID with install/uninstall requests; coordinator
+ship ID and binding generation and emitting them with install/uninstall requests; coordinator
 ownership/binding/attach/detach seams;
-new `fc_p13_smoke.gd`. **Non-goals:** multiplayer authority or unrelated extraction.
+new `fc_p13_smoke.gd`; timed physical-slot fixture migration in
+`ship_mod_inventory_sync_away_smoke.gd` and both home/away
+`ship_mod_system_effect` smokes; bound-ship and generation callback assertions in
+`ship_modification_panel_smoke.gd`. **Non-goals:** multiplayer authority or unrelated
+extraction.
 
 Known physically reachable unclaimed ships may be selected without ownership;
 access remains action-specific. Permanent install/remove requires access, while
