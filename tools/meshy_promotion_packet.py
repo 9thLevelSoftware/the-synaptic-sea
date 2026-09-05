@@ -9,6 +9,7 @@ runtime asset, catalog, wrapper, index, or imported sidecar.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -16,7 +17,7 @@ import re
 import stat
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 from urllib.parse import parse_qsl, urlsplit
 
 if __package__ in (None, ""):
@@ -30,10 +31,26 @@ from tools.meshy_asset_contract import canonical_json_bytes, load_contract  # no
 PROP_OVERLAY_NAME = "sidecar-overlay.json"
 THREAT_PATCH_NAME = "threat_visual_catalog.patch.json"
 ASSET_PROVENANCE_NAME = "asset-provenance.json"
+BIOMASS_CATALOG_PATCH_NAME = "biomass_part_catalog.patch.json"
+BIOMASS_WRAPPER_PROPOSAL_NAME = "biomass_wrapper.proposal.json"
 PROP_DOCUMENT_KIND = "meshy_sidecar_overlay"
 THREAT_DOCUMENT_KIND = "meshy_threat_promotion_proposal"
 THREAT_PATCH_DOCUMENT_KIND = "threat_visual_catalog_patch"
 ASSET_PROVENANCE_DOCUMENT_KIND = "asset_provenance"
+BIOMASS_CATALOG_PATCH_DOCUMENT_KIND = "biomass_part_catalog_patch_v1"
+BIOMASS_WRAPPER_DOCUMENT_KIND = "biomass_wrapper_proposal_v1"
+BIOMASS_CATALOG_RELATIVE = Path("data/combat/biomass_part_catalog.json")
+BIOMASS_MASTER_ROOT = Path("/Volumes/Untitled/SynapticSeaAssets/meshy/source")
+BIOMASS_EVIDENCE_ROOT = Path("/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot")
+BIOMASS_CATEGORIES = frozenset(
+    (
+        "biomass_core",
+        "biomass_limb",
+        "biomass_head",
+        "biomass_connector",
+        "biomass_appendage",
+    )
+)
 IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -62,6 +79,9 @@ SIGNED_QUERY_KEYS = {
     "sv",
     "token",
 }
+
+# Test-only fault-injection seam. Normal operation leaves this as None.
+_BIOMASS_AFTER_LEAF_HOOK: Callable[[Path, int], None] | None = None
 
 PathLike = Union[str, Path]
 
@@ -602,6 +622,754 @@ def write_threat_promotion_proposal(
     return proposal
 
 
+# Biomass part promotion ---------------------------------------------------
+
+
+def _biomass_lexical(path: PathLike, base: Optional[Path] = None) -> Path:
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = (base or Path.cwd()) / candidate
+    return Path(os.path.abspath(os.fspath(candidate)))
+
+
+def _biomass_contained(root: Path, candidate: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _biomass_reject_symlink_components(path: Path, label: str) -> None:
+    absolute = _biomass_lexical(path)
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            break
+        except OSError as exc:
+            raise PromotionPacketError(f"{label} could not be inspected") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise PromotionPacketError(f"{label} contains a symlink component")
+
+
+def _biomass_regular_file(path: Path, label: str, *, private: bool = False) -> os.stat_result:
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise PromotionPacketError(f"missing {label}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_size <= 0:
+        raise PromotionPacketError(f"{label} must be a non-empty regular file")
+    if private and stat.S_IMODE(info.st_mode) != 0o600:
+        raise PromotionPacketError(f"{label} must use mode 0600")
+    return info
+
+
+def _biomass_private_directory(path: Path, label: str) -> Path:
+    _biomass_reject_symlink_components(path, label)
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise PromotionPacketError(f"missing {label}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise PromotionPacketError(f"{label} must be a regular directory")
+    if stat.S_IMODE(info.st_mode) != 0o700:
+        raise PromotionPacketError(f"{label} must use mode 0700")
+    return path
+
+
+def _biomass_project_file(
+    root: Path, value: PathLike, label: str, *, expected: Optional[Path] = None
+) -> Path:
+    candidate = _biomass_lexical(value, root)
+    if not _biomass_contained(root, candidate):
+        raise PromotionPacketError(f"{label} must be inside the project root")
+    _biomass_reject_symlink_components(candidate, label)
+    if expected is not None and candidate != expected:
+        raise PromotionPacketError(f"{label} is not the repository-authoritative path")
+    _biomass_regular_file(candidate, label)
+    return candidate
+
+
+def _biomass_external_file(path: Path, label: str) -> Path:
+    _biomass_reject_symlink_components(path, label)
+    _biomass_regular_file(path, label)
+    return path
+
+
+def _biomass_canonical_document(path: Path, label: str) -> Tuple[Dict[str, Any], bytes]:
+    try:
+        document, raw = governance.strict_load_json_bytes(path, label, 4 * 1024 * 1024)
+        if raw != canonical_json_bytes(document):
+            raise PromotionPacketError(f"{label} is not canonical JSON")
+    except PromotionPacketError:
+        raise
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError(f"{label} is not valid canonical JSON") from exc
+    return document, raw
+
+
+def _biomass_validate_artifact(
+    value: object, path: Path, label: str, *, private: bool = True
+) -> Tuple[str, int]:
+    if not isinstance(value, Mapping) or set(value) != {"path", "sha256", "byte_size"}:
+        raise PromotionPacketError(f"{label} artifact record is not closed")
+    declared_path = value.get("path")
+    declared_hash = value.get("sha256")
+    declared_size = value.get("byte_size")
+    if declared_path != str(path):
+        raise PromotionPacketError(f"{label} path is not canonical")
+    if not isinstance(declared_hash, str) or SHA256_RE.fullmatch(declared_hash) is None:
+        raise PromotionPacketError(f"{label} hash is invalid")
+    if not isinstance(declared_size, int) or isinstance(declared_size, bool) or declared_size <= 0:
+        raise PromotionPacketError(f"{label} byte size is invalid")
+    _biomass_regular_file(path, label, private=private)
+    actual_hash = _hash_file(path, label)
+    actual_size = path.stat().st_size
+    if declared_hash != actual_hash or declared_size != actual_size:
+        raise PromotionPacketError(f"{label} does not match its artifact record")
+    return actual_hash, actual_size
+
+
+def _biomass_validate_render(value: object, path: Path, label: str) -> Tuple[str, int]:
+    if not isinstance(value, Mapping) or set(value) != {"sha256", "byte_size", "width", "height"}:
+        raise PromotionPacketError(f"{label} record is not closed")
+    declared_hash = value.get("sha256")
+    declared_size = value.get("byte_size")
+    if not isinstance(declared_hash, str) or SHA256_RE.fullmatch(declared_hash) is None:
+        raise PromotionPacketError(f"{label} hash is invalid")
+    if not isinstance(declared_size, int) or isinstance(declared_size, bool) or declared_size <= 0:
+        raise PromotionPacketError(f"{label} byte size is invalid")
+    for field in ("width", "height"):
+        dimension = value.get(field)
+        if not isinstance(dimension, int) or isinstance(dimension, bool) or dimension <= 0:
+            raise PromotionPacketError(f"{label} {field} is invalid")
+    _biomass_regular_file(path, label, private=True)
+    actual_hash = _hash_file(path, label)
+    actual_size = path.stat().st_size
+    if declared_hash != actual_hash or declared_size != actual_size:
+        raise PromotionPacketError(f"{label} does not match its artifact record")
+    return actual_hash, actual_size
+
+
+def _biomass_expected_evidence(asset_id: str, task_id: str) -> Path:
+    return _biomass_lexical(BIOMASS_EVIDENCE_ROOT) / asset_id / task_id
+
+
+def _biomass_expected_master(asset_id: str) -> Path:
+    return _biomass_lexical(BIOMASS_MASTER_ROOT) / asset_id / f"{asset_id}_master.blend"
+
+
+def _biomass_socket_catalog_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    sockets = entry.get("sockets")
+    if not isinstance(sockets, list):
+        raise PromotionPacketError("biomass catalog sockets are invalid")
+    result: List[Dict[str, Any]] = []
+    names: set[str] = set()
+    for index, socket in enumerate(sockets):
+        if not isinstance(socket, Mapping):
+            raise PromotionPacketError(f"biomass catalog socket {index} is invalid")
+        required = {"name", "kind", "accepts_categories", "position_m", "rotation_deg"}
+        if set(socket) != required:
+            raise PromotionPacketError(f"biomass catalog socket {index} is not closed")
+        name = socket.get("name")
+        if not isinstance(name, str) or not name or name in names:
+            raise PromotionPacketError("biomass catalog socket names are invalid")
+        names.add(name)
+        result.append(
+            {
+                "name": name,
+                "kind": socket["kind"],
+                "position_m": copy.deepcopy(socket["position_m"]),
+                "rotation_deg": copy.deepcopy(socket["rotation_deg"]),
+            }
+        )
+    result.sort(key=lambda value: value["name"])
+    return {
+        "category": entry.get("category"),
+        "assembly_roles": copy.deepcopy(entry.get("assembly_roles")),
+        "sockets": result,
+    }
+
+
+def _biomass_load_catalog(
+    root: Path, part_catalog_path: PathLike, expected_hash: str, asset_id: str
+) -> Tuple[Path, Dict[str, Any], Dict[str, Any]]:
+    if SHA256_RE.fullmatch(expected_hash) is None:
+        raise PromotionPacketError("expected part catalog hash is invalid")
+    expected_path = root / BIOMASS_CATALOG_RELATIVE
+    catalog_path = _biomass_project_file(
+        root, part_catalog_path, "part catalog", expected=expected_path
+    )
+    actual_hash = _hash_file(catalog_path, "part catalog")
+    if actual_hash != expected_hash:
+        raise PromotionPacketError("part catalog hash does not match expected hash")
+    try:
+        document, _raw = governance.strict_load_json_bytes(
+            catalog_path, "part catalog", 4 * 1024 * 1024
+        )
+        from tools import biomass_catalog_validate
+
+        errors = biomass_catalog_validate.validate_part_catalog(document, root)
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("part catalog is not a valid biomass catalog") from exc
+    if errors:
+        raise PromotionPacketError("part catalog is not repository-authoritative: " + "; ".join(errors))
+    parts = document.get("parts")
+    if not isinstance(parts, dict) or asset_id not in parts or not isinstance(parts[asset_id], dict):
+        raise PromotionPacketError("part catalog lacks the exact contract asset entry")
+    return catalog_path, copy.deepcopy(document), copy.deepcopy(parts[asset_id])
+
+
+def _biomass_validate_contract_binding(
+    root: Path,
+    resolved_task: Path,
+    contract_path: PathLike,
+    generation: Mapping[str, Any],
+) -> Tuple[Path, Path, Any, Dict[str, Any], bytes]:
+    task_contract_path = candidate_review._governed_artifact(
+        root, resolved_task, "contract.json"
+    )
+    task_contract_document, task_contract_raw = _biomass_canonical_document(
+        task_contract_path, "task contract"
+    )
+    try:
+        task_contract = load_contract(task_contract_path)
+        caller_path = _biomass_project_file(root, contract_path, "caller contract")
+        caller_contract = load_contract(caller_path)
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("caller contract is not valid") from exc
+    if caller_contract.snapshot_bytes() != task_contract.snapshot_bytes():
+        raise PromotionPacketError("caller contract does not match task-local contract")
+    contract_artifact_hash = hashlib.sha256(task_contract_raw).hexdigest()
+    if generation.get("contract_artifact_sha256") != contract_artifact_hash:
+        raise PromotionPacketError("generation contract artifact is not bound")
+    if generation.get("contract_sha256") != caller_contract.sha256:
+        raise PromotionPacketError("generation contract hash is not bound to caller contract")
+    if task_contract_document != task_contract.document:
+        raise PromotionPacketError("task contract snapshot changed during verification")
+    return task_contract_path, caller_path, caller_contract, task_contract_document, task_contract_raw
+
+
+def _biomass_validate_task_records(
+    root: Path,
+    resolved_task: Path,
+    asset_id: str,
+    task_id: str,
+    contract_path: PathLike,
+    generation: Mapping[str, Any],
+) -> Dict[str, Any]:
+    task_contract_path, caller_path, contract, contract_document, task_contract_raw = _biomass_validate_contract_binding(
+        root, resolved_task, contract_path, generation
+    )
+    category = contract_document.get("category")
+    if category not in BIOMASS_CATEGORIES:
+        raise PromotionPacketError("contract category is not one of the five biomass categories")
+    if contract.asset_id != asset_id:
+        raise PromotionPacketError("contract asset_id does not match task directory")
+    generation_path = candidate_review._governed_artifact(root, resolved_task, "generation.json")
+    _biomass_regular_file(generation_path, "generation.json", private=True)
+    generation_hash = _hash_file(generation_path, "generation.json")
+    outputs = generation.get("outputs")
+    raw_output = outputs.get("raw.glb") if isinstance(outputs, Mapping) else None
+    if not isinstance(raw_output, Mapping):
+        raise PromotionPacketError("generation raw.glb output is missing")
+    raw_hash = raw_output.get("sha256")
+    raw_size = raw_output.get("byte_size")
+    if not isinstance(raw_hash, str) or SHA256_RE.fullmatch(raw_hash) is None:
+        raise PromotionPacketError("generation raw.glb hash is invalid")
+    if not isinstance(raw_size, int) or isinstance(raw_size, bool) or raw_size <= 0:
+        raise PromotionPacketError("generation raw.glb byte size is invalid")
+    raw_path = resolved_task / "raw.glb"
+    _biomass_regular_file(raw_path, "raw.glb", private=True)
+    if _hash_file(raw_path, "raw.glb") != raw_hash or raw_path.stat().st_size != raw_size:
+        raise PromotionPacketError("raw.glb does not match generation evidence")
+    return {
+        "task_contract_path": task_contract_path,
+        "caller_contract_path": caller_path,
+        "contract": contract,
+        "contract_document": contract_document,
+        "task_contract_raw": task_contract_raw,
+        "generation_path": generation_path,
+        "generation_sha256": generation_hash,
+        "raw_path": raw_path,
+        "raw_sha256": raw_hash,
+        "raw_byte_size": raw_size,
+    }
+
+
+def _biomass_validate_external_evidence(
+    root: Path,
+    resolved_task: Path,
+    asset_id: str,
+    task_id: str,
+    contract: Any,
+    task_records: Mapping[str, Any],
+) -> Dict[str, Any]:
+    evidence_dir = _biomass_expected_evidence(asset_id, task_id)
+    _biomass_private_directory(evidence_dir, "biomass evidence directory")
+    source_path = evidence_dir / "source-raw-manifest.json"
+    source, source_raw = _biomass_canonical_document(source_path, "source-raw-manifest.json")
+    try:
+        from tools import meshy_biomass_part_recipe as recipe
+
+        source = dict(recipe.load_source_raw_manifest(source_path))
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("source-raw-manifest.json is not canonical Task 10 evidence") from exc
+    if (
+        source.get("asset_id") != asset_id
+        or source.get("task_id") != task_id
+        or source.get("contract_sha256") != contract.sha256
+        or source.get("generation_sha256") != task_records["generation_sha256"]
+    ):
+        raise PromotionPacketError("source raw manifest is not bound to the selected task")
+    raw_path = task_records["raw_path"]
+    archive_path = evidence_dir / "source.raw.glb"
+    raw_hash, raw_size = _biomass_validate_artifact(
+        source.get("raw_source"), raw_path, "source raw output"
+    )
+    archive_hash, archive_size = _biomass_validate_artifact(
+        source.get("archive"), archive_path, "source raw archive"
+    )
+    if (raw_hash, raw_size) != (archive_hash, archive_size) != (
+        task_records["raw_sha256"],
+        task_records["raw_byte_size"],
+    ):
+        raise PromotionPacketError("source raw manifest does not match generation raw output")
+
+    preview_manifest_path = evidence_dir / "biomass-part-preview.json"
+    approval_path = evidence_dir / "biomass-part-preview-approval.json"
+    preview_path = evidence_dir / "cleaned.preview.glb"
+    preview, preview_raw = _biomass_canonical_document(
+        preview_manifest_path, "biomass-part-preview.json"
+    )
+    approval, approval_raw = _biomass_canonical_document(
+        approval_path, "biomass-part-preview-approval.json"
+    )
+    try:
+        preview = dict(recipe.load_preview_manifest(preview_manifest_path))
+        approval = dict(recipe.load_preview_approval(approval_path))
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("Task 10 preview evidence is not canonical") from exc
+    _biomass_regular_file(preview_path, "cleaned.preview.glb", private=True)
+    preview_hash = hashlib.sha256(preview_raw).hexdigest()
+    approval_hash = hashlib.sha256(approval_raw).hexdigest()
+    if approval.get("preview_manifest_sha256") != preview_hash:
+        raise PromotionPacketError("preview approval does not bind preview manifest")
+    if (
+        preview.get("asset_id") != asset_id
+        or preview.get("task_id") != task_id
+        or preview.get("contract_sha256") != contract.sha256
+        or preview.get("generation_sha256") != task_records["generation_sha256"]
+        or preview.get("source_raw_manifest_sha256") != hashlib.sha256(source_raw).hexdigest()
+        or preview.get("raw_sha256") != task_records["raw_sha256"]
+        or preview.get("archive_sha256") != task_records["raw_sha256"]
+        or preview.get("preview_glb", {}).get("path") != str(preview_path)
+    ):
+        raise PromotionPacketError("preview manifest is not bound to the selected task")
+    preview_artifact_hash, preview_artifact_size = _biomass_validate_artifact(
+        preview.get("preview_glb"), preview_path, "cleaned preview GLB"
+    )
+    if approval.get("preview_glb_sha256") != preview_artifact_hash:
+        raise PromotionPacketError("preview approval GLB hash does not match preview")
+    renders = preview.get("renders")
+    render_hashes = approval.get("render_hashes")
+    if not isinstance(renders, Mapping) or not isinstance(render_hashes, Mapping):
+        raise PromotionPacketError("preview render evidence is missing")
+    for name, record in renders.items():
+        if not isinstance(record, Mapping):
+            raise PromotionPacketError("preview render record is invalid")
+        render_path = evidence_dir / name
+        _biomass_validate_render(record, render_path, "preview render " + name)
+        if render_hashes.get(name) != record.get("sha256"):
+            raise PromotionPacketError("preview approval render hash does not match preview")
+    if approval.get("asset_id") != asset_id or approval.get("task_id") != task_id:
+        raise PromotionPacketError("preview approval identity is not bound")
+    if approval.get("contract_sha256") != contract.sha256:
+        raise PromotionPacketError("preview approval contract hash is not bound")
+    if approval.get("generation_sha256") != task_records["generation_sha256"]:
+        raise PromotionPacketError("preview approval generation hash is not bound")
+    return {
+        "evidence_dir": evidence_dir,
+        "source": source,
+        "source_sha256": hashlib.sha256(source_raw).hexdigest(),
+        "preview": preview,
+        "preview_sha256": preview_hash,
+        "preview_glb_sha256": preview_artifact_hash,
+        "preview_glb_byte_size": preview_artifact_size,
+        "approval": approval,
+        "approval_sha256": approval_hash,
+    }
+
+
+def _biomass_validate_recipe_and_reports(
+    root: Path,
+    resolved_task: Path,
+    asset_id: str,
+    task_id: str,
+    contract: Any,
+    task_records: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    catalog_hash: str,
+    catalog_entry: Mapping[str, Any],
+) -> Dict[str, Any]:
+    recipe_path = resolved_task / "biomass-part-recipe.json"
+    recipe_manifest, recipe_raw = _biomass_canonical_document(
+        recipe_path, "biomass-part-recipe.json"
+    )
+    try:
+        from tools import meshy_biomass_part_recipe as recipe_module
+
+        recipe_manifest = dict(recipe_module.load_recipe_manifest(recipe_path))
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("biomass-part-recipe.json is not canonical Task 10 evidence") from exc
+    master_path = _biomass_expected_master(asset_id)
+    _biomass_external_file(master_path, "canonical Blender master")
+    master_hash = _hash_file(master_path, "canonical Blender master")
+    cleaned_path = resolved_task / "cleaned.glb"
+    cleaned_info = _biomass_regular_file(cleaned_path, "cleaned.glb", private=True)
+    cleaned_hash = _hash_file(cleaned_path, "cleaned.glb")
+    source_hash = evidence["source_sha256"]
+    preview = evidence["preview"]
+    approval = evidence["approval"]
+    common_bindings = {
+        "asset_id": asset_id,
+        "task_id": task_id,
+        "contract_sha256": contract.sha256,
+        "part_catalog_sha256": catalog_hash,
+        "generation_sha256": task_records["generation_sha256"],
+        "source_raw_manifest_sha256": source_hash,
+        "raw_sha256": task_records["raw_sha256"],
+        "archive_sha256": task_records["raw_sha256"],
+        "master_path": str(master_path),
+        "master_sha256": master_hash,
+    }
+    for field, value in common_bindings.items():
+        if preview.get(field) != value:
+            raise PromotionPacketError(f"preview {field} is not bound to the selected evidence")
+        if approval.get(field) != value:
+            raise PromotionPacketError(f"preview approval {field} is not bound to the selected evidence")
+    if (
+        approval.get("preview_manifest_sha256") != evidence["preview_sha256"]
+        or approval.get("preview_glb_sha256") != preview.get("preview_glb", {}).get("sha256")
+        or approval.get("render_hashes")
+        != {
+            name: record["sha256"]
+            for name, record in preview.get("renders", {}).items()
+        }
+    ):
+        raise PromotionPacketError("preview approval does not bind the approved preview evidence")
+    expected = {
+        **common_bindings,
+        "preview_approval_sha256": evidence["approval_sha256"],
+    }
+    for field, value in expected.items():
+        if recipe_manifest.get(field) != value:
+            raise PromotionPacketError(f"recipe {field} is not bound to the selected evidence")
+    for field in (
+        "dimensions_m",
+        "low_poly_target",
+        "material_names",
+        "material_slot_count",
+        "uvs_present",
+        "socket_guides",
+        "socket_guides_exported",
+        "source_raw_preserved",
+        "runtime_promoted",
+    ):
+        if recipe_manifest.get(field) != preview.get(field):
+            raise PromotionPacketError(f"recipe {field} differs from the approved preview")
+    _biomass_validate_artifact(recipe_manifest.get("cleaned_glb"), cleaned_path, "recipe cleaned GLB")
+    if recipe_manifest["cleaned_glb"]["sha256"] != cleaned_hash:
+        raise PromotionPacketError("recipe cleaned GLB hash does not match cleaned.glb")
+    try:
+        from tools.meshy_biomass_part_recipe import build_socket_guides, triangle_limits
+
+        expected_guides = [
+            {"name": guide.name, "position_m": list(guide.position_m), "rotation_deg": list(guide.rotation_deg)}
+            for guide in build_socket_guides(catalog_entry)
+        ]
+        target, hard_max = triangle_limits(contract)
+    except (OSError, TypeError, ValueError, RecursionError) as exc:
+        raise PromotionPacketError("catalog socket or contract limits are invalid") from exc
+    low_poly = recipe_manifest.get("low_poly_target")
+    if not isinstance(low_poly, Mapping) or low_poly.get("target_triangles") != target or low_poly.get("hard_max") != hard_max:
+        raise PromotionPacketError("recipe triangle limits do not match the contract")
+    measured = low_poly.get("measured_triangles")
+    expected_status = "met" if isinstance(measured, int) and measured <= target else "review_required"
+    if low_poly.get("status") != expected_status or not isinstance(measured, int) or measured > hard_max:
+        raise PromotionPacketError("recipe triangle evidence is invalid")
+    if recipe_manifest.get("socket_guides") != expected_guides:
+        raise PromotionPacketError("recipe socket inventory does not match the catalog")
+    if (
+        recipe_manifest.get("socket_guides_exported") is not False
+        or recipe_manifest.get("source_raw_preserved") is not True
+        or recipe_manifest.get("runtime_promoted") is not False
+        or recipe_manifest.get("uvs_present") is not True
+    ):
+        raise PromotionPacketError("recipe visual-only policy flags are invalid")
+
+    report_path = resolved_task / "blender-validation.json"
+    report, report_raw = _biomass_canonical_document(report_path, "blender-validation.json")
+    _biomass_regular_file(report_path, "blender-validation.json", private=True)
+    if report.get("master_provenance") is not None:
+        raise PromotionPacketError("blender-validation.json master_provenance must be null")
+    try:
+        from tools import meshy_blender_validate as blender_validate
+
+        blender_validate._validate_report_record(report)
+        expected_report = blender_validate.verify_validation_report(
+            cleaned_path,
+            task_records["task_contract_path"],
+            report,
+            task_id=task_id,
+            expected_contract_sha256=contract.sha256,
+        )
+    except Exception as exc:
+        raise PromotionPacketError("Blender validation evidence is not bound to cleaned.glb") from exc
+    if (
+        report.get("task_id") != task_id
+        or report.get("asset_id") != asset_id
+        or report.get("contract_sha256") != contract.sha256
+        or report.get("sha256") != cleaned_hash
+        or report.get("byte_size") != cleaned_info.st_size
+        or recipe_manifest["low_poly_target"]["measured_triangles"]
+        != report.get("triangle_count")
+        or recipe_manifest.get("uvs_present") != report.get("uvs_present")
+        or not isinstance(expected_report, Mapping)
+        or expected_report.get("master_provenance") is not None
+    ):
+        raise PromotionPacketError("Blender validation identity or visual-only policy is invalid")
+    runtime_path = root / "artifacts/validation-previews/meshy" / asset_id / "runtime-review.json"
+    runtime_report = None
+    try:
+        from tools import meshy_runtime_review
+
+        runtime_report = meshy_runtime_review.verify_evidence_chain(root, resolved_task)
+    except Exception as exc:
+        raise PromotionPacketError("runtime review evidence is not fully bound") from exc
+    if not isinstance(runtime_report, Mapping):
+        raise PromotionPacketError("runtime review report is invalid")
+    runtime_hash = _hash_file(runtime_path, "runtime-review.json")
+    if (
+        runtime_report.get("asset_id") != asset_id
+        or runtime_report.get("task_id") != task_id
+        or runtime_report.get("contract_sha256") != contract.sha256
+        or runtime_report.get("cleaned_glb_sha256") != cleaned_hash
+        or runtime_report.get("blender_validation_sha256") != hashlib.sha256(report_raw).hexdigest()
+    ):
+        raise PromotionPacketError("runtime review cross-record binding is invalid")
+    if recipe_manifest.get("dimensions_m") != report.get("bounds", {}).get("dimensions"):
+        raise PromotionPacketError("recipe dimensions do not match Blender validation")
+    if recipe_manifest.get("material_names") != report.get("material_names") or recipe_manifest.get("material_slot_count") != len(report.get("material_names", [])):
+        raise PromotionPacketError("recipe material evidence does not match Blender validation")
+    return {
+        "recipe": recipe_manifest,
+        "recipe_sha256": hashlib.sha256(recipe_raw).hexdigest(),
+        "master_path": master_path,
+        "master_sha256": master_hash,
+        "cleaned_path": cleaned_path,
+        "cleaned_sha256": cleaned_hash,
+        "validation_path": report_path,
+        "validation_sha256": hashlib.sha256(report_raw).hexdigest(),
+        "runtime_path": runtime_path,
+        "runtime_sha256": runtime_hash,
+        "report": report,
+    }
+
+
+def build_biomass_part_promotion_proposal(
+    project_root: PathLike,
+    contract_path: PathLike,
+    task_dir: PathLike,
+    evidence_dir: PathLike,
+    part_catalog_path: PathLike,
+    expected_part_catalog_sha256: str,
+) -> dict[str, dict[str, Any]]:
+    """Build three review-only biomass packet documents without writing them."""
+    root, resolved_task, asset_id, task_id, envelope, generation = _verified_task(
+        project_root, task_dir
+    )
+    requested_evidence = _biomass_lexical(evidence_dir)
+    expected_evidence = _biomass_expected_evidence(asset_id, task_id)
+    if requested_evidence != expected_evidence:
+        raise PromotionPacketError("evidence directory must be the exact asset/task evidence leaf")
+    _biomass_reject_symlink_components(requested_evidence, "evidence directory")
+    task_records = _biomass_validate_task_records(
+        root, resolved_task, asset_id, task_id, contract_path, generation
+    )
+    contract = task_records["contract"]
+    catalog_path, _catalog_document, catalog_entry = _biomass_load_catalog(
+        root, part_catalog_path, expected_part_catalog_sha256, asset_id
+    )
+    if catalog_entry.get("category") != contract.document.get("category"):
+        raise PromotionPacketError("catalog category does not match the biomass contract")
+    evidence = _biomass_validate_external_evidence(
+        root, resolved_task, asset_id, task_id, contract, task_records
+    )
+    records = _biomass_validate_recipe_and_reports(
+        root,
+        resolved_task,
+        asset_id,
+        task_id,
+        contract,
+        task_records,
+        evidence,
+        expected_part_catalog_sha256,
+        catalog_entry,
+    )
+    wrapper_target = f"res://scenes/wrappers/biomass/{asset_id}.tscn"
+    import_target = f"res://assets/imported/threats/biomass/{asset_id}.glb"
+    catalog_target = "res://data/combat/biomass_part_catalog.json"
+    updated_entry = copy.deepcopy(catalog_entry)
+    updated_entry["wrapper_scene_path"] = wrapper_target
+    wrapper_catalog_entry = _biomass_socket_catalog_entry(catalog_entry)
+    patch = {
+        "schema_version": "1.0.0",
+        "document_kind": BIOMASS_CATALOG_PATCH_DOCUMENT_KIND,
+        "asset_id": asset_id,
+        "catalog_target": catalog_target,
+        "catalog_entry": updated_entry,
+        "operations": [
+            {
+                "op": "replace",
+                "path": f"/parts/{asset_id}/wrapper_scene_path",
+                "value": wrapper_target,
+            }
+        ],
+        "proposal_only": True,
+        "task_id": task_id,
+    }
+    wrapper = {
+        "schema_version": "1.0.0",
+        "document_kind": BIOMASS_WRAPPER_DOCUMENT_KIND,
+        "asset_id": asset_id,
+        "import_target": import_target,
+        "wrapper_target": wrapper_target,
+        "catalog_target": catalog_target,
+        "catalog_entry": wrapper_catalog_entry,
+        "proposal_only": True,
+        "task_id": task_id,
+        "evidence": {
+            "contract": {"path": str(task_records["caller_contract_path"]), "sha256": contract.sha256},
+            "part_catalog": {"path": str(catalog_path), "sha256": expected_part_catalog_sha256},
+            "generation": {"path": str(task_records["generation_path"]), "sha256": task_records["generation_sha256"]},
+            "source_raw_manifest": {"path": str(evidence["evidence_dir"] / "source-raw-manifest.json"), "sha256": evidence["source_sha256"]},
+            "raw": {"path": str(task_records["raw_path"]), "sha256": task_records["raw_sha256"]},
+            "archive": {"path": str(evidence["evidence_dir"] / "source.raw.glb"), "sha256": task_records["raw_sha256"]},
+            "cleaned_glb": {"path": str(records["cleaned_path"]), "sha256": records["cleaned_sha256"]},
+            "blender_validation": {"path": str(records["validation_path"]), "sha256": records["validation_sha256"]},
+            "runtime_review": {"path": str(records["runtime_path"]), "sha256": records["runtime_sha256"]},
+            "recipe": {"path": str(resolved_task / "biomass-part-recipe.json"), "sha256": records["recipe_sha256"]},
+            "master": {"path": str(records["master_path"]), "sha256": records["master_sha256"]},
+        },
+    }
+    provenance = {
+        "asset_id": asset_id,
+        "document_kind": ASSET_PROVENANCE_DOCUMENT_KIND,
+        "extensions": envelope["extensions"],
+        "proposal_only": True,
+        "provenance": envelope["provenance"],
+        "task_id": task_id,
+    }
+    documents = {
+        BIOMASS_CATALOG_PATCH_NAME: patch,
+        BIOMASS_WRAPPER_PROPOSAL_NAME: wrapper,
+        ASSET_PROVENANCE_NAME: provenance,
+    }
+    for name, value in documents.items():
+        if _security_diagnostics(value):
+            raise PromotionPacketError("unsafe biomass promotion proposal")
+        try:
+            canonical_json_bytes(value)
+        except (TypeError, ValueError, RecursionError) as exc:
+            raise PromotionPacketError(f"{name} is not canonical JSON") from exc
+    return copy.deepcopy(documents)
+
+
+def _biomass_preflight_leaf(path: Path, expected: bytes, label: str) -> bool:
+    _biomass_reject_symlink_components(path, label)
+    if not os.path.lexists(path):
+        return False
+    _biomass_regular_file(path, label, private=True)
+    try:
+        actual = path.read_bytes()
+    except OSError as exc:
+        raise PromotionPacketError(f"existing {label} cannot be read") from exc
+    if actual != expected:
+        raise PromotionPacketError(f"existing {label} is not the exact canonical proposal")
+    return True
+
+
+def _biomass_publish_bundle(
+    root: Path,
+    task_dir: Path,
+    leaves: List[Tuple[Path, bytes, str]],
+) -> None:
+    prepared = [
+        (path, payload, label, _biomass_preflight_leaf(path, payload, label))
+        for path, payload, label in leaves
+    ]
+    created: List[Tuple[Path, bytes]] = []
+    try:
+        for index, (path, payload, label, existing) in enumerate(prepared, start=1):
+            if existing:
+                continue
+            governance.atomic_create_bytes(
+                path, payload, project_root=root, allowed_root=task_dir, mode=0o600
+            )
+            _biomass_preflight_leaf(path, payload, label)
+            created.append((path, payload))
+            if _BIOMASS_AFTER_LEAF_HOOK is not None:
+                _BIOMASS_AFTER_LEAF_HOOK(path, index)
+    except Exception as exc:
+        for path, payload in reversed(created):
+            try:
+                if path.is_file() and not path.is_symlink() and path.read_bytes() == payload:
+                    path.unlink()
+            except OSError:
+                pass
+        if isinstance(exc, PromotionPacketError):
+            raise
+        raise PromotionPacketError("biomass proposal publication failed") from exc
+
+
+def write_biomass_part_promotion_proposal(
+    project_root: PathLike,
+    contract_path: PathLike,
+    task_dir: PathLike,
+    evidence_dir: PathLike,
+    part_catalog_path: PathLike,
+    expected_part_catalog_sha256: str,
+) -> dict[str, dict[str, Any]]:
+    """Publish exactly three immutable task-local biomass proposal leaves."""
+    proposal = build_biomass_part_promotion_proposal(
+        project_root,
+        contract_path,
+        task_dir,
+        evidence_dir,
+        part_catalog_path,
+        expected_part_catalog_sha256,
+    )
+    root, resolved_task = _layout_for_publication(project_root, task_dir)
+    leaves = [
+        (
+            _fixed_leaf(root, resolved_task, name),
+            canonical_json_bytes(proposal[name]),
+            name,
+        )
+        for name in (
+            BIOMASS_CATALOG_PATCH_NAME,
+            BIOMASS_WRAPPER_PROPOSAL_NAME,
+            ASSET_PROVENANCE_NAME,
+        )
+    ]
+    _biomass_publish_bundle(root, resolved_task, leaves)
+    return proposal
+
+
 # Names used by callers that refer to the output as an overlay/packet.
 build_sidecar_overlay = build_prop_promotion_proposal
 write_sidecar_overlay = write_prop_promotion_proposal
@@ -623,6 +1391,15 @@ def _build_parser() -> argparse.ArgumentParser:
     threat.add_argument("--task-dir", type=Path, required=True)
     threat.add_argument("--mesh-path")
     threat.add_argument("--archetype")
+    biomass = subparsers.add_parser(
+        "biomass-part", help="write a review-only biomass part proposal"
+    )
+    biomass.add_argument("--project-root", type=Path, required=True)
+    biomass.add_argument("--contract", type=Path, required=True)
+    biomass.add_argument("--task-dir", type=Path, required=True)
+    biomass.add_argument("--evidence-dir", type=Path, required=True)
+    biomass.add_argument("--part-catalog", type=Path, required=True)
+    biomass.add_argument("--expected-part-catalog-sha256", required=True)
     return parser
 
 
@@ -645,6 +1422,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                 archetype=args.archetype,
             )
             print("MESHY THREAT PROMOTION PROPOSAL PASS asset={0}".format(result["asset_id"]))
+        elif args.command == "biomass-part":
+            result = write_biomass_part_promotion_proposal(
+                args.project_root,
+                args.contract,
+                args.task_dir,
+                args.evidence_dir,
+                args.part_catalog,
+                args.expected_part_catalog_sha256,
+            )
+            wrapper = result[BIOMASS_WRAPPER_PROPOSAL_NAME]
+            print(
+                "MESHY BIOMASS PART PROMOTION PROPOSAL PASS asset={0}".format(
+                    wrapper["asset_id"]
+                )
+            )
         else:  # pragma: no cover - argparse owns command choices
             return 2
     except (OSError, PromotionPacketError, TypeError, ValueError) as exc:
@@ -660,6 +1452,10 @@ if __name__ == "__main__":
 __all__ = [
     "ASSET_PROVENANCE_NAME",
     "ASSET_PROVENANCE_DOCUMENT_KIND",
+    "BIOMASS_CATALOG_PATCH_DOCUMENT_KIND",
+    "BIOMASS_CATALOG_PATCH_NAME",
+    "BIOMASS_WRAPPER_DOCUMENT_KIND",
+    "BIOMASS_WRAPPER_PROPOSAL_NAME",
     "PROP_DOCUMENT_KIND",
     "PROP_OVERLAY_NAME",
     "PromotionPacketError",
@@ -667,6 +1463,7 @@ __all__ = [
     "THREAT_PATCH_DOCUMENT_KIND",
     "THREAT_PATCH_NAME",
     "build_catalog_promotion_proposal",
+    "build_biomass_part_promotion_proposal",
     "build_prop_promotion_proposal",
     "build_sidecar_overlay",
     "build_threat_promotion_proposal",
@@ -674,6 +1471,7 @@ __all__ = [
     "validate_ai_provenance",
     "validate_provenance",
     "write_catalog_promotion_proposal",
+    "write_biomass_part_promotion_proposal",
     "write_prop_promotion_proposal",
     "write_sidecar_overlay",
     "write_threat_promotion_proposal",

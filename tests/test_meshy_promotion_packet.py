@@ -15,15 +15,20 @@ from typing import Any, Dict, Tuple
 import pytest
 
 from tools import meshy_governance as governance
+from tools import meshy_promotion_packet as promotion_packet
 from tools.meshy_asset_contract import canonical_json_bytes
 from tools.meshy_promotion_packet import (
     ASSET_PROVENANCE_NAME,
+    BIOMASS_CATALOG_PATCH_NAME,
+    BIOMASS_WRAPPER_PROPOSAL_NAME,
     PROP_OVERLAY_NAME,
     THREAT_PATCH_NAME,
     PromotionPacketError,
+    build_biomass_part_promotion_proposal,
     build_prop_promotion_proposal,
     build_threat_promotion_proposal,
     validate_ai_provenance,
+    write_biomass_part_promotion_proposal,
     write_prop_promotion_proposal,
     write_threat_promotion_proposal,
 )
@@ -35,6 +40,34 @@ LIVE_RELATIVE = (
     "data/props/visual_bindings.generated.json",
     "scenes/wrappers/fixture_triangle.tscn",
 )
+
+
+def test_biomass_part_cli_and_api_surface_is_present() -> None:
+    from tools.meshy_promotion_packet import _build_parser
+
+    parser = _build_parser()
+    args = parser.parse_args(
+        [
+            "biomass-part",
+            "--project-root",
+            "/project",
+            "--contract",
+            "/project/contract.json",
+            "--task-dir",
+            "/project/assets/_staging/meshy/biomass_human_arm_v1/task-1",
+            "--evidence-dir",
+            "/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/biomass_human_arm_v1/task-1",
+            "--part-catalog",
+            "/project/data/combat/biomass_part_catalog.json",
+            "--expected-part-catalog-sha256",
+            "a" * 64,
+        ]
+    )
+    assert args.command == "biomass-part"
+    assert BIOMASS_CATALOG_PATCH_NAME == "biomass_part_catalog.patch.json"
+    assert BIOMASS_WRAPPER_PROPOSAL_NAME == "biomass_wrapper.proposal.json"
+    assert callable(build_biomass_part_promotion_proposal)
+    assert callable(write_biomass_part_promotion_proposal)
 
 
 def _visible_png_bytes() -> bytes:
@@ -153,6 +186,253 @@ def _canonical_fixture(
     report.chmod(0o600)
     bind_promotion_evidence(project_root, task_dir)
     return project_root, task_dir
+
+
+def _biomass_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Tuple[Path, Path, Path, Path, str]:
+    """Create complete Task 11 evidence with independent report authorities mocked."""
+    asset_id = "biomass_human_arm_v1"
+    task_id = "task-1"
+    project_root = tmp_path / "project"
+    task_dir = project_root / "assets/_staging/meshy" / asset_id / task_id
+    task_dir.mkdir(parents=True)
+    task_dir.chmod(0o700)
+    contract_source = Path(__file__).resolve().parents[1] / (
+        "data/asset_generation/contracts/biomass_human_arm_v1.json"
+    )
+    contract_path = project_root / "contract.json"
+    contract_path.write_bytes(contract_source.read_bytes())
+    catalog_source = Path(__file__).resolve().parents[1] / "data/combat/biomass_part_catalog.json"
+    catalog_path = project_root / "data/combat/biomass_part_catalog.json"
+    catalog_path.parent.mkdir(parents=True)
+    catalog_path.write_bytes(catalog_source.read_bytes())
+    task_contract = task_dir / "contract.json"
+    task_contract.write_bytes(contract_source.read_bytes())
+    task_contract.chmod(0o600)
+    contract_hash = hashlib.sha256(contract_path.read_bytes()).hexdigest()
+    task_contract_hash = hashlib.sha256(task_contract.read_bytes()).hexdigest()
+    raw = b"raw-glb"
+    raw_path = task_dir / "raw.glb"
+    raw_path.write_bytes(raw)
+    raw_path.chmod(0o600)
+    raw_hash = hashlib.sha256(raw).hexdigest()
+    generation = {
+        "asset_id": asset_id,
+        "task_id": task_id,
+        "status": "SUCCEEDED",
+        "contract_sha256": contract_hash,
+        "contract_artifact_sha256": task_contract_hash,
+        "input_image_hashes": {"front": "1" * 64},
+        "outputs": {"raw.glb": {"sha256": raw_hash, "byte_size": len(raw)}},
+        "provenance": {"provider": "meshy", "model": "meshy-t2", "license_state": "paid-private"},
+        "output_license": "paid-private",
+    }
+    generation_path = task_dir / "generation.json"
+    _write_canonical(generation_path, generation)
+    review = {"asset_id": asset_id, "task_id": task_id, "state": "promotion_ready", "reviewer": "reviewer"}
+    cleaned = task_dir / "cleaned.glb"
+    cleaned.write_bytes(b"cleaned-glb")
+    cleaned.chmod(0o600)
+    report = {
+        "schema_version": "1.0.0",
+        "document_kind": "meshy_blender_validation",
+        "status": "PASS",
+        "task_id": task_id,
+        "asset_id": asset_id,
+        "contract_sha256": contract_hash,
+        "sha256": hashlib.sha256(cleaned.read_bytes()).hexdigest(),
+        "byte_size": cleaned.stat().st_size,
+        "mesh_count": 1,
+        "triangle_count": 12,
+        "material_names": ["biomass_visual"],
+        "bounds": {"min": [-0.14, -0.14, -0.5], "max": [0.14, 0.14, 0.5], "dimensions": [0.28, 0.28, 1.0]},
+        "uvs_present": True,
+        "uv_evidence": [],
+        "blender_reimport_passed": True,
+        "master_provenance": None,
+    }
+    report_path = task_dir / "blender-validation.json"
+    _write_canonical(report_path, report)
+    evidence_root = tmp_path / "live-pilot"
+    evidence_dir = evidence_root / asset_id / task_id
+    evidence_dir.mkdir(parents=True)
+    evidence_dir.chmod(0o700)
+    master_root = tmp_path / "source"
+    master_path = master_root / asset_id / f"{asset_id}_master.blend"
+    master_path.parent.mkdir(parents=True)
+    master_path.write_bytes(b"master")
+    source = {
+        "schema_version": "1.0.0",
+        "document_kind": "biomass_source_raw_manifest_v1",
+        "asset_id": asset_id,
+        "task_id": task_id,
+        "generation_sha256": hashlib.sha256(generation_path.read_bytes()).hexdigest(),
+        "contract_sha256": contract_hash,
+        "raw_source": {"path": str(raw_path), "sha256": raw_hash, "byte_size": len(raw)},
+        "archive": {"path": str(evidence_dir / "source.raw.glb"), "sha256": raw_hash, "byte_size": len(raw)},
+    }
+    archive_path = evidence_dir / "source.raw.glb"
+    archive_path.write_bytes(raw)
+    archive_path.chmod(0o600)
+    _write_canonical(evidence_dir / "source-raw-manifest.json", source)
+    import tools.meshy_biomass_part_recipe as recipe_module
+
+    catalog_document = json.loads(catalog_path.read_text(encoding="utf-8"))
+    guides = [
+        {"name": guide.name, "position_m": list(guide.position_m), "rotation_deg": list(guide.rotation_deg)}
+        for guide in recipe_module.build_socket_guides(catalog_document["parts"][asset_id])
+    ]
+    preview_glb = evidence_dir / "cleaned.preview.glb"
+    preview_glb.write_bytes(b"preview-glb")
+    preview_glb.chmod(0o600)
+    render_names = ("front.png", "side.png", "three_quarter.png", "socket_overlay.png", "contact_sheet.png")
+    renders = {}
+    for name in render_names:
+        leaf = evidence_dir / name
+        leaf.write_bytes(name.encode("ascii"))
+        leaf.chmod(0o600)
+        renders[name] = {"sha256": hashlib.sha256(leaf.read_bytes()).hexdigest(), "byte_size": leaf.stat().st_size, "width": 1, "height": 1}
+    preview = {
+        "schema_version": "1.0.0", "document_kind": "biomass_part_preview_v1", "asset_id": asset_id, "task_id": task_id,
+        "contract_sha256": contract_hash, "part_catalog_sha256": hashlib.sha256(catalog_path.read_bytes()).hexdigest(),
+        "generation_sha256": source["generation_sha256"], "source_raw_manifest_sha256": hashlib.sha256((evidence_dir / "source-raw-manifest.json").read_bytes()).hexdigest(),
+        "raw_sha256": raw_hash, "archive_sha256": raw_hash, "master_path": str(master_path), "master_sha256": hashlib.sha256(master_path.read_bytes()).hexdigest(),
+        "preview_glb": {"path": str(preview_glb), "sha256": hashlib.sha256(preview_glb.read_bytes()).hexdigest(), "byte_size": preview_glb.stat().st_size},
+        "dimensions_m": [0.28, 0.28, 1.0], "low_poly_target": {"status": "met", "target_triangles": 1400, "measured_triangles": 12, "hard_max": 2500},
+        "material_names": ["biomass_visual"], "material_slot_count": 1, "uvs_present": True, "socket_guides": guides,
+        "socket_guides_exported": False, "source_raw_preserved": True, "runtime_promoted": False, "renders": renders,
+    }
+    preview_path = evidence_dir / "biomass-part-preview.json"
+    _write_canonical(preview_path, preview)
+    approval = {
+        "schema_version": "1.0.0", "document_kind": "biomass_part_preview_approval_v1", "asset_id": asset_id, "task_id": task_id,
+        "reviewer": "reviewer", "decision": "approved", "preview_manifest_sha256": hashlib.sha256(preview_path.read_bytes()).hexdigest(),
+        "preview_glb_sha256": preview["preview_glb"]["sha256"], "render_hashes": {name: renders[name]["sha256"] for name in render_names},
+        "contract_sha256": contract_hash, "part_catalog_sha256": preview["part_catalog_sha256"], "generation_sha256": source["generation_sha256"],
+        "source_raw_manifest_sha256": preview["source_raw_manifest_sha256"], "raw_sha256": raw_hash, "archive_sha256": raw_hash,
+        "master_path": str(master_path), "master_sha256": preview["master_sha256"],
+    }
+    approval_path = evidence_dir / "biomass-part-preview-approval.json"
+    _write_canonical(approval_path, approval)
+    recipe = {
+        "schema_version": "1.0.0", "document_kind": "biomass_part_recipe_v1", "asset_id": asset_id, "task_id": task_id,
+        "contract_sha256": contract_hash, "part_catalog_sha256": preview["part_catalog_sha256"], "generation_sha256": source["generation_sha256"],
+        "source_raw_manifest_sha256": preview["source_raw_manifest_sha256"], "raw_sha256": raw_hash, "archive_sha256": raw_hash,
+        "master_path": str(master_path), "master_sha256": preview["master_sha256"], "preview_approval_sha256": hashlib.sha256(approval_path.read_bytes()).hexdigest(),
+        "cleaned_glb": {"path": str(cleaned), "sha256": hashlib.sha256(cleaned.read_bytes()).hexdigest(), "byte_size": cleaned.stat().st_size},
+        "dimensions_m": preview["dimensions_m"], "low_poly_target": preview["low_poly_target"], "material_names": preview["material_names"],
+        "material_slot_count": 1, "uvs_present": True, "socket_guides": guides, "socket_guides_exported": False,
+        "source_raw_preserved": True, "runtime_promoted": False,
+    }
+    _write_canonical(task_dir / "biomass-part-recipe.json", recipe)
+    runtime_path = project_root / "artifacts/validation-previews/meshy" / asset_id / "runtime-review.json"
+    runtime_path.parent.mkdir(parents=True)
+    runtime_report = {"asset_id": asset_id, "task_id": task_id, "contract_sha256": contract_hash, "cleaned_glb_sha256": recipe["cleaned_glb"]["sha256"], "blender_validation_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest()}
+    _write_canonical(runtime_path, runtime_report)
+    monkeypatch.setattr(promotion_packet, "BIOMASS_EVIDENCE_ROOT", evidence_root)
+    monkeypatch.setattr(promotion_packet, "BIOMASS_MASTER_ROOT", master_root)
+    monkeypatch.setattr(promotion_packet.candidate_review, "verify_review", lambda *_args: review)
+    monkeypatch.setattr(promotion_packet.candidate_review, "_load_task_record", lambda *_args: (task_dir / "review.json", review, generation, project_root.resolve(), task_dir.parent.resolve()))
+    monkeypatch.setattr(promotion_packet, "_hash_file", lambda path, label: hashlib.sha256(Path(path).read_bytes()).hexdigest())
+    monkeypatch.setattr(promotion_packet, "_biomass_canonical_document", lambda path, label: (json.loads(Path(path).read_text(encoding="utf-8")), Path(path).read_bytes()))
+    monkeypatch.setattr("tools.meshy_blender_validate._validate_report_record", lambda _report: None)
+    monkeypatch.setattr("tools.meshy_blender_validate.verify_validation_report", lambda *_args, **_kwargs: report)
+    monkeypatch.setattr("tools.meshy_runtime_review.verify_evidence_chain", lambda *_args: runtime_report)
+    return project_root, task_dir, contract_path, catalog_path, hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+
+
+def test_biomass_part_proposal_is_three_immutable_review_only_leaves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, contract_path, catalog_path, catalog_hash = _biomass_fixture(tmp_path, monkeypatch)
+    proposal = build_biomass_part_promotion_proposal(
+        project_root, contract_path, task_dir,
+        tmp_path / "live-pilot/biomass_human_arm_v1/task-1", catalog_path, catalog_hash
+    )
+    assert set(proposal) == {BIOMASS_CATALOG_PATCH_NAME, BIOMASS_WRAPPER_PROPOSAL_NAME, ASSET_PROVENANCE_NAME}
+    wrapper = proposal[BIOMASS_WRAPPER_PROPOSAL_NAME]
+    assert wrapper["import_target"] == "res://assets/imported/threats/biomass/biomass_human_arm_v1.glb"
+    assert wrapper["wrapper_target"] == "res://scenes/wrappers/biomass/biomass_human_arm_v1.tscn"
+    assert "collision_shapes" not in json.dumps(wrapper)
+    assert proposal[BIOMASS_CATALOG_PATCH_NAME]["catalog_entry"]["wrapper_scene_path"] == wrapper["wrapper_target"]
+    assert proposal[ASSET_PROVENANCE_NAME]["document_kind"] == "asset_provenance"
+    assert set(proposal[ASSET_PROVENANCE_NAME]) == {
+        "asset_id",
+        "document_kind",
+        "extensions",
+        "proposal_only",
+        "provenance",
+        "task_id",
+    }
+    assert not (task_dir / BIOMASS_CATALOG_PATCH_NAME).exists()
+    written = write_biomass_part_promotion_proposal(
+        project_root, contract_path, task_dir,
+        tmp_path / "live-pilot/biomass_human_arm_v1/task-1", catalog_path, catalog_hash
+    )
+    assert written == proposal
+    for name in (BIOMASS_CATALOG_PATCH_NAME, BIOMASS_WRAPPER_PROPOSAL_NAME, ASSET_PROVENANCE_NAME):
+        leaf = task_dir / name
+        assert leaf.read_bytes() == canonical_json_bytes(proposal[name])
+        assert stat.S_IMODE(leaf.stat().st_mode) == 0o600
+
+
+def test_biomass_part_rejects_forged_approval_catalog_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, contract_path, catalog_path, catalog_hash = _biomass_fixture(
+        tmp_path, monkeypatch
+    )
+    approval_path = tmp_path / "live-pilot/biomass_human_arm_v1/task-1/biomass-part-preview-approval.json"
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval["part_catalog_sha256"] = "f" * 64
+    _write_canonical(approval_path, approval)
+    recipe_path = task_dir / "biomass-part-recipe.json"
+    recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+    recipe["preview_approval_sha256"] = hashlib.sha256(approval_path.read_bytes()).hexdigest()
+    _write_canonical(recipe_path, recipe)
+
+    with pytest.raises(PromotionPacketError, match="approval|catalog"):
+        build_biomass_part_promotion_proposal(
+            project_root,
+            contract_path,
+            task_dir,
+            tmp_path / "live-pilot/biomass_human_arm_v1/task-1",
+            catalog_path,
+            catalog_hash,
+        )
+
+
+@pytest.mark.parametrize("fail_after", (1, 2))
+def test_biomass_part_publication_compensates_after_each_partial_leaf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_after: int
+) -> None:
+    project_root, task_dir, contract_path, catalog_path, catalog_hash = _biomass_fixture(
+        tmp_path, monkeypatch
+    )
+
+    def fail_after_leaf(_path: Path, index: int) -> None:
+        if index == fail_after:
+            raise RuntimeError("injected biomass publication failure")
+
+    monkeypatch.setattr(promotion_packet, "_BIOMASS_AFTER_LEAF_HOOK", fail_after_leaf)
+    with pytest.raises(PromotionPacketError, match="publication failed"):
+        write_biomass_part_promotion_proposal(
+            project_root,
+            contract_path,
+            task_dir,
+            tmp_path / "live-pilot/biomass_human_arm_v1/task-1",
+            catalog_path,
+            catalog_hash,
+        )
+    assert not any(
+        (task_dir / name).exists()
+        for name in (
+            BIOMASS_CATALOG_PATCH_NAME,
+            BIOMASS_WRAPPER_PROPOSAL_NAME,
+            ASSET_PROVENANCE_NAME,
+        )
+    )
 
 
 def _proposal_target() -> str:
