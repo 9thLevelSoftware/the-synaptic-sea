@@ -238,6 +238,8 @@ A second late review, `deleg_a90835bc`, returned `REQUEST_CHANGES` against `353f
 
 Quality review `deleg_c10def55` then returned `REQUEST_CHANGES` against `77bdb00`: an existing portal restored to `DOOR` could retain a locked/sealed runtime entity. Follow-up commit `7f847a8` resolved that exact branch by applying `synchronize_repaired_door()` to both restored and newly created portals; existing entities are repositioned, unlocked, closed, and unsealed. The permanent regression `furnished_and_repaired_interior_doors_stay_coherent_seed_zero` passes at final reviewed source `74d40b0`, so this historical verdict is also stale and non-blocking.
 
+Implementation delegation `deleg_37828356` subsequently found that portal relocation after the repair pass could still leave missing or stale runtime Door entities. Although its final report was interrupted, it committed `9057771` (`fix: restore relocated door entities`): a deterministic post-topology-mutation synchronization pass now reconciles every surviving `DOOR`/`LOCKED`/`HATCH` portal, canonicalizes pose/prototype/tag/lock state, creates missing entities, and deduplicates tagged Doors. The permanent seed-5 regression `surviving_interior_door_like_portals_have_runtime_entities_seed_five` passes at final reviewed source `74d40b0`.
+
 One merged automated-review warning remains worth an explicit human contract decision: `synchronize_door_entities()` does not force surviving existing `DOOR`/`HATCH` entities to `open=false`. This is not currently classified as a structural/runtime defect because:
 
 - `furnish()` intentionally generates unlocked doors with an independent 25% initial-open roll;
