@@ -40,7 +40,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
 | 0058 | docs/game/adr/0058-meshy-candidates-blender-authority.md | Meshy candidate-only generation, Blender canonical masters, staged review, and Godot runtime authority |
 | 0059 | docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md | Accepted contract; implementation pending: persistent quality lots, paid jobs, ship-scoped physical work and structural replacement |
-| 0060 | docs/game/adr/0060-windows-feature-completion-validation-runtime.md | Proposed: Windows 4.7.2 validation runtime, pending canonical compatibility evidence |
+| 0060 | docs/game/adr/0060-windows-feature-completion-validation-runtime.md | Accepted: Windows 4.7.2 validation baseline, 652 canonical checks and native probe verified; export qualification pending |
 | 0061 | docs/game/adr/0061-persist-resolved-generation-context.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
 | 0062 | docs/game/adr/0062-ship-owned-pending-output-receipts.md | Accepted P08 contract: ship-owned immutable pending receipts supersede only ADR-0059's pending-output placeholder; focused validation pending |
 | 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
