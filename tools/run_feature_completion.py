@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "data/validation/feature_completion_cases.json"
 VALIDATION_PLAN = ROOT / "docs/game/06_validation_plan.md"
 REGRESSION_HEADER = "## Regression bundle"
-REGRESSION_MARKER = re.compile(r"^echo 'SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true'$", re.M)
+REGRESSION_MARKER = re.compile(r"^echo (?:'SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true'|\"SYNAPTIC_SEA REGRESSION PASS commands=\$\{RUN_CLEAN_COUNT\} clean_output=true\")$", re.M)
 DIAGNOSTIC = re.compile(r"^(?:ERROR|WARNING|SCRIPT ERROR):.*$", re.M)
 Run = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -120,6 +120,8 @@ def _prepared_bundle(body: str) -> str:
     """Instrument the temporary copy so its terminal count is computed, never copied."""
     if "run_clean() {" not in body:
         raise RunnerError("Regression bundle has no recognized run_clean function")
+    if "RUN_CLEAN_COUNT=0" in body and "RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))" in body:
+        return body
     body = body.replace("run_clean() {", "RUN_CLEAN_COUNT=0\nrun_clean() {\n  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))", 1)
     return REGRESSION_MARKER.sub('echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"', body)
 

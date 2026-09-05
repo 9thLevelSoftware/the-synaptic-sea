@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import subprocess
 import tempfile
 import unittest
@@ -179,6 +180,30 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
             _, _, _, timed_out, cleanup_error = runner._capture(["godot"], cwd=self.root, env={}, timeout=1)
         self.assertTrue(timed_out)
         self.assertEqual("post-kill output drain timed out", cleanup_error)
+
+    def test_canonical_run_clean_prints_a_failing_child_before_exiting(self):
+        bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+        if not bash.is_file():
+            self.skipTest("Git Bash is required for this Windows shell regression")
+        script = self.root / "failing-child-regression.sh"
+        body, _ = runner.extract_regression_bundle()
+        # Exercise the authoritative shell policy rather than a copied function.
+        policy = body.split("\nrun_clean ", 1)[0]
+        environment = {**os.environ, "ROOT": str(self.root), "GODOT": "unused"}
+        for output, expected_code, failure_marker in (
+            ("retained failure", 7, "COMMAND_FAILED exit=7"),
+            ("ERROR: retained failure", 1, "UNEXPECTED_ERROR_OR_WARNING"),
+        ):
+            with self.subTest(output=output):
+                script.write_text(
+                    policy + "\nrun_clean 'fake child' 'FAKE PASS' /bin/sh -c "
+                    + "'printf \"FAKE PASS\\n" + output + "\\n\"; exit 7'\n",
+                    encoding="utf-8", newline="\n")
+                result = subprocess.run([str(bash), str(script)], env=environment,
+                                        text=True, capture_output=True, check=False, timeout=10)
+                self.assertEqual(expected_code, result.returncode, result.stderr)
+                self.assertIn(output, result.stdout)
+                self.assertIn(failure_marker, result.stdout)
 
 
 if __name__ == "__main__":
