@@ -302,6 +302,13 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     only without an extant field receipt. Missing mandatory fields in a v2 record
     are malformed, never a request for legacy migration. Verify valid prior-v5
     terminal-state resave and two reloads alongside v2 history-deletion mutants.
+    The prior v1 cancelled-job format retains no independent refunded-lot identity
+    or quality evidence. A matching pending refund therefore rejects with
+    `legacy_refund_history_unavailable`; its own lot records cannot be copied into
+    newly invented producer history to make the pair appear validated. The original
+    save remains untouched. Without a pending refund, the inert terminal tombstone
+    remains loadable and survives resave. Normal started-work cancellation retains
+    exact consumed history as forfeiture and must remain loadable without a refund.
 
 ## Locked transaction payloads
 
