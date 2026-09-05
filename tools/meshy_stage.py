@@ -2318,6 +2318,118 @@ def load_batch_journal(path: Union[str, os.PathLike]) -> Dict[str, Any]:
     return document
 
 
+def validate_plan_envelope(document: object) -> List[str]:
+    """Validate the plan envelope fields that the offline resolver governs."""
+
+    if not isinstance(document, dict):
+        return ["Meshy plan envelope must be an object"]
+    required = {
+        "asset_id", "candidate_count", "contract_sha256", "cost_per_candidate", "endpoint",
+        "maximum_credits", "pricing_checked_at", "pricing_expires_at", "pricing_id", "pricing_sha256",
+        "pricing_source_url", "prompt_packet_sha256", "prompt_profile_id", "prompt_profile_sha256",
+        "references_resolved", "request", "required_views",
+    }
+    errors: List[str] = []
+    if not required.issubset(set(document)):
+        errors.append("Meshy plan envelope fields are incomplete")
+    if not isinstance(document.get("asset_id"), str) or IDENTIFIER_RE.fullmatch(document.get("asset_id", "")) is None:
+        errors.append("Meshy plan asset_id is invalid")
+    if not _valid_positive_int(document.get("candidate_count")) or not _valid_positive_int(document.get("cost_per_candidate")) or not _valid_positive_int(document.get("maximum_credits")):
+        errors.append("Meshy plan credit fields are invalid")
+    elif document["maximum_credits"] != document["candidate_count"] * document["cost_per_candidate"]:
+        errors.append("Meshy plan credit bound is invalid")
+    if document.get("endpoint") not in ENDPOINTS.values():
+        errors.append("Meshy plan endpoint is invalid")
+    for name in ("contract_sha256", "pricing_sha256", "prompt_packet_sha256", "prompt_profile_sha256"):
+        if not _valid_hash(document.get(name)):
+            errors.append("Meshy plan %s is invalid" % name)
+    if not isinstance(document.get("pricing_id"), str) or not document["pricing_id"]:
+        errors.append("Meshy plan pricing_id is invalid")
+    if not isinstance(document.get("pricing_source_url"), str) or document["pricing_source_url"] != "https://docs.meshy.ai/api/pricing.md":
+        errors.append("Meshy plan pricing source is invalid")
+    required_views = document.get("required_views")
+    if not isinstance(required_views, list) or not required_views or any(not isinstance(view, str) for view in required_views):
+        errors.append("Meshy plan required_views is invalid")
+    request = document.get("request")
+    resolved = document.get("resolved_references")
+    references_resolved = document.get("references_resolved")
+    if type(references_resolved) is not bool:
+        errors.append("Meshy plan references_resolved is invalid")
+    if references_resolved is True:
+        errors.extend(_validate_reference_list(resolved, "Meshy plan resolved_references"))
+        if isinstance(resolved, list) and isinstance(required_views, list) and [item.get("view") for item in resolved if isinstance(item, dict)] != required_views:
+            errors.append("Meshy plan resolved reference views do not match required_views")
+        if not _valid_hash(document.get("provider_payload_sha256")):
+            errors.append("Meshy plan provider_payload_sha256 is invalid")
+        errors.extend(_validate_provider_request(request, document.get("endpoint"), resolved, "Meshy plan request"))
+    else:
+        if resolved is not None:
+            errors.extend(_validate_reference_list(resolved, "Meshy plan resolved_references"))
+        if "provider_payload_sha256" in document and not _valid_hash(document.get("provider_payload_sha256")):
+            errors.append("Meshy plan provider_payload_sha256 is invalid")
+        base_request_fields = {"model_type", "ai_model", "target_polycount", "should_texture", "target_formats"}
+        if not isinstance(request, dict) or set(request) != base_request_fields:
+            errors.append("Meshy plan request fields are invalid")
+    return sorted(set(errors))
+
+
+def _plan_envelope_path(project_root: Union[str, os.PathLike], contract: AssetContract) -> Tuple[Path, Path, Path]:
+    root, stage, asset_root = _validate_staging_paths(project_root, contract.asset_id)
+    plan_root = stage / "_plans"
+    governance._reject_symlink_components_below(root, plan_root, "Meshy plan root")
+    path = plan_root / (contract.asset_id + ".json")
+    governance._reject_symlink_components_below(root, path, "Meshy plan envelope")
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Meshy plan envelope is missing")
+    return root, plan_root, path
+
+
+def resolve_plan_envelope(
+    contract: AssetContract,
+    project_root: Path,
+    *,
+    pricing_file: Optional[Path],
+    reference_root: Path,
+    reference_specs: object,
+) -> Dict[str, Any]:
+    """Resolve references through ``plan_generation`` and persist only its governed fields."""
+
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    if reference_root is None or reference_specs is None:
+        raise ValueError("reference-root and reference specs are required")
+    root, plan_root, plan_path = _plan_envelope_path(project_root, contract)
+    envelope, _raw = governance.strict_load_json_bytes(plan_path, "Meshy plan envelope", 4 * 1024 * 1024)
+    errors = validate_plan_envelope(envelope)
+    if errors:
+        raise ValueError("invalid Meshy plan envelope: " + "; ".join(errors))
+    if envelope.get("asset_id") != contract.asset_id:
+        raise ValueError("Meshy plan asset identity does not match contract")
+    planned = plan_generation(
+        contract,
+        root,
+        pricing_file=pricing_file,
+        reference_root=reference_root,
+        reference_specs=reference_specs,
+    )
+    if planned.get("references_resolved") is not True or not planned.get("resolved_references") or not _valid_hash(planned.get("provider_payload_sha256")):
+        raise ValueError("Meshy references could not be resolved")
+    updated = _copy_mapping(envelope)
+    for name in ("references_resolved", "resolved_references", "provider_payload_sha256", "request"):
+        updated[name] = planned[name]
+    errors = validate_plan_envelope(updated)
+    if errors:
+        raise ValueError("invalid resolved Meshy plan envelope: " + "; ".join(errors))
+    governance.atomic_write_json(plan_path, updated, project_root=root, allowed_root=plan_root)
+    persisted, persisted_raw = governance.strict_load_json_bytes(plan_path, "Meshy plan envelope", 4 * 1024 * 1024)
+    errors = validate_plan_envelope(persisted)
+    if errors or persisted_raw != canonical_json_bytes(persisted):
+        raise ValueError("Meshy resolved plan envelope publication is invalid")
+    result = _copy_mapping(planned)
+    result["plan_path"] = plan_path.relative_to(root).as_posix()
+    return result
+
+
 def _snapshot_summary(records: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
     items = [dict(record) for record in records]
     target = next((item for item in items if item.get("path") == "assets/imported"), None)
@@ -3911,6 +4023,16 @@ def _build_parser() -> argparse.ArgumentParser:
     reapprove.add_argument("--batch-journal", type=Path, required=True)
     reapprove.add_argument("--reason", required=True)
     reapprove.add_argument("--operator", required=True)
+    resolve_plan = subparsers.add_parser(
+        "resolve-plan",
+        help="persist resolved references into a tracked plan envelope offline",
+        description="Resolve references through the read-only plan path and persist only plan-governed fields.",
+    )
+    resolve_plan.add_argument("--project-root", type=Path, required=True)
+    resolve_plan.add_argument("--contract", type=Path, required=True)
+    resolve_plan.add_argument("--pricing-file", type=Path, required=True)
+    resolve_plan.add_argument("--reference-root", type=Path, required=True)
+    resolve_plan.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
     return parser
 
 
@@ -3922,6 +4044,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             result = plan_generation(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
         elif args.command == "reapprove":
             result = reapprove_batch(contract, args.project_root, args.batch_journal, reason=args.reason, operator=args.operator)
+        elif args.command == "resolve-plan":
+            result = resolve_plan_envelope(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
         elif args.command == "generate":
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
@@ -3968,6 +4092,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         )
         return 0
+    if args.command == "resolve-plan":
+        print("MESHY RESOLVE-PLAN PASS asset={0} plan={1}".format(result["asset_id"], result["plan_path"]))
+        return 0
     return 0
 
 
@@ -3977,5 +4104,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "reapprove_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "reapprove_batch", "resolve_plan_envelope", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record", "validate_plan_envelope",
 ]

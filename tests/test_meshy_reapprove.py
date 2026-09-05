@@ -202,3 +202,91 @@ def test_reapprove_twice_appends_two_history_entries_and_verify_still_passes(tmp
     assert journal["approval_history"] == [original_approval, first_approval]
     assert len(journal["approval_history"]) == 2
     assert stage_module.verify_batch(project_root, _contract(project_root), _journal_path(project_root), pricing_file=project_root / PRICING_RELATIVE)["pass"] is True
+
+
+def test_resolve_plan_updates_only_plan_governed_fields_and_preserves_envelope(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    plan_path = project_root / PLAN_RELATIVE
+    before = json.loads((ROOT / PLAN_RELATIVE).read_text(encoding="utf-8"))
+    before["approved_credits"] = 20
+    before["operator_note"] = "preserve this envelope field"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_bytes(canonical_json_bytes(before))
+
+    result = stage_module.resolve_plan_envelope(
+        _contract(project_root),
+        project_root,
+        pricing_file=project_root / PRICING_RELATIVE,
+        reference_root=reference_root,
+        reference_specs=_reference_specs(),
+    )
+    after = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    assert after["references_resolved"] is True
+    assert [item["view"] for item in after["resolved_references"]] == ["front", "side", "back", "three_quarter"]
+    assert after["provider_payload_sha256"] == result["provider_payload_sha256"]
+    assert after["request"] == result["request"]
+    for key, value in before.items():
+        if key not in {"references_resolved", "resolved_references", "provider_payload_sha256", "request"}:
+            assert after[key] == value
+
+
+def test_resolve_plan_fails_closed_on_missing_or_mismatched_reference(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    plan_path = project_root / PLAN_RELATIVE
+    original = plan_path.read_bytes()
+    (reference_root / "source_side.png").unlink()
+
+    with pytest.raises(ValueError, match="reference"):
+        stage_module.resolve_plan_envelope(
+            _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+            reference_root=reference_root, reference_specs=_reference_specs(),
+        )
+
+    assert plan_path.read_bytes() == original
+
+
+def test_resolve_plan_output_is_canonical_and_revalidates(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    plan_path = project_root / PLAN_RELATIVE
+
+    stage_module.resolve_plan_envelope(
+        _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+        reference_root=reference_root, reference_specs=_reference_specs(),
+    )
+    document = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    assert plan_path.read_bytes() == canonical_json_bytes(document)
+    assert stage_module.validate_plan_envelope(document) == []
+
+
+def test_resolve_plan_leaves_batch_journal_and_task_dirs_untouched(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    asset_root = project_root / "assets/_staging/meshy" / ASSET_ID
+    before = _tree_digest(asset_root)
+
+    stage_module.resolve_plan_envelope(
+        _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+        reference_root=reference_root, reference_specs=_reference_specs(),
+    )
+
+    assert _tree_digest(asset_root) == before
+    assert _tree_digest(asset_root / "_batches") == _tree_digest(FIXTURE_ASSET_ROOT / "_batches")
+    for task_dir in sorted(path for path in asset_root.iterdir() if path.is_dir() and path.name != "_batches"):
+        source = FIXTURE_ASSET_ROOT / task_dir.name
+        assert _tree_digest(task_dir) == _tree_digest(source)
+
+
+def test_resolve_plan_makes_no_provider_or_network_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    monkeypatch.setattr(stage_module, "MeshyClient", NoProviderClient)
+
+    stage_module.resolve_plan_envelope(
+        _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+        reference_root=reference_root, reference_specs=_reference_specs(),
+    )
