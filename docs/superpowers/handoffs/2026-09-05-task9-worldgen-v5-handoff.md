@@ -162,6 +162,8 @@ Repository provenance document:
 
 The canonical runner is the fenced Bash block under `## Regression bundle` in `docs/game/06_validation_plan.md`. Regenerate it from the tracked document before rerunning; do not trust the session `/tmp` copy if the plan changes.
 
+A later non-authoritative 604-gate resume process (`proc_12d0f8884a33`) exited after printing the `main item economy reachability smoke` heading but before the child Godot process emitted a startup banner, error, or return code. Its preceding encounter injection, encounter placement, food consumption, item economy, and item-integrity gates all passed. Parent reconciliation found no residual process and reproduced the target both alone and after the two immediately preceding item-data gates: each run exited 0 with `MAIN PLAYABLE ITEM ECONOMY PASS crafted_sealant=true sealed=true crafted_ext=true extinguished=true reachable=true` and zero diagnostics. Treat that resume exit as external process-launch termination, not as a product regression or replacement for the complete commit-pinned 658 pass. The remaining resume rows were not run under the active stop.
+
 ### Cache-free macOS import/runtime
 
 A detached clean worktree at exact `09eb2584` was imported with `godot --headless --path <worktree> --import`, then ran:
