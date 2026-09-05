@@ -1,16 +1,33 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-09-05
 
-## Active milestone: Vertical Slice v1
+## Current feature-completion program
+
+The approved feature-completion program is active. Its scope is the
+[2026-09-04 execution plan](docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md)
+and [crafting/derelict feature specification](docs/game/features/crafting_derelict_feature_completion.md).
+The frozen acceptance authority is
+[`docs/game/inventory/feature_acceptance.json`](docs/game/inventory/feature_acceptance.json):
+668 recorded source rows, including 11 explicit deferrals; reviewed aliases yield a
+frozen denominator of 622 active criteria.
+
+The overall P00-P24 program remains in progress; accepted implementation slices are
+recorded in the plan, and full canonical and player acceptance remain pending. No
+task-level result, focused smoke membership, or historical milestone claim constitutes
+full canonical-program acceptance. In particular, P09 and P10 are not accepted merely
+because their focused smokes are classified.
+
+## Historical milestone: Vertical Slice v1 (as of 2026-08-11)
 
 - Contract: [`docs/game/features/vertical_slice_v1.md`](docs/game/features/vertical_slice_v1.md)
-- State: **pre-polish mechanical bar COMPLETE**; current work is productization (presentation/content/onboarding/demo), **not new simulation domains**.
+- Historical state: **pre-polish mechanical bar COMPLETE**; work was framed as
+  productization (presentation/content/onboarding/demo), **not new simulation domains**.
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
 
-## What this project actually is
+## Historical project description (as of 2026-08-11)
 
 A locked-isometric 3D space-horror **deep survival sim** (Godot 4.6.2, GDScript) — a
 "Project Zomboid in space." It is **pre-alpha with all 18 simulation loops closed**
@@ -18,14 +35,15 @@ A locked-isometric 3D space-horror **deep survival sim** (Godot 4.6.2, GDScript)
 polish, and the documented deferrals below. It is **not** a shipped release, despite
 what the archived "Gate 5 RC" docs claim.
 
-- **Project root (this machine):** `C:/Users/dasbl/Documents/The Synaptic Sea`
-- **Godot binary:** `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`
-- **This is a git repo** (branch `main`). Ignore any doc that says otherwise.
+- Historical project root on that machine: `C:/Users/dasbl/Documents/The Synaptic Sea`
+- Historical Godot binary: `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`
+- Historical checkout state: git branch `main`.
 
 ## Canonical status docs (trust these)
 
 | Doc | What it tells you |
 | --- | --- |
+| **`docs/game/inventory/feature_acceptance.json`** + **`docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md`** | Current feature-completion acceptance authority and execution scope. Historical inventory grades do not substitute for these criteria or fresh runtime and player evidence. |
 | **`docs/game/inventory/SYSTEM_INVENTORY.md`** + **`docs/game/inventory/system_map.html`** | **Canonical status doc.** Code-verified inventory of every runtime system/subsystem — model/reachable/driven/coupling grades with a derived completion %, plus a loop-closure + integration matrix. Generated from `system_inventory.json` by `tools/build_system_inventory.py`; the `--check` smoke fails if data/docs drift. Open `system_map.html` for the interactive card-grid + matrix view. |
 | `docs/game/system_completion_audit.md` | **Superseded — see inventory.** The earlier narrative loop-closure pass; kept for history but no longer the canonical grade source. |
 | `docs/game/integration_debt.md` | Reachability ledger — which scripts are actually mounted in the live run. |
