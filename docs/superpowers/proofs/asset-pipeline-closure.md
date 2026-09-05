@@ -17,7 +17,7 @@ external source receipts; historical PASS prose is not treated as fresh acceptan
 - The isolated worktree was created from the exact main `HEAD`, was clean before the scoped
   gate, and remained clean until this proof was created.
 
-Existing worktrees observed before this task:
+Pre-existing worktrees observed before Task A3:
 
 | Path | HEAD | branch |
 |---|---|---|
@@ -38,7 +38,8 @@ Existing worktrees observed before this task:
 | `/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/loot-integration-recovery` | `f589f62c` | `fix/loot-integration-recovery` |
 | `/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/meshy-blender-asset-system` | `f84ff366` | `fix/meshy-runtime-dual-hash-binding` |
 | `/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/procedural-biomass-assembly` | `4f1dc22a` | `feature/procedural-biomass-threat-assembly` |
-| `/Users/christopherwilloughby/Code/the-synaptic-sea-asset-pipeline-closure` | `f4a65669` | `fix/asset-pipeline-closure` |
+
+The isolated worktree at `/Users/christopherwilloughby/Code/the-synaptic-sea-asset-pipeline-closure` was created by Task A3 during execution from the recorded baseline; it was not a pre-existing worktree observed before this task.
 
 Recent main history at the baseline: `f4a65669 Merge pull request #547 from
 9thLevelSoftware/fix/meshy-runtime-dual-hash-binding`, `f84ff366 test: align promotion
@@ -183,7 +184,7 @@ non-destructive.
 | `/opt/homebrew/bin/python3.11 --version` | 0 | Python 3.11.15 |
 | `/opt/homebrew/bin/godot --version` | 0 | Godot 4.7.1 stable |
 | `/opt/homebrew/bin/blender --version` | 0 | Blender 5.2.0 LTS |
-| `PYTHONPATH=. PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /opt/homebrew/bin/python3.11 -m pytest -q -p no:cacheprovider [Task A4 file list]` | 1 | `528 passed, 5 failed, 44 subtests passed in 27.46s` |
+| `PYTHONPATH=. PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /opt/homebrew/bin/python3.11 -m pytest -q -p no:cacheprovider tests/test_meshy_asset_contract.py tests/test_meshy_stage.py tests/test_meshy_governance.py tests/test_meshy_candidate_review.py tests/test_meshy_blender_tools.py tests/test_meshy_loot_container_recipe.py tests/test_meshy_texture_packet.py tests/test_meshy_promotion_packet.py tests/test_meshy_runtime_review.py tests/test_prop_visual_metadata.py tests/test_validate_prop_visual_bindings.py` | 1 | `528 passed, 5 failed, 44 subtests passed` — five failures caused by missing task-local `raw.glb`; see below. |
 | Read-only board SQLite query for `synaptic-sea-stage-gate` | 0 | Asset/refinement/runtime-review statuses and dependencies recorded above |
 | Read-only evidence inventory/hash comparison | 0 | Main, Meshy worktree, selected task, master receipt, and historical proofs inventoried |
 | `git status --short --branch` in isolated worktree before proof creation | 0 | `fix/asset-pipeline-closure`; clean |
