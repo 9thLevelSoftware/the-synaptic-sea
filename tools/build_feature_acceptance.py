@@ -278,6 +278,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-repair-proposal.md",
         "scripts/systems/save_restore_candidate.gd",
         "scripts/main.gd", "scripts/title_main.gd",
+        "scripts/audio/audio_manager.gd",
         "scripts/ui/save_load_menu.gd", "scripts/ui/menu_coordinator.gd",
         *[f"scripts/systems/{name}.gd" for name in (
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
