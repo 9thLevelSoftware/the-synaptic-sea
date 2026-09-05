@@ -6513,17 +6513,30 @@ func travel_to(marker) -> Dictionary:
 	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
 	var first_run_contract_applied: bool = _apply_first_run_contract_to_marker(marker)
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
-	# Light up the procgen expansion lane for this derelict: resolve a deterministic
-	# biome + difficulty from the target marker and hand them to the generator so
-	# ShipLayoutGenerator runs EncounterInjector + room-variant selection and stamps
-	# biome_id/difficulty_id on the layout (consumed by threat spawning + scanner/HUD).
-	var run_ctx: Dictionary = _resolve_derelict_run_context(marker)
-	if first_run_contract_applied and first_run_contract != null:
-		run_ctx = {
-			"biome": str(first_run_contract.contract.get("biome_id", run_ctx.get("biome", ""))),
-			"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
-		}
-	ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
+	var mid: String = String(marker.marker_id)
+	var retained_instance = visited_ships.get(mid, null)
+	# A revisited derelict owns its persisted resolved context. Initial travel
+	# captures the exact context used below before ShipInstance persistence.
+	var run_ctx: Dictionary = {}
+	if retained_instance != null:
+		if not _apply_run_context_from_blueprint(retained_instance.blueprint):
+			_emit_travel_denied_sfx()
+			return {"success": false, "reason": "invalid_generation_context", "ship": null}
+		# Scanner markers are reconstructed from the world seed on every scan. A
+		# retained first-run ship may therefore have a contract-selected seed that
+		# differs from that transient marker. Regenerate from the ShipBlueprint,
+		# which is the saved identity for every revisit.
+		marker.seed_value = int(retained_instance.blueprint.seed_value)
+		marker.size_class = int(retained_instance.blueprint.size)
+		marker.condition = int(retained_instance.blueprint.condition)
+	else:
+		run_ctx = _resolve_derelict_run_context(marker)
+		if first_run_contract_applied and first_run_contract != null:
+			run_ctx = {
+				"biome": str(first_run_contract.contract.get("biome_id", run_ctx.get("biome", ""))),
+				"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
+			}
+		ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
@@ -6577,7 +6590,6 @@ func travel_to(marker) -> Dictionary:
 			leaving.scene_root.queue_free()
 			leaving.scene_root = null  # retained instance, scene dropped
 
-	var mid: String = String(marker.marker_id)
 	var inst
 	if visited_ships.has(mid):
 		# Revisit: reuse the retained instance (its systems state is preserved);
@@ -6587,6 +6599,10 @@ func travel_to(marker) -> Dictionary:
 		# First visit: build the per-ship systems manager seeded by condition so a
 		# wrecked ship boards with mostly-offline systems, and register it.
 		var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+		if not new_bp.set_generation_context_v1(run_ctx):
+			new_root.queue_free()
+			push_error("PlayableGeneratedShip: refused to persist invalid initial generation context for '%s'" % mid)
+			return {"success": false, "reason": "invalid_generation_context", "ship": null}
 		var new_mgr = ShipSystemsManagerScript.new()
 		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
 		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
@@ -10998,8 +11014,13 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 		return false
 	# Rebuild from this derelict's OWN seed/size/condition so a save-reload reproduces
 	# its injected encounters + biome/difficulty stamps (not empty / a stale marker's).
-	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if not _apply_run_context_from_blueprint(inst.blueprint):
+		return false
+	# Rebuild through the same native-capable public route used by initial
+	# marker travel. The saved blueprint remains the authoritative seed/size/
+	# condition source, so the loader descriptors match the persisted arc state.
+	var new_root: Node3D = ship_generator.generate_from_seed(
+			int(inst.blueprint.seed_value), int(inst.blueprint.size), int(inst.blueprint.condition))
 	if new_root == null:
 		return false
 	_attach_derelict_active(inst, new_root)
@@ -11022,8 +11043,13 @@ func _ensure_derelict_geometry(inst) -> void:
 	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
 		return
 	# Regenerate from this derelict's OWN context (see _apply_run_context_from_blueprint).
-	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if not _apply_run_context_from_blueprint(inst.blueprint):
+		push_error("PlayableGeneratedShip: refused geometry rebuild with invalid generation context for '%s'" % String(inst.marker_id))
+		return
+	# Retained geometry must use the same native-capable route as first travel;
+	# otherwise a saved native arc summary can be applied to a fallback scene.
+	var new_root: Node3D = ship_generator.generate_from_seed(
+			int(inst.blueprint.seed_value), int(inst.blueprint.size), int(inst.blueprint.condition))
 	if new_root == null:
 		return
 	inst.scene_root = new_root
@@ -11322,14 +11348,29 @@ func _resolve_derelict_run_context(marker) -> Dictionary:
 ## _ensure_derelict_geometry). Without this the generator's mutable biome/difficulty
 ## fields are empty on a fresh load (losing encounter injection + stamps) or stale
 ## from the last traveled marker (wrong biome/difficulty) — see the rebuild sites.
-func _apply_run_context_from_blueprint(blueprint) -> void:
+func _apply_run_context_from_blueprint(blueprint) -> bool:
 	if ship_generator == null:
-		return
+		return false
 	if blueprint == null:
-		ship_generator.configure_run_context("", "")
-		return
+		push_error("PlayableGeneratedShip: missing blueprint generation context")
+		return false
+	if blueprint.has_method("has_generation_context_v1") and blueprint.has_generation_context_v1():
+		if not blueprint.has_method("is_generation_context_v1_valid") or not blueprint.is_generation_context_v1_valid():
+			var detail: String = blueprint.get_generation_context_v1_error() if blueprint.has_method("get_generation_context_v1_error") else "unsupported payload"
+			push_error("PlayableGeneratedShip: invalid persisted generation context: %s" % detail)
+			return false
+		var saved_ctx: Dictionary = blueprint.generation_context_v1
+		var biome_id: String = str(saved_ctx["biome"])
+		var difficulty_id: String = str(saved_ctx["difficulty"])
+		if not _loot_biome_ids().has(biome_id) or not ["standard", "hardened", "deep_dive"].has(difficulty_id):
+			push_error("PlayableGeneratedShip: unsupported persisted generation context biome='%s' difficulty='%s'" % [biome_id, difficulty_id])
+			return false
+		ship_generator.configure_run_context(biome_id, difficulty_id)
+		return true
+	# Additive legacy behavior: old blueprint summaries have no resolved context.
 	var ctx: Dictionary = _resolve_run_context(int(blueprint.seed_value), int(blueprint.size), int(blueprint.condition))
 	ship_generator.configure_run_context(str(ctx.get("biome", "")), str(ctx.get("difficulty", "")))
+	return true
 
 func _resolve_current_loot_depth() -> int:
 	if current_ship == null or current_ship.blueprint == null:

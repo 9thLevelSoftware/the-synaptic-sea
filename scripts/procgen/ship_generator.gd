@@ -185,6 +185,14 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	if gameplay.is_empty() or not (gameplay.get("objectives", []) is Array) or (gameplay.get("objectives", []) as Array).is_empty():
 		push_error("SHIP GENERATOR FAIL worldgen gameplay slice builder returned no objectives")
 		return null
+	# The native export does not author builder-selected electrical arcs. The
+	# loader consumes arc_zones from layout, so preserve the same bridge used by
+	# the fallback layout pipeline before building the live scene.
+	var layout_arcs: Variant = layout.get("arc_zones", [])
+	var slice_arcs: Variant = gameplay.get("arc_zones", [])
+	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
+			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
+		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
 	var loot_tables: Dictionary = LootRollerScript.load_tables()
 	if loot_tables.is_empty():
 		push_error("SHIP GENERATOR FAIL game loot registry is empty")

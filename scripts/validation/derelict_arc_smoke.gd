@@ -86,6 +86,19 @@ func _active_derelict_arc_blocks() -> bool:
 	var summary: Dictionary = playable.get_arc_summary()
 	return bool(summary.get("arcing", false)) and _arc_collision_blocked(zone)
 
+
+func _current_arc_zone_ids() -> Array[String]:
+	var ids: Array[String] = []
+	if playable == null or playable.get_current_ship() == null:
+		return ids
+	var root: Node = playable.get_current_ship().scene_root
+	if root == null or not root.has_method("get_arc_zone_specs"):
+		return ids
+	for spec_variant in (root.get_arc_zone_specs() as Array):
+		if spec_variant is Dictionary:
+			ids.append(str((spec_variant as Dictionary).get("id", (spec_variant as Dictionary).get("zone_id", ""))))
+	return ids
+
 func _validate() -> void:
 	finished = true
 	_all_operational(playable.get_ship_systems_manager())
@@ -150,6 +163,10 @@ func _validate() -> void:
 	if not collision_blocked:
 		_fail("model is ARCING but the derelict zone node did not block (scene state not refreshed on away branch)")
 		return
+	var saved_zone_ids: Array = (playable.get_arc_summary().get("zone_ids", []) as Array).duplicate()
+	if saved_zone_ids.is_empty():
+		_fail("arcing state has no saved arc zone IDs")
+		return
 
 	if not playable.request_save():
 		_fail("request_save while derelict arc was ARCING failed")
@@ -160,6 +177,9 @@ func _validate() -> void:
 	if not playable.away_from_start or String(playable.get_current_ship().marker_id) != boarded_marker_id:
 		_fail("reload did not restore the saved boarded derelict '%s'" % boarded_marker_id)
 		return
+	if JSON.stringify(saved_zone_ids) != JSON.stringify(_current_arc_zone_ids()):
+		_fail("reload rebuilt different arc zone IDs than the saved native descriptor")
+		return
 	if not _active_derelict_arc_blocks():
 		_fail("reload reset or failed to render the arcing derelict arc")
 		return
@@ -167,14 +187,35 @@ func _validate() -> void:
 	if not playable.travel_home():
 		_fail("travel_home failed after arcing derelict reload")
 		return
+
+	# Board another retained ship before revisiting the saved arc ship. This makes
+	# its context the generator's most recent state, so the final revisit proves
+	# the first ship restores its own persisted context rather than inheriting it.
+	var contaminating_marker_id: String = ""
+	for candidate in in_range:
+		var candidate_id: String = String(candidate.marker_id)
+		if candidate_id == boarded_marker_id:
+			continue
+		if bool(playable.travel_to_marker_id(candidate_id).get("success", false)):
+			contaminating_marker_id = candidate_id
+			break
+	if contaminating_marker_id.is_empty():
+		_fail("could not board a second derelict to test generation-context isolation")
+		return
+	if not playable.travel_home():
+		_fail("travel_home failed after generation-context isolation visit")
+		return
 	if not bool(playable.travel_to_marker_id(boarded_marker_id).get("success", false)):
 		_fail("revisit to arcing derelict '%s' failed" % boarded_marker_id)
+		return
+	if JSON.stringify(saved_zone_ids) != JSON.stringify(_current_arc_zone_ids()):
+		_fail("revisit rebuilt different arc zone IDs than the saved native descriptor")
 		return
 	if not _active_derelict_arc_blocks():
 		_fail("revisit reset or failed to render the arcing derelict arc")
 		return
 
-	print("DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=%d arcing_observed=true collision_blocked=true reload_preserved=true revisit_preserved=true" % ticks)
+	print("DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=%d arcing_observed=true collision_blocked=true reload_preserved=true revisit_preserved=true other_ship_context_isolated=true" % ticks)
 	_cleanup(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
