@@ -1,6 +1,6 @@
 # ADR-0064: Version the parity fixture with the topology contract
 
-- Status: Accepted contract; candidate validation and implementation pending.
+- Status: Accepted contract, candidate and focused regression integration; full baseline pending.
 - Date: 2026-09-05
 - Requirements: FC-02; preserves structural validation and ADR-0053.
 
@@ -46,8 +46,26 @@ source-backed review is required before replacing this version's expected data.
 
 ## Acceptance boundary
 
-The existing candidate has not yet met this contract. Deterministic output alone
-does not establish semantic correctness. Approval requires the validations above
-and review of the changed occupancy against the current connector-growth contract.
+The candidate and regression integration passed independent endpoint, occupancy,
+wrapper, source-provenance, malformed-fixture and capture-path review. Fresh
+positive parity passes with no diagnostics; mutation probes fail cleanly without
+a PASS marker. The full canonical baseline remains pending.
 Historical staged asset evidence remains historical evidence; this decision does
 not claim a new visual-art acceptance or a completed feature gate.
+
+## Position representation addendum (2026-09-05)
+
+The independently accepted candidate hash was
+`BBE71EF7B95D429EB09D6AE6F47FC4E38DF181998095A7A7668987D40CDF6E59`.
+Strict fixture validation now stores placement and wrapper positions as arrays
+of three numbers instead of textual Vector3 coordinates. The resulting hash is
+`1B9FEB21C727679CF70BFF8246ABACB318DCC3B9A306E88E1FEA9E4A3EFD29EF`.
+Independent comparison normalized only those position fields in the preserved
+accepted capture and found full recursive JSON equality with the new capture.
+This representation change is accepted; no topology, wrapper, occupancy, or
+other metadata change is authorized by this addendum. The capture manifest
+records both hashes and the reason for the change.
+
+The reusable capture utility must refuse existing outputs and protected
+historical/golden directories, including relative, traversal and Windows case
+variants. Future captures remain candidates until separately reviewed.
