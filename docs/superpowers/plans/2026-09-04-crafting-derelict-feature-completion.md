@@ -639,7 +639,10 @@ returns zero transferred and retains every lot.
 and economy-cycle addendum; new
 `tools/check_crafting_economy.py`, `tests/test_crafting_economy.py`;
 `crafting_station.gd`, `recipe_picker_panel.gd`, coordinator input seams;
-new `fc_p09_smoke.gd`; `fc_p05_smoke.gd` tool-consumer regression only.
+new `fc_p09_smoke.gd`; `fc_p05_smoke.gd` tool-consumer regression only;
+`recipe_picker_panel_smoke.gd` for explicit station-owner adapters, visible queue,
+power and pending-output status, and missing/foreign/stale-owner denial. The panel
+fixture supplements the real coordinator/player journey in `fc_p09_smoke.gd`.
 `fc_p12_smoke.gd` is allowed only for the P09-compatible max-stack-one
 `console_unit` reentrant setup; it must preserve the P12 exact refund and
 duplicate-completion assertions.
@@ -804,7 +807,9 @@ new `fc_p13_smoke.gd`; timed physical-slot fixture migration in
 `ship_mod_system_effect` smokes; bound-ship and generation callback assertions in
 `ship_modification_panel_smoke.gd`; `component_remount_sfx_live_away_smoke.gd`
 only for actual boarded/selected/claimed away-owner setup and a fail-once/timeout
-guard. **Non-goals:** multiplayer authority or unrelated
+guard. `fc_p07_smoke.gd` may supply the explicit `ship-runtime` owner in its
+runtime catch-up context, preserving all scheduler catch-up assertions while
+testing the strict owner requirement. **Non-goals:** multiplayer authority or unrelated
 extraction.
 
 Known physically reachable unclaimed ships may be selected without ownership;

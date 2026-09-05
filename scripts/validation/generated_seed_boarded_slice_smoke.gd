@@ -50,13 +50,21 @@ func _all_operational(mgr) -> void:
 func _validate() -> void:
 	finished = true
 	_all_operational(playable.get_ship_systems_manager())
+	var home_ship = playable.get_current_ship()
+	if home_ship == null:
+		_fail("home current_ship missing before travel")
+		return
+	var home_root: Node = home_ship.scene_root
 
 	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")
 		return
-	if not bool(playable.travel_to_marker_id(String(in_range[0].marker_id)).get("success", false)):
+	var selected_marker = in_range[0]
+	var selected_marker_id: String = String(selected_marker.marker_id)
+	var travel_result: Dictionary = playable.travel_to_marker_id(selected_marker_id)
+	if not bool(travel_result.get("success", false)):
 		_fail("travel to derelict failed")
 		return
 	if not playable.away_from_start:
@@ -67,6 +75,26 @@ func _validate() -> void:
 	if cur == null:
 		_fail("current_ship missing after travel")
 		return
+	if cur == home_ship or cur.scene_root == home_root:
+		_fail("travel retained the pre-travel home ship/root")
+		return
+	if String(cur.marker_id).is_empty() or String(cur.marker_id) != selected_marker_id:
+		_fail("current marker_id=%s expected selected marker_id=%s" % [String(cur.marker_id), selected_marker_id])
+		return
+	if playable.visited_ships.get(selected_marker_id, null) != cur:
+		_fail("selected marker did not resolve to the active visited ShipInstance")
+		return
+	if travel_result.get("ship", null) != cur.scene_root:
+		_fail("travel result ship does not match active ShipInstance scene_root")
+		return
+	if cur.blueprint == null:
+		_fail("active selected ShipInstance has no blueprint")
+		return
+	# FirstRunContract may replace the transient scanner seed inside
+	# travel_to_marker_id. The active blueprint is the persisted resolved identity
+	# passed to ShipGenerator for this selected marker.
+	var selected_seed: int = int(cur.blueprint.seed_value)
+	var selected_size: int = int(cur.blueprint.size)
 	var derelict_root = cur.scene_root
 	if derelict_root == null or not is_instance_valid(derelict_root):
 		_fail("derelict scene_root missing")
@@ -85,9 +113,25 @@ func _validate() -> void:
 	if layout.is_empty():
 		_fail("boarded layout empty")
 		return
-	var program_id: String = str(layout.get("program_id", ""))
-	if program_id == "coherent-proof-ship-001" or not program_id.begins_with("procgen-"):
-		_fail("boarded layout is hub golden, program_id=%s" % program_id)
+	var loader_layout: Dictionary = loader.get_layout_copy()
+	if not layout.recursive_equal(loader_layout, 32):
+		_fail("active ShipInstance built_layout differs from GeneratedShipLoader layout")
+		return
+	var identity_reason: String = _worldgen_identity_error(layout, selected_seed, selected_size)
+	if not identity_reason.is_empty():
+		_fail(identity_reason)
+		return
+	var wrong_seed_layout: Dictionary = layout.duplicate(true)
+	var wrong_generator: Dictionary = wrong_seed_layout.get("generator", {})
+	wrong_generator["seed"] = selected_seed + 1
+	wrong_seed_layout["generator"] = wrong_generator
+	if _worldgen_identity_error(wrong_seed_layout, selected_seed, selected_size).is_empty():
+		_fail("wrong-seed worldgen identity was accepted")
+		return
+	var home_layout: Dictionary = layout.duplicate(true)
+	home_layout["program_id"] = "coherent-proof-ship-001"
+	if _worldgen_identity_error(home_layout, selected_seed, selected_size).is_empty():
+		_fail("home golden program identity was accepted")
 		return
 	if str(layout.get("schema_version", "")) != "1.2.0":
 		_fail("schema_version=%s expected 1.2.0" % str(layout.get("schema_version", "")))
@@ -180,6 +224,39 @@ func _validate() -> void:
 		return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
+
+
+func _worldgen_identity_error(layout: Dictionary, expected_seed: int, expected_size: int) -> String:
+	var expected_archetype: String = _worldgen_archetype_for_size(expected_size)
+	if expected_archetype.is_empty():
+		return "unsupported selected size_class=%d" % expected_size
+	var generator_v: Variant = layout.get("generator", {})
+	if not (generator_v is Dictionary):
+		return "boarded layout generator metadata missing"
+	var generator: Dictionary = generator_v as Dictionary
+	if str(generator.get("name", "")) != "worldgen" or int(generator.get("generator_version", -1)) != 2:
+		return "boarded layout is not worldgen v2"
+	if int(generator.get("seed", -1)) != expected_seed:
+		return "worldgen seed=%s expected selected seed=%d" % [str(generator.get("seed", "")), expected_seed]
+	if str(generator.get("archetype_id", "")) != expected_archetype:
+		return "worldgen archetype=%s expected size-%d archetype=%s" % [
+			str(generator.get("archetype_id", "")), expected_size, expected_archetype]
+	var expected_program_id: String = "worldgen-%s-%d" % [expected_archetype, expected_seed]
+	if str(layout.get("program_id", "")) != expected_program_id:
+		return "program_id=%s expected=%s" % [str(layout.get("program_id", "")), expected_program_id]
+	return ""
+
+
+func _worldgen_archetype_for_size(size_class: int) -> String:
+	match size_class:
+		ShipBlueprintScript.Size.LIFE_BOAT:
+			return "shuttle"
+		ShipBlueprintScript.Size.SMALL:
+			return "corvette"
+		ShipBlueprintScript.Size.MEDIUM:
+			return "freighter"
+		_:
+			return ""
 
 
 func _standing_start_to_goal(layout: Dictionary, loader: GeneratedShipLoader) -> String:

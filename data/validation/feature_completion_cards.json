@@ -1653,6 +1653,11 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/recipe_picker_panel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/validation/fc_p12_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -1908,7 +1913,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P10",
-        "line": 663
+        "line": 666
       }
     },
     {
@@ -2144,7 +2149,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 701
+        "line": 704
       }
     },
     {
@@ -2380,7 +2385,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 748
+        "line": 751
       }
     },
     {
@@ -2435,6 +2440,11 @@
         },
         {
           "path": "scripts/validation/fc_p13_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p07_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -2541,7 +2551,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 792
+        "line": 795
       }
     },
     {
@@ -2808,7 +2818,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 838
+        "line": 843
       }
     },
     {
@@ -2927,7 +2937,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 879
+        "line": 884
       }
     },
     {
@@ -3020,7 +3030,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 901
+        "line": 906
       }
     },
     {
@@ -3168,7 +3178,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 926
+        "line": 931
       }
     },
     {
@@ -3303,7 +3313,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 968
+        "line": 973
       }
     },
     {
@@ -3441,7 +3451,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1000
+        "line": 1005
       }
     },
     {
@@ -3588,7 +3598,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1028
+        "line": 1033
       }
     },
     {
@@ -3674,7 +3684,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1050
+        "line": 1055
       }
     },
     {
@@ -3767,7 +3777,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1074
+        "line": 1079
       }
     },
     {
@@ -3893,7 +3903,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1096
+        "line": 1101
       }
     },
     {
@@ -4016,7 +4026,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1121
+        "line": 1126
       }
     }
   ]

@@ -261,6 +261,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "tools/check_crafting_economy.py", "tests/test_crafting_economy.py",
         "scripts/tools/crafting_station.gd", "scripts/ui/recipe_picker_panel.gd", COORDINATOR,
         f"{VALIDATION}fc_p09_smoke.gd", f"{VALIDATION}fc_p05_smoke.gd",
+        f"{VALIDATION}recipe_picker_panel_smoke.gd",
         f"{VALIDATION}fc_p12_smoke.gd",
     ],
     "P10": [
@@ -312,6 +313,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "ship_work_context", "ship_runtime", "ship_instance", "ship_access_state", "crafting_state")],
         "scripts/systems/world_snapshot.gd", "scripts/ui/ship_modification_panel.gd",
         COORDINATOR, f"{VALIDATION}fc_p13_smoke.gd",
+        f"{VALIDATION}fc_p07_smoke.gd",
         *[f"{VALIDATION}{name}.gd" for name in (
             "ship_mod_inventory_sync_away_smoke", "ship_modification_panel_smoke",
             "ship_mod_system_effect_smoke", "ship_mod_system_effect_away_smoke",
