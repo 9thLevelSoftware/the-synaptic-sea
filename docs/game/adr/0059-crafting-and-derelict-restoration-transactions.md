@@ -271,8 +271,19 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     malformed present summaries and any authoritative mismatch; valid defaults in
     a recaptured candidate do not excuse discarded saved values. Normalization is
     limited to explicitly documented derived fields, never inventory, progression,
-    settings, system condition, ownership or receipt content. Prove nondefault
-    roundtrips and malformed audio, settings and ship-system denials.
+    settings, system condition, ownership or receipt content. The sole P10
+    recapture-comparison exception is
+    `home_ship.oxygen_summary.player_in_breach_zone`: it is a derived production-oxygen
+    projection (scene overlap or active field atmosphere) and may differ while the staged replacement has not received physics
+    overlap updates. If present in a current payload, validate it as `TYPE_BOOL`
+    before any normalization; omit only that exact path from the canonical recapture
+    comparison. Preserve every other saved oxygen value, threshold, breach state and
+    zone ID exactly, and preserve source bytes under the existing rejected-candidate
+    rule. After activation, revisit and tick, the flag must match actual scene
+    production oxygen context: current scene overlap or active field atmosphere.
+    Prove the precise legitimate projection difference, malformed
+    non-boolean rejection, and rejection for unrelated oxygen-field drift, alongside
+    nondefault roundtrips and malformed audio, settings and ship-system denials.
 30. Recoverable terminal receipts retain exact producer history after escrow is
     released. Validate original lots, producer identity, terminal outcome and
     sequence against that history, including field outputs and cancellation

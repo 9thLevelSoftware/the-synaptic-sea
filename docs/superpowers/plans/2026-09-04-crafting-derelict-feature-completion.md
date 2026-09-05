@@ -778,8 +778,15 @@ fixtures under `tests/fixtures/feature_completion/`.
 - [ ] Close ADR-0059 decisions 29-31: reject forged terminal refund/field receipts,
   preserve moved component lot origins across two reloads, bind restored inactive
   crafting owners before catch-up, and compare the full authoritative staged
-  recapture with the prepared world. Include malformed subsystem summaries and
-  valid nondefault roundtrips; no broad normalization may hide lost saved state.
+  recapture with the prepared world. `home_ship.oxygen_summary.player_in_breach_zone`
+  is the only recapture-comparison exception: validate a present current value as a
+  boolean before normalization, omit only that exact derived production-oxygen projection (scene overlap or active field atmosphere),
+  and after activation/revisit/tick prove it matches the production oxygen context:
+  current scene overlap or active field atmosphere. Test one precise
+  staged-rebuild projection difference, malformed non-boolean rejection, and unrelated
+  oxygen-field drift rejection. Preserve all other oxygen values, thresholds, breach
+  state and zone IDs exactly; no broad summary ignore or normalization may hide lost
+  saved state.
 
 **G1 exit:** FC-04..12 evidence is complete; the player can obtain, craft, queue,
 interrupt, collect and use differentiated output through normal controls.
