@@ -15,6 +15,11 @@ from typing import Any
 import pytest
 
 from tools.meshy_asset_contract import load_contract
+from tests.meshy_loot_container_fixtures import (
+    create_synthetic_blender_fixture,
+    materialize_fixture_case,
+    recover_verified_private_raw,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "data/asset_generation/contracts/loot_container_derelict_v1.json"
@@ -546,7 +551,7 @@ def _run_blender_inspection(blender: Path, blend_path: Path, expression: str) ->
     return records[0]
 
 
-def test_real_blender_recipe_is_deterministic_and_preserves_disposable_master(
+def test_synthetic_real_blender_recipe_is_deterministic_and_preserves_disposable_master(
     monkeypatch,
 ) -> None:
     blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
@@ -554,25 +559,14 @@ def test_real_blender_recipe_is_deterministic_and_preserves_disposable_master(
     from tools import meshy_loot_container_recipe as recipe
 
     contract = load_contract(CONTRACT_PATH)
-    canonical_master = Path(
-        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
-        "loot_container_derelict_v1_master.blend"
-    )
-    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
-    assert canonical_master.is_file() and canonical_raw.is_file()
     runs: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="meshy-task2-", dir="/private/var/tmp") as temporary:
         root = Path(temporary)
+        fixture = create_synthetic_blender_fixture(root, blender, ROOT)
         for index in (1, 2):
             case = root / ("case-" + str(index))
-            master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
-            task = case / "task"
-            evidence = case / "evidence"
-            master.parent.mkdir(parents=True)
-            task.mkdir(parents=True)
-            evidence.mkdir(parents=True)
-            shutil.copy2(canonical_master, master)
-            shutil.copy2(canonical_raw, task / "raw.glb")
+            disposable = materialize_fixture_case(fixture, case)
+            master, task, evidence = disposable.master, disposable.task, disposable.evidence
             paths = recipe.RecipePaths(
                 project_root=ROOT,
                 task_dir=task,
@@ -639,29 +633,19 @@ print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','Co
         assert glb_info["actions"] == ["lid_open"]
 
 
-def test_real_blender_front_hardware_geometry_and_hinge_follow(monkeypatch) -> None:
+def test_synthetic_real_blender_front_hardware_geometry_and_hinge_follow(
+    tmp_path: Path, monkeypatch
+) -> None:
     blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
     assert blender.is_file() and os.access(blender, os.X_OK)
     from tools import meshy_loot_container_recipe as recipe
 
     contract = load_contract(CONTRACT_PATH)
-    canonical_master = Path(
-        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
-        "loot_container_derelict_v1_master.blend"
-    )
-    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
-    assert canonical_master.is_file() and canonical_raw.is_file()
-
     with tempfile.TemporaryDirectory(prefix="meshy-front-hardware-", dir="/private/var/tmp") as temporary:
         root = Path(temporary)
-        master = root / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
-        task = root / "task"
-        evidence = root / "evidence"
-        master.parent.mkdir(parents=True)
-        task.mkdir()
-        evidence.mkdir()
-        shutil.copy2(canonical_master, master)
-        shutil.copy2(canonical_raw, task / "raw.glb")
+        fixture = create_synthetic_blender_fixture(root, blender, ROOT)
+        disposable = materialize_fixture_case(fixture, root / "case")
+        master, task, evidence = disposable.master, disposable.task, disposable.evidence
         paths = recipe.RecipePaths(
             project_root=ROOT,
             task_dir=task,
@@ -795,7 +779,7 @@ print('TASK2_JSON='+json.dumps({'objects':[name for name in ['ContainerRoot','Co
         assert glb_info["triangles"] <= 1500
 
 
-def test_real_blender_recipe_rejects_unowned_generated_name_collision(
+def test_synthetic_real_blender_recipe_rejects_unowned_generated_name_collision(
     tmp_path: Path, monkeypatch
 ) -> None:
     blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
@@ -804,20 +788,10 @@ def test_real_blender_recipe_rejects_unowned_generated_name_collision(
     from tools import meshy_loot_container_recipe as recipe
 
     contract = load_contract(CONTRACT_PATH)
-    canonical_master = Path(
-        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
-        "loot_container_derelict_v1_master.blend"
-    )
-    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
     case = tmp_path / "collision-case"
-    master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
-    task = case / "task"
-    evidence = case / "evidence"
-    master.parent.mkdir(parents=True)
-    task.mkdir()
-    evidence.mkdir()
-    shutil.copy2(canonical_master, master)
-    shutil.copy2(canonical_raw, task / "raw.glb")
+    fixture = create_synthetic_blender_fixture(tmp_path, blender, ROOT)
+    disposable = materialize_fixture_case(fixture, case)
+    master, task, evidence = disposable.master, disposable.task, disposable.evidence
 
     seed_expression = (
         "import bpy; "
@@ -871,7 +845,7 @@ print('TASK2_JSON='+json.dumps({'authored':bool(authored_names),'authored_names'
     assert not (master.parent / "build_recipe_manifest.json").exists()
 
 
-def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(
+def test_synthetic_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(
     tmp_path: Path, monkeypatch
 ) -> None:
     blender = Path(os.environ.get("BLENDER", "/opt/homebrew/bin/blender"))
@@ -880,19 +854,9 @@ def test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master(
     from tools import meshy_loot_container_recipe as recipe
 
     contract = load_contract(CONTRACT_PATH)
-    canonical_master = Path(
-        "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
-        "loot_container_derelict_v1_master.blend"
-    )
-    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1/" / TASK_ID / "raw.glb"
-    master = tmp_path / "generated" / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
-    task = tmp_path / "generated" / "task"
-    evidence = tmp_path / "generated" / "evidence"
-    master.parent.mkdir(parents=True)
-    task.mkdir()
-    evidence.mkdir()
-    shutil.copy2(canonical_master, master)
-    shutil.copy2(canonical_raw, task / "raw.glb")
+    fixture = create_synthetic_blender_fixture(tmp_path, blender, ROOT)
+    disposable = materialize_fixture_case(fixture, tmp_path / "generated")
+    master, task, evidence = disposable.master, disposable.task, disposable.evidence
     paths = recipe.RecipePaths(
         project_root=ROOT,
         task_dir=task,
@@ -1245,8 +1209,7 @@ def test_real_private_glb_uses_contract_dimension_order_for_pure_validator(
         "/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/"
         "loot_container_derelict_v1_master.blend"
     )
-    canonical_raw = ROOT / "assets/_staging/meshy/loot_container_derelict_v1" / TASK_ID / "raw.glb"
-    assert canonical_master.is_file() and canonical_raw.is_file()
+    assert canonical_master.is_file()
     contract = load_contract(CONTRACT_PATH)
     case = tmp_path / "closed-default"
     master = case / "source" / ASSET_ID / (ASSET_ID + "_master.blend")
@@ -1256,7 +1219,7 @@ def test_real_private_glb_uses_contract_dimension_order_for_pure_validator(
     task.mkdir()
     evidence.mkdir()
     shutil.copy2(canonical_master, master)
-    shutil.copy2(canonical_raw, task / "raw.glb")
+    recover_verified_private_raw(ROOT, task / "raw.glb", contract.sha256)
     paths = recipe.RecipePaths(
         project_root=ROOT,
         task_dir=task,

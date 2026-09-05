@@ -854,7 +854,6 @@ def _run_blender_recipe_runtime(paths: RecipePaths, contract: AssetContract, run
     root["hinge_axis"] = "X"
     root["hinge_open_degrees"] = 105.0
     root["state_frames"] = "closed:1,open:30,looted:60"
-    root["collision_owner"] = "godot_wrapper"
     root["source_provider"] = "meshy"
     root["source_task_id"] = SELECTED_TASK_ID
 
