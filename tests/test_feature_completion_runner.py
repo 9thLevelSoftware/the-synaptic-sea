@@ -45,6 +45,13 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
     def test_pass_with_warning_fails(self):
         self.assertFalse(self._run(stderr="WARNING: bad thing\n")["passed"])
 
+    def test_near_match_and_stderr_only_marker_fail(self):
+        self.assertFalse(self._run(stdout="NOT FC P03 PASSING\n")["passed"])
+        self.assertFalse(self._run(stdout="", stderr="FC P03 PASS\n")["passed"])
+
+    def test_pass_with_script_error_fails(self):
+        self.assertFalse(self._run(stdout="FC P03 PASS\n\x1b[31mSCRIPT ERROR: Invalid call\x1b[0m\n")["passed"])
+
     def test_expected_negative_diagnostic_still_fails(self):
         self.assertFalse(self._run(stdout="FC P03 PASS\nERROR: expected negative assertion\n")["passed"])
 
@@ -64,10 +71,25 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
         process = Mock(pid=4242)
         process.communicate.side_effect = [subprocess.TimeoutExpired(["godot"], 1), (b"partial", b"tail")]
         with patch.object(runner.os, "name", "posix"), patch.object(runner.subprocess, "Popen", return_value=process), patch.object(runner.os, "killpg", create=True) as killpg, patch.object(runner.signal, "SIGKILL", 9, create=True):
-            stdout, stderr, code, timed_out = runner._capture(["godot"], cwd=self.root, env={}, timeout=1)
+            stdout, stderr, code, timed_out, cleanup_error = runner._capture(["godot"], cwd=self.root, env={}, timeout=1)
         self.assertTrue(timed_out); self.assertIsNone(code)
         self.assertEqual("partial", stdout); self.assertEqual("tail", stderr)
+        self.assertIsNone(cleanup_error)
         killpg.assert_called_once_with(4242, 9)
+
+    def test_windows_cleanup_targets_only_owned_pid_and_reports_failure(self):
+        process = Mock(pid=4242)
+        failed = subprocess.CompletedProcess(["taskkill"], 1, "", "no access")
+        with patch.object(runner.os, "name", "nt"), patch.object(runner.subprocess, "run", return_value=failed) as taskkill:
+            error = runner._terminate_owned_process(process)
+        taskkill.assert_called_once_with(["taskkill", "/PID", "4242", "/T", "/F"], text=True, capture_output=True, check=False)
+        self.assertEqual("taskkill failed: 1", error)
+
+    def test_windows_process_group_is_created(self):
+        process = Mock(pid=9); process.communicate.return_value = ("", ""); process.returncode = 0
+        with patch.object(runner.os, "name", "nt"), patch.object(runner.subprocess, "Popen", return_value=process) as popen:
+            runner._capture(["godot"], cwd=self.root, env={}, timeout=1)
+        self.assertEqual(runner.subprocess.CREATE_NEW_PROCESS_GROUP, popen.call_args.kwargs["creationflags"])
 
     def test_missing_script_fails_explicitly(self):
         self.script.unlink()
@@ -85,11 +107,78 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(runner.RunnerError, "duplicate"):
             runner.load_cases(manifest)
 
+    def test_headless_manifest_rejects_player_scope_and_invalid_status(self):
+        manifest = self.root / "cases.json"
+        manifest.write_text('{"cases":[{"id":"P03","script":"a","marker":"FC P03 PASS","scope":"player","status":"done"}]}')
+        with self.assertRaisesRegex(runner.RunnerError, "invalid"):
+            runner.load_cases(manifest)
+
+    def test_manifest_rejects_unknown_profile(self):
+        manifest = self.root / "cases.json"
+        manifest.write_text('{"cases":[{"id":"P03","script":"a","marker":"FC P03 PASS","scope":"model","status":"active","profile":"craftng"}]}')
+        with self.assertRaisesRegex(runner.RunnerError, "invalid"):
+            runner.load_cases(manifest)
+
+    def test_manifest_rejects_missing_profile(self):
+        manifest = self.root / "cases.json"
+        manifest.write_text('{"cases":[{"id":"P03","script":"a","marker":"FC P03 PASS","scope":"model","status":"active"}]}')
+        with self.assertRaisesRegex(runner.RunnerError, "invalid"):
+            runner.load_cases(manifest)
+
+    def test_manifest_accepts_only_named_profiles(self):
+        manifest = self.root / "cases.json"
+        manifest.write_text('{"cases":[{"id":"P03","script":"a","marker":"FC P03 PASS","scope":"model","status":"active","profile":"crafting"},{"id":"P04","script":"b","marker":"FC P04 PASS","scope":"scene","status":"planned","profile":"restoration"}]}')
+        cases = runner.load_cases(manifest)
+        self.assertEqual({"crafting", "restoration"}, {case["profile"] for case in cases})
+
     def test_canonical_extraction_requires_expected_boundary_and_marker(self):
         plan = self.root / "plan.md"
         plan.write_text("## Regression bundle\n\n```bash\nrun_clean 'a' 'a' true\n```\n")
         with self.assertRaisesRegex(runner.RunnerError, "marker"):
             runner.extract_regression_bundle(plan)
+
+    def _bundle(self, stdout, stderr="", code=0):
+        body = "run_clean() { :; }\nrun_clean 'one' 'one' true\necho 'SYNAPTIC_SEA REGRESSION PASS commands=999 clean_output=true'\n"
+        def fake(command, **kwargs):
+            if command[-1] == "--version":
+                return subprocess.CompletedProcess(command, 0, "GNU bash", "")
+            return subprocess.CompletedProcess(command, code, stdout, stderr)
+        with patch.object(runner, "extract_regression_bundle", return_value=(body, 1)), patch.object(runner, "_verified_bash", return_value="C:\\Program Files\\Git\\bin\\bash.exe"):
+            return runner.execute_bundle(Path("C:\\Godot\\godot.exe"), self.evidence, self.user_data, run=fake, timeout=1)
+
+    def test_bundle_rejects_mismatch_duplicate_stderr_and_trailing_marker_forms(self):
+        self.assertFalse(self._bundle("SYNAPTIC_SEA REGRESSION PASS commands=999 clean_output=true\n")["passed"])
+        self.assertFalse(self._bundle("SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\nSYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n")["passed"])
+        self.assertFalse(self._bundle("", "SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n")["passed"])
+        self.assertFalse(self._bundle("SYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\nafter\n")["passed"])
+
+    def test_bundle_allows_canonical_allowlisted_output_but_requires_bundle_exit_for_other_diagnostics(self):
+        allowed = "WARNING: SaveLoadService: cannot save null world snapshot\nSYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n"
+        self.assertTrue(self._bundle(allowed)["passed"])
+        self.assertFalse(self._bundle("WARNING: unexpected\nSYNAPTIC_SEA REGRESSION PASS commands=1 clean_output=true\n", code=1)["passed"])
+
+    def test_windows_rejects_wsl_bash_and_accepts_git_bash_with_windows_paths(self):
+        def fake(command, **kwargs):
+            return subprocess.CompletedProcess(command, 0, "GNU bash", "")
+        with patch.object(runner.os, "name", "nt"), patch.object(runner.shutil, "which", return_value=r"C:\Windows\System32\bash.exe"), patch.object(runner.Path, "is_file", return_value=False):
+            with self.assertRaisesRegex(runner.RunnerError, "Windows-compatible"):
+                runner._verified_bash(fake)
+        with patch.object(runner.os, "name", "nt"), patch.object(runner.shutil, "which", return_value=r"C:\Program Files\Git\bin\bash.exe"):
+            self.assertEqual(r"C:\Program Files\Git\bin\bash.exe", runner._verified_bash(fake))
+
+    def test_prepared_bundle_derives_count_at_runtime(self):
+        source = "run_clean() {\n  :\n}\nrun_clean 'one' 'one' true\necho 'SYNAPTIC_SEA REGRESSION PASS commands=633 clean_output=true'\n"
+        prepared = runner._prepared_bundle(source)
+        self.assertIn("RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))", prepared)
+        self.assertIn("commands=${RUN_CLEAN_COUNT}", prepared)
+
+    def test_post_kill_drain_timeout_is_reported(self):
+        process = Mock(pid=17)
+        process.communicate.side_effect = [subprocess.TimeoutExpired(["godot"], 1), subprocess.TimeoutExpired(["godot"], 5)]
+        with patch.object(runner.os, "name", "posix"), patch.object(runner.subprocess, "Popen", return_value=process), patch.object(runner.os, "killpg", create=True), patch.object(runner.signal, "SIGKILL", 9, create=True):
+            _, _, _, timed_out, cleanup_error = runner._capture(["godot"], cwd=self.root, env={}, timeout=1)
+        self.assertTrue(timed_out)
+        self.assertEqual("post-kill output drain timed out", cleanup_error)
 
 
 if __name__ == "__main__":
