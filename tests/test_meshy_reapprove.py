@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import shutil
+import zlib
 from pathlib import Path
 from typing import Any, Dict
 
@@ -22,6 +23,8 @@ FIXTURE_ASSET_ROOT = ROOT / "assets/_staging/meshy" / ASSET_ID
 JOURNAL_NAME = "9e04213bc806421d8e64c9c9c23f26d3.json"
 PLAN_RELATIVE = Path("assets/_staging/meshy/_plans") / f"{ASSET_ID}.json"
 JOURNAL_RELATIVE = Path("assets/_staging/meshy") / ASSET_ID / "_batches" / JOURNAL_NAME
+JOURNAL_SCHEMA = ROOT / "data/asset_generation/schemas/meshy_batch_journal_v1.schema.json"
+PLAN_SCHEMA = ROOT / "data/asset_generation/schemas/meshy_plan_envelope_v1.schema.json"
 
 
 class NoProviderClient:
@@ -187,6 +190,49 @@ def test_legacy_journal_without_approval_history_still_validates(tmp_path: Path)
     assert stage_module.validate_batch_journal(journal) == []
 
 
+def test_reapprove_schema_extends_authoritatively() -> None:
+    schema = json.loads(JOURNAL_SCHEMA.read_text(encoding="utf-8"))
+    approval_schema = schema["$defs"]["approval"]
+
+    assert set(approval_schema["properties"]) >= {
+        "reapproved_at",
+        "reapprove_reason",
+        "reapprove_operator",
+    }
+    assert schema["properties"]["approval_history"] == {
+        "type": "array",
+        "items": {"$ref": "#/$defs/approval"},
+    }
+
+    original = json.loads((ROOT / JOURNAL_RELATIVE).read_text(encoding="utf-8"))
+    extended = copy.deepcopy(original)
+    extended["approval"]["reapproved_at"] = "2026-09-05T00:00:00Z"
+    extended["approval"]["reapprove_reason"] = "fixture reapproval"
+    extended["approval"]["reapprove_operator"] = "operator@example"
+    extended["approval_history"] = [copy.deepcopy(original["approval"])]
+    assert stage_module.validate_batch_journal(original) == []
+    assert stage_module.validate_batch_journal(extended) == []
+
+
+def test_real_plan_envelope_validates_against_authoritative_schema() -> None:
+    schema = json.loads(PLAN_SCHEMA.read_text(encoding="utf-8"))
+    envelope = json.loads((ROOT / PLAN_RELATIVE).read_text(encoding="utf-8"))
+
+    assert schema["additionalProperties"] is False
+    assert set(schema["properties"]) == set(envelope) | {
+        "provider_payload_sha256",
+        "resolved_references",
+    }
+    assert stage_module.validate_plan_envelope(envelope) == []
+
+
+def test_plan_envelope_missing_required_field_fails_authoritative_validation() -> None:
+    envelope = json.loads((ROOT / PLAN_RELATIVE).read_text(encoding="utf-8"))
+    envelope.pop("contract_sha256")
+
+    assert stage_module.validate_plan_envelope(envelope)
+
+
 def test_reapprove_twice_appends_two_history_entries_and_verify_still_passes(tmp_path: Path) -> None:
     project_root = _copy_fixture_project(tmp_path)
     (project_root / "assets/imported/user-import.glb").write_bytes(b"legitimate user import")
@@ -209,8 +255,6 @@ def test_resolve_plan_updates_only_plan_governed_fields_and_preserves_envelope(t
     reference_root = _copy_reference_set(project_root)
     plan_path = project_root / PLAN_RELATIVE
     before = json.loads((ROOT / PLAN_RELATIVE).read_text(encoding="utf-8"))
-    before["approved_credits"] = 20
-    before["operator_note"] = "preserve this envelope field"
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path.write_bytes(canonical_json_bytes(before))
 
@@ -246,6 +290,39 @@ def test_resolve_plan_fails_closed_on_missing_or_mismatched_reference(tmp_path: 
         )
 
     assert plan_path.read_bytes() == original
+
+
+def test_resolve_plan_fails_closed_on_reference_view_not_required_by_contract(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+
+    bad_specs = _reference_specs()
+    bad_specs[0] = "front2=source_front.png"
+    with pytest.raises(ValueError, match="reference views"):
+        stage_module.resolve_plan_envelope(
+            _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+            reference_root=reference_root, reference_specs=bad_specs,
+        )
+
+
+def test_resolve_plan_fails_closed_on_existing_reference_hash_mismatch(tmp_path: Path) -> None:
+    project_root = _copy_fixture_project(tmp_path)
+    reference_root = _copy_reference_set(project_root)
+    reference_path = reference_root / "source_side.png"
+    original = reference_path.read_bytes()
+    # Add a valid ancillary PNG chunk so the file remains structurally valid;
+    # the content hash is nevertheless different from the governed evidence.
+    insert_at = len(original) - 12
+    chunk_data = b"tampered"
+    chunk = len(chunk_data).to_bytes(4, "big") + b"tEXt" + chunk_data
+    chunk += zlib.crc32(chunk[4:]).to_bytes(4, "big")
+    reference_path.write_bytes(original[:insert_at] + chunk + original[insert_at:])
+
+    with pytest.raises(ValueError, match="reference"):
+        stage_module.resolve_plan_envelope(
+            _contract(project_root), project_root, pricing_file=project_root / PRICING_RELATIVE,
+            reference_root=reference_root, reference_specs=_reference_specs(),
+        )
 
 
 def test_resolve_plan_output_is_canonical_and_revalidates(tmp_path: Path) -> None:
