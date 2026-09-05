@@ -957,16 +957,19 @@ regeneration from the same seed/version; destruction does not erase repairabilit
 ### P17 — Define paid structural replacement and live safety preflight
 
 **Depends:** P09, P12-P13, P16. **Requirements:** FC-18..19.
-**Allowed files:** `structural_rebuild_state.gd`, `ship_work_transaction.gd`,
-`work_action_catalog.gd`, `work_action_resolver.gd`; new
-`structural_rebuild_preflight.gd`; narrow kit/contract/registered-endpoint seams
-in `generated_ship_loader.gd`, `modular_socket_catalog.gd`, `dock_ports.gd`,
+**Allowed files:** `structural_rebuild_state.gd`; a narrow owner-binding seam in
+`module_integrity_map.gd`; new `structural_rebuild_catalog.gd` and
+`structural_rebuild_preflight.gd`; `ship_work_transaction.gd`,
+`work_action_catalog.gd`, `work_action_resolver.gd`; narrow source-kit/module/
+contract and registered-endpoint seams in `generated_ship_loader.gd`,
+`modular_socket_catalog.gd`, `dock_ports.gd`,
 `docking_manager.gd`, `ship_instance.gd`, `ship_nav_graph.gd`, and the playable
 coordinator; new rebuild catalog, catalog checker/tests, work-action definitions,
 and compatible-action metadata in `data/tools/tool_definitions.json` plus only
 the `welder.compatible_work_action_ids` `rebuild_structure` entry in
 `data/items/item_definitions.json`; new `fc_p17_smoke.gd` and exact kit/contract
-assertions in `fc_p16_smoke.gd`.
+assertions in `fc_p16_smoke.gd`; a preparatory P17 policy/loader proof that does
+not emit an `FC P17 PASS` marker.
 **Non-goals:** geometry/nav/air mutation, component displacement, replacement
 outside the original transform/footprint, arbitrary rotation/substitution,
 auto-undocking, and persistence.
@@ -978,9 +981,21 @@ auto-undocking, and persistence.
   production reachability.
 - [ ] Author explicit same-original-module rows for all 15 active IDs across every
   active layout/contract tuple. The catalog is the sole BOM/tool/skill/duration
-  authority; each row configures a new `rebuild_structure` action using the
-  existing WorkAction model and contains no fallback. P09's structured result is consumed, not replaced by a
+  authority. A concrete runtime service loads only the canonical shipped path,
+  validates it atomically, owns recursively read-only rows, and resolves policy
+  by row ID; the evaluator never accepts caller-supplied row dictionaries. Each
+  row configures a new `rebuild_structure` action using the existing WorkAction
+  model and contains no fallback. P09's structured result is consumed, not replaced by a
   second solver; P09 review remains an acceptance blocker.
+- [ ] Bind each rebuild registry once to its exact creating
+  `ModuleIntegrityMap` through a weak owner reference. Resolve original
+  descriptors from that registry and live damage only from that exact map;
+  method-compatible adapters and rebound owners fail closed.
+- [ ] Prove all 60 active tuples against independent production identity: actual
+  layout and structural-kit module records, loader resolution, and loaded
+  contract resources on one side, canonical catalog expectations on the other.
+  Cover v0, hazard-to-v0, industrial-to-v0 and biomatter-to-v0-contract paths,
+  plus missing/mismatched contract, wrapper, footprint and socket negatives.
 - [ ] Implement pure eligibility and a scene-owned, read-only candidate preflight
   for actual actor, parked/grabbed cart, mounted component, physical cargo,
   registered dock identity, and candidate-result egress. Revalidate on timed

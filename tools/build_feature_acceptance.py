@@ -364,6 +364,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     ],
     "P17": [
         "scripts/systems/structural_rebuild_state.gd", "scripts/systems/ship_work_transaction.gd",
+        "scripts/systems/module_integrity_map.gd", "scripts/systems/structural_rebuild_catalog.gd",
         "scripts/systems/work_action_catalog.gd", "scripts/systems/work_action_resolver.gd",
         "scripts/procgen/structural_rebuild_preflight.gd", "scripts/procgen/generated_ship_loader.gd",
         "scripts/procgen/modular_socket_catalog.gd", "scripts/systems/dock_ports.gd",

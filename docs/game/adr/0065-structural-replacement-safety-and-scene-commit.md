@@ -4,6 +4,7 @@
 - Date: 2026-09-05
 - Requirements: FC-18, FC-19, FC-20, FC-22.
 - Related: ADR-0051, ADR-0053, ADR-0056, ADR-0059, ADR-0061, ADR-0062.
+- Feature spec and acceptance register: [`crafting_derelict_feature_completion.md`](../features/crafting_derelict_feature_completion.md#acceptance-register), especially FC-18 and FC-19.
 - Design review: `../../../.superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P17-design-review.md`.
 
 ## Context
@@ -112,6 +113,50 @@ P19 may reconstruct these fields for a legacy save only by regenerating the
 verified current baseline and matching the saved stable module ID, wrapper,
 transform, footprint, sockets and layout identity. A mismatch rejects restore;
 it does not guess a kit or rewrite the save.
+
+#### 2A. Exact integrity ownership
+
+Each `StructuralRebuildState` binds once to the exact `ModuleIntegrityMap` that
+created it and retains that identity through a `WeakRef`, avoiding an ownership
+cycle. Replacement evaluation rejects every other object, including a
+method-compatible adapter that returns the real rebuild registry. The rebuild
+state resolves the immutable original descriptor from its own `_originals`
+registry; the bound map supplies only the corresponding live integrity state.
+Caller-provided inspection dictionaries never grant replacement authority.
+
+The binding seam verifies the concrete production script and object identity.
+It has no home/current-map fallback and cannot be rebound after construction.
+
+#### 2B. Canonical runtime catalog authority
+
+P17 adds a concrete `StructuralRebuildCatalog` service that reads only
+`res://data/construction/structural_rebuild_catalog.json`. It strictly validates
+the document and every active row before publishing a recursively read-only,
+service-owned row registry. Failed validation publishes no partial registry.
+There is no runtime alternate-path loader, balance default, module-name
+derivation, or code copy of the catalog BOM.
+
+Replacement evaluation accepts a row ID and resolves it from that exact concrete
+catalog authority. It never accepts an arbitrary caller dictionary, even when
+that dictionary has the right schema and structural identity. Material IDs and
+amounts, tool class, skill ID and threshold, and duration therefore remain equal
+to the shipped canonical row. Tests mutate each of those fields while preserving
+valid JSON types and prove the mutation cannot authorize a plan.
+
+#### 2C. Independent loader/contract identity evidence
+
+The 60 active policy tuples are checked with independent actual and expected
+sides. The actual descriptor side comes from the production layout, the exact
+structural kit/module record chosen by generation, the loader's no-fallback
+contract resolution seam, and the loaded contract `Resource` properties. The
+catalog supplies only the expected policy side.
+
+The proof explicitly covers v0, hazard-layout-to-v0-structure,
+industrial-layout-to-v0-structure, and biomatter-layout/biomatter-kit-to-v0-
+contract paths. Missing or mismatched contract resource, wrapper, footprint,
+socket, and layout/kit/contract identity deny before policy admission. This is
+preparatory identity and pure-policy evidence; it is not the live FC-19 safety
+preflight or an `FC P17 PASS` claim.
 
 ### 3. P17 policy and live preflight
 
