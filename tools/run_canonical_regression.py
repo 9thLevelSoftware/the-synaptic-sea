@@ -15,6 +15,7 @@ _COUNT_MARKER_RE = re.compile(
 _EXECUTABLE_COUNT_MARKER_RE = re.compile(
     r"""^echo\s+(?P<quote>['"])(?P<marker>SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true)(?P=quote)$"""
 )
+_SHELL_FUNCTION_START_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{\s*$")
 
 
 def _strip_shell_comment(line: str) -> str:
@@ -71,8 +72,16 @@ def extract_bundle(document: str) -> str:
 
     executable_markers = 0
     control_depth = 0
+    function_depth = 0
     for raw_line in script.splitlines():
         code = _strip_shell_comment(raw_line).strip()
+        if function_depth:
+            if code in ("}", "};"):
+                function_depth -= 1
+            continue
+        if _SHELL_FUNCTION_START_RE.fullmatch(code):
+            function_depth = 1
+            continue
         if code and _EXECUTABLE_COUNT_MARKER_RE.fullmatch(code) and control_depth == 0:
             executable_markers += 1
         control_depth = _shell_control_depth(code, control_depth)
