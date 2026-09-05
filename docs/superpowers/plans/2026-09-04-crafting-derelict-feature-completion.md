@@ -748,24 +748,27 @@ fixtures under `tests/fixtures/feature_completion/`.
   twice and compare quantity, quality, progress and receipts exactly.
 - [ ] Add a fresh-process disk proof. Producer mode uses the production save API
   to write the versioned baseline slot, then separately writes immutable expected
-  observations and a digest manifest into one unique test directory. It records the
+  observations and a digest manifest under one unique evidence parent. It records the
   baseline artifact path and digest without treating the expected-observation manifest
-  as save evidence. Consumer one starts in a separately launched OS process and
-  receives only the baseline path plus expected-observation manifest; it first verifies
-  the baseline input digest, then independently asserts exact owners, lots, knowledge,
-  jobs, escrow, station IDs, progress, pending receipts and component origins from
-  disk. It collects once through the production interaction, saves the resulting world
-  through the production API, and records a distinct post-collection artifact and
-  digest. Consumer two is another fresh OS process: it loads only that persisted
-  post-collection slot and proves no remaining output, recharge, duplicate reservation,
+  as save evidence. Producer, consumer one, and consumer two are three separately
+  launched OS processes. Each receives a distinct, initially empty user-home subdirectory
+  under that evidence parent; the production slot is absent before its allowed artifact is
+  installed, and no mutable save, index, cache, or user-home state is shared between them.
+  Consumer one receives only the baseline path plus expected-observation manifest. It first
+  verifies the baseline input digest, then independently asserts exact owners, lots,
+  knowledge, jobs, escrow, station IDs, progress, pending receipts and component origins
+  from disk. It collects once through the production interaction, saves the resulting world
+  through the production API, and records a distinct post-collection artifact and digest.
+  Consumer two receives only that post-collection artifact plus its post-save manifest; it
+  loads no baseline slot and proves no remaining output, recharge, duplicate reservation,
   duplicate collection, receipt replay, or migrated sidecar. The baseline copy/digest
   remains available for comparison; different baseline and post-collection digests are
   valid. No consumer may accept producer memory, a process-local singleton, or a copied
-  fixture as evidence. The strict Python orchestration, if used, creates one unique
-  directory and sets only that directory's `APPDATA`, `LOCALAPPDATA`, and Godot save
-  path for every child process. It rejects missing producer/consumer markers,
+  fixture as evidence. The strict Python orchestration, if used, creates the evidence
+  parent and sets each child only to its own user-home subdirectory through `APPDATA`,
+  `LOCALAPPDATA`, and the Godot save path. It rejects missing producer/consumer markers,
   diagnostics, unexpected output, a baseline digest mismatch, or cleanup beyond the
-  unique directory. It retains raw logs, manifests, baseline/post-save artifacts and
+  unique evidence parent. It retains raw logs, manifests, baseline/post-save artifacts and
   accepted evidence on success; only scratch user directories may be cleaned after
   capture, while failures are retained for diagnosis. `FC P10 PROCESS PASS` is
   preparatory process-isolation evidence only. It never substitutes for `FC P10 PASS`,
