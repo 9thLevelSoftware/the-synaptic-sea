@@ -645,6 +645,11 @@ returns zero transferred and retains every lot.
 and economy-cycle addendum; new
 `tools/check_crafting_economy.py`, `tests/test_crafting_economy.py`;
 `crafting_station.gd`, `recipe_picker_panel.gd`, coordinator input seams;
+`work_action_driver.gd` only for a defensive-copy projection of the selected
+tool context actually consumed at successful action start, alongside its frozen
+quality multiplier. Reset it with the driver's action lifecycle; this adds no
+second escrow authority or persistence schema. Verify that projection through
+real timed weld/cut progress and terminal consequences, not helper selection alone;
 new `fc_p09_smoke.gd`; `fc_p05_smoke.gd` tool-consumer regression only;
 `recipe_picker_panel_smoke.gd` for explicit station-owner adapters, visible queue,
 power and pending-output status, and missing/foreign/stale-owner denial. The panel

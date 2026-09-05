@@ -265,6 +265,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "data/items/item_definitions.json", "data/items/loot_tables.json",
         "data/items/quality_effects.json", COMPONENT_CATALOG,
         "tools/check_crafting_economy.py", "tests/test_crafting_economy.py",
+        "scripts/systems/work_action_driver.gd",
         "scripts/tools/crafting_station.gd", "scripts/ui/recipe_picker_panel.gd", COORDINATOR,
         f"{VALIDATION}fc_p09_smoke.gd", f"{VALIDATION}fc_p05_smoke.gd",
         f"{VALIDATION}recipe_picker_panel_smoke.gd",
