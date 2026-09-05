@@ -236,6 +236,8 @@ The read-only review delegation `deleg_67716770` inspected source commit `353f5d
 
 A second late review, `deleg_a90835bc`, returned `REQUEST_CHANGES` against `353f5d1` because a newly created connectivity-repair portal had no matching runtime Door entity. Follow-up commit `77bdb00` resolved that exact defect by threading `next_entity_id` into `repair_connectivity()` and unconditionally calling `synchronize_repaired_door()` after either restoring or creating a portal. The focused regression `repaired_interior_portals_have_runtime_door_entities_seed_two` passes at final reviewed source `74d40b0`; this verdict is therefore stale and non-blocking. The timeboxed spec re-review `deleg_eccdbc93` then inspected combined range `eb7845e..77bdb00`, ran the relevant regression, and returned `VERDICT: PASS` with no remaining blocking gaps.
 
+Quality review `deleg_c10def55` then returned `REQUEST_CHANGES` against `77bdb00`: an existing portal restored to `DOOR` could retain a locked/sealed runtime entity. Follow-up commit `7f847a8` resolved that exact branch by applying `synchronize_repaired_door()` to both restored and newly created portals; existing entities are repositioned, unlocked, closed, and unsealed. The permanent regression `furnished_and_repaired_interior_doors_stay_coherent_seed_zero` passes at final reviewed source `74d40b0`, so this historical verdict is also stale and non-blocking.
+
 One merged automated-review warning remains worth an explicit human contract decision: `synchronize_door_entities()` does not force surviving existing `DOOR`/`HATCH` entities to `open=false`. This is not currently classified as a structural/runtime defect because:
 
 - `furnish()` intentionally generates unlocked doors with an independent 25% initial-open roll;
