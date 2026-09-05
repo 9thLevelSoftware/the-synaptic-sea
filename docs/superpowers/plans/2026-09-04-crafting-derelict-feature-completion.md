@@ -706,8 +706,10 @@ ship_instance,ship_runtime,pillar_persistence}.gd`; coordinator capture, detache
 new `scripts/systems/save_restore_candidate.gd` for the detached owner graph;
 `scripts/main.gd` and `scripts/title_main.gd` only staged playable-instance
 replacement, owner pointer and signal reconnection seams;
-`scripts/audio/audio_manager.gd` only to defer global AudioServer writes while a
-restore candidate is staged and publish its bus settings on successful activation.
+`scripts/audio/audio_manager.gd` only to defer global AudioServer writes and
+physical playback while a restore candidate is staged, suppress synthetic restore
+events that mutate hydrated SFX routing/captions/cooldowns, and publish its bus
+settings on successful activation without replaying restoration events.
 Failure tests must compare actual global bus volume/mute before and after both
 post-rebuild and post-world-apply failures, not only audio model counters;
 `scripts/ui/save_load_menu.gd` and `scripts/ui/menu_coordinator.gd` only modern
