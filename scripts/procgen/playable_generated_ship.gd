@@ -1718,11 +1718,13 @@ func set_manual_power_route_for_validation(subsystem_id: String, units: float) -
 	return ok
 
 func force_hull_breach_for_validation(compartment_id: String, amount: float = 0.6) -> bool:
-	if hull_integrity_state == null:
+	var hull = _active_hull()
+	if hull == null:
 		return false
-	var ok: bool = hull_integrity_state.damage_compartment(compartment_id, amount, true)
+	var ok: bool = hull.damage_compartment(compartment_id, amount, true)
 	if ok:
 		_emit_meta_hull_groan()
+		_sync_breach_seal_points()
 	_recompute_expanded_ship_systems(0.0)
 	_refresh_tracker_system_status_lines()
 	return ok
@@ -1735,9 +1737,12 @@ func _emit_meta_hull_groan() -> void:
 		audio_manager.play_sfx(AudioEventSeamScript.META_HULL_GROAN)
 
 func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0) -> bool:
-	if hull_integrity_state == null:
+	var hull = _active_hull()
+	if hull == null:
 		return false
-	var ok: bool = hull_integrity_state.seal_compartment(compartment_id, amount)
+	var ok: bool = hull.seal_compartment(compartment_id, amount)
+	if ok:
+		_sync_breach_seal_points()
 	_recompute_expanded_ship_systems(0.0)
 	_refresh_tracker_system_status_lines()
 	return ok
@@ -3182,48 +3187,77 @@ func _clear_repair_points() -> void:
 
 func _build_breach_seal_points() -> void:
 	_clear_breach_seal_points()
+	_sync_breach_seal_points()
+
+## Keep the live breach affordances synchronized with the active hull model without
+## resetting in-progress channels. Runtime web damage and emergency venting can open
+## a compartment after the scene load that initially projected breach points.
+func _sync_breach_seal_points() -> void:
 	var hull = _active_hull()
 	if hull == null:
+		_clear_breach_seal_points()
 		return
-	# Only seal breached compartments; healthy hull needs no seal node.
-	var breached: Array = []
-	for cid in hull.compartments:
-		if bool((hull.compartments[cid] as Dictionary).get("breach_open", false)):
-			breached.append(str(cid))
-	if breached.is_empty():
-		return
-	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
-		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
-	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
+	var retained: Array = []
+	var points_by_compartment: Dictionary = {}
+	for sp in breach_seal_points:
+		if not is_instance_valid(sp):
+			continue
+		var cid: String = str(sp.compartment_id)
+		var is_open: bool = hull.compartments.has(cid) \
+			and bool((hull.compartments[cid] as Dictionary).get("breach_open", false))
+		if cid.is_empty() or not is_open or sp.hull_state != hull or points_by_compartment.has(cid):
+			_detach_and_free_breach_seal_point(sp)
+			continue
+		points_by_compartment[cid] = sp
+		retained.append(sp)
+	breach_seal_points = retained
+
+	var positions: Array = _breach_seal_positions_for_active_ship()
 	if positions.is_empty():
 		return
-	var idx: int = 0
-	for cid in breached:
-		var pos: Vector3 = positions[idx % positions.size()]
-		idx += 1
+	var compartment_ids: Array = []
+	for raw_cid in hull.compartments.keys():
+		compartment_ids.append(str(raw_cid))
+	compartment_ids.sort()
+	for cid in compartment_ids:
+		if points_by_compartment.has(cid) \
+			or not bool((hull.compartments[cid] as Dictionary).get("breach_open", false)):
+			continue
+		var stable_index: int = compartment_ids.find(cid)
 		var sp = BreachSealPointScript.new()
-		sp.configure(cid, hull, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
+		sp.configure(cid, hull, inventory_state, player_progression,
+			positions[stable_index % positions.size()], 4.0, "hull_sealant", 1.0, 1.8)
 		if not sp.breach_sealed.is_connected(_on_breach_sealed):
 			sp.breach_sealed.connect(_on_breach_sealed)
-		# Tranche 1 (audit): seal_blocked fired on four failure paths but was
-		# never connected — a blocked seal gave zero player feedback.
 		if not sp.seal_blocked.is_connected(_on_seal_blocked):
 			sp.seal_blocked.connect(_on_seal_blocked)
-		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
-			current_ship.scene_root.add_child(sp)
-		elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
-			lifeboat_ship.scene_root.add_child(sp)
-		else:
-			repair_point_root.add_child(sp)
+		_attach_breach_seal_point(sp)
 		breach_seal_points.append(sp)
+
+func _breach_seal_positions_for_active_ship() -> Array:
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	return _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
+
+func _attach_breach_seal_point(sp) -> void:
+	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+		current_ship.scene_root.add_child(sp)
+	elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		lifeboat_ship.scene_root.add_child(sp)
+	else:
+		repair_point_root.add_child(sp)
+
+func _detach_and_free_breach_seal_point(sp) -> void:
+	if not is_instance_valid(sp):
+		return
+	var parent = sp.get_parent()
+	if parent != null and is_instance_valid(parent):
+		parent.remove_child(sp)
+	sp.queue_free()
 
 func _clear_breach_seal_points() -> void:
 	for sp in breach_seal_points:
-		if is_instance_valid(sp):
-			var parent = sp.get_parent()
-			if parent != null and is_instance_valid(parent):
-				parent.remove_child(sp)
-			sp.queue_free()
+		_detach_and_free_breach_seal_point(sp)
 	breach_seal_points.clear()
 
 func _on_breach_sealed(compartment_id: String) -> void:
@@ -3239,6 +3273,7 @@ func _on_breach_sealed(compartment_id: String) -> void:
 	emit_training_event("build_shelter", compartment_id)
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("breach_sealed", "any")
+	_sync_breach_seal_points()
 
 ## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
 ## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
@@ -5278,6 +5313,7 @@ func _on_compartment_vented(compartment_id: String) -> void:
 	if hull != null and hull.compartments.has(compartment_id):
 		hull.damage_compartment(compartment_id, 0.0, true)
 		_emit_meta_hull_groan()
+		_sync_breach_seal_points()
 	_apply_decompression_module_damage(compartment_id)
 	_refresh_fire_zones()
 	_refresh_oxygen_state(false, 0.0)
@@ -8053,22 +8089,28 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	for b in dock_barriers:
 		if is_instance_valid(b) and not b.opened and b.try_start(player_body):
 			return
-	for t in bridge_terminals:
-		if is_instance_valid(t) and t.try_login(player_body):
-			return
 	if away_from_start:
-		# Fire suppression has emergency precedence: a co-located repair or breach
-		# handler may soft-deny while the active fire point can still save the room.
+		# An active fire is the only fire affordance that preempts another emergency.
+		# Idle fire markers soft-deny, so dispatching them here made a co-located breach
+		# unreachable even when its seal item and range gates were satisfied.
+		var active_fire = _active_fire_state()
 		for fp in fire_suppression_points:
-			if is_instance_valid(fp) and fp.try_start(player_body):
+			if is_instance_valid(fp) and active_fire != null \
+					and active_fire.is_burning(fp.compartment_id) and fp.try_start(player_body):
 				return
-		# Sub-project #4: try repair points before loot/objectives.
-		for rp in repair_points:
-			if is_instance_valid(rp) and rp.try_start(player_body):
-				return
-		# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+		# Breaches are survival-critical and must be reachable before generic repairs,
+		# whose soft-blocked points may share the same room anchor.
 		for sp in breach_seal_points:
 			if is_instance_valid(sp) and sp.try_start(player_body):
+				return
+		# Bridge terminals retain their original priority over generic repairs; only
+		# active fire and a live breach preempt navigation at a shared anchor.
+		for t in bridge_terminals:
+			if is_instance_valid(t) and t.try_login(player_body):
+				return
+		# Sub-project #4: repair points before loot/objectives.
+		for rp in repair_points:
+			if is_instance_valid(rp) and rp.try_start(player_body):
 				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
@@ -8106,18 +8148,24 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 		_emit_interact_miss_sfx()
 		return
-	# Fire suppression has emergency precedence: a co-located repair or breach
-	# handler may soft-deny while the active fire point can still save the room.
+	# An active fire is the only fire affordance that preempts another emergency.
+	var active_fire = _active_fire_state()
 	for fp in fire_suppression_points:
-		if is_instance_valid(fp) and fp.try_start(player_body):
+		if is_instance_valid(fp) and active_fire != null \
+				and active_fire.is_burning(fp.compartment_id) and fp.try_start(player_body):
 			return
-	# Sub-project #4: try lifeboat repair points before pickups/objectives.
-	for rp in repair_points:
-		if is_instance_valid(rp) and rp.try_start(player_body):
-			return
-	# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+	# Breaches are survival-critical and must be reachable before generic repairs.
 	for sp in breach_seal_points:
 		if is_instance_valid(sp) and sp.try_start(player_body):
+			return
+	# Bridge terminals retain their original priority over generic repairs; only
+	# active fire and a live breach preempt navigation at a shared anchor.
+	for t in bridge_terminals:
+		if is_instance_valid(t) and t.try_login(player_body):
+			return
+	# Sub-project #4: lifeboat repair points before pickups/objectives.
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.try_start(player_body):
 			return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
@@ -8678,6 +8726,9 @@ func _tick_present_ships(delta: float) -> void:
 	_advance_ship(home_ship, delta)
 	if away_from_start and current_ship != null and current_ship != home_ship:
 		_advance_ship(current_ship, delta)
+	# ShipRuntime can open new breaches after initial scene projection. Reconcile only
+	# the active hull so the displayed affordances track its live, authoritative state.
+	_sync_breach_seal_points()
 	_biomatter_pulse_cooldown = maxf(0.0, _biomatter_pulse_cooldown - delta)
 	if hull_web_state != null and float(hull_web_state.coverage) > cov_before + 0.0001:
 		_maybe_emit_biomatter_pulse()
