@@ -1921,12 +1921,67 @@ def validate_generation_record(document: object) -> List[str]:
     return _validate_generation_record_strict(document)
 
 
+_APPROVAL_REQUIRED_FIELDS = {
+    "contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256",
+    "pricing_id", "pricing_sha256", "provider_payload_sha256", "request", "references", "endpoint",
+    "candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits", "output_license",
+    "protected_snapshot", "created_at",
+}
+_APPROVAL_OPTIONAL_FIELDS = {"reapproved_at", "reapprove_reason", "reapprove_operator"}
+
+
+def _validate_approval_record(value: object, label: str) -> List[str]:
+    errors: List[str] = []
+    allowed_fields = _APPROVAL_REQUIRED_FIELDS | _APPROVAL_OPTIONAL_FIELDS
+    if not isinstance(value, dict) or not _APPROVAL_REQUIRED_FIELDS.issubset(set(value)) or set(value) - allowed_fields:
+        return [label + " fields are not exact"]
+    for name in ("contract_sha256", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_sha256", "provider_payload_sha256"):
+        if not _valid_hash(value.get(name)):
+            errors.append(label + " hash is invalid")
+    if not isinstance(value.get("prompt_profile_id"), str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value.get("prompt_profile_id", "")) is None:
+        errors.append(label + " prompt profile is invalid")
+    if not isinstance(value.get("pricing_id"), str) or not value["pricing_id"]:
+        errors.append(label + " pricing id is invalid")
+    for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits"):
+        if not _valid_positive_int(value.get(name)):
+            errors.append(label + " credit field is invalid")
+    expected_cost = 5 if value.get("endpoint") == ENDPOINTS["image_to_3d"] else 20 if value.get("endpoint") == ENDPOINTS["multi_image_to_3d"] else None
+    if expected_cost is not None and value.get("cost_per_candidate") != expected_cost:
+        errors.append(label + " cost is invalid")
+    if all(_valid_positive_int(value.get(name)) for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits")):
+        if value["maximum_credits"] != value["candidate_count"] * value["cost_per_candidate"] or value["approved_credits"] < value["maximum_credits"]:
+            errors.append(label + " credit bound is invalid")
+    if value.get("endpoint") not in ENDPOINTS.values():
+        errors.append(label + " endpoint is invalid")
+    errors.extend(_validate_reference_list(value.get("references"), label + " references"))
+    errors.extend(_validate_provider_request(value.get("request"), value.get("endpoint"), value.get("references"), label + " request"))
+    if value.get("output_license") not in _ALLOWED_LICENSES:
+        errors.append(label + " license is invalid")
+    errors.extend(_validate_protected_snapshot(value.get("protected_snapshot"), label + " protected snapshot"))
+    if not isinstance(value.get("created_at"), str) or not value["created_at"]:
+        errors.append(label + " created_at is invalid")
+    for name in _APPROVAL_OPTIONAL_FIELDS:
+        if name in value and (not isinstance(value[name], str) or not value[name].strip()):
+            errors.append(label + " " + name + " is invalid")
+    if "reapproved_at" in value:
+        timestamp = value["reapproved_at"]
+        if not isinstance(timestamp, str) or not timestamp.endswith("Z"):
+            errors.append(label + " reapproved_at must be ISO-8601 UTC")
+        else:
+            try:
+                datetime.fromisoformat(timestamp[:-1] + "+00:00")
+            except ValueError:
+                errors.append(label + " reapproved_at must be ISO-8601 UTC")
+    return sorted(set(errors))
+
+
 def _validate_batch_journal_strict(document: object) -> List[str]:
     if not isinstance(document, dict):
         return ["batch journal must be an object"]
     required = {"schema_version", "document_kind", "batch_id", "asset_id", "approval", "state", "tasks", "cumulative_consumed_credits"}
+    allowed = required | {"approval_history"}
     errors: List[str] = []
-    if set(document) != required:
+    if not required.issubset(set(document)) or set(document) - allowed:
         errors.append("batch journal fields are not exact")
     if document.get("schema_version") != "1.0.0" or document.get("document_kind") != "meshy_batch_journal":
         errors.append("batch journal kind/version is invalid")
@@ -1938,40 +1993,14 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
     if state not in ("APPROVED", "SUBMITTING", "COMPLETED", "FAILED", "BUDGET_OVERRUN", "UNCERTAIN"):
         errors.append("batch journal state is invalid")
     approval = document.get("approval")
-    approval_fields = {
-        "contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256",
-        "pricing_id", "pricing_sha256", "provider_payload_sha256", "request", "references", "endpoint",
-        "candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits", "output_license",
-        "protected_snapshot", "created_at",
-    }
-    if not isinstance(approval, dict) or set(approval) != approval_fields:
-        errors.append("batch journal approval fields are not exact")
-    else:
-        for name in ("contract_sha256", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_sha256", "provider_payload_sha256"):
-            if not _valid_hash(approval.get(name)):
-                errors.append("batch journal approval hash is invalid")
-        if not isinstance(approval.get("prompt_profile_id"), str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", approval.get("prompt_profile_id", "")) is None:
-            errors.append("batch journal approval prompt profile is invalid")
-        if not isinstance(approval.get("pricing_id"), str) or not approval["pricing_id"]:
-            errors.append("batch journal approval pricing id is invalid")
-        for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits"):
-            if not _valid_positive_int(approval.get(name)):
-                errors.append("batch journal approval credit field is invalid")
-        expected_cost = 5 if approval.get("endpoint") == ENDPOINTS["image_to_3d"] else 20 if approval.get("endpoint") == ENDPOINTS["multi_image_to_3d"] else None
-        if expected_cost is not None and approval.get("cost_per_candidate") != expected_cost:
-            errors.append("batch journal approval cost is invalid")
-        if all(_valid_positive_int(approval.get(name)) for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits")):
-            if approval["maximum_credits"] != approval["candidate_count"] * approval["cost_per_candidate"] or approval["approved_credits"] < approval["maximum_credits"]:
-                errors.append("batch journal approval credit bound is invalid")
-        if approval.get("endpoint") not in ENDPOINTS.values():
-            errors.append("batch journal approval endpoint is invalid")
-        errors.extend(_validate_reference_list(approval.get("references"), "batch journal approval references"))
-        errors.extend(_validate_provider_request(approval.get("request"), approval.get("endpoint"), approval.get("references"), "batch journal approval request"))
-        if approval.get("output_license") not in _ALLOWED_LICENSES:
-            errors.append("batch journal approval license is invalid")
-        errors.extend(_validate_protected_snapshot(approval.get("protected_snapshot"), "batch journal protected snapshot"))
-        if not isinstance(approval.get("created_at"), str) or not approval["created_at"]:
-            errors.append("batch journal approval created_at is invalid")
+    errors.extend(_validate_approval_record(approval, "batch journal approval"))
+    history = document.get("approval_history")
+    if history is not None:
+        if not isinstance(history, list):
+            errors.append("batch journal approval_history must be a list")
+        else:
+            for index, item in enumerate(history):
+                errors.extend(_validate_approval_record(item, "batch journal approval_history[%d]" % index))
     tasks = document.get("tasks")
     task_ids = set()
 
@@ -2287,6 +2316,100 @@ def load_batch_journal(path: Union[str, os.PathLike]) -> Dict[str, Any]:
     if Path(path).suffix == ".json" and Path(path).stem != document["batch_id"]:
         raise ValueError("Meshy batch journal filename does not match batch_id")
     return document
+
+
+def _snapshot_summary(records: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    items = [dict(record) for record in records]
+    target = next((item for item in items if item.get("path") == "assets/imported"), None)
+    if target is None:
+        target = {"sha256": None, "size": 0}
+    return {"sha256": target.get("sha256"), "size": target.get("size", 0), "records": items}
+
+
+def _load_canonical_batch_journal(path: Path) -> Dict[str, Any]:
+    document, raw = governance.strict_load_json_bytes(path, "Meshy batch journal", 4 * 1024 * 1024)
+    errors = validate_batch_journal(document)
+    if errors:
+        raise ValueError("invalid Meshy batch journal: " + "; ".join(errors))
+    if raw != canonical_json_bytes(document):
+        raise ValueError("Meshy batch journal is not canonical")
+    if path.suffix == ".json" and path.stem != document["batch_id"]:
+        raise ValueError("Meshy batch journal filename does not match batch id")
+    return document
+
+
+def reapprove_batch(
+    contract: AssetContract,
+    project_root: Path,
+    batch_journal: Union[str, os.PathLike],
+    *,
+    reason: str,
+    operator: str,
+) -> Dict[str, Any]:
+    """Rebind a completed batch to the current protected snapshot without provider access."""
+
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reapprove reason must be nonempty")
+    if not isinstance(operator, str) or not operator.strip():
+        raise ValueError("reapprove operator must be nonempty")
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    root, _stage, asset_root, journal_path = _resume_journal_path(project_root, contract.asset_id, batch_journal)
+    journal = _load_canonical_batch_journal(journal_path)
+    if journal.get("asset_id") != contract.asset_id:
+        raise ValueError("Meshy batch journal asset identity does not match contract")
+    if journal.get("state") != "COMPLETED":
+        raise ValueError("Meshy batch journal must be COMPLETED to reapprove")
+    journal_task_ids = {task.get("task_id") for task in journal["tasks"] if task.get("task_id") is not None}
+    inventory_errors: List[str] = []
+    task_dirs = _visible_task_directories(root, asset_root, journal_task_ids, inventory_errors)
+    if inventory_errors:
+        raise ValueError("Meshy batch has unresolved task evidence: " + "; ".join(sorted(set(inventory_errors))))
+    for index, task in enumerate(journal["tasks"]):
+        task_id = task.get("task_id")
+        if task.get("state") != "SUCCEEDED" or not isinstance(task_id, str) or task_id not in task_dirs:
+            raise ValueError("Meshy batch has unverified or unresolved task evidence at index %d" % index)
+        try:
+            record = load_generation_record(task_dirs[task_id] / "generation.json", journal_path=journal_path)
+        except (OSError, TypeError, ValueError) as exc:
+            raise ValueError("Meshy batch has unverified task evidence at index %d" % index) from exc
+        if record.get("status") != "SUCCEEDED":
+            raise ValueError("Meshy batch has unverified task evidence at index %d" % index)
+    protected = governance.snapshot_protected_surfaces(
+        root,
+        max_file_bytes=_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES,
+        max_total_bytes=_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES,
+        max_entries=_REPOSITORY_SNAPSHOT_MAX_ENTRIES,
+        max_depth=_REPOSITORY_SNAPSHOT_MAX_DEPTH,
+    )
+    new_records = [{"type": item.type, "path": item.path, "sha256": item.sha256, "size": item.size} for item in protected]
+    original_approval = _copy_mapping(journal["approval"])
+    updated_approval = _copy_mapping(original_approval)
+    updated_approval["protected_snapshot"] = new_records
+    updated_approval["reapproved_at"] = _utc_timestamp()
+    updated_approval["reapprove_reason"] = reason
+    updated_approval["reapprove_operator"] = operator
+    updated = _copy_mapping(journal)
+    updated["approval"] = updated_approval
+    history = updated.get("approval_history", [])
+    if not isinstance(history, list):
+        raise ValueError("Meshy batch journal approval_history must be a list")
+    updated["approval_history"] = history + [original_approval]
+    errors = validate_batch_journal(updated)
+    if errors:
+        raise ValueError("invalid Meshy batch journal after reapproval: " + "; ".join(errors))
+    governance.atomic_write_json(journal_path, updated, project_root=root, allowed_root=journal_path.parent)
+    persisted = _load_canonical_batch_journal(journal_path)
+    if persisted != updated:
+        raise ValueError("Meshy batch journal changed during reapproval")
+    old_records = original_approval["protected_snapshot"]
+    return {
+        "asset_id": contract.asset_id,
+        "batch_id": journal["batch_id"],
+        "old_snapshot": _snapshot_summary(old_records),
+        "new_snapshot": _snapshot_summary(new_records),
+        "approval_history_length": len(updated["approval_history"]),
+    }
 
 
 def _resume_journal_path(
@@ -3778,6 +3901,16 @@ def _build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--contract", type=Path, required=True)
     verify.add_argument("--batch-journal", type=Path, required=True)
     verify.add_argument("--pricing-file", type=Path, default=None)
+    reapprove = subparsers.add_parser(
+        "reapprove",
+        help="rebind a completed batch to the current protected snapshot offline",
+        description="Rebind a completed Meshy batch to the current protected snapshot without provider access.",
+    )
+    reapprove.add_argument("--project-root", type=Path, required=True)
+    reapprove.add_argument("--contract", type=Path, required=True)
+    reapprove.add_argument("--batch-journal", type=Path, required=True)
+    reapprove.add_argument("--reason", required=True)
+    reapprove.add_argument("--operator", required=True)
     return parser
 
 
@@ -3787,6 +3920,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         contract = load_contract(args.contract)
         if args.command == "plan":
             result = plan_generation(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
+        elif args.command == "reapprove":
+            result = reapprove_batch(contract, args.project_root, args.batch_journal, reason=args.reason, operator=args.operator)
         elif args.command == "generate":
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
@@ -3823,6 +3958,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
         print("MESHY VERIFY FAIL batch={0}".format(result["batch_id"]))
         return 1
+    if args.command == "reapprove":
+        old_snapshot = result["old_snapshot"]
+        new_snapshot = result["new_snapshot"]
+        print(
+            "MESHY REAPPROVE PASS batch={0} old_sha256={1} old_size={2} new_sha256={3} new_size={4}".format(
+                result["batch_id"], old_snapshot["sha256"], old_snapshot["size"],
+                new_snapshot["sha256"], new_snapshot["size"],
+            )
+        )
+        return 0
     return 0
 
 
@@ -3832,5 +3977,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "reapprove_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
 ]
