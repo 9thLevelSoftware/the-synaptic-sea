@@ -158,6 +158,41 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# Vault's guard_wing intentionally offers a distinct `security` room, not an
+	# armory alias.  Exercise real seeded assignment until the authored role is
+	# selected, then require the explicit compact guard-post footprint.
+	var vault_template: TopologyTemplateScript = TopologyTemplateScript.from_dict(
+		_load_json_dict("res://data/procgen/templates/vault.json"))
+	if _fatal_error:
+		return
+	var security_room: Dictionary = {}
+	for vault_seed in range(1, 65):
+		var vault_blueprint: ShipBlueprintScript = ShipBlueprintScript.new(
+			ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.PRISTINE, vault_seed)
+		var vault_plan: Array[Dictionary] = assigner.assign(vault_template, vault_blueprint, {})
+		for vault_room in vault_plan:
+			if str(vault_room.get("role", "")) == "security":
+				security_room = vault_room
+				break
+		if not security_room.is_empty():
+			break
+	if security_room.is_empty():
+		push_error("ROOM ASSIGNER FAIL vault guard_wing never selected security across seeded assignments")
+		quit(1)
+		return
+	if str(security_room.get("zone_id", "")) != "guard_wing":
+		push_error("ROOM ASSIGNER FAIL security zone=%s expected=guard_wing" % str(security_room.get("zone_id", "")))
+		quit(1)
+		return
+	if not RoomAssignerScript.ROOM_FOOTPRINT_OPTIONS.has("security"):
+		push_error("ROOM ASSIGNER FAIL security lacks an explicit footprint catalog entry")
+		quit(1)
+		return
+	if security_room.get("footprint", Vector2i.ZERO) != Vector2i(2, 2):
+		push_error("ROOM ASSIGNER FAIL security footprint=%s expected=(2, 2)" % str(security_room.get("footprint", Vector2i.ZERO)))
+		quit(1)
+		return
+
 	print("ROOM ASSIGNER PASS rooms=%d first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced" % room_plan.size())
 	quit(0)
 

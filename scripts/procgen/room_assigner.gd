@@ -26,6 +26,10 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 	"crew_quarters":  [Vector2i(2, 2), Vector2i(2, 1)],
 	"mess_hall":      [Vector2i(2, 2), Vector2i(3, 2)],
 	"armory":         [Vector2i(1, 2), Vector2i(2, 2)],
+	# Vault guard-wing security rooms formerly took the implicit default 2x2
+	# fallback.  Keep their authored role distinct from an armory and make its
+	# compact guard-post footprint an explicit catalog contract.
+	"security":       [Vector2i(2, 2)],
 	"maintenance":    [Vector2i(1, 2), Vector2i(2, 2)],
 	"life_support":   [Vector2i(2, 2)],
 	"reactor":        [Vector2i(3, 3), Vector2i(2, 3), Vector2i(3, 2)],
