@@ -140,7 +140,7 @@ Committed game artifacts:
 
 | Platform | Path | SHA-256 | Size |
 |---|---|---|---:|
-| macOS arm64 | `addons/derelict/bin/macos/libderelict_godot.dylib` | `265a675a261d85c891251239c7bd34f82f4c4cbe111aefa1607bce3233271e10` | 5,983,264 bytes |
+| macOS arm64 | `addons/derelict/bin/macos/libderelict_godot.dylib` | `265a675a261d85c891251239c7bd34f82f4c4cbe111aefa1607bce3233271e10` | 6,207,440 bytes |
 | Windows x86-64 | `addons/derelict/bin/win64/derelict_godot.dll` | `de2dde8842a152054005c868689d38d88118e654b66b002ef7f980ec2b83a8fb` | 6,746,112 bytes |
 
 Repository provenance document:
@@ -256,6 +256,8 @@ Late RCA delegation `deleg_76a35821` independently identified the original v5 de
 Late spec-compliance review `deleg_55d82e00` was interrupted before it emitted any verdict. Its transcript contains no standalone finding and cannot count as approval because the review began against a mutable pre-commit worktree. Before interruption it completed source inspection, reported static contract checks passing for the v5 guard, arc bridge, seed-stable regeneration, marker restoration, and unchanged structural validator, then observed live worldgen v5 loading. Parent reconciliation at the unchanged technical snapshot freshly passed all four focused gates: `derelict_arc_smoke.gd`, `worldgen_wired_travel_smoke.gd`, `world_persist_restore_smoke.gd`, and `world_save_anywhere_smoke.gd`. The prior commit-pinned Task 9/worldgen QA approvals remain authoritative; this interrupted run neither adds a blocker nor supplies a new approval.
 
 Bounded source spec review `deleg_bb6c58fb` subsequently returned `VERDICT: PASS` for the exact two-file diff from base `6531bb2e`: `scripts/procgen/ship_generator.gd` and `scripts/procgen/playable_generated_ship.gd`, 30 insertions and 8 deletions. Those reviewed source blobs were committed minutes later in `5ee96219` (`fix: refresh worldgen and preserve derelict lifecycle`), which is an ancestor of technical snapshot `09eb2584`. The review covered the v5 fail-closed guard, authored-versus-builder arc authority, seed-stable regeneration, marker restoration, revisit/save lifecycle behavior, and unchanged structural validation. It intentionally excluded the native binaries; binary provenance and runtime acceptance remain established by the separate source-build, macOS, Windows, and focused lifecycle evidence above.
+
+Code-quality review `deleg_8b60e174` then inspected commit `5ee96219` against parent `6531bb2e` and returned `APPROVED` with no Critical, Important, or Minor findings. It confirmed retained blueprint identity is restored before worldgen and dock checks, failed travel leaves ship/world state unchanged, both rebuild paths use `generate_from_seed`, the native version check fails closed at v5, authored arc data is preserved, and the native hashes/formats match provenance. Parent verification confirmed `5ee96219` is an ancestor of `09eb2584`, its provenance and binary blobs remain unchanged through that snapshot, and the committed artifacts are Mach-O arm64 `265a675a...3271e10` (6,207,440 bytes) and PE32+ x86-64 `de2dde88...83a8fb` (6,746,112 bytes). This completes the bounded source-and-artifact spec/quality review pair for `5ee96219`.
 
 ## Recommended developer review
 
