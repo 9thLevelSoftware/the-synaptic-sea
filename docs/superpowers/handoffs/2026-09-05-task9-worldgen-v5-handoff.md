@@ -28,7 +28,7 @@ Worldgen source:
 - Repository: `https://github.com/9thLevelSoftware/worldgen`
 - Source PR: `https://github.com/9thLevelSoftware/worldgen/pull/16`
 - Reviewed source commit: `74d40b0d52d6bf744cef414cc6910378f83fb08a`
-- Squash-merge commit: `554dbe9cfb7eecd3d639f32aad9c28219303a5e1`
+- Squash-merge commit: `554dbe9cfb7eecd3d639f32aad9c28219303a8f0`
 - Source tree for both commits: `ec710d7b6d4c870cc7d5627f35ad4eeaaf228910`
 - Generator contract: version `5`
 
