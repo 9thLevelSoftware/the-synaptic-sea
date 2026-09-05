@@ -40,6 +40,8 @@ Add two offline, fail-closed subcommands to `tools/meshy_stage.py`:
 Neither command constructs a provider client or makes a network call. Operators must supply a
 nonempty reapproval reason and operator identity explicitly.
 
+The first live use of these offline operations was batch `9e04213b` on `2026-09-05`.
+
 ## Consequences
 
 - Legitimate protected-surface growth can be rebound without generating new provider tasks or

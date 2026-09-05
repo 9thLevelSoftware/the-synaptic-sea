@@ -1,21 +1,22 @@
-# Asset-pipeline closure baseline proof
+# Asset-pipeline closure evidence reconciliation
 
-Task A only: freeze a non-destructive baseline and reconcile ownership. Observed at
-`2026-09-04 23:53:49 EDT` (`2026-09-05T03:53:49Z`). No provider call, asset generation,
-Blender authoring, runtime capture, promotion, or source edit was performed by this task.
-Evidence was read from the repository, the existing Meshy worktree, the board database, and
-external source receipts; historical PASS prose is not treated as fresh acceptance evidence.
+This document retains the non-destructive Task A baseline context and reconciles it with the now-
+integrated loot-container evidence. This documentation task made no provider call, asset-generation
+request, Blender authoring, runtime capture, promotion, or source-asset edit; it read
+the tracked state and updated only the four requested documentation files. Historical baseline
+notes remain audit context; the current integrated state is recorded in the evidence and command
+sections below.
 
 ## Tested commit
 
 - Main checkout: `/Users/christopherwilloughby/Code/the-synaptic-sea`.
 - Main branch at inspection: `main`.
-- Main `HEAD`: `f4a656692606e23813df68d24daba4c5e4a0151b`.
-- Isolated worktree: `/Users/christopherwilloughby/Code/the-synaptic-sea-asset-pipeline-closure`.
-- Isolated branch: `fix/asset-pipeline-closure`.
-- Isolated worktree `HEAD`: `f4a656692606e23813df68d24daba4c5e4a0151b`.
-- The isolated worktree was created from the exact main `HEAD`, was clean before the scoped
-  gate, and remained clean until this proof was created.
+- Main `HEAD` for the integrated evidence: `655ae0380f5950c6723aec9fa9b150a463ad4ff4`.
+- Isolated worktree: `/Users/christopherwilloughby/Code/the-synaptic-sea-docs`.
+- Isolated branch: `docs/evidence-rebind-reconciliation`.
+- Isolated worktree `HEAD`: `655ae0380f5950c6723aec9fa9b150a463ad4ff4`.
+- The isolated worktree was clean before the documentation edits; the dirty main checkout was
+  not reset, stashed, cleaned, staged, or overwritten.
 
 Pre-existing worktrees observed before Task A3:
 
@@ -39,21 +40,17 @@ Pre-existing worktrees observed before Task A3:
 | `/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/meshy-blender-asset-system` | `f84ff366` | `fix/meshy-runtime-dual-hash-binding` |
 | `/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/procedural-biomass-assembly` | `4f1dc22a` | `feature/procedural-biomass-threat-assembly` |
 
-The isolated worktree at `/Users/christopherwilloughby/Code/the-synaptic-sea-asset-pipeline-closure` was created by Task A3 during execution from the recorded baseline; it was not a pre-existing worktree observed before this task.
+The worktree table above is retained as historical Task A context. The current docs worktree used for
+this reconciliation is `/Users/christopherwilloughby/Code/the-synaptic-sea-docs` on
+`docs/evidence-rebind-reconciliation` at `655ae038`; the main checkout was not reset, stashed,
+cleaned, staged, or overwritten.
 
-Recent main history at the baseline: `f4a65669 Merge pull request #547 from
-9thLevelSoftware/fix/meshy-runtime-dual-hash-binding`, `f84ff366 test: align promotion
-fixture with runtime evidence`, `9c9899bf fix: bind runtime visibility evidence`, `69b1e1d0
-Merge pull request #546 from 9thLevelSoftware/cursor/hinge-sample-semantics-c965`, and
-`8e226670 fix: use local transforms for runtime cutaway`.
+Recent integrated history includes `655ae038 test: pin reapprove fixtures to pre-reapprove journal
+snapshot`, `48202a8b art: rebind loot container approval evidence offline`, `c70f9b17 art: stage
+loot container promotion proposal (D8)`, `ceb8fe5a art: record loot container runtime review (D6)`,
+and `cc8c8c95 art: publish cleaned loot container evidence (D5)`.
 
-During final verification, the separate main checkout advanced independently from the recorded
-baseline to `5240a42fdd4309c5c6ded45fba3ca05144b391ce` through commits `e1407d63` and
-`5240a42f`. Its remaining status was 4 tracked modifications and 2,202 untracked paths.
-The isolated Task A worktree stayed at the recorded `f4a656692606e23813df68d24daba4c5e4a0151b`
-commit; no attempt was made to reconcile or modify main.
-
-## Toolchain
+## Historical Task A toolchain
 
 The plan-required environment was used in the isolated worktree:
 
@@ -66,7 +63,7 @@ The plan-required environment was used in the isolated worktree:
 The scoped gate used `PYTHONPATH=.`, `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and
 `PYTHONDONTWRITEBYTECODE=1`.
 
-## Dirty-source exclusions
+## Historical Task A dirty-source exclusions
 
 The main checkout was not reset, stashed, cleaned, staged, or overwritten. Its status at
 inspection contained `2,208` entries: `5` tracked modifications and `2,203` untracked paths.
@@ -94,8 +91,8 @@ Every row records `ID | requirement | source evidence | owner lane | state | clo
 | ID | requirement | source evidence | owner lane | state | closing test/evidence |
 |---|---|---|---|---|---|
 | BASE-001 | Preserve the user's dirty main checkout | Main status: 5 tracked modifications and 2,203 untracked paths; isolated worktree at the exact main `HEAD` | Integrator | CLOSED for Task A | Isolated status was clean before proof; main was not edited by this task |
-| BASE-002 | The scoped Python pipeline gate must be run without hiding failures | Exact Task A4 pytest command; `528 passed, 5 failed, 44 subtests passed` | Meshy/Blender evidence | BLOCKED | Five named loot tests fail on missing task-local `raw.glb`; rerun after exact evidence rehydration |
-| BASE-003 | Selected loot evidence must bind raw, cleaned, Blender, runtime, and promotion records | Meshy worktree task `01a05dcb-fc3b-7418-b105-2170af354088`; `review.json.state=selected`; no `runtime-review.json`; no live-pilot directory | Loot evidence lane | BLOCKED | Reconcile exact task evidence, run fresh six-case runtime review, then verify candidate state |
+| BASE-002 | The scoped Python pipeline gate must be run without hiding failures | Exact integrated nine-suite command; `442 passed in 34.38s` | Meshy/Blender evidence | CLOSED for integrated evidence | Fresh focused bundle passed with `/usr/bin/python3` |
+| BASE-003 | Selected loot evidence must bind raw, cleaned, Blender, runtime, and promotion records | Tracked batch `9e04213bc806421d8e64c9c9c23f26d3`; selected task `01a05dcb-fc3b-7418-b105-2170af354088`; `review.json.state=promotion_ready`; D5/D6/D8 records present | Loot evidence lane | CLOSED except live application | Candidate, Blender, runtime, and proposal evidence verify; apply the staged proposal only through a separate reviewed operation |
 | BASE-004 | Do not submit a replacement historical `stalker_v1` batch | Main `_staging/meshy/stalker_v1/` and plan context record historical failed batch IDs `1a2553d5068b4f069fcbbdb88db851c5`, `8b09cef0333541db8ae3781c8ea2b9a6`, and completed batch `a7089e88e2cf4cea90a0c4c2efc0df7b` | Provider-integrity lane | HOLD | Preserve existing journals and records; no provider call or replacement submission |
 | BASE-005 | Keep Focused Nine ownership fail-closed | Board `t_f2796a0f` is blocked; its read-only salvage comment reports no coherent migration/backups, six unowned masters, and three potentially tainted masters | Structural/ownership lane | BLOCKED | Governed migration with exact signatures, backups, hashes, and rerun of the focused ownership suite |
 | BASE-006 | Keep review-only biomass promotion packets behind their dependencies | Board `t_ee221c02` is running; child spec/quality cards `t_139d5dfc` and `t_8569ee64` are todo | Biomass continuation lane | IN PROGRESS / DEPENDENCY | Complete Task 11 implementation and independent spec/quality gates |
@@ -115,56 +112,49 @@ was used to close a card.
 
 ### Repository and planning records
 
-- Main and isolated baseline both resolve to `f4a656692606e23813df68d24daba4c5e4a0151b`.
-- Main and the existing Meshy worktree contain the same five read-only plan envelopes under
-  `assets/_staging/meshy/_plans/`: `biomatter_swarm_kit_v1.json` (`112f9998...`),
-  `crafting_station_derelict_v1.json` (`87a5a058...`), `hull_tendril_kit_v1.json`
-  (`feb2b227...`), `loot_container_derelict_v1.json` (`8cd0b5db...`), and `stalker_v1.json`
-  (`e44cd28c...`). These are planning records, not provider execution or promotion evidence.
-- Main contains historical `stalker_v1` task records with contract/generation/review JSON and
-  a mixture of raw outputs; no selected loot evidence is present in main.
+- The docs worktree and main both resolve to `655ae0380f5950c6723aec9fa9b150a463ad4ff4`,
+  with the integrated evidence commits `d3df50da`, `d444f8a6`, `cc8c8c95`, `ceb8fe5a`,
+  `c70f9b17`, `48202a8b`, and the fixture-pinning `655ae038`.
+- The tracked loot plan envelope is
+  `assets/_staging/meshy/_plans/loot_container_derelict_v1.json` with
+  `references_resolved=true`, four `resolved_references`, and provider payload SHA-256
+  `e1cadfd6f2292bbd6cff38956fe6d2d0287d4f94d4523a5ff0bce4d63a2d90b7`.
+- The plan's four resolved references are `source_front.png`, `source_side.png`,
+  `source_back.png`, and `source_three_quarter.png`, with the tracked task-local byte sizes and
+  hashes recorded in the envelope.
 
-### Existing Meshy loot evidence
+### Integrated Meshy loot evidence
 
-The existing Meshy worktree is
-`/Volumes/Untitled/HermesOffload/christopherwilloughby/.hermes/worktrees/the-synaptic-sea/meshy-blender-asset-system`.
-Its loot batch journal is `_batches/9e04213bc806421d8e64c9c9c23f26d3.json`, size `3,180`,
-SHA-256 `c4b5be55db4f433ff9e2be57b9f5161701beb974d71c4455ab44c4d104376a15`.
-
-Four candidate records were present. Contract SHA-256 was `a6227476...` for each candidate;
-the following file hashes were observed:
-
-| candidate | generation.json | review.json state | raw.glb | cleaned.glb / Blender report |
-|---|---|---|---|---|
-| `01a05d53-a25e-73e9-9b2a-376899969470` | `3d981f04...` | `pending` | 58,192 bytes, `46358dce...` | absent / absent |
-| `01a05dcb-fc3b-7418-b105-2170af354088` | `19af8fde...` | `selected` | 58,720 bytes, `ff07ca3f0e87e29fb1a77c007cf261920ac370f870ead9c21446b4ad1f15e377` | 67,188 bytes, `eebcead4...` / report `4a205a23...` |
-| `01a05dcc-80b8-74ef-8c40-6f4e6d414cc3` | `d97a6cbe...` | `pending` | 55,440 bytes, `6e286803...` | absent / absent |
-| `01a05dcd-5f42-7694-a318-fb104d459344` | `5939b931...` | `pending` | 57,380 bytes, `436c3c34...` | absent / absent |
-
-For selected task `01a05dcb-fc3b-7418-b105-2170af354088`:
-
-- `contract.json`: 1,286 bytes, SHA-256 `a6227476a16d51288eb2dc588b032b55c3b0dcd758210a4d427c6643642cf1e0`.
-- `generation.json`: 2,888 bytes, SHA-256 `19af8fde5bf8f42bbb3aefbe4584b6029283dc2ccc1537102c1e3cca7356b1a5`; its
-  `outputs.raw.glb` hash matches the observed raw file `ff07ca3f...`.
-- `review.json`: 451 bytes, SHA-256 `fd2df22a099e687e20719d6cf3b891c24c5127db18e947bcf308c69d293aa3ff`; state remains
-  `selected`, decision `accept_for_cleanup`, with all six candidate checks true.
-- `raw.glb`: 58,720 bytes, SHA-256 `ff07ca3f0e87e29fb1a77c007cf261920ac370f870ead9c21446b4ad1f15e377`.
-- `cleaned.glb`: 67,188 bytes, SHA-256 `eebcead4f6620845dcc53819fff0e600ebc409435598dfedc259254640bfca92`.
-- `blender-validation.json`: 1,441 bytes, SHA-256 `4a205a236fc063ebc73648aa8081bd9067ee1b6848bce0c00a37f6c4d4589ace`; report status
-  is `PASS`, with 792 triangles, six meshes, UV evidence, and `master_provenance: null`.
-- `runtime-review.json` is absent. The expected external live-pilot directory
-  `/Volumes/Untitled/SynapticSeaAssets/meshy/live-pilot/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088`
-  is absent.
-- External master receipt `build_recipe_manifest.json`: 1,232 bytes, SHA-256
-  `0bb2dc885e98d4e6cce9bd82bdca0269f37fb457f8ffec2807d45e84bd77aa93`. External master
-  `loot_container_derelict_v1_master.blend`: 177,620 bytes, SHA-256
-  `85a31b4bd06a24566ca88894fc181f95461a2a00aef67bc3494510291bdf651b`. The receipt binds the
-  selected task and raw hash, records `source_raw_preserved: true`, and records
-  `runtime_promoted: false`.
-
-No evidence was copied from the existing Meshy worktree into this isolated worktree because the
-selected task's full promotion prerequisite set is not verified and the scoped gate must remain
-non-destructive.
+- The tracked batch journal is
+  `assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json`.
+  It is `COMPLETED` with four `SUCCEEDED` tasks at five consumed credits each; the current
+  approval has protected snapshot `assets/imported` SHA-256 `4842dcc36a48f47c63850433d56763b7a4957bcc4031788d702315e9d93c42e7`,
+  size `2528217250`, `reapproved_at` `2026-09-05T19:03:05.491301Z`, operator `christopher`, and reason
+  `assets/imported grew from legitimate post-approval imports; protected snapshot recomputed offline against current repository state`.
+- The journal has one append-only `approval_history` entry containing the original approval
+  verbatim. Its original `assets/imported` snapshot was SHA-256 `0ad2fc66f53680b0f772f9344c215ddaaed35a69cb61a60b0bfc7d13610ee39c`,
+  size `1922700132`; the other three protected-surface records were unchanged. The current approval snapshot is
+  `4842dcc36a48f47c63850433d56763b7a4957bcc4031788d702315e9d93c42e7` / `2528217250`; the rebind was offline and did not create a provider task.
+- D5 selected-candidate evidence is task
+  `assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088/`:
+  `raw.glb` is 58,720 bytes with SHA-256
+  `ff07ca3f0e87e29fb1a77c007cf261920ac370f870ead9c21446b4ad1f15e377`; `cleaned.glb` is
+  67,188 bytes with SHA-256 `eebcead4f6620845dcc53819fff0e600ebc409435598dfedc259254640bfca92`;
+  and `blender-validation.json` is `PASS` with 792 triangles, 6 meshes, 2 materials
+  (`painted_ship_alloy`, `warning_accent`), and valid UV evidence.
+- The selected `review.json` has `state=promotion_ready`, `decision=promotion_ready`, and all
+  six candidate checks true. The other three candidates are `rejected`, each with reason
+  `superseded by already-selected candidate 01a05dcb-fc3b-7418-b105-2170af354088`.
+- D6 runtime evidence is
+  `artifacts/validation-previews/meshy/loot_container_derelict_v1/runtime-review.json` with
+  `pass=true`, six captures for seeds `42` and `777` across `normal`, `emergency`, and `dark`,
+  and 18 runtime PNG outputs.
+- D8 evidence is the task-local `sidecar-overlay.json` with `proposal_only=true`, targeting
+  `res://assets/imported/props/dressing/loot_container_derelict_v1.sidecar.json`; that target
+  file is not present under `assets/imported`.
+- Git-tracked evidence leaves are mode `0644` by design. Private execution and external staging
+  contexts rehydrate evidence leaves to `0600` and directories to `0700` before private gates;
+  this is the documented mode policy, not a blocker.
 
 ### Historical proofs and limits
 
@@ -180,60 +170,58 @@ non-destructive.
 
 | Command or action | exit | observed result |
 |---|---:|---|
-| `git worktree add -b fix/asset-pipeline-closure /Users/christopherwilloughby/Code/the-synaptic-sea-asset-pipeline-closure f4a656692606e23813df68d24daba4c5e4a0151b` | 0 | New clean isolated branch at the requested baseline |
-| `/opt/homebrew/bin/python3.11 --version` | 0 | Python 3.11.15 |
-| `/opt/homebrew/bin/godot --version` | 0 | Godot 4.7.1 stable |
-| `/opt/homebrew/bin/blender --version` | 0 | Blender 5.2.0 LTS |
-| `PYTHONPATH=. PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /opt/homebrew/bin/python3.11 -m pytest -q -p no:cacheprovider tests/test_meshy_asset_contract.py tests/test_meshy_stage.py tests/test_meshy_governance.py tests/test_meshy_candidate_review.py tests/test_meshy_blender_tools.py tests/test_meshy_loot_container_recipe.py tests/test_meshy_texture_packet.py tests/test_meshy_promotion_packet.py tests/test_meshy_runtime_review.py tests/test_prop_visual_metadata.py tests/test_validate_prop_visual_bindings.py` | 1 | `528 passed, 5 failed, 44 subtests passed` — five failures caused by missing task-local `raw.glb`; see below. |
-| Read-only board SQLite query for `synaptic-sea-stage-gate` | 0 | Asset/refinement/runtime-review statuses and dependencies recorded above |
-| Read-only evidence inventory/hash comparison | 0 | Main, Meshy worktree, selected task, master receipt, and historical proofs inventoried |
-| `git status --short --branch` in isolated worktree before proof creation | 0 | `fix/asset-pipeline-closure`; clean |
+| `git worktree add -b docs/evidence-rebind-reconciliation /Users/christopherwilloughby/Code/the-synaptic-sea-docs 655ae038` | 0 | Isolated docs worktree at the required base |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py reapprove --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json --reason "assets/imported grew from legitimate post-approval imports; protected snapshot recomputed offline against current repository state" --operator christopher` | 0 | `MESHY REAPPROVE PASS`; the live protected snapshot was rebound offline and the original approval was retained in history |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py resolve-plan --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --pricing-file data/asset_generation/meshy_pricing_v1.json --reference-root assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088 --reference front=source_front.png --reference side=source_side.png --reference back=source_back.png --reference three_quarter=source_three_quarter.png` | 0 | `MESHY RESOLVE-PLAN PASS`; four references and the provider payload hash were persisted |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py verify --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json --pricing-file data/asset_generation/meshy_pricing_v1.json` on main | 0 | `MESHY VERIFY PASS`; terminal state `COMPLETED`, four verified task IDs, no unresolved entries |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_candidate_review.py verify --project-root . --task-dir assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088` | 0 | `MESHY CANDIDATE REVIEW PASS`; `state=promotion_ready` |
+| Candidate verify for each of the three sibling task directories | 1 each | `MESHY CANDIDATE REVIEW REJECTED`; each was rejected as superseded by the selected candidate |
+| Integrated nine-suite Meshy command from `docs/game/06_validation_plan.md` | 0 | `442 passed in 34.38s` |
 
-The five failing tests were exactly:
-
-- `tests/test_meshy_loot_container_recipe.py::test_real_blender_recipe_is_deterministic_and_preserves_disposable_master`
-- `tests/test_meshy_loot_container_recipe.py::test_real_blender_front_hardware_geometry_and_hinge_follow`
-- `tests/test_meshy_loot_container_recipe.py::test_real_blender_recipe_rejects_unowned_generated_name_collision`
-- `tests/test_meshy_loot_container_recipe.py::test_real_blender_recipe_is_idempotent_on_same_disposable_generated_master`
-- `tests/test_meshy_loot_container_recipe.py::test_real_private_glb_uses_contract_dimension_order_for_pure_validator`
-
-The first, second, and fifth fail at their assertion that the canonical external master and
-main-relative task-local raw path exist. The third and fourth fail while copying that same
-missing task-local `raw.glb`. The five real-Blender loot paths therefore did not reach their
-recipe operation; the missing bound raw artifact is recorded as a blocker, not bypassed.
+The three sibling exit-1 results are expected terminal rejection results, not failed validation of
+the selected candidate. The private candidate and preview directories were rehydrated to mode
+`0700` with evidence leaves at `0600` for the candidate verification gate, then restored to their
+Git-tracked `0755`/`0644` representation.
 
 ## Visual verdicts
 
-- **Loot container:** no fresh runtime visual verdict. The selected candidate has a machine
-  Blender validation report with status `PASS`, but the candidate remains `selected`, not
-  `promotion_ready`; runtime evidence is absent and no promotion is claimed.
+- **Loot container:** D5 Blender evidence is `PASS` with 792 triangles, 2 materials, and UVs;
+  D6 runtime evidence passes six locked-isometric cases across seeds `42` and `777` and
+  `normal`, `emergency`, and `dark` lighting; the selected candidate is `promotion_ready`.
+  D8 remains proposal-only: no live imported asset or sidecar target was written.
 - **Focused Nine:** historical comparison proof is staging/validation PASS and explicitly
   non-promoted. Current ownership and airlock cards remain blocked; no fresh visual acceptance
   was asserted.
 - **ithappy:** historical full-conversion proof is explicitly pending Godot import verification;
   it is not used as current runtime evidence.
 - Image existence, a machine validation report, a board status, or an old PASS paragraph was not
-  treated as human/art or gameplay-scale acceptance.
+  treated as human/art or gameplay-scale acceptance. The current D6 report is included because it
+  records the exact six-case runtime review and passes its evidence contract.
 
 ## Promotion diffs
 
-- Task A made no promotion diff and did not write `assets/imported`, `data/combat`, `data/props`,
-  `scenes/wrappers`, generated indexes, runtime catalogs, or gameplay data.
-- The isolated worktree had no diff before the proof was created. The main checkout's pre-existing
-  tracked and untracked changes remain excluded and were not reclassified as Task A output.
-- The only intended commit content is this proof document.
+- D8 added only the staged `sidecar-overlay.json` proposal under the selected task directory; it
+  did not write `assets/imported`, `data/combat`, `data/props`, `scenes/wrappers`, generated
+  indexes, runtime catalogs, or gameplay data.
+- The proposal target
+  `res://assets/imported/props/dressing/loot_container_derelict_v1.sidecar.json` is descriptive
+  and absent. Applying it is a separate future operation per plan Task I.
+- The main checkout's pre-existing tracked and untracked changes remain excluded from this docs
+  branch and were not reclassified as task output.
+
+## Reconciled former blockers
+
+- Protected-surface drift was resolved by offline reapproval: the current approval snapshot is
+  `assets/imported` SHA-256 `4842dcc36a48f47c63850433d56763b7a4957bcc4031788d702315e9d93c42e7`, size
+  `2528217250`; the original approval remains in append-only `approval_history` with SHA-256
+  `0ad2fc66f53680b0f772f9344c215ddaaed35a69cb61a60b0bfc7d13610ee39c`, size `1922700132`.
+- The three pending candidate-review blockers were resolved: the siblings are explicitly rejected
+  as superseded, while candidate `01a05dcb-fc3b-7418-b105-2170af354088` is `promotion_ready`.
+- The `references_resolved=false` blocker was resolved: the tracked loot plan persists
+  `references_resolved=true`, four resolved references, and provider payload SHA-256
+  `e1cadfd6f2292bbd6cff38956fe6d2d0287d4f94d4523a5ff0bce4d63a2d90b7`.
 
 ## Known blockers
 
-1. The isolated baseline lacks the exact task-local loot raw artifact at
-   `assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088/raw.glb`,
-   causing the five exact scoped-test failures. Do not fabricate or regenerate it through Meshy;
-   rehydrate only from a verified immutable source with matching identity and hash.
-2. The selected loot record has Blender evidence but no task-local runtime report, no live-pilot
-   evidence directory, and `review.json.state=selected`; it is not promotion-ready.
-3. Focused Nine ownership remediation is blocked by the board's fail-closed salvage findings:
-   no coherent migration/backups/report, six unowned masters, and three potentially tainted masters.
-4. The main checkout remains dirty with user changes and generated/untracked assets. Any later task
-   must start from a newly reconciled baseline and must not reset, stash, clean, or mass-stage it.
-5. Existing historical proofs are retained as audit context only. They do not close current runtime,
-   ownership, evidence, or promotion gates.
+1. The promotion proposal is staged but not applied: applying `sidecar-overlay.json` to live
+   `assets/imported` is a separate future operation per plan Task I; no promotion is claimed here.
