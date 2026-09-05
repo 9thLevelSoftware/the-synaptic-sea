@@ -69,6 +69,18 @@ noid = {"systems":[{"file":"tools/build_system_inventory.py","kind":"simulation"
   "input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}], "loops":[]}
 t("missing id caught", any("missing 'id'" in e for e in b.validate(noid, ".")))
 
+# duplicate IDs make integration references ambiguous.
+duplicate = {"systems":[
+ {"id":"same","file":"tools/build_system_inventory.py","kind":"simulation","confidence":"V","input":{},"output":{},"subsystems":[]},
+ {"id":"same","file":"tools/test_build_system_inventory.py","kind":"simulation","confidence":"V","input":{},"output":{},"subsystems":[]}], "loops":[]}
+t("duplicate id caught", any("duplicate system id" in e for e in b.validate(duplicate, ".")))
+
+# An inventory-discovered file may be known to exist while its completion is not.
+unassessed = {"kind":"simulation","assessment":"unassessed","confidence":"U",
+              "input":{"live":False},"output":{"live":False},"subsystems":[]}
+t("unassessed has no fabricated score", b.leaf_completion(unassessed) is None)
+t("unassessed label", b.completion_label(unassessed) == "not assessed")
+
 # subsystems appear as flattened rows in the map payload (not just top-level)
 nested = {"systems":[{"id":"parent","file":"tools/build_system_inventory.py","name":"Parent","domain":"d",
   "kind":"simulation","confidence":"V","input":{"live":True},"output":{"live":True},"integrations":[],
