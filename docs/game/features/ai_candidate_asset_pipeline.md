@@ -183,7 +183,9 @@ $MESHY_MASTER_ROOT/<asset_id>/
   exports/
 ```
 
-The external master backup gate must pass before any future promotion-ready decision.
+The external master backup gate must pass before final promotion eligibility. The
+`promotion_ready` value in the selected task's `review.json` is the candidate-review state only;
+it does not assert that the external-master backup gate passed or that final promotion is eligible.
 
 ## Protected runtime surfaces
 
@@ -358,14 +360,16 @@ TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
 
 The host toolchain evidence was reverified at the integrated state on main `HEAD`
 `655ae0380f5950c6723aec9fa9b150a463ad4ff4`: the focused integrated nine-suite command completed
-442 tests, and the loot-container record includes the selected promotion-ready candidate,
-cleaned GLB, Blender validation, six-case runtime review, and proposal-only sidecar. The proposal
-target remains separate from live runtime assets.
+442 tests, and the loot-container record includes the selected candidate-review state
+`promotion_ready`, cleaned GLB, Blender validation, six-case runtime review, and proposal-only
+sidecar. The candidate-review state is not final promotion eligibility: the external-master
+backup gate and separate reviewed task remain required. The proposal target remains separate from
+live runtime assets.
 
 The runtime marker requires task identity:
 
 ```text
-MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
+MESHY RUNTIME REVIEW PASS asset=loot_container_derelict_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
 ```
 
 Existing Godot regression smokes remain regression evidence and must use the current validation
@@ -405,6 +409,7 @@ unclassified diagnostic.
 ## Related records
 
 - ADR: `docs/game/adr/0058-meshy-candidates-blender-authority.md`
+- Offline evidence rebinding: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`
 - Existing prop metadata authority: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`
 - Existing prop feature contract: `docs/game/features/asset_metadata_pipeline.md`
 - Requirements: `REQ-AIAP-001` through `REQ-AIAP-010` in `docs/game/05_requirements.md`

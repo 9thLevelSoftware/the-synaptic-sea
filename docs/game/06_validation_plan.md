@@ -150,7 +150,8 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_texture_pack
 The Blender commands are host-Python launchers; do not invoke them as `blender --python`.
 The integrated loot-container D5 evidence contains task-local `raw.glb` preservation and
 `cleaned.glb`; `blender-validation.json` is `PASS` with 792 triangles, 2 materials, and UVs.
-The selected review record is `promotion_ready`.
+The selected review record is `promotion_ready` as a candidate-review state only; final promotion
+eligibility still requires the external-master backup gate and a separate reviewed task.
 
 ### Locked-isometric runtime review and proposal boundary
 
@@ -191,6 +192,12 @@ or `SCRIPT ERROR:` lines block runtime acceptance unless the exact output is cla
 plan; a pass marker or zero exit code does not override an unclassified diagnostic. Generation
 and review must not write to `assets/imported`, `data/combat/threat_visual_catalog.json`,
 `data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is separate.
+
+### Related records
+
+- Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
+- ADR-0058: `docs/game/adr/0058-meshy-candidates-blender-authority.md`.
+- ADR-0060 offline evidence rebinding: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`.
 
 ## Godot binary
 

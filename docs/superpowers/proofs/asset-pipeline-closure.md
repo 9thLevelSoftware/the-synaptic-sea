@@ -16,8 +16,10 @@ sections below.
 - Isolated branch: `docs/evidence-rebind-reconciliation`.
 - Isolated worktree branch history: based on main evidence baseline
   `655ae0380f5950c6723aec9fa9b150a463ad4ff4`, then the documentation reconciliation
-  commits `f3f1259b5d451d6c13f39e521ea13f79f893ca1c` and
-  `cea3137c` (verify the live tip with `git rev-parse HEAD` in the worktree).
+  commits `f3f1259b5d451d6c13f39e521ea13f79f893ca1c`, `cea3137c9bd80baa05ee73d856ce5b6c4bb4dcd4`,
+  and `069f9f2799eaac2e777f3bf41ea2e4ae5a9a6faa`. The isolated worktree `HEAD` at documentation
+  inspection was `069f9f2799eaac2e777f3bf41ea2e4ae5a9a6faa`; verify the live tip with
+  `git rev-parse HEAD` in the worktree.
 - The isolated worktree was clean before the documentation edits; the dirty main checkout was
   not reset, stashed, cleaned, staged, or overwritten.
 
@@ -46,8 +48,8 @@ Pre-existing worktrees observed before Task A3:
 The worktree table above is retained as historical Task A context. The current docs worktree used for
 this reconciliation is `/Users/christopherwilloughby/Code/the-synaptic-sea-docs` on
 `docs/evidence-rebind-reconciliation`, based on `655ae038` and carrying the documentation
-reconciliation commits `f3f1259b` and `cea3137c`; the main checkout was not reset, stashed,
-cleaned, staged, or overwritten.
+reconciliation commits `f3f1259b`, `cea3137c`, and `069f9f27` (`HEAD`); the main checkout was not
+reset, stashed, cleaned, staged, or overwritten.
 
 Recent integrated history includes `655ae038 test: pin reapprove fixtures to pre-reapprove journal
 snapshot`, `48202a8b art: rebind loot container approval evidence offline`, `c70f9b17 art: stage
@@ -96,7 +98,7 @@ Every row records `ID | requirement | source evidence | owner lane | state | clo
 |---|---|---|---|---|---|
 | BASE-001 | Preserve the user's dirty main checkout | Main status: 5 tracked modifications and 2,203 untracked paths; isolated worktree at the exact main `HEAD` | Integrator | CLOSED for Task A | Isolated status was clean before proof; main was not edited by this task |
 | BASE-002 | The scoped Python pipeline gate must be run without hiding failures | Exact integrated nine-suite command; `442 passed in 34.38s` | Meshy/Blender evidence | CLOSED for integrated evidence | Fresh focused bundle passed with `/usr/bin/python3` |
-| BASE-003 | Selected loot evidence must bind raw, cleaned, Blender, runtime, and promotion records | Tracked batch `9e04213bc806421d8e64c9c9c23f26d3`; selected task `01a05dcb-fc3b-7418-b105-2170af354088`; `review.json.state=promotion_ready`; D5/D6/D8 records present | Loot evidence lane | CLOSED except live application | Candidate, Blender, runtime, and proposal evidence verify; apply the staged proposal only through a separate reviewed operation |
+| BASE-003 | Selected loot evidence must bind raw, cleaned, Blender, runtime, and promotion records | Tracked batch `9e04213bc806421d8e64c9c9c23f26d3`; selected task `01a05dcb-fc3b-7418-b105-2170af354088`; `review.json.state=promotion_ready` (candidate-review state only); D5/D6/D8 records present | Loot evidence lane | CLOSED except live application | Candidate, Blender, runtime, and proposal evidence verify; external-master backup and final application remain separate reviewed operations |
 | BASE-004 | Do not submit a replacement historical `stalker_v1` batch | Main `_staging/meshy/stalker_v1/` and plan context record historical failed batch IDs `1a2553d5068b4f069fcbbdb88db851c5`, `8b09cef0333541db8ae3781c8ea2b9a6`, and completed batch `a7089e88e2cf4cea90a0c4c2efc0df7b` | Provider-integrity lane | HOLD | Preserve existing journals and records; no provider call or replacement submission |
 | BASE-005 | Keep Focused Nine ownership fail-closed | Board `t_f2796a0f` is blocked; its read-only salvage comment reports no coherent migration/backups, six unowned masters, and three potentially tainted masters | Structural/ownership lane | BLOCKED | Governed migration with exact signatures, backups, hashes, and rerun of the focused ownership suite |
 | BASE-006 | Keep review-only biomass promotion packets behind their dependencies | Board `t_ee221c02` is running; child spec/quality cards `t_139d5dfc` and `t_8569ee64` are todo | Biomass continuation lane | IN PROGRESS / DEPENDENCY | Complete Task 11 implementation and independent spec/quality gates |
@@ -119,7 +121,8 @@ was used to close a card.
 - Main resolves to the integrated evidence baseline `655ae0380f5950c6723aec9fa9b150a463ad4ff4`
   with the integrated evidence commits `d3df50da`, `d444f8a6`, `cc8c8c95`, `ceb8fe5a`,
   `c70f9b17`, `48202a8b`, and the fixture-pinning `655ae038`. The docs worktree adds this
-  documentation reconciliation on top (commits `f3f1259b` and `cea3137c`).
+  documentation reconciliation on top (commits `f3f1259b`, `cea3137c`, and `069f9f27`; current
+  `HEAD` `069f9f2799eaac2e777f3bf41ea2e4ae5a9a6faa`).
 - The tracked loot plan envelope is
   `assets/_staging/meshy/_plans/loot_container_derelict_v1.json` with
   `references_resolved=true`, four `resolved_references`, and provider payload SHA-256
@@ -147,8 +150,17 @@ was used to close a card.
   67,188 bytes with SHA-256 `eebcead4f6620845dcc53819fff0e600ebc409435598dfedc259254640bfca92`;
   and `blender-validation.json` is `PASS` with 792 triangles, 6 meshes, 2 materials
   (`painted_ship_alloy`, `warning_accent`), and valid UV evidence.
+- The external master recipe at
+  `/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/build_recipe_manifest.json`
+  records the canonical master at
+  `/Volumes/Untitled/SynapticSeaAssets/meshy/source/loot_container_derelict_v1/loot_container_derelict_v1_master.blend`
+  with SHA-256 `fa83dd06b78428cfd8aff65380ddba3db9f8425c66a9378090ca772e63263ca4` and
+  `runtime_promoted=false`. The task-local validator's `master_provenance` is `null`, so this
+  external record is separate evidence; no external-master backup-gate PASS is asserted here.
 - The selected `review.json` has `state=promotion_ready`, `decision=promotion_ready`, and all
-  six candidate checks true. The other three candidates are `rejected`, each with reason
+  six candidate checks true. This is the candidate-review state only; it is not final promotion
+  eligibility because the external-master backup gate and separate reviewed task are still required.
+  The other three candidates are `rejected`, each with reason
   `superseded by already-selected candidate 01a05dcb-fc3b-7418-b105-2170af354088`.
 - D6 runtime evidence is
   `artifacts/validation-previews/meshy/loot_container_derelict_v1/runtime-review.json` with
@@ -179,7 +191,7 @@ was used to close a card.
 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py reapprove --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json --reason "assets/imported grew from legitimate post-approval imports; protected snapshot recomputed offline against current repository state" --operator christopher` | 0 | `MESHY REAPPROVE PASS`; the live protected snapshot was rebound offline and the original approval was retained in history |
 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py resolve-plan --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --pricing-file data/asset_generation/meshy_pricing_v1.json --reference-root assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088 --reference front=source_front.png --reference side=source_side.png --reference back=source_back.png --reference three_quarter=source_three_quarter.png` | 0 | `MESHY RESOLVE-PLAN PASS`; four references and the provider payload hash were persisted |
 | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py verify --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json --pricing-file data/asset_generation/meshy_pricing_v1.json` on main | 0 | `MESHY VERIFY PASS`; terminal state `COMPLETED`, four verified task IDs, no unresolved entries |
-| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_candidate_review.py verify --project-root . --task-dir assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088` | 0 | `MESHY CANDIDATE REVIEW PASS`; `state=promotion_ready` |
+| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_candidate_review.py verify --project-root . --task-dir assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088` after private-mode rehydration | 0 | `MESHY CANDIDATE REVIEW PASS`; `state=promotion_ready` (candidate-review state only) |
 | Candidate verify for each of the three sibling task directories | 1 each | `MESHY CANDIDATE REVIEW REJECTED`; each was rejected as superseded by the selected candidate |
 | Integrated nine-suite Meshy command from `docs/game/06_validation_plan.md` | 0 | `442 passed in 34.38s` |
 
@@ -188,11 +200,57 @@ the selected candidate. The private candidate and preview directories were rehyd
 `0700` with evidence leaves at `0600` for the candidate verification gate, then restored to their
 Git-tracked `0755`/`0644` representation.
 
+### Reproduction boundary
+
+The `meshy_stage verify` PASS in the table was intentionally run from the main checkout at
+`655ae0380f5950c6723aec9fa9b150a463ad4ff4`, not from this docs-only worktree. The main checkout
+contains pre-existing untracked `assets/imported` content covered by the current protected snapshot;
+the docs worktree does not. Running that command in the docs worktree therefore reports
+`protected runtime surfaces changed since approval` and is not a valid reproduction of the recorded
+PASS. Re-run it from the checkout that owns that snapshot:
+
+```bash
+MAIN_ROOT=/path/to/the-synaptic-sea
+test "$(git -C "$MAIN_ROOT" rev-parse HEAD)" = "655ae0380f5950c6723aec9fa9b150a463ad4ff4"
+(
+  cd "$MAIN_ROOT" &&
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py verify \
+    --project-root . \
+    --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
+    --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json \
+    --pricing-file data/asset_generation/meshy_pricing_v1.json
+)
+```
+
+The candidate-review gate has a separate private-mode prerequisite. From the docs worktree, use the
+following setup, run the verification, and restore the tracked representation afterward:
+
+```bash
+DOCS_ROOT=/path/to/the-synaptic-sea-docs
+TASK_DIR="$DOCS_ROOT/assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088"
+PREVIEW_DIR="$DOCS_ROOT/artifacts/validation-previews/meshy/loot_container_derelict_v1"
+chmod 700 "$TASK_DIR" "$PREVIEW_DIR"
+find "$TASK_DIR" "$PREVIEW_DIR" -type f -exec chmod 600 {} +
+(
+  cd "$DOCS_ROOT" &&
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_candidate_review.py verify \
+    --project-root . --task-dir "${TASK_DIR#$DOCS_ROOT/}"
+)
+find "$TASK_DIR" "$PREVIEW_DIR" -type f -exec chmod 644 {} +
+chmod 755 "$TASK_DIR" "$PREVIEW_DIR"
+```
+
+This setup produced `MESHY CANDIDATE REVIEW PASS task_id=01a05dcb-fc3b-7418-b105-2170af354088
+state=promotion_ready`. The mode rehydration is required because the validator rejects the
+Git-tracked `0644`/`0755` representation at the private execution boundary; no evidence bytes are
+changed.
+
 ## Visual verdicts
 
 - **Loot container:** D5 Blender evidence is `PASS` with 792 triangles, 2 materials, and UVs;
   D6 runtime evidence passes six locked-isometric cases across seeds `42` and `777` and
-  `normal`, `emergency`, and `dark` lighting; the selected candidate is `promotion_ready`.
+  `normal`, `emergency`, and `dark` lighting; the selected candidate's review state is
+  `promotion_ready` (candidate-review state only, not final promotion eligibility).
   D8 remains proposal-only: no live imported asset or sidecar target was written.
 - **Focused Nine:** historical comparison proof is staging/validation PASS and explicitly
   non-promoted. Current ownership and airlock cards remain blocked; no fresh visual acceptance
@@ -221,7 +279,8 @@ Git-tracked `0755`/`0644` representation.
   `2528217250`; the original approval remains in append-only `approval_history` with SHA-256
   `0ad2fc66f53680b0f772f9344c215ddaaed35a69cb61a60b0bfc7d13610ee39c`, size `1922700132`.
 - The three pending candidate-review blockers were resolved: the siblings are explicitly rejected
-  as superseded, while candidate `01a05dcb-fc3b-7418-b105-2170af354088` is `promotion_ready`.
+  as superseded, while candidate `01a05dcb-fc3b-7418-b105-2170af354088` is in review state
+  `promotion_ready`; this does not satisfy the external-master backup gate or apply promotion.
 - The `references_resolved=false` blocker was resolved: the tracked loot plan persists
   `references_resolved=true`, four resolved references, and provider payload SHA-256
   `e1cadfd6f2292bbd6cff38956fe6d2d0287d4f94d4523a5ff0bce4d63a2d90b7`.

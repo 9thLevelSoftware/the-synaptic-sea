@@ -3,9 +3,11 @@
 ## Status
 
 Accepted. The toolchain implementation is present and host-verified at merge commit
-`4dc9e7d7f7aee2c5884bb72118949583737e8994`. Real provider tasks, candidate artifacts, and the
-six-case runtime evidence remain intentionally reserved for the post-PR live pilot; no provider
-call or promotion is part of this documentation refresh.
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. The integrated `loot_container_derelict_v1`
+pilot now has tracked provider tasks, candidate artifacts, and six-case runtime evidence at the
+main evidence baseline `655ae0380f5950c6723aec9fa9b150a463ad4ff4`. Other pilot assets and live
+promotion remain separately gated; no provider call or promotion is part of this documentation
+refresh.
 
 ## Date
 
@@ -250,11 +252,12 @@ redefine the prop sidecar/index contract or move gameplay state into it.
 
 - Candidate generation, selection, Blender cleanup, validation, and promotion are separate
   stages and require more records than a direct import.
-- External `.blend` masters require a backup/checkpoint gate before promotion.
+- The integrated `loot_container_derelict_v1` pilot now has tracked provider tasks, raw/cleaned
+  GLBs, generation/review records, an external Blender master recipe, and six runtime captures;
+  the other pilot assets and any applied promotion remain separately gated.
+- External `.blend` masters require a backup/checkpoint gate before final promotion eligibility.
 - The six-case runtime review and clean diagnostic requirement make visual promotion slower but
   prevent context and log regressions.
-- Real provider tasks, raw/cleaned GLBs, external Blender masters, generation records, and six
-  runtime captures are not present until the post-PR live pilot.
 
 ## Validation
 
@@ -264,13 +267,18 @@ ADR:
 - Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
 - Requirements: `REQ-AIAP-001` through `REQ-AIAP-010` in `docs/game/05_requirements.md`.
 - Current command registry and evidence boundary: `docs/game/06_validation_plan.md`.
+- Offline evidence rebinding workflow: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`.
 
 The implemented gates include the contract validator, focused Python tests, the host-Python
 Blender master and normalized-GLB validator, the locked-isometric runtime-review harness, and
 the existing Godot smokes. At commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`, the focused
 Meshy suite passed 340 tests in 185.67 seconds and the Blender focused tests passed 2 tests.
-There is no real Meshy task directory, raw/cleaned GLB, generation/review record, external master,
-or six-capture runtime report yet; those are truthful post-PR live-pilot evidence limitations.
+At the integrated evidence baseline `655ae0380f5950c6723aec9fa9b150a463ad4ff4`, the focused
+nine-suite command passed 442 tests, and the tracked loot-container records include the selected
+candidate, raw/cleaned GLBs, generation/review evidence, Blender validation, and six-case runtime
+review. The selected task's `promotion_ready` value is the candidate-review state only; it does not
+satisfy the external-master backup gate or authorize final promotion. Other pilot assets remain
+post-PR live-pilot evidence limitations.
 
 ## Alternatives considered
 
