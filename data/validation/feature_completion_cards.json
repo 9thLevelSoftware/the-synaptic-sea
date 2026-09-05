@@ -3147,6 +3147,21 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/systems/runtime_physical_volume_catalog.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/systems/runtime_physical_volume.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/systems/structural_rebuild_collision_query.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
           "path": "scripts/systems/work_action_catalog.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -3212,12 +3227,32 @@
           "scope_state": "present"
         },
         {
+          "path": "data/physics/runtime_physical_volume_profiles.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
           "path": "tools/check_structural_rebuild_catalog.py",
           "source_exists": true,
           "scope_state": "present"
         },
         {
           "path": "tests/test_structural_rebuild_catalog.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/check_runtime_physical_volume_catalog.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/test_runtime_physical_volume_catalog.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tools/classify_orphan_smokes.sh",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -3240,10 +3275,20 @@
           "path": "scripts/validation/structural_rebuild_policy_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/runtime_physical_volume_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/structural_rebuild_collision_query_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
         }
       ],
       "scope_decisions_pending": [],
-      "non_goals": "Placement outside the original footprint.",
+      "non_goals": "Placement outside the original footprint or unreviewed cart push physics.",
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P17 --evidence-dir artifacts/feature-completion/P17",
@@ -3260,7 +3305,45 @@
           }
         },
         {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/runtime_physical_volume_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "RUNTIME PHYSICAL VOLUME PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/structural_rebuild_collision_query_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "STRUCTURAL REBUILD COLLISION QUERY PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
           "command": "& $Python -m unittest tests.test_structural_rebuild_catalog",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "OK"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python -m unittest tests.test_runtime_physical_volume_catalog",
           "success": {
             "exit_code": 0,
             "required_output": [
@@ -3408,7 +3491,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 1047
+        "line": 1103
       }
     },
     {
@@ -3546,7 +3629,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1079
+        "line": 1135
       }
     },
     {
@@ -3693,7 +3776,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1107
+        "line": 1163
       }
     },
     {
@@ -3779,7 +3862,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1129
+        "line": 1185
       }
     },
     {
@@ -3872,7 +3955,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1153
+        "line": 1209
       }
     },
     {
@@ -3998,7 +4081,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1175
+        "line": 1231
       }
     },
     {
@@ -4121,7 +4204,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1200
+        "line": 1256
       }
     }
   ]

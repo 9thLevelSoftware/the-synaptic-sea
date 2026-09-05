@@ -137,7 +137,7 @@ CARD_NON_GOALS = {
     "P14": "Free repair on install or balance inflation.",
     "P15": "Ordinary repair resurrecting destroyed modules.",
     "P16": "Reconstruction or altered room generation.",
-    "P17": "Placement outside the original footprint.",
+    "P17": "Placement outside the original footprint or unreviewed cart push physics.",
     "P18": "Visual-only replacement or native-generator replacement.",
     "P19": "Silently discarding unmatched deltas.",
     "P20": "Bypassing safe-return or ownership rules.",
@@ -369,16 +369,23 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
     "P17": [
         "scripts/systems/structural_rebuild_state.gd", "scripts/systems/ship_work_transaction.gd",
         "scripts/systems/module_integrity_map.gd", "scripts/systems/structural_rebuild_catalog.gd",
+        "scripts/systems/runtime_physical_volume_catalog.gd",
+        "scripts/systems/runtime_physical_volume.gd",
+        "scripts/systems/structural_rebuild_collision_query.gd",
         "scripts/systems/work_action_catalog.gd", "scripts/systems/work_action_resolver.gd",
         "scripts/procgen/structural_rebuild_preflight.gd", "scripts/procgen/generated_ship_loader.gd",
         "scripts/procgen/modular_socket_catalog.gd", "scripts/systems/dock_ports.gd",
         "scripts/systems/docking_manager.gd", "scripts/systems/ship_instance.gd",
         "scripts/systems/ship_nav_graph.gd", COORDINATOR,
         "data/construction/structural_rebuild_catalog.json", "data/tools/tool_definitions.json",
-        "data/items/item_definitions.json",
+        "data/items/item_definitions.json", "data/physics/runtime_physical_volume_profiles.json",
         "tools/check_structural_rebuild_catalog.py", "tests/test_structural_rebuild_catalog.py",
+        "tools/check_runtime_physical_volume_catalog.py",
+        "tests/test_runtime_physical_volume_catalog.py", "tools/classify_orphan_smokes.sh",
         WORK_ACTION_CATALOG, f"{VALIDATION}fc_p17_smoke.gd", f"{VALIDATION}fc_p16_smoke.gd",
         f"{VALIDATION}structural_rebuild_policy_smoke.gd",
+        f"{VALIDATION}runtime_physical_volume_smoke.gd",
+        f"{VALIDATION}structural_rebuild_collision_query_smoke.gd",
     ],
     "P18": [
         "scripts/procgen/structural_rebuild_applier.gd", "scripts/procgen/generated_ship_loader.gd",
@@ -458,6 +465,10 @@ CARD_SMOKES = {
     ],
     "P15": ["repair_loop_smoke.gd", "module_integrity_consequences_smoke.gd", "ship_mod_plating_repair_away_smoke.gd"],
     "P16": ["module_integrity_smoke.gd", "nav_solid_edges_smoke.gd"],
+    "P17": [
+        "runtime_physical_volume_smoke.gd",
+        "structural_rebuild_collision_query_smoke.gd",
+    ],
     "P18": ["module_integrity_consequences_smoke.gd", "ship_nav_graph_smoke.gd", "slice_atmosphere_smoke.gd", "physical_travel_smoke.gd"],
     "P19": ["pillar_persistence_smoke.gd", "pillar_revisit_persistence_smoke.gd", "world_persist_restore_smoke.gd", "docking_persistence_smoke.gd"],
     "P20": ["pilot_switch_smoke.gd", "repair_loop_smoke.gd", "docking_loop_smoke.gd", "worldgen_wired_travel_smoke.gd"],
@@ -1426,7 +1437,10 @@ def _verification(card_id: str, root: Path) -> list[dict[str, Any]]:
     if card_id == "P09":
         checks.append(_check("& $Python -m unittest tests.test_crafting_economy", "OK", forbid_diagnostics=False))
     if card_id == "P17":
-        checks.append(_check("& $Python -m unittest tests.test_structural_rebuild_catalog", "OK", forbid_diagnostics=False))
+        checks.extend([
+            _check("& $Python -m unittest tests.test_structural_rebuild_catalog", "OK", forbid_diagnostics=False),
+            _check("& $Python -m unittest tests.test_runtime_physical_volume_catalog", "OK", forbid_diagnostics=False),
+        ])
     if card_id in {"P00", "P10", "P20", "P22"}:
         profile = "baseline" if card_id == "P00" else "crafting" if card_id == "P10" else "restoration" if card_id == "P20" else "all"
         checks.append(_check(

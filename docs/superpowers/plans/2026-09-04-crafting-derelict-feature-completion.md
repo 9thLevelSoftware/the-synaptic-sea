@@ -987,22 +987,53 @@ regeneration from the same seed/version; destruction does not erase repairabilit
 **Depends:** P09, P12-P13, P16. **Requirements:** FC-18..19.
 **Allowed files:** `structural_rebuild_state.gd`; a narrow owner-binding seam in
 `module_integrity_map.gd`; new `structural_rebuild_catalog.gd` and
-`structural_rebuild_preflight.gd`; `ship_work_transaction.gd`,
+`structural_rebuild_preflight.gd`; new
+`runtime_physical_volume_catalog.gd`, `runtime_physical_volume.gd`, and
+`structural_rebuild_collision_query.gd`; `ship_work_transaction.gd`,
 `work_action_catalog.gd`, `work_action_resolver.gd`; narrow source-kit/module/
 contract and registered-endpoint seams in `generated_ship_loader.gd`,
 `modular_socket_catalog.gd`, `dock_ports.gd`,
 `docking_manager.gd`, `ship_instance.gd`, `ship_nav_graph.gd`, and the playable
-coordinator; new rebuild catalog, catalog checker/tests, work-action definitions,
+coordinator; new rebuild and physical-volume catalogs, catalog checker/tests,
+work-action definitions,
 and compatible-action metadata in `data/tools/tool_definitions.json` plus only
 the `welder.compatible_work_action_ids` `rebuild_structure` entry in
-`data/items/item_definitions.json`; new `fc_p17_smoke.gd` and exact kit/contract
+`data/items/item_definitions.json`; focused physical-volume/query, blocker,
+endpoint, route, and live-safety smokes; new `fc_p17_smoke.gd` and exact kit/contract
 assertions in `fc_p16_smoke.gd`; `structural_rebuild_policy_smoke.gd`, a
 preparatory P17 policy/loader proof that does
 not emit an `FC P17 PASS` marker.
 **Non-goals:** geometry/nav/air mutation, component displacement, replacement
 outside the original transform/footprint, arbitrary rotation/substitution,
-auto-undocking, and persistence.
+auto-undocking, persistence, or adding cart push/motion behavior in the
+physical-volume foundation slice.
 
+**P17 foundation slice A:** land the explicit reviewed physical-volume catalog,
+strict immutable loader, primitive builder, and private candidate-only query
+helper before any cart/component/dock/coordinator integration. It remains inside
+the existing P17 card and acceptance denominator. Its proofs cannot emit or
+satisfy `FC P17 PASS`. External `synaptic-sea-stage-gate` synchronization stays
+`pending`; the generated local P17 card is the operational scope record.
+
+**Future integration scope pending:** endpoint/dock identity, candidate routes,
+base-world clearance, and coordinator wiring remain later P17 integration windows
+within their existing allowlist. Cart/drop/component projections, mount anchors,
+and player collision-mask changes additionally require reviewed file-scope
+additions. The foundation authorization does not permit those product edits.
+
+- [ ] Author the ADR-0065 reviewed cart/drop/component box dimensions and exact
+  local transforms as canonical data. Reserve layer bit 2 with mask 0 for passive
+  projections; use private-space layer bit 1 for the isolated candidate. Reject
+  missing, malformed, duplicate, non-finite, or non-positive rows. Runtime must
+  not derive dimensions from interaction radii, visual bounds/meshes, or defaults.
+- [ ] Build exact box/capsule primitives and a private-space query helper using
+  Godot 4.7.2 `PhysicsDirectSpaceState3D.intersect_shape()` and `cast_motion()`.
+  Preserve rotations/local offsets, use zero margin, isolate the candidate, and
+  free every RID on every result. Do not substitute AABBs or sampled points.
+- [ ] Prove foundation behavior through strict catalog Python tests and real
+  Godot primitive/query smokes. The initial gameplay dimensions require scene
+  clearance validation before later live integration; synthetic fixture-only
+  boxes do not certify the authored profile data.
 - [ ] Add exact layout-kit, structural-kit, and structural-contract identity to
   every original descriptor/fingerprint. The active source matrix is biomatter
   authored hive template plus hazard/industrial/lifeboat v0 resolution; ithappy
@@ -1033,12 +1064,37 @@ auto-undocking, and persistence.
   for actual actor, parked/grabbed cart, mounted component, physical cargo,
   registered dock identity, and candidate-result egress. Revalidate on timed
   completion; stale/occupied work changes nothing and has no net spend.
+- [ ] Keep imported visuals collision-free. Later live integration reconstructs
+  passive cart/drop/component projections only from canonical profile IDs and
+  stable authored transforms. If projections become player-motion blockers,
+  specify and prove swept/clamped grabbed-cart follow, exclusions, and blocked
+  motion before adding layer bit 2 to the player mask; profile plumbing alone
+  must not change or claim push physics.
+- [ ] Register each production endpoint with stable IDs and distinct,
+  clearance-sized `threshold_nav_node_id` and `interior_nav_node_id`. For each
+  side of each active connection that was usable before the candidate, require
+  a baseline existing-world threshold-to-meaningful-interior path and preserve
+  that same anchor pair after replacement. The deterministic interior anchor is
+  strictly beyond the endpoint-owned edge/footprint, has another traversable
+  interior neighbor, and the route has a real edge plus at least one traversal-
+  capsule diameter of separation and continuous clearance. Missing, ambiguous,
+  near-identical, dead-end, or disconnected anchors on a usable endpoint are
+  unsupported live safety, never a vacuous or omitted obligation. Do not newly
+  require every endpoint to be actor-reachable; separately require the actor to
+  reach one candidate-usable registered exit.
+- [ ] Treat the private candidate query as incremental obstruction evidence only.
+  Independently check every returned route segment against authoritative live
+  unchanged solids, closed portals, and dynamic blockers, excluding only the
+  actor's own body and already-disabled destroyed-target shapes. Authorization
+  requires topology, base-world clearance, and candidate-only continuous sweep.
 - [ ] Reserve exact lots only through P12. Keep scene application blocked until
   P18 consumes the immutable plan. Test shared edge/both rooms, interruption,
   duplicate completion, active docking, missing contract, recovery availability,
   and accessible starter/wreck acquisition through the live path.
 - [ ] Run P17/catalog/P09/P12/P13/P16 plus docking/cart/component/socket/nav/loader
-  regressions. Synthetic safety dictionaries do not satisfy FC-19 acceptance.
+  regressions. Run the foundation catalog/query checks before shared integration.
+  Synthetic safety dictionaries and the foundation slice do not satisfy FC-19
+  acceptance.
 
 **Assertion:** ordinary `repair()` still leaves a destroyed wall destroyed;
 `evaluate_replace` allows only its exact paid same-module candidate when the

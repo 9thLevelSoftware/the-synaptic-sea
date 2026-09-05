@@ -157,6 +157,11 @@ save/load or repeated callbacks.
 - Validate replacement type/footprint/sockets, actor/cargo overlap, docking portal
   occupancy, and required egress. Do not build through a player, cart, component,
   or active docking connection. A blocked completion spends no materials.
+  ADR-0065 sections 3A/3B define the P17 foundation: canonical authored physical
+  profiles and exact isolated candidate shape queries. These preparatory checks
+  do not satisfy FC-19 until real scene bindings, existing-world clearance and
+  registered exit/connection routes are verified. Interaction radii and imported
+  visual bounds never authorize structural placement.
 - A successful replacement restores geometry, collision, navigable edge state,
   atmosphere enclosure, component-slot availability, and structural health as one
   committed operation. Intact restoration must close the hole it replaces.

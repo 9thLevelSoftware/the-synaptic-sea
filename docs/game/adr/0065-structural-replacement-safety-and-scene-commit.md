@@ -193,6 +193,70 @@ A monotonically changing, session-local safety revision and P13 binding/target
 revision bind the plan. Scene nodes, physics RIDs and safety snapshots are never
 serialized.
 
+#### 3A. Explicit physical-volume authority
+
+`data/physics/runtime_physical_volume_profiles.json` is the sole runtime
+authority for cart, floor-drop, and mounted-component gameplay solids used by
+P17. Each strict row owns its shape kind, dimensions, local transform, collision
+layer/mask, and blocking purposes. Runtime may not infer dimensions from an
+interaction radius, marker or imported mesh, visual bounds, or a default. The
+collision-free imported-visual boundary remains unchanged.
+
+The initial rounded gameplay boxes, in metres as width, height, depth, are:
+
+| Profile | W | H | D | Placement |
+|---|---:|---:|---:|---|
+| cart | 0.75 | 0.56 | 0.50 | floor |
+| floor_drop | 0.35 | 0.25 | 0.35 | floor, local Y 0.20 |
+| air_recycler | 0.80 | 0.56 | 0.60 | authored mount |
+| conduit | 0.30 | 1.00 | 0.22 | authored mount |
+| console_generic_wall | 0.60 | 0.54 | 0.34 | wall |
+| console_generic_deck | 0.60 | 0.54 | 0.34 | deck |
+| hull_plating | 1.00 | 1.00 | 0.08 | wall |
+| locker_wall | 0.60 | 0.75 | 0.34 | wall |
+| machinery_block | 0.80 | 0.90 | 0.60 | authored mount |
+| nav_console | 0.90 | 0.71 | 0.36 | authored mount |
+| pump | 0.40 | 0.52 | 0.40 | authored mount |
+| reactor_console | 0.60 | 0.75 | 0.35 | authored mount |
+| sensor_rack | 0.40 | 0.78 | 0.28 | authored mount |
+| thruster_control | 0.68 | 0.48 | 0.37 | authored mount |
+
+Except for `floor_drop`, a floor/deck profile uses local Y equal to half its
+height and local Z zero. A wall profile uses local Y equal to half its height and
+local Z equal to half its depth toward the registered interior normal. The two
+console variants prevent runtime wall/deck inference. The current project layer
+inventory uses only layer bit 1. The foundation reserves layer bit 2 with mask 0
+for passive physical projections; the isolated candidate body uses private-space
+layer bit 1. A later player-motion slice must explicitly add projection bit 2 to
+the player mask together with swept cart behavior. These initial dimensions
+require real scene clearance verification; they are not illustrative fixture
+boxes or a final-art acceptance claim.
+
+The foundation slice adds only the strict catalog, primitive builder, and exact
+query helper. It does not add or change cart movement. A later cart integration
+may make the projection block player motion only after it specifies deterministic
+swept/clamped push-follow, actor/cart exclusions, and blocked-motion behavior.
+Until then it may provide truthful scene-owned obstruction geometry for P17
+queries without claiming push physics.
+
+#### 3B. Incremental candidate query and base-world clearance
+
+P17 creates one private `PhysicsServer3D` space containing only the detached
+candidate wrapper's exact authored shapes on a dedicated query layer. It uses
+`PhysicsDirectSpaceState3D.intersect_shape()` for blocker overlap and
+`cast_motion()` for continuous capsule sweep with zero margin. The query preserves
+shape rotation and local offset and cleans every temporary RID. A missing direct
+state returns pending/unsupported through the stable P13 token/context
+revalidation path; it never falls back to AABBs or sampled points.
+
+This private query proves only obstruction newly introduced by the candidate.
+Every accepted route must also pass an independent existing-world clearance
+query against authoritative unchanged solids, closed portals, and dynamic
+blockers, excluding only the attending actor's own body and the destroyed
+target's already-disabled shapes. Candidate safety is the conjunction of pure
+candidate topology, existing-world clearance, and candidate-only continuous
+sweep. No candidate-only result may be described as full path clearance.
+
 ### 4. Docking and registered exits
 
 Every boarding/docking port used by production receives stable authored identity:
@@ -202,6 +266,8 @@ Every boarding/docking port used by production receives stable authored identity
 - stable `target_module_id`, structural module kind and `structural_edge_key`
   when the endpoint is edge-owned;
 - endpoint ID and local/world transform;
+- distinct `threshold_nav_node_id` and `interior_nav_node_id`, each resolving a
+  real clearance-sized point rather than near-identical samples of one location;
 - type, size and current condition/usable state.
 
 The loader registers the existing production `DockPorts` position/facing once
@@ -221,8 +287,28 @@ denied. Replacement never auto-undocks a ship.
 Egress is evaluated against the candidate result, not only the destroyed scene
 before replacement. The candidate must provide a path from the attending actor
 to at least one registered boarding/airlock endpoint that is usable in the
-candidate state, and it must preserve the path on both ends of every active
-docking connection.
+candidate state.
+
+Before candidate evaluation, the scene snapshot freezes one connected-side
+obligation for each endpoint side of every active docking connection. A usable
+endpoint record must resolve distinct stable threshold and interior anchors. The
+interior anchor is the deterministic first authored navigation node strictly
+inside the owning ship beyond the endpoint-owned edge/footprint. It must have a
+traversable neighbor other than the threshold, and the baseline path must contain
+at least one real graph edge and separate the two world points by at least the
+current traversal-capsule diameter. The existing-world authority must prove
+continuous clearance along that path into the ship's interior route network.
+Missing, ambiguous, near-identical, dead-end, or disconnected anchors on an
+endpoint marked usable make live safety unsupported; they do not erase the
+obligation. The candidate must retain the same stable threshold-to-interior
+anchor path on each previously usable side.
+
+This preserves the path on both connected ships without requiring every docking
+endpoint to be reachable from the attending actor. An endpoint that was already
+sealed or unusable creates no preservation obligation, but it cannot satisfy the
+actor's candidate exit rule. Replacing the exact module or edge that owns either
+side of an active connection remains `active_dock_connection` and never
+auto-undocks the ships.
 
 A target may itself restore a registered exit from unusable to usable. Therefore
 having no usable exit before work does not automatically reject the replacement;
@@ -232,8 +318,10 @@ candidate result has no usable registered exit, preflight returns
 path so the rule cannot deadlock the feature.
 
 `ShipNavGraph` gains a pure candidate-path query over copied topology and explicit
-endpoint IDs. P17 uses it for policy. The scene preflight repeats the check using
-the candidate collision result. Neither path query mutates the live graph.
+stable threshold/interior endpoint anchors. P17 uses it for policy. The scene
+preflight separately checks existing-world clearance and candidate-only
+continuous collision sweep for each returned segment. Neither path query mutates
+the live graph.
 
 ### 6. P18 APPLYING/finalize scene lifecycle
 
@@ -304,6 +392,11 @@ schema and never serialize scene handles.
 - P17's production scope is larger than its original brief: it needs a read-only
   scene preflight, exact loader/port/endpoint identity, docking relationship
   fields, a candidate path query and narrow coordinator request wiring.
+- P17 first lands a bounded foundation slice for the canonical physical-volume
+  catalog, primitive builder, and private candidate-only query. The existing P17
+  card remains the sole FC-19 owner and cannot claim FC-19 from foundation proof.
+  Cart/drop/component/dock/coordinator integration follows in separately reviewed
+  windows after shared P10/P13 source ownership is released.
 - P18's scope must include the P12 staged-token callback extension.
 - P18 staging is an explicit asynchronous preparation state outside synchronous
   P12 commit. Pending/failed preparation retains READY escrow; a commit receipt
