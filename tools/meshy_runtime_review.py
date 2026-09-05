@@ -1280,15 +1280,28 @@ def _load_runtime_inputs(
             raise ReviewError("generation identity is not bound to the task")
         if generation.get("contract_artifact_sha256") != hashlib.sha256(task_contract_raw).hexdigest():
             raise ReviewError("generation contract artifact is not bound")
-        caller = load_contract(contract_path) if contract_path is not None else task_contract_model
+        if contract_path is not None:
+            caller = load_contract(contract_path)
+            caller_label = "caller contract"
+        else:
+            # Re-verification has no CLI contract argument, but a project-local
+            # canonical contract is still an authenticated source hash for the
+            # dual-hash task format (artifact hash != source snapshot hash).
+            canonical_contract_path = (
+                root / "data" / "asset_generation" / "contracts" / (task_contract_model.asset_id + ".json")
+            )
+            if canonical_contract_path.is_file():
+                _reject_symlink(canonical_contract_path, "canonical contract")
+                caller = load_contract(canonical_contract_path)
+                caller_label = "canonical contract"
+            else:
+                caller = task_contract_model
+                caller_label = "task-local contract"
         if caller.snapshot_bytes() != task_contract_model.snapshot_bytes():
             raise ReviewError("caller contract does not match task-local contract")
-        if contract_path is not None and generation.get("contract_sha256") != caller.sha256:
-            raise ReviewError("generation contract hash is not bound to caller contract")
-        if contract_path is None:
-            if generation.get("contract_sha256") != task_contract_model.sha256:
-                raise ReviewError("generation contract hash is not bound to the task-local contract")
-        bound_contract_hash = task_contract_model.sha256
+        if generation.get("contract_sha256") != caller.sha256:
+            raise ReviewError("generation contract hash is not bound to " + caller_label)
+        bound_contract_hash = caller.sha256
         cleaned = candidate_review._governed_artifact(root, resolved_task, "cleaned.glb")
         r4_path = candidate_review._governed_artifact(root, resolved_task, "blender-validation.json")
         cleaned_info = cleaned.lstat()

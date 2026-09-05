@@ -668,6 +668,34 @@ def test_reverification_without_caller_source_contract_remains_fail_closed_for_d
         review._load_runtime_inputs(project_root, None, task_dir)
 
 
+def test_reverification_without_caller_contract_accepts_authenticated_dual_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, task_dir, source_contract, _task_contract = _bound_dual_hash_runtime_fixture(tmp_path)
+    source_path = project_root / "data/asset_generation/contracts/fixture_triangle.json"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(
+        json.dumps(source_contract.document, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
+    )
+    report = validate_cleaned_glb(task_dir / "cleaned.glb", source_contract, task_id=task_dir.name)
+    report["blender_reimport_passed"] = True
+    (task_dir / "blender-validation.json").write_bytes(canonical_json_bytes(report))
+
+    def fake_reimport(glb_path: Path, expected_triangles: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            sha256=review.governance.file_sha256(glb_path),
+            byte_size=glb_path.stat().st_size,
+            triangle_count=expected_triangles,
+        )
+
+    monkeypatch.setattr(validate_module, "_reimport_with_blender", fake_reimport, raising=False)
+    monkeypatch.setattr(validate_module, "_reimport_with_blender_process", fake_reimport, raising=False)
+    inputs, _review, generation, _root = review._load_runtime_inputs(project_root, None, task_dir)
+
+    assert generation["contract_sha256"] == source_contract.sha256
+    assert inputs.contract_hash == source_contract.sha256
+
+
 def test_reverification_without_caller_contract_rejects_forged_generation_hash(
     tmp_path: Path,
 ) -> None:
