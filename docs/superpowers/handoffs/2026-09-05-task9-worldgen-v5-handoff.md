@@ -2,13 +2,24 @@
 
 Date: 2026-09-05
 
-## Pause directive
+## Resume directive — supersedes the historical pause
 
-Christopher requested that work stop and be handed to another developer for review. No Task 10–15 implementation should begin until a developer reviews this document and explicitly resumes the Kanban chain.
+Christopher explicitly resumed work: “Please disregard all of the spam above and resume work on correcting issues and completing the synaptic sea asset creation and refinement pipeline.” The historical pause and stop statements below describe the earlier handoff, not current instructions. Resume the existing Task 9 review → Task 10–15 chain without reimplementing verified work or creating duplicate pipeline cards. The live ten-file Task 9 plan and three-argument `validate_part(instance, part_id, entry)` contract supersede stale five-file/two-argument card text. Preserve independent review, source/provenance checks, visual acceptance, and the separate promotion gate.
 
-At the time of this handoff:
+### Resume verification
 
-- No Kanban task is `running` or `ready`.
+- Tested HEAD: `e1b7d91601a007fd4faa1a220d768edf3304c697`; no technical-source changes during the run.
+- Fresh canonical full bundle: exit `0`, exactly `658` executed headings in documented order, one emitted `SYNAPTIC_SEA REGRESSION PASS commands=658 clean_output=true` marker. The unchanged runner enforces its existing per-label diagnostic allowlist.
+- Runner SHA-256: `76c2b4de173027208b236438bd1db7d3af22db8f852eb19653e2484f9be27b87`; combined output/trace SHA-256: `a2331974bc1575a7fe0a66234f1afe0f089f4b9ae4ff38550693f6138e7f3860`.
+- Evidence directory: `/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/synaptic-fresh-658-zs1p5vlo/` (`canonical.sh`, `full.log`, `result.json`); retain these as Task 9 attachments. Bash 3.2 puts the execution trace in the combined log, not `trace.log`.
+- Separate fresh wrapper/assembly/gait/manager/detection/behavior/AI checks pass with no diagnostics; the selected Meshy boundary suites pass `263` tests. Independent read-only review confirms Task 9's exact ten-file commit/ancestry and the already-committed archetype-tuning fix `34a30755`.
+- Broader Meshy/biomass Python run: `656 passed, 5 failed`. The five failures are legacy loot real-Blender cases that stop at missing private task-local `raw.glb`; they are not a clean pass. Repair is isolated in `t_cd275951`, independently reviewed by `t_812d51b6`, then integrated serially by `t_e274ae71` before Task 15. Do not expand Task 10's scope or fabricate generation records to hide these failures.
+- The historical `/tmp/synaptic-sea-regression-658-final-09eb.log` no longer matches the digest recorded below. Its ordered labels/markers and diagnostic allowlists were audited, but that does not restore its old provenance. Use the fresh evidence above for current gating.
+- Task 10 source-manifest prose now distinguishes the `generation.json` file digest from the raw artifact hash/byte size; schema field names and provenance ownership remain unchanged.
+
+### State at the historical pause
+
+- No Kanban task was `running` or `ready`.
 - The implementation worktree was clean at the technical freeze.
 - The feature branch and remote branch were byte-identical at technical implementation snapshot `09eb258486adeede012eaeba7017a1ff53607a8a`.
 - The only planned descendant of that snapshot is the commit adding this handoff document; it must change no other path.
@@ -291,6 +302,8 @@ Commit `73851214` (`test: isolate co-located hazard dispatch smokes`) follows `3
 Commit `65a13021` (`test: align survival speed gate with continuous curve`) follows `73851214` with exactly `scripts/validation/main_playable_survival_stakes_smoke.gd`. It retires the stale fixed `0.5 * move_speed` expectation and calculates expected speed from `move_speed * vitals_state.get_movement_speed_multiplier()`, requiring that value to remain positive, be below full speed, and match `player.get_effective_move_speed()` within tolerance; the frozen `gate_half=true` marker name remains unchanged for regression compatibility, as do the incapacitation lock and death-path checks. Bounded read-only spec review `deleg_a61a6423` inspected exactly `65a13021` against `73851214` and returned `VERDICT: PASS` without findings. `65a13021` is an ancestor of `09eb2584`, and a fresh parent run at current handoff HEAD passes with zero Godot diagnostics. This is a valid first-stage source-spec approval; it is not represented as a separate code-quality verdict.
 
 Commit `5b783998` (`test: use deferred spatial audio sentinel`) follows `65a13021` with exactly `scripts/validation/audio_spatial_playback_smoke.gd`. The old fallback sentinel `sfx.door.open` had gained a real `door_open.wav` stream, so the test now uses `sfx.tool.use`: an event that remains present in the authoritative `AudioEventSeam` catalog but intentionally has deferred content absent from `AudioManager.STREAM_CATALOG`. The gate still requires allocation and spatial positioning of its pooled player while asserting `stream == null` and `playing == false`; the real-stream `sfx.tool.pickup` and production corpse-loot pickup-position proofs remain unchanged. Bounded read-only spec review `deleg_6e3ff2f2` inspected exactly `5b783998` against `65a13021` and returned `VERDICT: PASS` without findings. `5b783998` is an ancestor of `09eb2584`, and a fresh parent spatial-audio run at current handoff HEAD passes with zero Godot diagnostics. This is a valid first-stage source-spec approval; it is not represented as a separate code-quality verdict.
+
+Commit `d84137d1` (`fix: support Python 3.9 architecture renders`) follows `5b783998` with exactly `tools/validate_architecture_diagrams.py`. It replaces Python-3.10-only `Path.write_text(..., newline="\n")` with `Path.open("w", encoding="utf-8", newline="\n")` plus `handle.write(...)`, preserving deterministic LF Mermaid source while restoring Python 3.9 compatibility. Bounded read-only spec review `deleg_b3b3e4e8` inspected exactly `d84137d1` against `5b783998` and returned `VERDICT: PASS` without findings. `d84137d1` is an ancestor of `09eb2584`; parent verification explicitly ran `/usr/bin/python3` 3.9.6 at current handoff HEAD and produced `ARCHITECTURE DIAGRAMS PASS diagrams=5 exports=5 references=49` with a clean tree. This is a valid first-stage source-spec approval; it is not represented as a separate code-quality verdict.
 
 ## Recommended developer review
 

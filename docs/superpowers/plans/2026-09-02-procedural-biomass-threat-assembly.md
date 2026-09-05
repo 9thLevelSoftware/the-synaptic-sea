@@ -1357,7 +1357,10 @@ unknown fields are permitted):
 
 `raw_source`, `archive`, `preview_glb`, and `cleaned_glb` are closed objects exactly
 `{path, sha256, byte_size}`. In the source manifest, `raw_source` is task-local and `archive`
-is the exact external evidence leaf; their hashes and sizes equal `generation_sha256`.
+is the exact external evidence leaf; both artifact hashes and byte sizes must match the
+raw-output artifact hash and byte size bound by the selected `generation.json` record.
+`generation_sha256` is instead the SHA-256 of the exact regular `generation.json` file;
+it must not be confused with the raw GLB digest or compared with a byte count.
 `preview_glb` has the same shape. The recipe's `cleaned_glb` is task-local `cleaned.glb`.
 `renders` is an exact map of `front.png`, `side.png`, `three_quarter.png`,
 `socket_overlay.png`, and `contact_sheet.png` to `{sha256, byte_size, width, height}`.
