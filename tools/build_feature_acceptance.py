@@ -246,8 +246,10 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         f"{VALIDATION}fc_p08_smoke.gd", f"{VALIDATION}fc_p07_smoke.gd",
     ],
     "P09": [
+        "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
         "data/recipes/recipe_definitions.json", "data/materials/material_definitions.json",
-        "data/items/item_definitions.json", "data/items/loot_tables.json", COMPONENT_CATALOG,
+        "data/items/item_definitions.json", "data/items/loot_tables.json",
+        "data/items/quality_effects.json", COMPONENT_CATALOG,
         "tools/check_crafting_economy.py", "tests/test_crafting_economy.py",
         "scripts/tools/crafting_station.gd", "scripts/ui/recipe_picker_panel.gd", COORDINATOR,
         f"{VALIDATION}fc_p09_smoke.gd",

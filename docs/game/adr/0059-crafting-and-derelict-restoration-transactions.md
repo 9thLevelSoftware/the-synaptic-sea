@@ -122,6 +122,22 @@ and cross-ship mutations. Existing saves and module-based generation must surviv
     work only after explicit owner/target revalidation and rebinding to the current
     generation.
 
+16. Recipe-economy closure uses authored identities and quantity balance. Similar
+    IDs are never implicit aliases. A crafted tool may satisfy timed work only
+    through an action-specific compatibility row; the coordinator selects the
+    concrete compatible lot while WorkActionState continues to validate the
+    work-action catalog's required class. This preserves lot quality as the effect
+    source without making every item in one broad tool class satisfy every verb.
+    Component inventory forms are explicit item definitions whose weight matches
+    the component catalog mass. Repair `plating` and mountable `plating_plate`
+    remain distinct and are connected by an authored one-way conversion. Economy
+    validation computes fixed-point acquisition through real bootstrapped sources
+    and reports every zero-power conversion group. It rejects only a proven firing
+    combination with no net item deficit and a positive item gain; neutral cycles
+    remain valid and visible. Production systems such as hydroponics and water
+    recycling count only when their actual input, system, power, seed and station
+    prerequisites are reachable.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are

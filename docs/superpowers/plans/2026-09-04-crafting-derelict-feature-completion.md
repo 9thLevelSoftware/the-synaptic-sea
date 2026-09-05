@@ -598,7 +598,9 @@ returns zero transferred and retains every lot.
 ### P09 — Complete recipe economy, queue UX and acquisition routes
 
 **Depends:** P05-P08. **Requirements:** FC-10..11.
-**Allowed files:** recipe/material/item/loot/component catalogs; new
+**Allowed files:** recipe/material/item/loot/component catalogs;
+`data/items/quality_effects.json`; ADR-0059 action-specific tool-compatibility
+and economy-cycle addendum; new
 `tools/check_crafting_economy.py`, `tests/test_crafting_economy.py`;
 `crafting_station.gd`, `recipe_picker_panel.gd`, coordinator input seams;
 new `fc_p09_smoke.gd`. **Non-goals:** expanding recipe count as a success metric.
