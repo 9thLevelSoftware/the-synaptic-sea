@@ -304,6 +304,11 @@ The reviewed P00 current-objective fixture migration also permits
 `bridge_07:reach_goal`, and align the documented runtime-demo marker count from 4/4 to
 1/1. This is fixture/assertion maintenance only and changes no production
 generation or objective behavior.
+The same reviewed fixture migration permits
+`scripts/validation/procgen_loader_playable_contract_smoke.gd` only: assert the
+current `149ed476` one-objective `bridge_07:reach_goal` fixture contract and its
+225 collision, 70 edge, and 52 floor markers. This adds no production behavior
+and does not alter the canonical bundle.
 **Non-goals:** unrelated
 gameplay edits, blanket reimport churn or installs.
 

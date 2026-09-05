@@ -176,6 +176,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/validation/procgen_golden_parity_smoke.gd",
         "scripts/validation/procgen_layout_stress_smoke.gd",
         "scripts/validation/procgen_playable_ship_smoke.gd",
+        "scripts/validation/procgen_loader_playable_contract_smoke.gd",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
         "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
         "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
