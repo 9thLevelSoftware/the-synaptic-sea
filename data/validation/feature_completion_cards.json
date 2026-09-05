@@ -3148,18 +3148,18 @@
         },
         {
           "path": "scripts/systems/runtime_physical_volume_catalog.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/systems/runtime_physical_volume.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/systems/structural_rebuild_collision_query.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/systems/work_action_catalog.gd",
@@ -3228,8 +3228,8 @@
         },
         {
           "path": "data/physics/runtime_physical_volume_profiles.json",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tools/check_structural_rebuild_catalog.py",
@@ -3243,13 +3243,13 @@
         },
         {
           "path": "tools/check_runtime_physical_volume_catalog.py",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tests/test_runtime_physical_volume_catalog.py",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tools/classify_orphan_smokes.sh",
@@ -3283,13 +3283,13 @@
         },
         {
           "path": "scripts/validation/runtime_physical_volume_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/validation/structural_rebuild_collision_query_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],
