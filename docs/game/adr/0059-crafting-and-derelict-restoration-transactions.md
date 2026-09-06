@@ -464,10 +464,15 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     edge and rejected missing-witness and relocated/mobile cases through
     `SaveLoadService`, rather than calling the initializer with an arbitrary
     anchor.
-42. `last_attack_result` is either exactly empty (no attack receipt) or the
-    production weapon-hit receipt with its required String, Boolean, finite
-    numeric, integral-ammunition, and armor-profile field types; unknown keys or
-    coercible wrong types reject. Successful manager application clears
+42. `last_attack_result` is either exactly empty (no attack receipt), the exact
+    incoming-damage receipt produced by `ThreatManager.tick` through
+    `DamagePipeline.apply_to_vitals`, or the exact weapon-hit receipt produced by
+    `ThreatManager.attack_with_weapon` through `DamagePipeline.apply_to_threat`.
+    Both production receipt variants require exact String identity, finite
+    numeric, and complete armor-profile field types; the weapon-hit extension
+    additionally requires exact Boolean success, String weapon/target/ammunition
+    identity, finite stun duration, and integral ammunition count. Unknown keys
+    or coercible wrong types reject. Successful manager application clears
     `engaged_los`; rejected application preserves it. The lethal ranged restore
     proof invokes `PlayableGeneratedShip._on_threat_killed` with the restored
     manager receipt and observes the production training/progression callback:
