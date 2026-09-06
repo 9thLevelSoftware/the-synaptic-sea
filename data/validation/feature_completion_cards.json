@@ -1693,6 +1693,16 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/fc_p09_natural_route_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/recipe_resource_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/validation/recipe_picker_panel_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -1703,8 +1713,13 @@
           "scope_state": "present"
         }
       ],
-      "scope_decisions_pending": [],
-      "non_goals": "Recipe count as a completion metric.",
+      "scope_decisions_pending": [
+        "R04 may propose a minimal balance or authored-progression change only after normal-control evidence demonstrates a specific broken link; root owns that ruling.",
+        "Full production-source closure is deferred until reviewed R03/R11 integration; R04 records exact source hashes and reachable-route limits.",
+        "R07 machinery-condition review retires old donor-healing assumptions; R04 must observe only current intended station/system benefit.",
+        "Every P09 Godot body uses the hardened feature-completion runner, which first runs the accepted FC P10 USER DATA PROBE PASS containment check with all four owned-home variables."
+      ],
+      "non_goals": "Recipe count as a completion metric; arbitrary loot or balance additions from a sampled absence; injected inventory, force repair, teleport, direct skill mutation, or snapshot seeding as natural-path evidence; retired donor healing; unproven low-repair-class softlock claims; editor/import/plugin launch; or early full-source pinning.",
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P09 --evidence-dir artifacts/feature-completion/P09",
@@ -1712,6 +1727,20 @@
             "exit_code": 0,
             "required_output": [
               "FC P09 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p09_natural_route_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P09 NATURAL ROUTE PASS"
             ],
             "forbidden_output": [
               "ERROR:",
@@ -2421,7 +2450,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P10",
-        "line": 695
+        "line": 725
       }
     },
     {
@@ -2657,7 +2686,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 882
+        "line": 912
       }
     },
     {
@@ -2893,7 +2922,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 929
+        "line": 959
       }
     },
     {
@@ -3059,7 +3088,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 973
+        "line": 1003
       }
     },
     {
@@ -3326,7 +3355,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 1021
+        "line": 1051
       }
     },
     {
@@ -3445,7 +3474,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 1062
+        "line": 1092
       }
     },
     {
@@ -3538,7 +3567,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 1084
+        "line": 1114
       }
     },
     {
@@ -3818,7 +3847,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 1109
+        "line": 1139
       }
     },
     {
@@ -3953,7 +3982,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 1245
+        "line": 1275
       }
     },
     {
@@ -4091,7 +4120,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1277
+        "line": 1307
       }
     },
     {
@@ -4238,7 +4267,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1305
+        "line": 1335
       }
     },
     {
@@ -4324,7 +4353,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1327
+        "line": 1357
       }
     },
     {
@@ -4417,7 +4446,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1351
+        "line": 1381
       }
     },
     {
@@ -4543,7 +4572,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1373
+        "line": 1403
       }
     },
     {
@@ -4666,7 +4695,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1398
+        "line": 1428
       }
     }
   ]

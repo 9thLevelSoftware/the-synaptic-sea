@@ -659,14 +659,28 @@ tool context actually consumed at successful action start, alongside its frozen
 quality multiplier. Reset it with the driver's action lifecycle; this adds no
 second escrow authority or persistence schema. Verify that projection through
 real timed weld/cut progress and terminal consequences, not helper selection alone;
-new `fc_p09_smoke.gd`; `fc_p05_smoke.gd` tool-consumer regression only;
+new `fc_p09_smoke.gd` and new `fc_p09_natural_route_smoke.gd` for the
+Title-origin normal-control acquisition proof; `fc_p05_smoke.gd` tool-consumer regression only;
 `recipe_picker_panel_smoke.gd` for explicit station-owner adapters, visible queue,
 power and pending-output status, and missing/foreign/stale-owner denial. The panel
 fixture supplements the real coordinator/player journey in `fc_p09_smoke.gd`.
 `fc_p12_smoke.gd` is allowed only for the P09-compatible max-stack-one
 `console_unit` reentrant setup; it must preserve the P12 exact refund and
 duplicate-completion assertions.
-**Non-goals:** expanding recipe count as a success metric.
+R04 additionally permits the existing `recipe_resource_smoke.gd` as a catalog
+regression. Every P09 Godot body must be launched by the hardened
+`run_feature_completion.py` runner, whose accepted `fc_p10_process_smoke.gd`
+probe establishes the four-variable owned-home containment first; neither the
+probe nor fixture injection is P09 behavior evidence. R04 does not add new
+gameplay seams unless a reviewed, demonstrated broken acquisition edge requires
+one.
+**Non-goals:** expanding recipe count as a success metric; arbitrary loot or
+balance additions because a sampled route lacks an item; validation-stock,
+force-repair, teleport, direct skill-dictionary mutation, or snapshot seeding
+as natural-path evidence; claiming retired donor-healing behavior as an R04
+benefit; changing selectable-class repair balance before an authored route is
+shown missing; editor/import/plugin launch; or pinning full production source
+closure before the reviewed R03/R11 integration boundary.
 
 P09 also permits owner-explicit physical station construction and attach/occupancy
 binding in the coordinator. Keep each station alive under its actual attached
@@ -691,6 +705,22 @@ and that reference. Real away-station and remote-home denial proof is required.
 
 **Assertion:** a cold run can acquire every mandatory opening repair input; optional
 advanced recipes require attainable knowledge/tier upgrades, not circular prerequisites.
+
+**R04 governance checkpoint (2026-09-05):** FC-10 acquisition proof starts at
+Title New Game on the authored `coherent_ship_001` slice. It records the exact
+searched container origin and resulting lot, obtains recipe knowledge through
+inventory Use, and drives the physical station picker, paid job, collection and
+ordinary output consumer. Existing P09 fixture injection and force-repair
+coverage remains valid for negative/model cases but cannot certify this route.
+The preserved titanium path is `thruster_nozzle` or `plasma_cutter` through the
+skill-1 salvage workbench into `titanium_ingot`; a missing sampled roll is not
+authorization to add loot. The advanced route must prove `plating` to
+`plating_plate` and its real installation/repair consumer. Default Engineer
+repair 3 meets the opening nav-linkage repair-2 gate; low-repair selectable
+classes remain an explicit authored-progression audit, not an assumed softlock.
+Every Godot body uses the accepted fresh owned-home containment probe first and
+records command, environment, output, diagnostics and source hashes. Root owns
+balance rulings and the runtime release.
 
 ### P10 — Migrate and persist crafting at transaction boundaries
 

@@ -129,7 +129,7 @@ CARD_NON_GOALS = {
     "P06": "A separate metaprogression system or hundreds of recipes.",
     "P07": "Queue UI or station-power rebalancing.",
     "P08": "Infinite hidden player storage.",
-    "P09": "Recipe count as a completion metric.",
+    "P09": "Recipe count as a completion metric; arbitrary loot or balance additions from a sampled absence; injected inventory, force repair, teleport, direct skill mutation, or snapshot seeding as natural-path evidence; retired donor healing; unproven low-repair-class softlock claims; editor/import/plugin launch; or early full-source pinning.",
     "P10": "Save filename changes, historical-data deletion, default-profile cleanup, comparison epsilon, new ignored fields, generalized oxygen normalization, combat-schema weakening, editor/import/plugin launch, or unrelated P09/P17/catalog/navigation behavior.",
     "P11": "Timing changes before P12 or synthetic replacement slots.",
     "P12": "Replacing the interaction system.",
@@ -145,6 +145,15 @@ CARD_NON_GOALS = {
     "P22": "Substituting headless helper calls for player evidence.",
     "P23": "Completion claims for uninspected domains.",
     "P24": "Publishing, purchasing services, or enabling cloud integrations.",
+}
+
+CARD_SCOPE_DECISIONS = {
+    "P09": [
+        "R04 may propose a minimal balance or authored-progression change only after normal-control evidence demonstrates a specific broken link; root owns that ruling.",
+        "Full production-source closure is deferred until reviewed R03/R11 integration; R04 records exact source hashes and reachable-route limits.",
+        "R07 machinery-condition review retires old donor-healing assumptions; R04 must observe only current intended station/system benefit.",
+        "Every P09 Godot body uses the hardened feature-completion runner, which first runs the accepted FC P10 USER DATA PROBE PASS containment check with all four owned-home variables."
+    ],
 }
 
 CARD_CONTRACTS = {
@@ -309,6 +318,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/systems/work_action_driver.gd",
         "scripts/tools/crafting_station.gd", "scripts/ui/recipe_picker_panel.gd", COORDINATOR,
         f"{VALIDATION}fc_p09_smoke.gd", f"{VALIDATION}fc_p05_smoke.gd",
+        f"{VALIDATION}fc_p09_natural_route_smoke.gd",
+        f"{VALIDATION}recipe_resource_smoke.gd",
         f"{VALIDATION}recipe_picker_panel_smoke.gd",
         f"{VALIDATION}fc_p12_smoke.gd",
     ],
@@ -524,7 +535,7 @@ CARD_SMOKES = {
     "P06": ["crafting_recipe_list_smoke.gd", "main_playable_slice_recipe_picker_smoke.gd"],
     "P07": ["crafting_state_smoke.gd", "station_state_smoke.gd", "fc_p06_smoke.gd"],
     "P08": ["main_playable_slice_station_craft_smoke.gd", "main_playable_slice_salvage_picker_smoke.gd"],
-    "P09": ["recipe_resource_smoke.gd", "recipe_picker_panel_smoke.gd"],
+    "P09": ["fc_p09_natural_route_smoke.gd", "recipe_resource_smoke.gd", "recipe_picker_panel_smoke.gd"],
     "P10": [
         "fc_p13_smoke.gd", "save_migration_service_smoke.gd",
         "save_migration_world_smoke.gd", "save_load_service_smoke.gd",
@@ -1630,7 +1641,7 @@ def build_card_manifest(root: Path = ROOT) -> dict[str, Any]:
                 }
                 for path in CARD_ALLOWLISTS[card_id]
             ],
-            "scope_decisions_pending": [],
+            "scope_decisions_pending": CARD_SCOPE_DECISIONS.get(card_id, []),
             "non_goals": CARD_NON_GOALS[card_id],
             **({"contract": CARD_CONTRACTS[card_id]} if card_id in CARD_CONTRACTS else {}),
             "verification": _verification(card_id, root),

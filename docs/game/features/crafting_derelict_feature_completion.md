@@ -240,6 +240,12 @@ registers them in `05_requirements.md` and resolves conflicts before code change
 | FC-23 | Every active designed system passes its own player acceptance criteria | Whole-game domain closure review |
 | FC-24 | Core loop works in an offline native export without dev tools | Clean-machine exported-build playthrough |
 
+R04 records the existing FC-10 obligations without changing this frozen
+criterion: validate recipe/deconstruction/BOM/knowledge/tier/component edges;
+reject missing IDs, mandatory prerequisite cycles, and sinkless profitable
+cycles; and capture Title-authored starter, donor, and advanced routes through
+normal controls, inventory Use, paid work, collection, and an output consumer.
+
 ## Final player scenarios
 
 Run both seeds 42 and 777 in `breach_field`/`standard`, with home and away branches:

@@ -34,8 +34,8 @@ ADR-0059; registry/card manifest: `inventory/feature_acceptance.json` and
 | FC-07 | Approved, unimplemented | P07 | Paid, identified, station-owned jobs execute once. |
 | FC-08 | Approved, unimplemented | P07/P08 | Power/cancel/retry preserve escrow, progress, quantities. |
 | FC-09 | Approved, unimplemented | P08 | Full destinations never lose output/salvage. |
-| FC-10 | Approved, unimplemented | P09 | Reachable, non-profitable recipe and repair chains. |
-| FC-11 | Approved, unimplemented | P09/P21 | UI exposes choices, costs, quality, queue and blockers. |
+| FC-10 | Approved, unimplemented | P09 | Reachable, non-profitable recipe and repair chains, proved from Title-authored container origins through normal controls. |
+| FC-11 | Approved, unimplemented | P09/P21 | UI exposes choices, costs, quality, queue and blockers through the physical owner-bound station. |
 | FC-12 | Approved, unimplemented | P10 | Old/new saves preserve jobs, knowledge, outputs and quality. |
 | FC-13 | Approved, unimplemented | P11 | Only catalogued compatible parts fit physical slots. |
 | FC-14 | Approved, unimplemented | P12 | Physical work is timed, interruptible, exactly once. |
