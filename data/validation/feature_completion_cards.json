@@ -3327,8 +3327,8 @@
         },
         {
           "path": "scripts/validation/structural_rebuild_candidate_nav_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],

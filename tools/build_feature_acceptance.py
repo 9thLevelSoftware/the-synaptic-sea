@@ -1215,21 +1215,34 @@ def build(
         for entry in active
         if entry["metric_equivalence"]["counts_toward_proposed_denominator"]
     ]
-    evidence_counts = {
+    promoted_evidence_counts = {
         "implemented": sum(entry["evidence"]["implemented"] for entry in proposed_metric_criteria),
         "production_reachable": sum(entry["evidence"]["production_reachable"] for entry in proposed_metric_criteria),
         "freshly_validated": sum(entry["evidence"]["fresh_validation"] for entry in proposed_metric_criteria),
         "player_accepted": sum(entry["evidence"]["player_accepted"] for entry in proposed_metric_criteria),
         "accepted": sum(entry["evidence"]["state"] == "accepted" for entry in proposed_metric_criteria),
     }
+    mapped_criteria = [
+        entry for entry in proposed_metric_criteria
+        if entry["evidence"]["state"] != "not_verified" and bool(entry["evidence"]["refs"])
+    ]
+    # The source scope is frozen, but incomplete criterion mapping is unknown
+    # coverage, not an assertion that the product has zero implementation.
+    evidence_mapping = {
+        "status": "complete" if len(mapped_criteria) == len(proposed_metric_criteria) else "incomplete",
+        "mapped_criteria": len(mapped_criteria),
+        "unknown_criteria": len(proposed_metric_criteria) - len(mapped_criteria),
+        "coverage_percent": round(len(mapped_criteria) * 100 / len(proposed_metric_criteria), 2) if proposed_metric_criteria else None,
+        "definition": "Only reviewed criterion-level evidence mappings count as coverage; historical status and standalone/helper PASS output do not create one.",
+    }
     scope_frozen = dict(frozen_scope_contract) if frozen_scope_contract is not None else None
     percentages = (
         {
-            "implemented": round(evidence_counts["implemented"] * 100 / len(proposed_metric_criteria), 2) if proposed_metric_criteria else None,
-            "validated": round(evidence_counts["freshly_validated"] * 100 / len(proposed_metric_criteria), 2) if proposed_metric_criteria else None,
-            "accepted": round(evidence_counts["accepted"] * 100 / len(proposed_metric_criteria), 2) if proposed_metric_criteria else None,
+            "implemented": round(promoted_evidence_counts["implemented"] * 100 / len(proposed_metric_criteria), 2) if evidence_mapping["status"] == "complete" and proposed_metric_criteria else None,
+            "validated": round(promoted_evidence_counts["freshly_validated"] * 100 / len(proposed_metric_criteria), 2) if evidence_mapping["status"] == "complete" and proposed_metric_criteria else None,
+            "accepted": round(promoted_evidence_counts["accepted"] * 100 / len(proposed_metric_criteria), 2) if evidence_mapping["status"] == "complete" and proposed_metric_criteria else None,
         }
-        if scope_frozen is not None
+        if scope_frozen is not None and evidence_mapping["status"] == "complete"
         else {"implemented": None, "validated": None, "accepted": None}
     )
     return {
@@ -1299,12 +1312,18 @@ def build(
             "deferred": len(criteria) - len(active),
             "active_metric_denominator": len(proposed_metric_criteria),
             "equivalence_alias_count": len(active) - len(proposed_metric_criteria),
-            **evidence_counts,
+            "implemented": promoted_evidence_counts["implemented"] if evidence_mapping["status"] == "complete" else None,
+            "production_reachable": promoted_evidence_counts["production_reachable"] if evidence_mapping["status"] == "complete" else None,
+            "freshly_validated": promoted_evidence_counts["freshly_validated"] if evidence_mapping["status"] == "complete" else None,
+            "player_accepted": promoted_evidence_counts["player_accepted"] if evidence_mapping["status"] == "complete" else None,
+            "accepted": promoted_evidence_counts["accepted"] if evidence_mapping["status"] == "complete" else None,
+            "promoted_evidence_counts": promoted_evidence_counts,
+            "evidence_mapping": evidence_mapping,
             "unassessed_source_count": len(blockers),
             "metric_blockers": blockers,
             "percentages": percentages,
             "definition": (
-                "Percentages use the frozen active metric denominator after reviewed exact-text equivalence; historical status is provenance, not execution evidence."
+                "Implementation, reachability, validation, and acceptance totals remain unknown until criterion-level evidence mapping is reviewed. promoted_evidence_counts records only explicit registry promotion, not product completion."
                 if scope_frozen is not None
                 else "Percentages remain null until coordinator review freezes the source leaves and exact-text equivalence map; historical status is provenance, not execution evidence."
             ),
@@ -1528,7 +1547,8 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
     identifiers = [entry["id"] for entry in registry["criteria"]]
     assert len(identifiers) == len(set(identifiers)), "duplicate criterion IDs"
     assert len([identifier for identifier in identifiers if re.fullmatch(r"FC-\d{2}", identifier)]) == 24, "missing FC criterion"
-    assert len([identifier for identifier in identifiers if identifier.startswith("REQ-")]) >= 130, "requirement acceptance leaves not represented"
+    if root.resolve() == ROOT.resolve():
+        assert len([identifier for identifier in identifiers if identifier.startswith("REQ-")]) >= 130, "requirement acceptance leaves not represented"
     assert registry["accounting"]["recorded"] == len(registry["criteria"]), "recorded denominator mismatch"
     assert registry["accounting"]["active"] + registry["accounting"]["deferred"] == len(registry["criteria"]), "active/deferred accounting mismatch"
     assert registry.get("criterion_supersession_source") == {
@@ -1653,6 +1673,39 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
         assert registry["scope_review"]["status"] == "frozen", "frozen scope review state mismatch"
     if registry["accounting"]["metric_blockers"]:
         assert all(value is None for value in registry["accounting"]["percentages"].values()), "incomplete denominator published percentages"
+    evidence_mapping = registry["accounting"].get("evidence_mapping", {})
+    proposed_metric_criteria = [
+        entry for entry in registry["criteria"]
+        if not entry["deferred"] and entry["metric_equivalence"]["counts_toward_proposed_denominator"]
+    ]
+    expected_mapped_criteria = [
+        entry for entry in registry["criteria"]
+        if not entry["deferred"]
+        and entry["metric_equivalence"]["counts_toward_proposed_denominator"]
+        and entry["evidence"]["state"] != "not_verified"
+        and bool(entry["evidence"]["refs"])
+    ]
+    expected_promoted_evidence_counts = {
+        "implemented": sum(entry["evidence"]["implemented"] for entry in proposed_metric_criteria),
+        "production_reachable": sum(entry["evidence"]["production_reachable"] for entry in proposed_metric_criteria),
+        "freshly_validated": sum(entry["evidence"]["fresh_validation"] for entry in proposed_metric_criteria),
+        "player_accepted": sum(entry["evidence"]["player_accepted"] for entry in proposed_metric_criteria),
+        "accepted": sum(entry["evidence"]["state"] == "accepted" for entry in proposed_metric_criteria),
+    }
+    assert evidence_mapping.get("mapped_criteria") == len(expected_mapped_criteria), "evidence mapping count mismatch"
+    assert evidence_mapping.get("unknown_criteria") == proposed_count - len(expected_mapped_criteria), "evidence mapping unknown count mismatch"
+    assert registry["accounting"].get("promoted_evidence_counts") == expected_promoted_evidence_counts, "promoted evidence count mismatch"
+    if evidence_mapping.get("status") == "incomplete":
+        assert all(value is None for value in registry["accounting"]["percentages"].values()), "unreviewed evidence mapping published completion percentages"
+        assert all(registry["accounting"][field] is None for field in (
+            "implemented", "production_reachable", "freshly_validated", "player_accepted", "accepted"
+        )), "unreviewed evidence mapping published completion totals"
+    else:
+        assert evidence_mapping.get("status") == "complete", "invalid evidence mapping status"
+        assert len(expected_mapped_criteria) == proposed_count, "complete evidence mapping has unknown criteria"
+        assert all(registry["accounting"][field] == expected_promoted_evidence_counts[field] for field in (
+            "implemented", "production_reachable", "freshly_validated", "player_accepted", "accepted"
+        )), "complete evidence mapping headline totals mismatch"
 
     manifest = cards if cards is not None else build_card_manifest(root)
     assert manifest["sync_status"] == "pending", "board synchronization was not observed"

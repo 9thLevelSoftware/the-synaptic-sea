@@ -1516,6 +1516,7 @@ membership changes).
 | `fc_p08_smoke` | standalone-feature-completion |
 | `fc_p09_smoke` | standalone-feature-completion |
 | `fc_p10_smoke` | standalone-feature-completion |
+| `fc_p10_process_smoke` | standalone-feature-completion |
 | `fc_p11_live_smoke` | standalone-feature-completion |
 | `fc_p11_smoke` | standalone-feature-completion |
 | `fc_p12_smoke` | standalone-feature-completion |
@@ -1541,6 +1542,7 @@ membership changes).
 | `sim_vector3_smoke` | promotion-candidate |
 | `runtime_physical_volume_smoke` | standalone-feature-completion |
 | `structural_rebuild_collision_query_smoke` | standalone-feature-completion |
+| `structural_rebuild_candidate_nav_smoke` | standalone-feature-completion |
 | `structural_rebuild_policy_smoke` | standalone-feature-completion |
 | `top_down_harness_smoke` | promotion-candidate |
 | `top_down_readability_harness` | non-headless-harness |

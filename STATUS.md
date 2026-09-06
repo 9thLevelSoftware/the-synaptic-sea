@@ -26,15 +26,17 @@ complete regression run.
 P09 proves crafted quality changes actual timed work. A discovery run using repaired
 travel systems found the genuine schematic lot `loot:-2:-2:1:container_53:000` in
 `salvage_engineering`; the natural schematic and donor acquisition journey remains
-open. P10 has a clean partial scene test covering exact-quality field output through
-two reloads, a revisit, and ordinary collection once; fresh-process, adversarial,
-component-move, and integration checks remain open.
+open. P10 has a clean partial scene test and a retained three-process proof of the
+exact quality/job/receipt wire path through save, load, collection, and reload. Those
+focused proofs do not cover the full P10 matrix; adversarial, component-move, and
+integration evidence still require final source-pinned review.
 
 P17's query and physical-volume helper both pass in the full project. The helper's
 full-project evidence artifact is retained at
 `artifacts/feature-completion/P17-physical-shared-20260905/summary.json`.
-Live cart/component bindings, registered docking routes, candidate navigation, paid
-rebuild application, and end-to-end acceptance remain unfinished.
+Live cart/component bindings, registered docking routes, ownership-bound candidate
+navigation, paid rebuild application, and end-to-end acceptance remain unfinished.
+The separately retained candidate-navigation smoke is pure helper evidence only.
 
 ## Historical milestone: Vertical Slice v1 (as of 2026-08-11)
 

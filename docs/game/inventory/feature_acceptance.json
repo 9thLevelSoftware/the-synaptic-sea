@@ -77,19 +77,33 @@
     "deferred": 11,
     "active_metric_denominator": 622,
     "equivalence_alias_count": 35,
-    "implemented": 0,
-    "production_reachable": 0,
-    "freshly_validated": 0,
-    "player_accepted": 0,
-    "accepted": 0,
+    "implemented": null,
+    "production_reachable": null,
+    "freshly_validated": null,
+    "player_accepted": null,
+    "accepted": null,
+    "promoted_evidence_counts": {
+      "implemented": 0,
+      "production_reachable": 0,
+      "freshly_validated": 0,
+      "player_accepted": 0,
+      "accepted": 0
+    },
+    "evidence_mapping": {
+      "status": "incomplete",
+      "mapped_criteria": 0,
+      "unknown_criteria": 622,
+      "coverage_percent": 0.0,
+      "definition": "Only reviewed criterion-level evidence mappings count as coverage; historical status and standalone/helper PASS output do not create one."
+    },
     "unassessed_source_count": 0,
     "metric_blockers": [],
     "percentages": {
-      "implemented": 0.0,
-      "validated": 0.0,
-      "accepted": 0.0
+      "implemented": null,
+      "validated": null,
+      "accepted": null
     },
-    "definition": "Percentages use the frozen active metric denominator after reviewed exact-text equivalence; historical status is provenance, not execution evidence."
+    "definition": "Implementation, reachability, validation, and acceptance totals remain unknown until criterion-level evidence mapping is reviewed. promoted_evidence_counts records only explicit registry promotion, not product completion."
   },
   "migration_contract": {
     "reserved_run_version": "gate2-current-run-5",

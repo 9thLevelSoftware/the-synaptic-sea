@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tools.build_feature_acceptance import (
     PLAN,
+    PLAN_REL,
     SUPERSESSIONS_REL,
     _digest,
     _natural_requirement_criterion_id,
@@ -464,6 +465,54 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertEqual(len(registry["criteria"]), registry["accounting"]["recorded"])
         self.assertNotIn("source_directory", cards)
 
+    def test_partial_evidence_mapping_keeps_headline_counts_unknown(self):
+        registry = write_registry(self.root)
+        target = next(entry for entry in registry["criteria"] if not entry["deferred"] and entry["metric_equivalence"]["counts_toward_proposed_denominator"])
+        target["evidence"] = {"implemented": True, "production_reachable": True,
+                              "fresh_validation": True, "player_accepted": False,
+                              "state": "verified_scene", "refs": ["artifact://partial"]}
+        self.sources.registry.write_text(json.dumps(registry), encoding="utf-8")
+        rebuilt = build(self.root)
+        accounting = rebuilt["accounting"]
+        self.assertEqual("incomplete", accounting["evidence_mapping"]["status"])
+        self.assertEqual(1, accounting["evidence_mapping"]["mapped_criteria"])
+        self.assertEqual(1, accounting["promoted_evidence_counts"]["implemented"])
+        self.assertEqual(1, accounting["promoted_evidence_counts"]["freshly_validated"])
+        self.assertTrue(all(accounting[field] is None for field in ("implemented", "production_reachable", "freshly_validated", "player_accepted", "accepted")))
+        self.assertTrue(all(value is None for value in accounting["percentages"].values()))
+
+    def test_complete_evidence_mapping_publishes_derived_counts(self):
+        (self.sources.features / "missing_acceptance.md").unlink()
+        registry = write_registry(self.root)
+        frozen = {"frozen_on": "2026-09-05", "source_leaf_set_fingerprint": registry["scope_freeze_candidate"]["source_leaf_set_fingerprint"]}
+        denominator = [entry for entry in registry["criteria"] if not entry["deferred"] and entry["metric_equivalence"]["counts_toward_proposed_denominator"]]
+        for index, entry in enumerate(denominator):
+            entry["evidence"] = {"implemented": index % 2 == 0, "production_reachable": index % 3 == 0,
+                                 "fresh_validation": index % 4 == 0, "player_accepted": index % 5 == 0,
+                                 "state": "accepted" if index % 6 == 0 else "verified_scene", "refs": [f"artifact://{index}"]}
+        self.sources.registry.write_text(json.dumps(registry), encoding="utf-8")
+        rebuilt = build(self.root, frozen_scope_contract=frozen)
+        accounting = rebuilt["accounting"]
+        self.assertEqual("complete", accounting["evidence_mapping"]["status"])
+        self.assertEqual(0, accounting["evidence_mapping"]["unknown_criteria"])
+        self.assertEqual(len(denominator), accounting["evidence_mapping"]["mapped_criteria"])
+        expected = {"implemented": sum(index % 2 == 0 for index in range(len(denominator))), "production_reachable": sum(index % 3 == 0 for index in range(len(denominator))), "freshly_validated": sum(index % 4 == 0 for index in range(len(denominator))), "player_accepted": sum(index % 5 == 0 for index in range(len(denominator))), "accepted": sum(index % 6 == 0 for index in range(len(denominator)))}
+        self.assertEqual(expected, {key: accounting[key] for key in expected})
+        self.assertEqual(expected, accounting["promoted_evidence_counts"])
+        self.assertEqual(round(expected["implemented"] * 100 / len(denominator), 2), accounting["percentages"]["implemented"])
+        self.assertEqual(round(expected["freshly_validated"] * 100 / len(denominator), 2), accounting["percentages"]["validated"])
+        self.assertEqual(round(expected["accepted"] * 100 / len(denominator), 2), accounting["percentages"]["accepted"])
+        plan = self.root / PLAN_REL
+        plan.parent.mkdir(parents=True, exist_ok=True)
+        plan.write_text(PLAN.read_text(encoding="utf-8"), encoding="utf-8")
+        validate(rebuilt, build_card_manifest(self.root), self.root)
+        damaged = copy.deepcopy(rebuilt)
+        damaged["accounting"]["promoted_evidence_counts"]["implemented"] += 1
+        with self.assertRaisesRegex(AssertionError, "promoted evidence count mismatch"):
+            validate(damaged, build_card_manifest(self.root), self.root)
+        unfrozen = build(self.root)
+        self.assertTrue(all(value is None for value in unfrozen["accounting"]["percentages"].values()))
+
     def test_real_source_accounting_matches_the_reviewed_frozen_scope(self):
         registry = build()
         self.assertEqual([], registry["accounting"]["metric_blockers"])
@@ -482,8 +531,28 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertEqual("matches_frozen_contract", registry["scope_freeze_candidate"]["status"])
         self.assertEqual("frozen", registry["scope_review"]["status"])
         self.assertEqual(
-            {"implemented": 0.0, "validated": 0.0, "accepted": 0.0},
+            {"implemented": None, "validated": None, "accepted": None},
             registry["accounting"]["percentages"],
+        )
+        self.assertEqual(
+            {
+                "status": "incomplete",
+                "mapped_criteria": 0,
+                "unknown_criteria": 622,
+                "coverage_percent": 0.0,
+                "definition": "Only reviewed criterion-level evidence mappings count as coverage; historical status and standalone/helper PASS output do not create one.",
+            },
+            registry["accounting"]["evidence_mapping"],
+        )
+        self.assertEqual(
+            {
+                "implemented": 0,
+                "production_reachable": 0,
+                "freshly_validated": 0,
+                "player_accepted": 0,
+                "accepted": 0,
+            },
+            registry["accounting"]["promoted_evidence_counts"],
         )
         self.assertGreater(registry["accounting"]["equivalence_alias_count"], 0)
         self.assertEqual(622, registry["accounting"]["active_metric_denominator"])
