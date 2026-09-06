@@ -670,7 +670,7 @@ run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determin
 # the full line's rooms=[9,12] is a character class under grep.
 run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
 run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
-run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=9 small_rooms=24' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
+run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms=9 small_rooms=24' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
 run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=1 interactions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
 run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
@@ -1515,8 +1515,10 @@ membership changes).
 | `fc_p07_smoke` | standalone-feature-completion |
 | `fc_p08_smoke` | standalone-feature-completion |
 | `fc_p09_smoke` | standalone-feature-completion |
+| `fc_p09_natural_route_smoke` | standalone-feature-completion |
 | `fc_p10_smoke` | standalone-feature-completion |
 | `fc_p10_process_smoke` | standalone-feature-completion |
+| `combat_persistence_smoke` | standalone-feature-completion |
 | `fc_p11_live_smoke` | standalone-feature-completion |
 | `fc_p11_smoke` | standalone-feature-completion |
 | `fc_p12_smoke` | standalone-feature-completion |

@@ -38,8 +38,8 @@ classify() {
     # classification does not claim fresh evidence or acceptance.
     fc_p00_native_arc_smoke|fc_p03_smoke|fc_p04_floor_drop_persistence_smoke|\
     fc_p04_holder_atomicity_smoke|fc_p04_objective_lots_smoke|fc_p04_smoke|\
-    fc_p05_smoke|fc_p06_smoke|fc_p07_smoke|fc_p08_smoke|fc_p09_smoke|\
-    fc_p10_smoke|fc_p10_process_smoke|fc_p11_live_smoke|fc_p11_smoke|fc_p12_smoke|fc_p13_smoke|\
+    fc_p05_smoke|fc_p06_smoke|fc_p07_smoke|fc_p08_smoke|fc_p09_smoke|fc_p09_natural_route_smoke|\
+    combat_persistence_smoke|fc_p10_smoke|fc_p10_process_smoke|fc_p11_live_smoke|fc_p11_smoke|fc_p12_smoke|fc_p13_smoke|\
     fc_p16_smoke|runtime_physical_volume_smoke|structural_rebuild_collision_query_smoke|\
     structural_rebuild_candidate_nav_smoke|structural_rebuild_policy_smoke)
       echo "standalone-feature-completion" ;;
