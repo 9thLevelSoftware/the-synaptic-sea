@@ -4,15 +4,16 @@
 
 No completion claim without fresh validation evidence.
 
-## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; host/toolchain verified; live candidate pilot pending post-PR
+## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; integrated loot-container evidence present; promotion remains proposal-only
 
 Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
 Requirements: `REQ-AIAP-001` through `REQ-AIAP-010`.
 
-The toolchain is implemented and host/toolchain verified at commit
-`4dc9e7d7f7aee2c5884bb72118949583737e8994`. This section records current commands and evidence
-boundaries. No real provider task, candidate artifact, external Blender master, or six-case
-candidate runtime capture is claimed here; those are post-PR live-pilot evidence.
+The toolchain is implemented and the integrated loot-container evidence is tracked at main
+`HEAD` `655ae0380f5950c6723aec9fa9b150a463ad4ff4`. This section records current commands and
+evidence boundaries. The completed batch, resolved plan envelope, selected candidate, Blender
+validation, six-case runtime review, and staged promotion proposal are present; applying that
+proposal to live runtime assets remains a separate reviewed operation.
 
 The authority chain is:
 
@@ -41,17 +42,16 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 -m pytest -q \
   tests/test_meshy_texture_packet.py \
   tests/test_meshy_promotion_packet.py \
   tests/test_meshy_runtime_review.py \
-  tests/test_validate_prop_visual_bindings.py \
-  tests/test_prop_visual_metadata.py
+  tests/test_prop_visual_metadata.py \
+  tests/test_meshy_reapprove.py
 ```
 
-At the implementation snapshot, this focused suite completed **340 passed in 185.67s**.
-That duration is the canonical citation for this snapshot; ADR-0058 and
-`docs/superpowers/proofs/meshy-skill-pressure-tests.md` must reuse it rather than a later
-rerun. The contract validator and all nine host CLI help surfaces also passed with
-`/usr/bin/python3`.
-The read-only plan makes no provider call and records `references_resolved=false` until real
-rights-cleared reference files are supplied for the pilot:
+At the integrated evidence state, this focused nine-suite command completed **442 passed in
+34.38s**.
+The read-only `plan` path makes no provider call. For the loot-container batch, the tracked plan
+envelope now records `references_resolved=true`, four `resolved_references`, and provider payload
+SHA-256 `e1cadfd6f2292bbd6cff38956fe6d2d0287d4f94d4523a5ff0bce4d63a2d90b7` after the offline
+`resolve-plan` operation:
 
 ```bash
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py plan \
@@ -59,6 +59,31 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py pla
   --contract data/asset_generation/contracts/<asset_id>.json \
   --pricing-file data/asset_generation/meshy_pricing_v1.json
 ```
+
+For the integrated loot-container batch, the offline evidence-rebind commands were:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py reapprove \
+  --project-root . \
+  --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
+  --batch-journal assets/_staging/meshy/loot_container_derelict_v1/_batches/9e04213bc806421d8e64c9c9c23f26d3.json \
+  --reason "assets/imported grew from legitimate post-approval imports; protected snapshot recomputed offline against current repository state" \
+  --operator christopher
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_stage.py resolve-plan \
+  --project-root . \
+  --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
+  --pricing-file data/asset_generation/meshy_pricing_v1.json \
+  --reference-root assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088 \
+  --reference front=source_front.png \
+  --reference side=source_side.png \
+  --reference back=source_back.png \
+  --reference three_quarter=source_three_quarter.png
+```
+
+Both commands are offline and make no provider call. `reapprove` requires a completed batch with
+all task evidence verified, appends the original approval verbatim to `approval_history`, and
+rebinds only the live protected snapshot. `resolve-plan` preserves the other plan-envelope fields
+while persisting the resolved references and provider payload hash.
 
 ### Current host-Python lifecycle
 
@@ -71,8 +96,9 @@ are not a human blocker. The optional texture packet is proposal-only, uses a se
 value must be greater than or equal to the current fixed 10-credit estimate, so
 `TEXTURE_APPROVED_CREDITS` must be `10` or greater. It still requires selected candidate, Blender,
 and UV evidence and does not weaken task/artifact integrity. The lifecycle is
-plan → generate → resume/verify → candidate review → Blender master and validator → optional
-texture packet after selection/UV → runtime review → binder → proposal only:
+plan → resolve-plan (when references are supplied) → generate → resume/verify → reapprove (for
+legitimate protected-surface growth on a completed batch) → candidate review → Blender master and
+validator → optional texture packet after selection/UV → runtime review → binder → proposal only:
 
 ```bash
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_stage.py generate \
@@ -122,38 +148,32 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_texture_pack
 ```
 
 The Blender commands are host-Python launchers; do not invoke them as `blender --python`.
-Blender focused evidence at the snapshot is 2 passed tests for valid re-import/publication and
-non-affine rejection. No external pilot master or cleaned GLB is present yet.
+The integrated loot-container D5 evidence contains task-local `raw.glb` preservation and
+`cleaned.glb`; `blender-validation.json` is `PASS` with 792 triangles, 2 materials, and UVs.
+The selected review record is `promotion_ready` as a candidate-review state only; final promotion
+eligibility still requires the external-master backup gate and a separate reviewed task.
 
 ### Locked-isometric runtime review and proposal boundary
 
 ```bash
-TASK_ID="${TASK_ID:?set TASK_ID to the Meshy task id}"
-TASK_DIR="assets/_staging/meshy/stalker_v1/${TASK_ID}"
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_runtime_review.py \
-  --project-root . --contract data/asset_generation/contracts/stalker_v1.json \
-  --task-dir "$TASK_DIR" --preview-dir artifacts/validation-previews/meshy/stalker_v1
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_candidate_review.py bind \
+TASK_DIR="assets/_staging/meshy/loot_container_derelict_v1/01a05dcb-fc3b-7418-b105-2170af354088"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_runtime_review.py \
+  --project-root . --contract data/asset_generation/contracts/loot_container_derelict_v1.json \
+  --task-dir "$TASK_DIR" \
+  --preview-dir artifacts/validation-previews/meshy/loot_container_derelict_v1
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_candidate_review.py verify \
   --project-root . --task-dir "$TASK_DIR"
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/meshy_promotion_packet.py threat \
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /usr/bin/python3 tools/meshy_promotion_packet.py prop \
   --project-root . --task-dir "$TASK_DIR" \
-  --archetype stalker
+  --target-path res://assets/imported/props/dressing/loot_container_derelict_v1.sidecar.json
 ```
 
-The runner uses the real `breach_field` environment and locked-isometric camera for exactly six
-cases: seeds `42` and `777` × `normal`, `emergency`, and `dark` lighting. It publishes captures
-only after complete PNGs, clean diagnostics, task/artifact identity, selected/SUCCEEDED evidence,
-and the Blender re-import report pass. The exact producer marker requires task identity:
-
-```text
-MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
-```
-
-There is no Meshy task directory, raw/cleaned GLB, generation/review record, external master, or
-six runtime captures in this phase; the real candidate lifecycle is pending the post-PR live
-pilot. Runtime review, the binder, and the proposal command never write live catalogs, generated
-indexes, wrappers, or imported assets. The promotion packet is a proposal only and application
-requires a separate reviewed task.
+The integrated D6 runtime record is `pass=true` with six cases: seeds `42` and `777` × `normal`,
+`emergency`, and `dark` lighting, producing 18 runtime PNGs. The D8 sidecar proposal is staged
+with `proposal_only=true` and targets
+`res://assets/imported/props/dressing/loot_container_derelict_v1.sidecar.json`; that target is
+not written. The promotion proposal is staged but not applied; this is the only remaining
+loot-container gap and applying it requires a separate reviewed task.
 
 ### Existing Godot regression smokes — current commands
 
@@ -172,6 +192,12 @@ or `SCRIPT ERROR:` lines block runtime acceptance unless the exact output is cla
 plan; a pass marker or zero exit code does not override an unclassified diagnostic. Generation
 and review must not write to `assets/imported`, `data/combat/threat_visual_catalog.json`,
 `data/props/visual_bindings.generated.json`, or `scenes/wrappers`; promotion is separate.
+
+### Related records
+
+- Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.
+- ADR-0058: `docs/game/adr/0058-meshy-candidates-blender-authority.md`.
+- ADR-0060 offline evidence rebinding: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`.
 
 ## Godot binary
 
@@ -308,6 +334,7 @@ GODOT="${GODOT:?set Godot 4.7.1 executable}"
 # fails the bundle. See "Baseline Godot teardown noise" below for the
 # audit trail and the exact evidence-gathering command.
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
+BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
 REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\\$"
 # The save/load service smoke deliberately writes a slot with an incompatible
 # (newer) slice_version to assert the migration-rejection path; that emits one
@@ -1125,6 +1152,8 @@ baseline engine noise and filtered by the script above:
   leak count is identical across every smoke; the smoke that runs first
   reports a higher count because earlier `addons/gdai-mcp-plugin-godot/`
   capture registrations are torn down once and not re-registered per run.
+  This is filtered by the exact `BASELINE_WARNING` pattern above; any other
+  warning remains unexpected and fails the bundle.
 
 REQ-012 adds one additional expected `WARNING:` line that is part of the
 save/load service contract test (the smoke writes a snapshot with an

@@ -1667,9 +1667,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 These requirements govern the implemented candidate-only AI asset workflow described in
 `features/ai_candidate_asset_pipeline.md`. The toolchain is implemented and host-verified at
-commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`; that implementation evidence is separate from
-real provider candidates, which remain a post-PR live-pilot limitation. Meshy output is never a
-runtime source, and promotion is always a separate reviewed task.
+commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`; the integrated `loot_container_derelict_v1`
+evidence is tracked at main evidence baseline `655ae0380f5950c6723aec9fa9b150a463ad4ff4`,
+including its completed batch, selected candidate, Blender/runtime evidence, and proposal-only
+promotion record. Other pilot assets remain separately gated. Meshy output is never a runtime
+source, and promotion is always a separate reviewed task.
 
 ## REQ-AIAP-001: Contract-first candidate generation
 
@@ -1706,8 +1708,9 @@ runtime source, and promotion is always a separate reviewed task.
   - Missing, inconsistent, unlicensed, or ambiguous references fail closed before provider
     submission.
 - Verification:
-  - Focused Meshy contract/staging/provenance tests pass; real rights-cleared pilot files are
-    intentionally absent until the post-PR live pilot.
+  - Focused Meshy contract/staging/provenance tests pass; the integrated loot-container pilot uses
+    tracked rights-cleared reference files. Other pilot reference files remain absent until their
+    post-PR live pilots.
 
 ## REQ-AIAP-003: Standing subscription authorization and request integrity
 
@@ -1781,8 +1784,9 @@ runtime source, and promotion is always a separate reviewed task.
   - The validator reports failures rather than silently decimating, retopologizing, or
     otherwise changing the Blender master.
 - Verification:
-  - Host Blender re-import/publication tests pass; a real external pilot GLB is not available
-    until the post-PR live pilot.
+  - Host Blender re-import/publication tests pass; the integrated loot-container pilot has
+    tracked task-local raw/cleaned GLBs and Blender validation evidence. Other pilot GLBs remain
+    post-PR live-pilot evidence.
 
 ## REQ-AIAP-007: Wrapper-owned gameplay concerns
 
@@ -1801,7 +1805,8 @@ runtime source, and promotion is always a separate reviewed task.
     state.
 - Verification:
   - Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the
-    regression path; candidate runtime evidence is supplied by the post-PR live pilot.
+    regression path; the integrated loot-container pilot supplies current D6 six-case runtime
+    evidence, while other candidate runtime evidence remains post-PR live-pilot work.
 
 ## REQ-AIAP-008: Locked-isometric seed review
 
@@ -1818,8 +1823,8 @@ runtime source, and promotion is always a separate reviewed task.
     unless that exact output is explicitly classified by the validation plan.
 - Verification:
   - `/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands
-    in `docs/game/06_validation_plan.md`; six real candidate captures remain post-PR pilot
-    evidence.
+    in `docs/game/06_validation_plan.md`; the integrated loot-container pilot has a tracked
+    six-case runtime report, while other candidate captures remain post-PR live-pilot evidence.
 
 ## REQ-AIAP-009: No automatic promotion
 

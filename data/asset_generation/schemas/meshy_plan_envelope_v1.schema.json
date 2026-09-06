@@ -1,0 +1,415 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synaptic-sea.invalid/schemas/meshy_plan_envelope_v1.schema.json",
+  "title": "Synaptic Sea Meshy plan envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "candidate_count",
+    "contract_sha256",
+    "cost_per_candidate",
+    "endpoint",
+    "maximum_credits",
+    "pricing_checked_at",
+    "pricing_expires_at",
+    "pricing_id",
+    "pricing_sha256",
+    "pricing_source_url",
+    "prompt_packet_sha256",
+    "prompt_profile_id",
+    "prompt_profile_sha256",
+    "references_resolved",
+    "request",
+    "required_views"
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "view",
+        "basename",
+        "media_type",
+        "byte_size",
+        "sha256"
+      ],
+      "properties": {
+        "view": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "minLength": 1
+        },
+        "basename": {
+          "type": "string",
+          "pattern": "^[^/\\\\]+$",
+          "minLength": 1
+        },
+        "media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ]
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "baseRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_type",
+        "ai_model",
+        "target_polycount",
+        "should_texture",
+        "target_formats"
+      ],
+      "properties": {
+        "model_type": {
+          "enum": [
+            "smart-topology",
+            "standard"
+          ]
+        },
+        "ai_model": {
+          "enum": [
+            "meshy-t2",
+            "meshy-7",
+            "latest"
+          ]
+        },
+        "target_polycount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "should_texture": {
+          "const": false
+        },
+        "target_formats": {
+          "type": "array",
+          "const": [
+            "glb"
+          ]
+        }
+      }
+    },
+    "imageRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_type",
+        "ai_model",
+        "target_polycount",
+        "should_texture",
+        "target_formats",
+        "image_url"
+      ],
+      "properties": {
+        "model_type": {
+          "const": "smart-topology"
+        },
+        "ai_model": {
+          "const": "meshy-t2"
+        },
+        "target_polycount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "should_texture": {
+          "const": false
+        },
+        "target_formats": {
+          "type": "array",
+          "const": [
+            "glb"
+          ]
+        },
+        "image_url": {
+          "$ref": "#/$defs/reference"
+        }
+      }
+    },
+    "multiImageRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_type",
+        "ai_model",
+        "target_polycount",
+        "should_texture",
+        "target_formats",
+        "image_urls"
+      ],
+      "properties": {
+        "model_type": {
+          "const": "standard"
+        },
+        "ai_model": {
+          "enum": [
+            "meshy-7",
+            "latest"
+          ]
+        },
+        "target_polycount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "should_texture": {
+          "const": false
+        },
+        "target_formats": {
+          "type": "array",
+          "const": [
+            "glb"
+          ]
+        },
+        "image_urls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "asset_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "candidate_count": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "contract_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "cost_per_candidate": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "endpoint": {
+      "enum": [
+        "/openapi/v1/image-to-3d",
+        "/openapi/v1/multi-image-to-3d"
+      ]
+    },
+    "maximum_credits": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "pricing_checked_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "pricing_expires_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "pricing_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "minLength": 1
+    },
+    "pricing_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "pricing_source_url": {
+      "const": "https://docs.meshy.ai/api/pricing.md"
+    },
+    "prompt_packet_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "prompt_profile_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "prompt_profile_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "references_resolved": {
+      "type": "boolean"
+    },
+    "request": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/baseRequest"
+        },
+        {
+          "$ref": "#/$defs/imageRequest"
+        },
+        {
+          "$ref": "#/$defs/multiImageRequest"
+        }
+      ]
+    },
+    "required_views": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "front",
+          "side",
+          "back",
+          "left",
+          "right",
+          "three_quarter"
+        ]
+      }
+    },
+    "resolved_references": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "provider_payload_sha256": {
+      "$ref": "#/$defs/hash"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "references_resolved": {
+            "const": true
+          }
+        },
+        "required": [
+          "references_resolved"
+        ]
+      },
+      "then": {
+        "required": [
+          "resolved_references",
+          "provider_payload_sha256"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "resolved_references"
+              ]
+            },
+            {
+              "required": [
+                "provider_payload_sha256"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "references_resolved": {
+            "const": false
+          },
+          "endpoint": {
+            "const": "/openapi/v1/image-to-3d"
+          }
+        },
+        "required": [
+          "references_resolved",
+          "endpoint"
+        ]
+      },
+      "then": {
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/baseRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "references_resolved": {
+            "const": false
+          },
+          "endpoint": {
+            "const": "/openapi/v1/multi-image-to-3d"
+          }
+        },
+        "required": [
+          "references_resolved",
+          "endpoint"
+        ]
+      },
+      "then": {
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/baseRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "references_resolved": {
+            "const": true
+          },
+          "endpoint": {
+            "const": "/openapi/v1/image-to-3d"
+          }
+        },
+        "required": [
+          "references_resolved",
+          "endpoint"
+        ]
+      },
+      "then": {
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/imageRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "references_resolved": {
+            "const": true
+          },
+          "endpoint": {
+            "const": "/openapi/v1/multi-image-to-3d"
+          }
+        },
+        "required": [
+          "references_resolved",
+          "endpoint"
+        ]
+      },
+      "then": {
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/multiImageRequest"
+          }
+        }
+      }
+    }
+  ]
+}

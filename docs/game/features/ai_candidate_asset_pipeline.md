@@ -3,10 +3,11 @@
 ## Status
 
 Implemented and host-verified at toolchain snapshot commit
-`4dc9e7d7f7aee2c5884bb72118949583737e8994`. This document records the current CLI and runtime
-contracts. Real provider tasks, downloaded candidates, external Blender masters, and six-case
-candidate runtime captures remain intentionally reserved for the post-PR live pilot; this
-documentation refresh performs no provider call or promotion.
+`4dc9e7d7f7aee2c5884bb72118949583737e8994`. The integrated loot-container evidence is now tracked
+through main `HEAD` `655ae0380f5950c6723aec9fa9b150a463ad4ff4`: it includes a completed provider
+batch, downloaded candidates, the selected cleaned GLB, and six-case runtime captures. Other pilot
+assets and live promotion remain separately gated; this documentation refresh performs no provider
+call or promotion.
 
 ## Scope
 
@@ -23,8 +24,9 @@ Meshy is a candidate generator only. It cannot author structural floors, walls, 
 sockets, collision, or damage topology. A raw candidate never becomes a runtime asset by
 being downloaded, selected, textured, or opened by a Godot bridge.
 
-The implemented tools and tests preserve this scope and the protected-path rules below. A real
-candidate lifecycle is a separate post-PR pilot and cannot be inferred from host-only evidence.
+The implemented tools and tests preserve this scope and the protected-path rules below. The
+loot-container lifecycle is evidenced by tracked D5/D6/D8 records; other candidate lifecycles
+remain separate pilots and cannot be inferred from host-only evidence.
 
 ## Authority and ownership
 
@@ -127,8 +129,9 @@ Blender, and UV evidence and does not weaken task/artifact integrity.
 
 No API call is permitted without a validated contract, validated reference rights, the required
 `--approved-credits` integrity field, and an immutable request record. A dry-run plan is read-only
-and makes no provider call; its current `references_resolved=false` result truthfully records that
-rights-cleared reference files are absent until the live pilot.
+and makes no provider call. The tracked loot-container plan now records `references_resolved=true`
+with four resolved references and a persisted provider payload hash after offline `resolve-plan`;
+other plans remain `false` until their rights-cleared reference files are supplied.
 
 Each `generate` operation creates one governed batch containing exactly the contract's
 `candidate_count` planned candidate task records. `loot_container_derelict_v1` therefore uses one
@@ -165,6 +168,11 @@ Absent reference views are omitted rather than represented by empty files. `gene
 is immutable after download; candidate decisions and later validation belong in `review.json`
 and the corresponding validation records.
 
+Git-tracked evidence leaves are mode `0644` by design because Git cannot represent `0600`.
+Execution worktrees and external staging contexts rehydrate evidence files to `0600` and private
+directories to `0700` before private validation gates; writers enforce `0600` at write time and
+validators require it when reading private evidence.
+
 The editable master is external/heavy source and is not a runtime staging substitute:
 
 ```text
@@ -175,7 +183,9 @@ $MESHY_MASTER_ROOT/<asset_id>/
   exports/
 ```
 
-The external master backup gate must pass before any future promotion-ready decision.
+The external master backup gate must pass before final promotion eligibility. The
+`promotion_ready` value in the selected task's `review.json` is the candidate-review state only;
+it does not assert that the external-master backup gate passed or that final promotion is eligible.
 
 ## Protected runtime surfaces
 
@@ -292,7 +302,8 @@ and unambiguous:
 
 ## Current validation and command surfaces
 
-The current host-Python lifecycle is plan → generate → resume/verify → candidate review →
+The current host-Python lifecycle is plan → resolve-plan (when references are supplied) →
+generate → resume/verify → reapprove for legitimate protected-surface growth → candidate review →
 Blender master and validator → optional texture packet after selection/UV → runtime review →
 evidence binder → proposal only. Run commands from the repository root:
 
@@ -347,16 +358,18 @@ TEXTURE_APPROVED_CREDITS="${TEXTURE_APPROVED_CREDITS:-10}"
 # /usr/bin/python3 tools/meshy_promotion_packet.py threat --project-root . --task-dir "<task_dir>"
 ```
 
-The host toolchain evidence is current at commit `4dc9e7d7f7aee2c5884bb72118949583737e8994`:
-the focused Meshy suite completed 340 tests in 185.67 seconds, and the real Blender focused
-tests passed 2 tests for valid re-import/publication and non-affine rejection. The real candidate
-lifecycle is not claimed here: no Meshy task directory, raw/cleaned GLB, generation/review
-record, external Blender master, or six runtime captures exists until the post-PR live pilot.
+The host toolchain evidence was reverified at the integrated state on main `HEAD`
+`655ae0380f5950c6723aec9fa9b150a463ad4ff4`: the focused integrated nine-suite command completed
+442 tests, and the loot-container record includes the selected candidate-review state
+`promotion_ready`, cleaned GLB, Blender validation, six-case runtime review, and proposal-only
+sidecar. The candidate-review state is not final promotion eligibility: the external-master
+backup gate and separate reviewed task remain required. The proposal target remains separate from
+live runtime assets.
 
 The runtime marker requires task identity:
 
 ```text
-MESHY RUNTIME REVIEW PASS asset=stalker_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
+MESHY RUNTIME REVIEW PASS asset=loot_container_derelict_v1 task_id=<task_id> seeds=42,777 lighting=normal,emergency,dark captures=6
 ```
 
 Existing Godot regression smokes remain regression evidence and must use the current validation
@@ -396,6 +409,7 @@ unclassified diagnostic.
 ## Related records
 
 - ADR: `docs/game/adr/0058-meshy-candidates-blender-authority.md`
+- Offline evidence rebinding: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`
 - Existing prop metadata authority: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`
 - Existing prop feature contract: `docs/game/features/asset_metadata_pipeline.md`
 - Requirements: `REQ-AIAP-001` through `REQ-AIAP-010` in `docs/game/05_requirements.md`

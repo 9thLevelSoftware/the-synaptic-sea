@@ -48,6 +48,9 @@ ENDPOINTS = {
     "multi_image_to_3d": "/openapi/v1/multi-image-to-3d",
 }
 DEFAULT_PRICING_PATH = Path(__file__).resolve().parents[1] / "data/asset_generation/meshy_pricing_v1.json"
+SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "data/asset_generation/schemas"
+JOURNAL_SCHEMA_PATH = SCHEMA_ROOT / "meshy_batch_journal_v1.schema.json"
+PLAN_ENVELOPE_SCHEMA_PATH = SCHEMA_ROOT / "meshy_plan_envelope_v1.schema.json"
 STAGING_RELATIVE = Path("assets/_staging/meshy")
 PROTECTED_RELATIVE = governance.PROTECTED_RUNTIME_RELATIVE_PATHS
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -64,9 +67,9 @@ _PRICING_ID_RE = re.compile(r"^meshy_api_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 _PRICING_MAX_BYTES = 1024 * 1024
 _REFERENCE_FILE_MAX_BYTES = 16 * 1024 * 1024
 _REFERENCE_TOTAL_MAX_BYTES = 48 * 1024 * 1024
-_GLB_MAX_BYTES = 64 * 1024 * 1024
+_GLB_MAX_BYTES = 128 * 1024 * 1024
 _THUMBNAIL_MAX_BYTES = 16 * 1024 * 1024
-_DOWNLOAD_TOTAL_MAX_BYTES = 80 * 1024 * 1024
+_DOWNLOAD_TOTAL_MAX_BYTES = 256 * 1024 * 1024
 _MAX_POLL_ATTEMPTS = 120
 _POLL_DELAYS = (0.0, 0.25, 0.5, 1.0, 2.0)
 _DEFAULT_DEADLINE_SECONDS = 1200
@@ -91,6 +94,189 @@ _SAFE_ERROR_MESSAGES = {
     "Meshy task id collision",
     "Meshy task publication durability is uncertain",
 }
+
+
+def _load_authoritative_schema(path: Path, label: str) -> Dict[str, Any]:
+    """Load a bounded JSON schema through the repository's strict loader."""
+
+    try:
+        schema = governance.strict_load_json(path, label + " schema", 4 * 1024 * 1024)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError("{0} authoritative schema is unavailable".format(label)) from exc
+    if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        raise ValueError("{0} authoritative schema dialect is invalid".format(label))
+    if schema.get("type") != "object" or schema.get("additionalProperties") is not False:
+        raise ValueError("{0} authoritative schema boundary is invalid".format(label))
+    properties = schema.get("properties")
+    required = schema.get("required")
+    if not isinstance(properties, dict) or not isinstance(required, list):
+        raise ValueError("{0} authoritative schema shape is invalid".format(label))
+    return schema
+
+
+def _schema_value_equal(left: object, right: object) -> bool:
+    """Compare JSON values without treating booleans as integers."""
+
+    if isinstance(left, bool) != isinstance(right, bool):
+        return False
+    return left == right
+
+
+def _schema_type_matches(value: object, expected: object) -> bool:
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "boolean":
+        return type(value) is bool
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "null":
+        return value is None
+    return True
+
+
+def _validate_json_schema_instance(
+    value: object,
+    schema: object,
+    root_schema: Mapping[str, Any],
+    label: str,
+) -> List[str]:
+    """Validate the JSON-Schema vocabulary used by the governed Meshy schemas.
+
+    The project intentionally has no third-party runtime dependency for these
+    offline commands.  This small validator covers the draft 2020-12 keywords
+    used by the checked-in Meshy schemas, including local refs and conditionals.
+    """
+
+    if schema is True:
+        return []
+    if schema is False:
+        return [label + " is forbidden by the authoritative schema"]
+    if not isinstance(schema, dict):
+        return [label + " has an invalid authoritative schema"]
+    reference = schema.get("$ref")
+    if reference is not None:
+        prefix = "#/$defs/"
+        if not isinstance(reference, str) or not reference.startswith(prefix):
+            return [label + " uses an unsupported authoritative schema reference"]
+        target = root_schema.get("$defs", {}).get(reference[len(prefix):])
+        if target is None:
+            return [label + " uses an unresolved authoritative schema reference"]
+        return _validate_json_schema_instance(value, target, root_schema, label)
+
+    errors: List[str] = []
+    expected_type = schema.get("type")
+    if expected_type is not None:
+        expected_types = expected_type if isinstance(expected_type, list) else [expected_type]
+        if not any(_schema_type_matches(value, item) for item in expected_types):
+            return [label + " has the wrong type"]
+    if "const" in schema and not _schema_value_equal(value, schema["const"]):
+        errors.append(label + " does not match const")
+    if "enum" in schema and not any(_schema_value_equal(value, item) for item in schema["enum"]):
+        errors.append(label + " is not an allowed value")
+    if isinstance(value, str):
+        if isinstance(schema.get("minLength"), int) and len(value) < schema["minLength"]:
+            errors.append(label + " is shorter than the minimum length")
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                matched = re.search(pattern, value) is not None
+            except re.error:
+                matched = False
+            if not matched:
+                errors.append(label + " does not match the required pattern")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(schema.get("minimum"), (int, float)) and value < schema["minimum"]:
+            errors.append(label + " is below the minimum")
+        if isinstance(schema.get("exclusiveMinimum"), (int, float)) and value <= schema["exclusiveMinimum"]:
+            errors.append(label + " is not above the exclusive minimum")
+        if isinstance(schema.get("maximum"), (int, float)) and value > schema["maximum"]:
+            errors.append(label + " exceeds the maximum")
+    if isinstance(value, list):
+        if isinstance(schema.get("minItems"), int) and len(value) < schema["minItems"]:
+            errors.append(label + " has too few items")
+        if isinstance(schema.get("maxItems"), int) and len(value) > schema["maxItems"]:
+            errors.append(label + " has too many items")
+        if schema.get("uniqueItems") is True:
+            fingerprints = [json.dumps(item, sort_keys=True, separators=(",", ":")) for item in value]
+            if len(fingerprints) != len(set(fingerprints)):
+                errors.append(label + " contains duplicate items")
+        prefix_items = schema.get("prefixItems")
+        if isinstance(prefix_items, list):
+            for index, item_schema in enumerate(prefix_items[: len(value)]):
+                errors.extend(_validate_json_schema_instance(value[index], item_schema, root_schema, "%s[%d]" % (label, index)))
+        item_schema = schema.get("items")
+        if item_schema is not None:
+            start = len(prefix_items) if isinstance(prefix_items, list) else 0
+            for index, item in enumerate(value[start:], start):
+                errors.extend(_validate_json_schema_instance(item, item_schema, root_schema, "%s[%d]" % (label, index)))
+        contains = schema.get("contains")
+        if contains is not None and not any(
+            not _validate_json_schema_instance(item, contains, root_schema, "%s[%d]" % (label, index))
+            for index, item in enumerate(value)
+        ):
+            errors.append(label + " does not contain a matching item")
+    if isinstance(value, dict):
+        required = schema.get("required")
+        if isinstance(required, list):
+            for name in required:
+                if name not in value:
+                    errors.append(label + " is missing required field: " + str(name))
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            for name, child_schema in properties.items():
+                if name in value:
+                    errors.extend(_validate_json_schema_instance(value[name], child_schema, root_schema, label + "." + str(name)))
+            if schema.get("additionalProperties") is False:
+                for name in sorted(set(value) - set(properties)):
+                    errors.append(label + " contains unknown field: " + str(name))
+            elif isinstance(schema.get("additionalProperties"), (dict, bool)):
+                additional = schema["additionalProperties"]
+                for name in sorted(set(value) - set(properties)):
+                    errors.extend(_validate_json_schema_instance(value[name], additional, root_schema, label + "." + str(name)))
+    for child_schema in schema.get("allOf", []):
+        errors.extend(_validate_json_schema_instance(value, child_schema, root_schema, label))
+    alternatives = schema.get("anyOf")
+    if isinstance(alternatives, list) and not any(
+        isinstance(item, (dict, bool))
+        and not _validate_json_schema_instance(value, item, root_schema, label)
+        for item in alternatives
+    ):
+        errors.append(label + " does not match any authoritative schema alternative")
+    one_of = schema.get("oneOf")
+    if isinstance(one_of, list):
+        matches = sum(1 for item in one_of if isinstance(item, (dict, bool)) and not _validate_json_schema_instance(value, item, root_schema, label))
+        if matches != 1:
+            errors.append(label + " does not match exactly one authoritative schema alternative")
+    if_schema = schema.get("if")
+    if if_schema is not None:
+        if not _validate_json_schema_instance(value, if_schema, root_schema, label):
+            branch = schema.get("then")
+            if branch is not None:
+                errors.extend(_validate_json_schema_instance(value, branch, root_schema, label))
+        else:
+            branch = schema.get("else")
+            if branch is not None:
+                errors.extend(_validate_json_schema_instance(value, branch, root_schema, label))
+    not_schema = schema.get("not")
+    if not_schema is not None and not _validate_json_schema_instance(value, not_schema, root_schema, label):
+        errors.append(label + " matches a forbidden authoritative schema")
+    return sorted(set(errors))
+
+
+def _validate_authoritative_top_level(document: object, path: Path, label: str) -> List[str]:
+    """Validate a document against its checked-in authoritative schema."""
+
+    try:
+        schema = _load_authoritative_schema(path, label)
+    except ValueError as exc:
+        return [str(exc)]
+    return _validate_json_schema_instance(document, schema, schema, label)
 
 
 class MeshyClient:
@@ -1921,12 +2107,67 @@ def validate_generation_record(document: object) -> List[str]:
     return _validate_generation_record_strict(document)
 
 
+_APPROVAL_REQUIRED_FIELDS = {
+    "contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256",
+    "pricing_id", "pricing_sha256", "provider_payload_sha256", "request", "references", "endpoint",
+    "candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits", "output_license",
+    "protected_snapshot", "created_at",
+}
+_APPROVAL_OPTIONAL_FIELDS = {"reapproved_at", "reapprove_reason", "reapprove_operator"}
+
+
+def _validate_approval_record(value: object, label: str) -> List[str]:
+    errors: List[str] = []
+    allowed_fields = _APPROVAL_REQUIRED_FIELDS | _APPROVAL_OPTIONAL_FIELDS
+    if not isinstance(value, dict) or not _APPROVAL_REQUIRED_FIELDS.issubset(set(value)) or set(value) - allowed_fields:
+        return [label + " fields are not exact"]
+    for name in ("contract_sha256", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_sha256", "provider_payload_sha256"):
+        if not _valid_hash(value.get(name)):
+            errors.append(label + " hash is invalid")
+    if not isinstance(value.get("prompt_profile_id"), str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value.get("prompt_profile_id", "")) is None:
+        errors.append(label + " prompt profile is invalid")
+    if not isinstance(value.get("pricing_id"), str) or not value["pricing_id"]:
+        errors.append(label + " pricing id is invalid")
+    for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits"):
+        if not _valid_positive_int(value.get(name)):
+            errors.append(label + " credit field is invalid")
+    expected_cost = 5 if value.get("endpoint") == ENDPOINTS["image_to_3d"] else 20 if value.get("endpoint") == ENDPOINTS["multi_image_to_3d"] else None
+    if expected_cost is not None and value.get("cost_per_candidate") != expected_cost:
+        errors.append(label + " cost is invalid")
+    if all(_valid_positive_int(value.get(name)) for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits")):
+        if value["maximum_credits"] != value["candidate_count"] * value["cost_per_candidate"] or value["approved_credits"] < value["maximum_credits"]:
+            errors.append(label + " credit bound is invalid")
+    if value.get("endpoint") not in ENDPOINTS.values():
+        errors.append(label + " endpoint is invalid")
+    errors.extend(_validate_reference_list(value.get("references"), label + " references"))
+    errors.extend(_validate_provider_request(value.get("request"), value.get("endpoint"), value.get("references"), label + " request"))
+    if value.get("output_license") not in _ALLOWED_LICENSES:
+        errors.append(label + " license is invalid")
+    errors.extend(_validate_protected_snapshot(value.get("protected_snapshot"), label + " protected snapshot"))
+    if not isinstance(value.get("created_at"), str) or not value["created_at"]:
+        errors.append(label + " created_at is invalid")
+    for name in _APPROVAL_OPTIONAL_FIELDS:
+        if name in value and (not isinstance(value[name], str) or not value[name].strip()):
+            errors.append(label + " " + name + " is invalid")
+    if "reapproved_at" in value:
+        timestamp = value["reapproved_at"]
+        if not isinstance(timestamp, str) or not timestamp.endswith("Z"):
+            errors.append(label + " reapproved_at must be ISO-8601 UTC")
+        else:
+            try:
+                datetime.fromisoformat(timestamp[:-1] + "+00:00")
+            except ValueError:
+                errors.append(label + " reapproved_at must be ISO-8601 UTC")
+    return sorted(set(errors))
+
+
 def _validate_batch_journal_strict(document: object) -> List[str]:
     if not isinstance(document, dict):
         return ["batch journal must be an object"]
     required = {"schema_version", "document_kind", "batch_id", "asset_id", "approval", "state", "tasks", "cumulative_consumed_credits"}
-    errors: List[str] = []
-    if set(document) != required:
+    allowed = required | {"approval_history"}
+    errors: List[str] = _validate_authoritative_top_level(document, JOURNAL_SCHEMA_PATH, "Meshy batch journal")
+    if not required.issubset(set(document)) or set(document) - allowed:
         errors.append("batch journal fields are not exact")
     if document.get("schema_version") != "1.0.0" or document.get("document_kind") != "meshy_batch_journal":
         errors.append("batch journal kind/version is invalid")
@@ -1938,40 +2179,14 @@ def _validate_batch_journal_strict(document: object) -> List[str]:
     if state not in ("APPROVED", "SUBMITTING", "COMPLETED", "FAILED", "BUDGET_OVERRUN", "UNCERTAIN"):
         errors.append("batch journal state is invalid")
     approval = document.get("approval")
-    approval_fields = {
-        "contract_sha256", "prompt_profile_id", "prompt_profile_sha256", "prompt_packet_sha256",
-        "pricing_id", "pricing_sha256", "provider_payload_sha256", "request", "references", "endpoint",
-        "candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits", "output_license",
-        "protected_snapshot", "created_at",
-    }
-    if not isinstance(approval, dict) or set(approval) != approval_fields:
-        errors.append("batch journal approval fields are not exact")
-    else:
-        for name in ("contract_sha256", "prompt_profile_sha256", "prompt_packet_sha256", "pricing_sha256", "provider_payload_sha256"):
-            if not _valid_hash(approval.get(name)):
-                errors.append("batch journal approval hash is invalid")
-        if not isinstance(approval.get("prompt_profile_id"), str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", approval.get("prompt_profile_id", "")) is None:
-            errors.append("batch journal approval prompt profile is invalid")
-        if not isinstance(approval.get("pricing_id"), str) or not approval["pricing_id"]:
-            errors.append("batch journal approval pricing id is invalid")
-        for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits"):
-            if not _valid_positive_int(approval.get(name)):
-                errors.append("batch journal approval credit field is invalid")
-        expected_cost = 5 if approval.get("endpoint") == ENDPOINTS["image_to_3d"] else 20 if approval.get("endpoint") == ENDPOINTS["multi_image_to_3d"] else None
-        if expected_cost is not None and approval.get("cost_per_candidate") != expected_cost:
-            errors.append("batch journal approval cost is invalid")
-        if all(_valid_positive_int(approval.get(name)) for name in ("candidate_count", "cost_per_candidate", "maximum_credits", "approved_credits")):
-            if approval["maximum_credits"] != approval["candidate_count"] * approval["cost_per_candidate"] or approval["approved_credits"] < approval["maximum_credits"]:
-                errors.append("batch journal approval credit bound is invalid")
-        if approval.get("endpoint") not in ENDPOINTS.values():
-            errors.append("batch journal approval endpoint is invalid")
-        errors.extend(_validate_reference_list(approval.get("references"), "batch journal approval references"))
-        errors.extend(_validate_provider_request(approval.get("request"), approval.get("endpoint"), approval.get("references"), "batch journal approval request"))
-        if approval.get("output_license") not in _ALLOWED_LICENSES:
-            errors.append("batch journal approval license is invalid")
-        errors.extend(_validate_protected_snapshot(approval.get("protected_snapshot"), "batch journal protected snapshot"))
-        if not isinstance(approval.get("created_at"), str) or not approval["created_at"]:
-            errors.append("batch journal approval created_at is invalid")
+    errors.extend(_validate_approval_record(approval, "batch journal approval"))
+    history = document.get("approval_history")
+    if history is not None:
+        if not isinstance(history, list):
+            errors.append("batch journal approval_history must be a list")
+        else:
+            for index, item in enumerate(history):
+                errors.extend(_validate_approval_record(item, "batch journal approval_history[%d]" % index))
     tasks = document.get("tasks")
     task_ids = set()
 
@@ -2287,6 +2502,249 @@ def load_batch_journal(path: Union[str, os.PathLike]) -> Dict[str, Any]:
     if Path(path).suffix == ".json" and Path(path).stem != document["batch_id"]:
         raise ValueError("Meshy batch journal filename does not match batch_id")
     return document
+
+
+def validate_plan_envelope(document: object) -> List[str]:
+    """Validate the plan envelope fields that the offline resolver governs."""
+
+    if not isinstance(document, dict):
+        return ["Meshy plan envelope must be an object"]
+    required = {
+        "asset_id", "candidate_count", "contract_sha256", "cost_per_candidate", "endpoint",
+        "maximum_credits", "pricing_checked_at", "pricing_expires_at", "pricing_id", "pricing_sha256",
+        "pricing_source_url", "prompt_packet_sha256", "prompt_profile_id", "prompt_profile_sha256",
+        "references_resolved", "request", "required_views",
+    }
+    errors: List[str] = _validate_authoritative_top_level(document, PLAN_ENVELOPE_SCHEMA_PATH, "Meshy plan envelope")
+    if not required.issubset(set(document)):
+        errors.append("Meshy plan envelope fields are incomplete")
+    if not isinstance(document.get("asset_id"), str) or IDENTIFIER_RE.fullmatch(document.get("asset_id", "")) is None:
+        errors.append("Meshy plan asset_id is invalid")
+    if not _valid_positive_int(document.get("candidate_count")) or not _valid_positive_int(document.get("cost_per_candidate")) or not _valid_positive_int(document.get("maximum_credits")):
+        errors.append("Meshy plan credit fields are invalid")
+    elif document["maximum_credits"] != document["candidate_count"] * document["cost_per_candidate"]:
+        errors.append("Meshy plan credit bound is invalid")
+    if document.get("endpoint") not in ENDPOINTS.values():
+        errors.append("Meshy plan endpoint is invalid")
+    for name in ("contract_sha256", "pricing_sha256", "prompt_packet_sha256", "prompt_profile_sha256"):
+        if not _valid_hash(document.get(name)):
+            errors.append("Meshy plan %s is invalid" % name)
+    if not isinstance(document.get("pricing_id"), str) or not document["pricing_id"]:
+        errors.append("Meshy plan pricing_id is invalid")
+    if not isinstance(document.get("pricing_source_url"), str) or document["pricing_source_url"] != "https://docs.meshy.ai/api/pricing.md":
+        errors.append("Meshy plan pricing source is invalid")
+    required_views = document.get("required_views")
+    if not isinstance(required_views, list) or not required_views or any(not isinstance(view, str) for view in required_views):
+        errors.append("Meshy plan required_views is invalid")
+    request = document.get("request")
+    resolved = document.get("resolved_references")
+    references_resolved = document.get("references_resolved")
+    if type(references_resolved) is not bool:
+        errors.append("Meshy plan references_resolved is invalid")
+    if references_resolved is True:
+        errors.extend(_validate_reference_list(resolved, "Meshy plan resolved_references"))
+        if isinstance(resolved, list) and isinstance(required_views, list) and [item.get("view") for item in resolved if isinstance(item, dict)] != required_views:
+            errors.append("Meshy plan resolved reference views do not match required_views")
+        if not _valid_hash(document.get("provider_payload_sha256")):
+            errors.append("Meshy plan provider_payload_sha256 is invalid")
+        errors.extend(_validate_provider_request(request, document.get("endpoint"), resolved, "Meshy plan request"))
+    else:
+        if resolved is not None or "provider_payload_sha256" in document:
+            errors.append("Meshy unresolved plan must not contain resolved evidence")
+        base_request_fields = {"model_type", "ai_model", "target_polycount", "should_texture", "target_formats"}
+        if not isinstance(request, dict) or set(request) != base_request_fields:
+            errors.append("Meshy plan request fields are invalid")
+    return sorted(set(errors))
+
+
+def _plan_envelope_path(project_root: Union[str, os.PathLike], contract: AssetContract) -> Tuple[Path, Path, Path]:
+    root, stage, asset_root = _validate_staging_paths(project_root, contract.asset_id)
+    plan_root = stage / "_plans"
+    governance._reject_symlink_components_below(root, plan_root, "Meshy plan root")
+    path = plan_root / (contract.asset_id + ".json")
+    governance._reject_symlink_components_below(root, path, "Meshy plan envelope")
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Meshy plan envelope is missing")
+    return root, plan_root, path
+
+
+def _expected_plan_references(
+    root: Path, contract: AssetContract, envelope: Mapping[str, Any]
+) -> Optional[List[Dict[str, Any]]]:
+    """Return trusted reference evidence already bound to this plan.
+
+    A resolved envelope is its own source of expected reference hashes.  A
+    legacy unresolved envelope can be checked against the contract-bound
+    batch approval when one exists; this keeps a changed file from being
+    silently accepted as a new reference while allowing standalone plans with
+    no prior batch to resolve normally.
+    """
+
+    resolved = envelope.get("resolved_references")
+    if envelope.get("references_resolved") is True and isinstance(resolved, list):
+        return [dict(item) for item in resolved if isinstance(item, dict)]
+    batch_root = root / STAGING_RELATIVE / contract.asset_id / "_batches"
+    if not batch_root.exists():
+        return None
+    if batch_root.is_symlink() or not batch_root.is_dir():
+        raise ValueError("Meshy batch journal root is not a directory")
+    for path in sorted(batch_root.glob("*.json")):
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("Meshy batch journal entry is not a regular file")
+        journal = _load_canonical_batch_journal(path)
+        approval = journal.get("approval")
+        if (
+            journal.get("asset_id") == contract.asset_id
+            and isinstance(approval, dict)
+            and approval.get("contract_sha256") == envelope.get("contract_sha256")
+        ):
+            references = approval.get("references")
+            if isinstance(references, list):
+                return [dict(item) for item in references if isinstance(item, dict)]
+    return None
+
+
+def resolve_plan_envelope(
+    contract: AssetContract,
+    project_root: Path,
+    *,
+    pricing_file: Optional[Path],
+    reference_root: Path,
+    reference_specs: object,
+) -> Dict[str, Any]:
+    """Resolve references through ``plan_generation`` and persist only its governed fields."""
+
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    if reference_root is None or reference_specs is None:
+        raise ValueError("reference-root and reference specs are required")
+    root, plan_root, plan_path = _plan_envelope_path(project_root, contract)
+    envelope, _raw = governance.strict_load_json_bytes(plan_path, "Meshy plan envelope", 4 * 1024 * 1024)
+    errors = validate_plan_envelope(envelope)
+    if errors:
+        raise ValueError("invalid Meshy plan envelope: " + "; ".join(errors))
+    if envelope.get("asset_id") != contract.asset_id:
+        raise ValueError("Meshy plan asset identity does not match contract")
+    planned = plan_generation(
+        contract,
+        root,
+        pricing_file=pricing_file,
+        reference_root=reference_root,
+        reference_specs=reference_specs,
+    )
+    if planned.get("references_resolved") is not True or not planned.get("resolved_references") or not _valid_hash(planned.get("provider_payload_sha256")):
+        raise ValueError("Meshy references could not be resolved")
+    expected_references = _expected_plan_references(root, contract, envelope)
+    if expected_references is not None and planned["resolved_references"] != expected_references:
+        raise ValueError("Meshy reference content hash does not match plan or contract evidence")
+    updated = _copy_mapping(envelope)
+    for name in ("references_resolved", "resolved_references", "provider_payload_sha256", "request"):
+        updated[name] = planned[name]
+    errors = validate_plan_envelope(updated)
+    if errors:
+        raise ValueError("invalid resolved Meshy plan envelope: " + "; ".join(errors))
+    governance.atomic_write_json(plan_path, updated, project_root=root, allowed_root=plan_root)
+    persisted, persisted_raw = governance.strict_load_json_bytes(plan_path, "Meshy plan envelope", 4 * 1024 * 1024)
+    errors = validate_plan_envelope(persisted)
+    if errors or persisted_raw != canonical_json_bytes(persisted):
+        raise ValueError("Meshy resolved plan envelope publication is invalid")
+    result = _copy_mapping(planned)
+    result["plan_path"] = plan_path.relative_to(root).as_posix()
+    return result
+
+
+def _snapshot_summary(records: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    items = [dict(record) for record in records]
+    target = next((item for item in items if item.get("path") == "assets/imported"), None)
+    if target is None:
+        target = {"sha256": None, "size": 0}
+    return {"sha256": target.get("sha256"), "size": target.get("size", 0), "records": items}
+
+
+def _load_canonical_batch_journal(path: Path) -> Dict[str, Any]:
+    document, raw = governance.strict_load_json_bytes(path, "Meshy batch journal", 4 * 1024 * 1024)
+    errors = validate_batch_journal(document)
+    if errors:
+        raise ValueError("invalid Meshy batch journal: " + "; ".join(errors))
+    if raw != canonical_json_bytes(document):
+        raise ValueError("Meshy batch journal is not canonical")
+    if path.suffix == ".json" and path.stem != document["batch_id"]:
+        raise ValueError("Meshy batch journal filename does not match batch id")
+    return document
+
+
+def reapprove_batch(
+    contract: AssetContract,
+    project_root: Path,
+    batch_journal: Union[str, os.PathLike],
+    *,
+    reason: str,
+    operator: str,
+) -> Dict[str, Any]:
+    """Rebind a completed batch to the current protected snapshot without provider access."""
+
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reapprove reason must be nonempty")
+    if not isinstance(operator, str) or not operator.strip():
+        raise ValueError("reapprove operator must be nonempty")
+    if not isinstance(contract, AssetContract):
+        raise TypeError("contract must be an AssetContract")
+    root, _stage, asset_root, journal_path = _resume_journal_path(project_root, contract.asset_id, batch_journal)
+    journal = _load_canonical_batch_journal(journal_path)
+    if journal.get("asset_id") != contract.asset_id:
+        raise ValueError("Meshy batch journal asset identity does not match contract")
+    if journal.get("state") != "COMPLETED":
+        raise ValueError("Meshy batch journal must be COMPLETED to reapprove")
+    journal_task_ids = {task.get("task_id") for task in journal["tasks"] if task.get("task_id") is not None}
+    inventory_errors: List[str] = []
+    task_dirs = _visible_task_directories(root, asset_root, journal_task_ids, inventory_errors)
+    if inventory_errors:
+        raise ValueError("Meshy batch has unresolved task evidence: " + "; ".join(sorted(set(inventory_errors))))
+    for index, task in enumerate(journal["tasks"]):
+        task_id = task.get("task_id")
+        if task.get("state") != "SUCCEEDED" or not isinstance(task_id, str) or task_id not in task_dirs:
+            raise ValueError("Meshy batch has unverified or unresolved task evidence at index %d" % index)
+        try:
+            record = load_generation_record(task_dirs[task_id] / "generation.json", journal_path=journal_path)
+        except (OSError, TypeError, ValueError) as exc:
+            raise ValueError("Meshy batch has unverified task evidence at index %d" % index) from exc
+        if record.get("status") != "SUCCEEDED":
+            raise ValueError("Meshy batch has unverified task evidence at index %d" % index)
+    protected = governance.snapshot_protected_surfaces(
+        root,
+        max_file_bytes=_REPOSITORY_SNAPSHOT_MAX_FILE_BYTES,
+        max_total_bytes=_REPOSITORY_SNAPSHOT_MAX_TOTAL_BYTES,
+        max_entries=_REPOSITORY_SNAPSHOT_MAX_ENTRIES,
+        max_depth=_REPOSITORY_SNAPSHOT_MAX_DEPTH,
+    )
+    new_records = [{"type": item.type, "path": item.path, "sha256": item.sha256, "size": item.size} for item in protected]
+    original_approval = _copy_mapping(journal["approval"])
+    updated_approval = _copy_mapping(original_approval)
+    updated_approval["protected_snapshot"] = new_records
+    updated_approval["reapproved_at"] = _utc_timestamp()
+    updated_approval["reapprove_reason"] = reason
+    updated_approval["reapprove_operator"] = operator
+    updated = _copy_mapping(journal)
+    updated["approval"] = updated_approval
+    history = updated.get("approval_history", [])
+    if not isinstance(history, list):
+        raise ValueError("Meshy batch journal approval_history must be a list")
+    updated["approval_history"] = history + [original_approval]
+    errors = validate_batch_journal(updated)
+    if errors:
+        raise ValueError("invalid Meshy batch journal after reapproval: " + "; ".join(errors))
+    governance.atomic_write_json(journal_path, updated, project_root=root, allowed_root=journal_path.parent)
+    persisted = _load_canonical_batch_journal(journal_path)
+    if persisted != updated:
+        raise ValueError("Meshy batch journal changed during reapproval")
+    old_records = original_approval["protected_snapshot"]
+    return {
+        "asset_id": contract.asset_id,
+        "batch_id": journal["batch_id"],
+        "old_snapshot": _snapshot_summary(old_records),
+        "new_snapshot": _snapshot_summary(new_records),
+        "approval_history_length": len(updated["approval_history"]),
+    }
 
 
 def _resume_journal_path(
@@ -3778,6 +4236,26 @@ def _build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--contract", type=Path, required=True)
     verify.add_argument("--batch-journal", type=Path, required=True)
     verify.add_argument("--pricing-file", type=Path, default=None)
+    reapprove = subparsers.add_parser(
+        "reapprove",
+        help="rebind a completed batch to the current protected snapshot offline",
+        description="Rebind a completed Meshy batch to the current protected snapshot without provider access.",
+    )
+    reapprove.add_argument("--project-root", type=Path, required=True)
+    reapprove.add_argument("--contract", type=Path, required=True)
+    reapprove.add_argument("--batch-journal", type=Path, required=True)
+    reapprove.add_argument("--reason", required=True)
+    reapprove.add_argument("--operator", required=True)
+    resolve_plan = subparsers.add_parser(
+        "resolve-plan",
+        help="persist resolved references into a tracked plan envelope offline",
+        description="Resolve references through the read-only plan path and persist only plan-governed fields.",
+    )
+    resolve_plan.add_argument("--project-root", type=Path, required=True)
+    resolve_plan.add_argument("--contract", type=Path, required=True)
+    resolve_plan.add_argument("--pricing-file", type=Path, required=True)
+    resolve_plan.add_argument("--reference-root", type=Path, required=True)
+    resolve_plan.add_argument("--reference", action="append", required=True, metavar="VIEW=FILENAME")
     return parser
 
 
@@ -3787,6 +4265,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         contract = load_contract(args.contract)
         if args.command == "plan":
             result = plan_generation(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
+        elif args.command == "reapprove":
+            result = reapprove_batch(contract, args.project_root, args.batch_journal, reason=args.reason, operator=args.operator)
+        elif args.command == "resolve-plan":
+            result = resolve_plan_envelope(contract, args.project_root, pricing_file=args.pricing_file, reference_root=args.reference_root, reference_specs=args.reference)
         elif args.command == "generate":
             if args.approved_credits <= 0:
                 raise ValueError("approved credit ceiling must be positive")
@@ -3823,6 +4305,19 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
         print("MESHY VERIFY FAIL batch={0}".format(result["batch_id"]))
         return 1
+    if args.command == "reapprove":
+        old_snapshot = result["old_snapshot"]
+        new_snapshot = result["new_snapshot"]
+        print(
+            "MESHY REAPPROVE PASS batch={0} old_sha256={1} old_size={2} new_sha256={3} new_size={4}".format(
+                result["batch_id"], old_snapshot["sha256"], old_snapshot["size"],
+                new_snapshot["sha256"], new_snapshot["size"],
+            )
+        )
+        return 0
+    if args.command == "resolve-plan":
+        print("MESHY RESOLVE-PLAN PASS asset={0} plan={1}".format(result["asset_id"], result["plan_path"]))
+        return 0
     return 0
 
 
@@ -3832,5 +4327,5 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_PRICING_PATH", "ENDPOINTS", "MeshyClient", "PricingRecord", "ReferenceInput", "ReferenceInputs", "TransientProviderRequest",
-    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record",
+    "build_transient_provider_request", "generate_batch", "resume_batch", "continue_batch", "verify_batch", "reapprove_batch", "resolve_plan_envelope", "load_batch_journal", "load_generation_record", "load_pricing", "plan_generation", "resolve_reference_inputs", "validate_batch_journal", "validate_generation_record", "validate_plan_envelope",
 ]
