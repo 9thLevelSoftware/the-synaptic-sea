@@ -1831,6 +1831,26 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_context.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/systems/run_snapshot.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -1941,6 +1961,11 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/fc_p13_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/validation/combat_persistence_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -2011,6 +2036,76 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_quicksave_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_meta_autosave_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/title_save_query_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/title_load_failure_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_feature_completion.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_completion_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-3-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "docs/game/06_validation_plan.md",
           "source_exists": true,
           "scope_state": "present"
@@ -2022,7 +2117,7 @@
         }
       ],
       "scope_decisions_pending": [],
-      "non_goals": "Save filename changes or historical-data deletion.",
+      "non_goals": "Save filename changes, historical-data deletion, default-profile cleanup, comparison epsilon, new ignored fields, generalized oxygen normalization, combat-schema weakening, editor/import/plugin launch, or unrelated P09/P17/catalog/navigation behavior.",
       "contract": {
         "r02_versions": {
           "run": "gate2-current-run-6",
@@ -2079,6 +2174,20 @@
           }
         },
         {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p13_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P13 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
           "command": "& $Godot --headless --path . --script res://scripts/validation/save_migration_service_smoke.gd",
           "success": {
             "exit_code": 0,
@@ -2121,6 +2230,48 @@
           }
         },
         {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/world_snapshot_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLD SNAPSHOT PASS round_trip=true version_gated=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/world_save_service_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
           "command": "& $Godot --headless --path . --script res://scripts/validation/combat_persistence_smoke.gd",
           "success": {
             "exit_code": 0,
@@ -2132,6 +2283,86 @@
               "WARNING:",
               "SCRIPT ERROR:"
             ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_generator_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_quicksave_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_meta_autosave_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/title_save_query_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/title_load_failure_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m pytest -q tests/test_p10_process_runner.py tests/test_feature_completion_runner.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
           }
         },
         {
@@ -2402,7 +2633,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 856
+        "line": 877
       }
     },
     {
@@ -2638,7 +2869,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 903
+        "line": 924
       }
     },
     {
@@ -2804,7 +3035,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 947
+        "line": 968
       }
     },
     {
@@ -3071,7 +3302,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 995
+        "line": 1016
       }
     },
     {
@@ -3190,7 +3421,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 1036
+        "line": 1057
       }
     },
     {
@@ -3283,7 +3514,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 1058
+        "line": 1079
       }
     },
     {
@@ -3563,7 +3794,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 1083
+        "line": 1104
       }
     },
     {
@@ -3698,7 +3929,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 1219
+        "line": 1240
       }
     },
     {
@@ -3836,7 +4067,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1251
+        "line": 1272
       }
     },
     {
@@ -3983,7 +4214,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1279
+        "line": 1300
       }
     },
     {
@@ -4069,7 +4300,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1301
+        "line": 1322
       }
     },
     {
@@ -4162,7 +4393,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1325
+        "line": 1346
       }
     },
     {
@@ -4288,7 +4519,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1347
+        "line": 1368
       }
     },
     {
@@ -4411,7 +4642,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1372
+        "line": 1393
       }
     }
   ]

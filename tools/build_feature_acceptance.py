@@ -130,7 +130,7 @@ CARD_NON_GOALS = {
     "P07": "Queue UI or station-power rebalancing.",
     "P08": "Infinite hidden player storage.",
     "P09": "Recipe count as a completion metric.",
-    "P10": "Save filename changes or historical-data deletion.",
+    "P10": "Save filename changes, historical-data deletion, default-profile cleanup, comparison epsilon, new ignored fields, generalized oxygen normalization, combat-schema weakening, editor/import/plugin launch, or unrelated P09/P17/catalog/navigation behavior.",
     "P11": "Timing changes before P12 or synthetic replacement slots.",
     "P12": "Replacing the interaction system.",
     "P13": "Multiplayer authority or unrelated extraction.",
@@ -321,6 +321,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/audio/audio_manager.gd",
         "scripts/camera/iso_camera_rig.gd",
         "scripts/ui/save_load_menu.gd", "scripts/ui/menu_coordinator.gd",
+        "scripts/ui/recipe_picker_panel.gd", "scripts/ui/ship_modification_panel.gd",
+        "scripts/tools/crafting_station.gd", "scripts/systems/ship_work_context.gd",
         *[f"scripts/systems/{name}.gd" for name in (
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
             "crafting_state", "craft_job_state", "craft_job_scheduler", "station_state",
@@ -329,7 +331,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "threat_manager", "threat_save_contract", "threat_initial_state_builder",
         )],
         COORDINATOR, "tests/fixtures/feature_completion/**", f"{VALIDATION}fc_p10_smoke.gd",
-        f"{VALIDATION}fc_p10_process_smoke.gd", f"{VALIDATION}combat_persistence_smoke.gd",
+        f"{VALIDATION}fc_p10_process_smoke.gd", f"{VALIDATION}fc_p13_smoke.gd",
+        f"{VALIDATION}combat_persistence_smoke.gd",
         "tools/run_p10_process_smoke.py",
         "tests/test_p10_process_runner.py",
         "tests/fixtures/feature_completion/p10_run_v7_future.json",
@@ -339,7 +342,17 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "threat_ai_state_smoke", "tendril_structure_damage_smoke",
             "save_migration_service_smoke", "save_migration_world_smoke",
             "save_load_service_smoke", "world_snapshot_smoke", "world_save_service_smoke",
+            "ship_mod_run_snapshot_smoke", "main_playable_quicksave_smoke",
+            "main_playable_meta_autosave_smoke", "title_save_query_smoke",
+            "title_load_failure_smoke",
         )],
+        "tools/run_feature_completion.py", "tests/test_feature_completion_runner.py",
+        "docs/game/05_requirements.md",
+        "docs/game/features/crafting_derelict_feature_completion.md",
+        "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-3-brief.md",
+        "tools/build_feature_acceptance.py", "data/validation/feature_completion_cards.json",
+        "docs/game/inventory/feature_acceptance.json",
         "docs/game/06_validation_plan.md", "tools/classify_orphan_smokes.sh",
     ],
     "P11": [
@@ -511,8 +524,13 @@ CARD_SMOKES = {
     "P08": ["main_playable_slice_station_craft_smoke.gd", "main_playable_slice_salvage_picker_smoke.gd"],
     "P09": ["recipe_resource_smoke.gd", "recipe_picker_panel_smoke.gd"],
     "P10": [
-        "save_migration_service_smoke.gd", "save_migration_world_smoke.gd",
-        "save_load_service_smoke.gd", "combat_persistence_smoke.gd",
+        "fc_p13_smoke.gd", "save_migration_service_smoke.gd",
+        "save_migration_world_smoke.gd", "save_load_service_smoke.gd",
+        "world_snapshot_smoke.gd", "world_save_service_smoke.gd",
+        "ship_mod_run_snapshot_smoke.gd", "combat_persistence_smoke.gd",
+        "ship_generator_smoke.gd", "main_playable_quicksave_smoke.gd",
+        "main_playable_meta_autosave_smoke.gd", "title_save_query_smoke.gd",
+        "title_load_failure_smoke.gd",
     ],
     "P11": ["component_slot_population_smoke.gd", "component_system_link_smoke.gd", "ship_modification_panel_smoke.gd", "ship_modification_smoke.gd"],
     "P12": ["repair_unification_smoke.gd", "repair_blocked_consume_smoke.gd", "work_action_driver_smoke.gd", "component_mount_dismount_smoke.gd"],
@@ -1412,6 +1430,12 @@ def build(
                 "missing_host_witness": "reject_unreconstructable_historical_anchor",
                 "active_mobile_edge": "reject_unreconstructable_historical_anchor",
             },
+            "r02_last_attack_result_variants": {
+                "empty": "exact_empty_dictionary",
+                "incoming_damage": "ThreatManager.tick->DamagePipeline.apply_to_vitals",
+                "weapon_hit": "ThreatManager.attack_with_weapon->DamagePipeline.apply_to_threat",
+                "validation": "exact_keys_and_types_no_coercion",
+            },
             "r02_focused_user_isolation": [
                 "APPDATA", "LOCALAPPDATA", "GODOT_USER_PATH", "XDG_DATA_HOME",
             ],
@@ -1544,6 +1568,11 @@ def _verification(card_id: str, root: Path) -> list[dict[str, Any]]:
     if card_id == "P09":
         checks.append(_check("& $Python -m unittest tests.test_crafting_economy", "OK", forbid_diagnostics=False))
     if card_id == "P10":
+        checks.append(_check(
+            "& $Python -m pytest -q tests/test_p10_process_runner.py tests/test_feature_completion_runner.py",
+            "passed",
+            forbid_diagnostics=False,
+        ))
         checks.append(_check(
             "& $Python tools/run_p10_process_smoke.py --godot $Godot --root . --evidence-dir artifacts/feature-completion/P10-process",
             "FC P10 PROCESS PASS",

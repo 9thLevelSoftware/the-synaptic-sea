@@ -743,6 +743,26 @@ scoped `fc_p10_process_smoke.gd`; it adds no new runtime or validation source
 file. Before any focused smoke, the probe must print and validate the resolved
 `user://` root under one newly created task-owned directory while all four of
 `APPDATA`, `LOCALAPPDATA`, `GODOT_USER_PATH`, and `XDG_DATA_HOME` point there.
+
+R03 closes the remaining FC-12 matrix in the same ownership window. Its added
+scope is `scripts/systems/ship_work_context.gd`,
+`scripts/ui/{recipe_picker_panel,ship_modification_panel}.gd`,
+`scripts/tools/crafting_station.gd`, `scripts/validation/fc_p13_smoke.gd`,
+`scripts/validation/ship_mod_run_snapshot_smoke.gd`, and the existing
+quick-save, autosave, title-query, and title-load-failure smokes only where a
+fixture or assertion is required to prove a successful production load path.
+R03 may also change `tools/run_feature_completion.py` and
+`tests/test_feature_completion_runner.py` to reject reused evidence roots and
+run the accepted no-save containment probe before any feature or extracted P02
+smoke body. The local card source/generator, generated card/acceptance files,
+this feature specification, FC-12 requirement references, and this plan are
+governance scope. R03 must reproduce and close exact nondefault electrical-arc
+timer persistence, the stale world-save and component-condition fixtures, the
+single exact oxygen-projection exception, and successful manual/quick/auto/title
+loads without weakening any other comparison. Every Godot process uses a new
+initially empty owned home with equal `APPDATA`, `LOCALAPPDATA`,
+`GODOT_USER_PATH`, and `XDG_DATA_HOME`, and passes the separate no-save probe
+before its smoke body.
 **Non-goals:** changing save filenames or wiping historical data.
 
 **R02 combat amendment:** allocate current `gate2-current-run-6`, `world-6`,
@@ -780,7 +800,8 @@ non-active mobile ship, matching `_attach_derelict_active` ->
 an active owner that is itself mobile because legacy saves contain no root/socket
 transform from which to reconstruct the post-dock mobile anchor. This makes no
 claim about an unavailable original historical transform. The focused smoke must also retain exact combat
-codec migration reasons, require a typed production weapon-hit receipt, clear
+codec migration reasons, require the exact typed production incoming-damage and
+weapon-hit receipt variants named by ADR-0059 decision 42, clear
 successful `engaged_los`, and observe the production kill training/progression
 callback after restore.
 

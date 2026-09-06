@@ -125,6 +125,28 @@ save/load or repeated callbacks.
 - Splitting, cargo/cart transfer, drops, corpse loot, equipment, salvage, and saves
   preserve lot identity/metadata without minting quantity or rerolling quality.
 
+### Atomic persistence closure
+
+- FC-12 and REQ-012 apply to every production entry path: manual, quick, auto,
+  and title-initiated load. A successful load publishes one fully validated
+  replacement world; a rejected load leaves the current playable instance,
+  owner graph, lots, escrow, receipts, audio buses/playback, current camera,
+  source bytes, slot index, and migration sidecars unchanged.
+- Current present audio, settings, ship-system, oxygen, combat, crafting,
+  knowledge, component, and access payloads are strict. Old schemas migrate only
+  through their declared version boundary, and a migrated sidecar is published
+  only after the detached candidate commits successfully.
+- Exact numeric authority survives serialization and two restores, including
+  lot quality and electrical-arc phase timers. The sole staged recapture
+  exception is `home_ship.oxygen_summary.player_in_breach_zone`, which is a
+  boolean projection derived from the activated scene overlap or active field
+  atmosphere. No other oxygen, timer, combat, or subsystem field is normalized
+  or omitted from comparison.
+- Restored owners bind before tick, collection, station interaction, or inactive
+  catch-up is enabled. Same-ship and cross-ship component moves preserve their
+  immutable source lots, and stale coordinator or selected-ship pointers fail
+  closed rather than mutating another owner.
+
 ### Repair and installation
 
 - Repair/system patch, component install/remove, and structural replacement use
