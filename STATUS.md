@@ -1,6 +1,6 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-09-05
+**Last updated:** 2026-09-06
 
 ## Current feature-completion program
 
@@ -26,10 +26,17 @@ complete regression run.
 P09 proves crafted quality changes actual timed work. A discovery run using repaired
 travel systems found the genuine schematic lot `loot:-2:-2:1:container_53:000` in
 `salvage_engineering`; the natural schematic and donor acquisition journey remains
-open. P10 has a clean partial scene test and a retained three-process proof of the
-exact quality/job/receipt wire path through save, load, collection, and reload. Those
-focused proofs do not cover the full P10 matrix; adversarial, component-move, and
-integration evidence still require final source-pinned review.
+open. R02/R03 persistence closure has passed independent review of its retained
+source packages, including adversarial ownership/escrow cases, actual manual,
+quick, auto and title load paths, and a fresh three-process exact-recapture proof.
+The complete integrated regression and product acceptance still remain pending.
+R06 physical-work ownership is in its first review-fix round for authoritative
+live target range, complete rejection side-effect evidence, and an additional
+required direct snapshot regression. R04 natural crafting remains blocked by
+confirmed docking geometry and ceiling collision defects; R10-A scopes their
+correction before that journey resumes. The economy checker component has passed
+independent review, while its final production proof pin remains blocked until
+R05 qualification after reviewed rebuild integration.
 
 P17's query and physical-volume helper both pass in the full project. The helper's
 full-project evidence artifact is retained at
