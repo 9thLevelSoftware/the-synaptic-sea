@@ -156,9 +156,9 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 - [ ] Record a machinery-donor route: locate compatible donor, dismount through real work, retain lot/condition/origin, transport and install in a real compatible slot, then observe the intended station/system benefit.
 - [ ] Record an advanced route through genuine schematic use, XP/skill growth, tier access, and required advanced parts. Confirm `plating` to `plating_plate` conversion and its actual installation/repair use.
 - [ ] Fix only demonstrated broken links; each new data edge must have a necessity, balance invariant, and acquisition test. Controlled setup remains useful for negative tests but never satisfies natural acquisition.
-- [ ] Pin the economy checker's full production source closure only after reviewed stable integration. Run its existing negative tests, recipe resource/picker checks, and actual timed quality tests.
+- [ ] Run the economy checker's negative tests, explicitly provisional graph diagnostics, recipe resource/picker checks, and actual timed quality tests. Retain the canonical pending-source-pin rejection until R05 pins the reviewed R11 integration.
 
-**Exit:** starter, donor, and advanced routes are reachable through normal gameplay; the economy checker passes against the reviewed production source; no resource injection, force repair, or teleport substitutes for route evidence.
+**Exit:** starter, donor, and advanced routes are reachable through normal gameplay; provisional graph checks and their negative tests pass with the final production source pin explicitly pending R05 after R11; no resource injection, force repair, or teleport substitutes for route evidence. R04 cannot claim canonical economy or G1 acceptance.
 
 ### Task 5: R05 — Qualify crafting as a complete feature
 
@@ -169,6 +169,7 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 - [ ] Trace every FC-04–12 criterion to a real input path and downstream effect. Recheck lot transfer through inventory, cargo, cart, drops, equipment, corpse, salvage, and save paths touched by integration.
 - [ ] Exercise independent home/away stations, serial per-station queues, exact paid reservation, power pause/resume, cancellation warnings, pending/refund capacity, and destruction recovery.
 - [ ] Verify picker and execution share knowledge/skill/tier/power/input eligibility and display exact denial reasons, quality, owner, queue, progress, and pending output.
+- [ ] After reviewed R11 integration, pin the economy checker's complete production source closure and require its canonical check to pass. This closes R04's explicitly deferred source-pin obligation; provisional diagnostics cannot satisfy this gate.
 - [ ] Run the crafting profile and applicable full regression at a frozen candidate; repair failures before marking G1 accepted. Keep human/controller acceptance open until R16 if not yet observed.
 
 **Exit:** all crafting implementation/runtime criteria pass, and every remaining player-evidence dependency is explicit; full G1 acceptance requires those player criteria too.
