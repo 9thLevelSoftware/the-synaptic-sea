@@ -738,6 +738,11 @@ R02 also scopes `scripts/procgen/ship_generator.gd` to the pure
 extraction and `scripts/validation/ship_generator_smoke.gd` to prove its native
 and fallback documents match those consumed by production scene generation, with
 explicit failure and no Node/RID in the pure result.
+The R02 review fix may add a no-save containment-probe mode to the already
+scoped `fc_p10_process_smoke.gd`; it adds no new runtime or validation source
+file. Before any focused smoke, the probe must print and validate the resolved
+`user://` root under one newly created task-owned directory while all four of
+`APPDATA`, `LOCALAPPDATA`, `GODOT_USER_PATH`, and `XDG_DATA_HOME` point there.
 **Non-goals:** changing save filenames or wiping historical data.
 
 **R02 combat amendment:** allocate current `gate2-current-run-6`, `world-6`,
@@ -759,6 +764,25 @@ v6 exactly. Home inventory combat and visited ship combat remain separate owner
 state; candidate inventory normalization retains validated `threat_summary` and
 strictly String `combat_hotbar_text`. The frozen legacy archetype map and complete
 validation/rollback/proof obligations are specified by ADR-0059 decisions 33-39.
+Review-fix compatibility follows ADR-0059 decisions 40-42. The exact historical
+embedded pairings are world v1/run v1, world v2/run v1, world v3/run v1,
+world v4/run v1, v3, or v4, world v5/run v5, and world v6/run v6; each boundary
+rejects every other pairing with a structured version-mismatch reason before
+migration. Home bootstrap resolves only the immutable complete path triples for
+the default smoke-seed profile and production coherent profiles 001 and 002.
+Away bootstrap uses the deterministic current restore anchor produced by
+`_activate_derelict_from_instance` -> `_attach_derelict_active`; subsequent
+`_apply_docking_snapshot` does not move a host root. It accepts that
+production current-owner host anchor only when the
+persisted edge set positively records `host == current_location` with a known
+non-active mobile ship, matching `_attach_derelict_active` ->
+`_dock_piloted_to` -> `_current_dock_edges`; it rejects a missing host witness or
+an active owner that is itself mobile because legacy saves contain no root/socket
+transform from which to reconstruct the post-dock mobile anchor. This makes no
+claim about an unavailable original historical transform. The focused smoke must also retain exact combat
+codec migration reasons, require a typed production weapon-hit receipt, clear
+successful `engaged_los`, and observe the production kill training/progression
+callback after restore.
 
 - [ ] Implement ADR-0059 decisions 23-26: coherent world envelopes for modern
   slots, legacy closed-graph adaptation, single pending authority, target-run

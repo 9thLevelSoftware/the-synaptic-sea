@@ -417,6 +417,67 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     discriminator and payload into a genuinely legacy-shaped document cannot be
     detected cryptographically and no such claim is made.
 
+### R02 review-fix amendment accepted for implementation
+
+40. Embedded home-run compatibility follows the versions that were actually
+    current together in merged history, rather than matching numeric suffixes:
+    `world-1`/run v1, `world-2`/run v1, `world-3`/run v1,
+    `world-4`/run v1, v3, or v4, `world-5`/run v5, and current
+    `world-6`/run v6. Run v2 was an internal migration waypoint and was never a
+    shipped current partner for `world-4`, so `world-4`/run v2 rejects. Each
+    outer migration boundary validates its source pairing before changing the
+    embedded run. A missing, non-String, or historically impossible embedded
+    version rejects with
+    `world_home_version_mismatch:<world>:expected=<versions>:actual=<value-or-type>`;
+    nested combat migration failures retain the exact `ThreatSaveContract`
+    reason instead of collapsing to a generic malformed-payload reason.
+41. Legacy home combat bootstrap recognizes only the three complete production
+    starting-document profiles: the default smoke-seed layout/gameplay pair,
+    `coherent_ship_001`, and `coherent_ship_002`; all use
+    `res://data/kits/ship_structural_v0.json`. The service matches the complete
+    saved layout/kit/gameplay triple to an immutable profile and then reads the
+    canonical layout member from that profile. Partial matches, arbitrary
+    existing paths, and mixed supported triples reject with
+    `combat_bootstrap_home_profile_unknown` before mutation. As stated in
+    decision 39, an editable save that substitutes one complete supported triple
+    for another cannot be detected as tampering without cryptographic authority.
+    For an away owner, migration follows the canonical current restore result,
+    rather than claiming to recover an unrecorded historical transform.
+    `_activate_derelict_from_instance` calls `_attach_derelict_active`, which
+    regenerates the current derelict at `DERELICT_DOCK_OFFSET`, and
+    `_apply_docking_snapshot` leaves that root fixed when the current derelict is
+    the host while moving each mobile endpoint to its regenerated port/slot.
+    `_dock_piloted_to` attaches a mobile ship during ordinary activation and
+    `_current_dock_edges` persists that parent relation
+    with `host == current_location`. Legacy bootstrap requires this positive host
+    edge witness, a known non-active mobile ship ID, and no edge naming the active
+    ship ID as mobile before using the canonical host anchor. Logical host/mobile
+    edges are persisted, but historical root/socket transforms are not. A missing
+    host witness or an active owner that appears as a mobile endpoint rejects with
+    `combat_bootstrap_active_anchor_unreconstructable`; absence of a mobile edge
+    alone never implies the canonical host case. A claimed current ship cannot
+    move through ordinary travel while retaining its own `current_location`:
+    `travel_to` rejects its own marker as `already_here`, and travel to another
+    marker changes `current_location` to that new host. Any persisted topology
+    that nevertheless makes the active ship mobile remains rejected. Tests
+    exercise the accepted production host
+    edge and rejected missing-witness and relocated/mobile cases through
+    `SaveLoadService`, rather than calling the initializer with an arbitrary
+    anchor.
+42. `last_attack_result` is either exactly empty (no attack receipt) or the
+    production weapon-hit receipt with its required String, Boolean, finite
+    numeric, integral-ammunition, and armor-profile field types; unknown keys or
+    coercible wrong types reject. Successful manager application clears
+    `engaged_los`; rejected application preserves it. The lethal ranged restore
+    proof invokes `PlayableGeneratedShip._on_threat_killed` with the restored
+    manager receipt and observes the production training/progression callback:
+    one scavenging kill reward and no intimidation reward. Before any R02 fix
+    smoke, a separate no-save probe mode in `fc_p10_process_smoke.gd` prints and
+    verifies the resolved `user://` directory while `APPDATA`, `LOCALAPPDATA`,
+    `GODOT_USER_PATH`, and `XDG_DATA_HOME` all name one new task-owned root. The
+    focused smoke processes use that same four-variable isolation and never use
+    the default profile.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are

@@ -1390,7 +1390,31 @@ def build(
             "current_run_version": "gate2-current-run-6",
             "current_world_version": "world-6",
             "current_combat_version": "threat-manager-2",
-            "r02_implemented": False,
+            "r02_implemented": True,
+            "r02_historical_world_run_pairs": {
+                "world-1": ["gate2-current-run-1"],
+                "world-2": ["gate2-current-run-1"],
+                "world-3": ["gate2-current-run-1"],
+                "world-4": [
+                    "gate2-current-run-1", "gate2-current-run-3",
+                    "gate2-current-run-4",
+                ],
+                "world-5": ["gate2-current-run-5"],
+                "world-6": ["gate2-current-run-6"],
+            },
+            "r02_home_bootstrap_profiles": [
+                "default_seed_000017", "coherent_ship_001",
+                "coherent_ship_002",
+            ],
+            "r02_active_away_anchor_policy": {
+                "canonical_restore_authority": "activate_derelict_then_attach_at_dock_offset_then_apply_docking_snapshot",
+                "stationary_current_host": "require_host_current_location_edge_with_known_non_active_mobile_then_use_canonical_restore_anchor",
+                "missing_host_witness": "reject_unreconstructable_historical_anchor",
+                "active_mobile_edge": "reject_unreconstructable_historical_anchor",
+            },
+            "r02_focused_user_isolation": [
+                "APPDATA", "LOCALAPPDATA", "GODOT_USER_PATH", "XDG_DATA_HOME",
+            ],
             "payloads": [
                 "item_lots_v1", "craft_jobs_v1", "pending_outputs_v1",
                 "recipe_knowledge_v1", "work_transactions_v1", "structural_rebuild_v1",
