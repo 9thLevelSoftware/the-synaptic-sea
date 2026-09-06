@@ -299,9 +299,33 @@ and distinct threshold/interior navigation nodes plus clearance points. The
 compiler accepts this deliberately exterior portal form while continuing to
 reject accidental one-room internal portals.
 
-A valid endpoint lies on a supporting exterior plane: every non-join collision
-shape of its complete owning hull is in the inward half-space, and its
-threshold/clearance envelope lies outside. Only the separately authenticated
+The authorizer receives an immutable normalized collision-box projection rather
+than loading wrapper nodes. The existing kit stores this additive versioned
+derivative for each contract-selected canonical wrapper. Every module projection
+records its wrapper identity, wrapper/content SHA-256 values, and each box's
+stable node path, exact composed local basis/origin, and dimensions. A
+deterministic pipeline step rejects missing or duplicate paths, unsupported
+shapes/resources or transform syntax, malformed or singular transforms, absent
+wrappers, and stale hashes. The current contract-selected wrappers contain
+enabled `BoxShape3D` resources with identity/cardinal composed bases, while the
+projection format records any finite, non-singular composed `Transform3D` basis
+exactly instead of narrowing non-join production geometry for parser simplicity.
+GLB input-sidecar proxy bounds are not a substitute. The live loader separately
+resolves the selected wrapper and requires exact projection agreement before it
+publishes an endpoint or permits docking preflight. Wrapper and contract
+source-byte hashes are build provenance checked by the generator; exported
+runtime validation instead requires the materialized collision paths, transforms
+and dimensions to reproduce the stored normalized content fingerprint, without
+a missing-source bypass.
+
+A valid endpoint lies on a supporting exterior plane. That plane is the exact
+outer collision face of the projected canonical doorway frame in the endpoint
+direction, rather than its center or a fixed half-depth. For each non-join
+collision shape whose tangent/up projection has positive area inside the finite
+aperture envelope, the complete shape is in the inward half-space, and the
+threshold/clearance envelope lies outside. Shapes outside that finite projection
+are irrelevant to this support predicate but remain in the strict cross-ship
+pair inventory. Only the separately authenticated
 portions of that endpoint's named join boxes may cross the plane, and only into
 the bounded half-space clips used to construct the seam envelope below. This
 excludes concave boundary edges that would still dock through another room
@@ -323,6 +347,11 @@ incident floor/corridor-floor placements. Walls, ceilings, blocked/solid portals
 room-interior shapes, unrelated floors and dynamic bodies are never join pieces.
 The live loader resolves those IDs to contract-selected canonical wrapper boxes
 and requires exact agreement with the precompiled collision fingerprint.
+The build pipeline validates projection source hashes. At runtime the loader
+independently normalizes the materialized collision boxes and compares their
+content fingerprint before endpoint fingerprint comparison. All supporting-plane
+and seam extents are derived from projected boxes. Doorway depth and its
+half-depth are not hardcoded runtime tolerances.
 
 In threshold coordinates, the constructor clips each authenticated join box to
 its outward half-space and unions the exact clipped AABBs from both mated sides.
@@ -339,8 +368,8 @@ box-intersection AABB lies wholly inside the constructed envelope. There is no
 epsilon or global overlap allowance. The mobile threshold owner instantiates the
 separate closed-state barrier exactly once, and an independent full-capsule sweep
 between both interior clearance points must pass with that barrier open.
-Supporting planes constrain the full hull, while this narrow rule admits only
-the canonical connector/floor contact needed by real wrappers. The diagnostic
+The aperture-scoped supporting-plane predicate and strict all-pairs test together
+admit only the canonical connector/floor contact needed by real wrappers. The diagnostic
 `(-2, 0, 0)` mobile port and `(-4, 0, 0)` root pose remain evidence examples,
 never authored constants.
 

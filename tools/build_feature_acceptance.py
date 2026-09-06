@@ -170,7 +170,7 @@ CARD_SCOPE_DECISIONS = {
     ],
     "P17": [
         "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
-        "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal on a supporting hull plane; every non-join shape remains inward, while only authenticated join-box portions may cross into exact bounded seam clips.",
+        "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
         "Docking derives the mobile transform from opposing authenticated descriptors and rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope; the mobile owner instantiates one separate barrier, capsule passage remains independent, and moved-owner combat positions receive the same root delta.",
         "The fixed lifeboat owns one authored clear initial interior spawn; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
@@ -230,7 +230,15 @@ CARD_CONTRACTS = {
             "interior_clearance_point_local", "join_piece_placement_ids",
             "join_collision_fingerprint",
         ],
-        "endpoint_geometry": "Explicit one-sided exterior portal on a supporting plane; every non-join owner shape remains inward and threshold clearance remains outside; only authenticated named join-box portions may cross into exact bounded seam clips; fixed lifeboat west airlock/engine seam is forbidden.",
+        "endpoint_geometry": "Explicit one-sided exterior portal on the projected canonical doorway frame's exact outer collision face; each non-join owner shape whose tangent/up projection intersects the finite aperture remains wholly inward and threshold clearance remains outside; all shapes remain subject to strict cross-ship pair checks; fixed lifeboat west airlock/engine seam is forbidden.",
+        "dock_collision_projection": {
+            "schema": "dock-collision-projection-v1",
+            "owner": "data/kits/ship_structural_v0.json",
+            "source": "contract-selected canonical wrapper trees",
+            "module_fields": ["module_id", "wrapper_scene", "wrapper_sha256", "content_sha256", "boxes"],
+            "box_fields": ["shape_path", "basis", "origin", "dimensions"],
+            "policy": "Generated deterministically from current selected BoxShape3D wrappers while recording any finite non-singular composed basis exactly; source-byte hashes are build provenance; pure authorizer consumes a validated immutable projection; exported live loader requires exact materialized path/shape/transform/dimension and normalized-content fingerprint agreement; no missing-source bypass, GLB sidecar substitution, or hardcoded doorway half-depth.",
+        },
         "initial_player_spawn_v1_exact_fields": [
             "spawn_id", "owner_ship_id", "room_id", "nav_node_id", "local_position",
         ],
@@ -599,6 +607,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.input.json",
         "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.manifest.json",
         "data/kits/ship_structural_v0.json", "tools/focused_nine_blender_recipes.py",
+        "tools/build_dock_collision_projection.py", "tests/test_dock_collision_projection.py",
         "tools/prop_visual_metadata.py", "tests/test_focused_nine_blender_recipes.py",
         "tests/test_prop_visual_metadata.py", "scripts/placement/validate_wrapper_scenes.gd",
         "tools/check_structural_rebuild_catalog.py", "tests/test_structural_rebuild_catalog.py",
