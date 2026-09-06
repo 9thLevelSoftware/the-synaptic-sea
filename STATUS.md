@@ -30,9 +30,9 @@ open. R02/R03 persistence closure has passed independent review of its retained
 source packages, including adversarial ownership/escrow cases, actual manual,
 quick, auto and title load paths, and a fresh three-process exact-recapture proof.
 The complete integrated regression and product acceptance still remain pending.
-R06 physical-work ownership is in its first review-fix round for authoritative
-live target range, complete rejection side-effect evidence, and an additional
-required direct snapshot regression. R04 natural crafting remains blocked by
+R06 physical-work ownership has passed independent review after two fix rounds,
+including canonical live target range, fresh attendance, complete production
+denial side-effect checks, and the required direct snapshot regression. R04 natural crafting remains blocked by
 confirmed docking geometry and ceiling collision defects; R10-A scopes their
 correction before that journey resumes. The economy checker component has passed
 independent review, while its final production proof pin remains blocked until
