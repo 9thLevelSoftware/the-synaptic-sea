@@ -1,0 +1,1583 @@
+{
+	"world_summary": {
+		"world_seed": 17,
+		"player_position": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"generated_marker_ids": []
+	},
+	"home_ship": {
+		"layout_path": "res://data/procgen/golden/coherent_ship_001/layout.json",
+		"kit_path": "res://data/kits/ship_structural_v0.json",
+		"gameplay_slice_path": "res://data/procgen/golden/coherent_ship_001/gameplay_slice.json",
+		"player_position": [
+			20.0,
+			4.550000190734863,
+			4.0
+		],
+		"current_objective_sequence": 1,
+		"ship_systems_summary": {
+			"systems": {
+				"power": {
+					"system_id": "power",
+					"dependency_ids": [],
+					"subcomponents": [
+						{
+							"subcomponent_id": "reactor_core",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"reactor_core"
+							],
+							"required_tools": [
+								"plasma_cutter"
+							],
+							"min_skill": 4,
+							"repair_seconds": 20.0
+						},
+						{
+							"subcomponent_id": "power_distribution",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 2,
+							"repair_seconds": 10.0
+						},
+						{
+							"subcomponent_id": "battery_cells",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [],
+							"min_skill": 1,
+							"repair_seconds": 6.0
+						}
+					]
+				},
+				"life_support": {
+					"system_id": "life_support",
+					"dependency_ids": [
+						"power"
+					],
+					"subcomponents": [
+						{
+							"subcomponent_id": "air_recycler",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"oxygen_filter"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 2,
+							"repair_seconds": 12.0
+						},
+						{
+							"subcomponent_id": "co2_scrubber",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"oxygen_filter"
+							],
+							"required_tools": [],
+							"min_skill": 1,
+							"repair_seconds": 8.0
+						},
+						{
+							"subcomponent_id": "oxygen_tanks",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"sealant"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 2,
+							"repair_seconds": 10.0
+						}
+					],
+					"oxygen": {
+						"hazard_kind": "oxygen",
+						"oxygen": 100.0,
+						"max_oxygen": 100.0,
+						"drain_rate": 6.0,
+						"effective_drain_rate": 6.0,
+						"drain_multiplier": 1.0,
+						"equipment_drain_multiplier": 1.0,
+						"regen_rate": 3.5,
+						"recovery_threshold": 30.0,
+						"safe_threshold": 35.0,
+						"breach_open": true,
+						"breach_sealed": false,
+						"passability_blocked": false,
+						"player_in_breach_zone": false,
+						"breach_zone_ids": [
+							"life_support"
+						]
+					}
+				},
+				"gravity": {
+					"system_id": "gravity",
+					"dependency_ids": [
+						"power"
+					],
+					"subcomponents": [
+						{
+							"subcomponent_id": "gravity_plating",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"plating"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 14.0
+						},
+						{
+							"subcomponent_id": "field_emitter",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 12.0
+						},
+						{
+							"subcomponent_id": "inertial_dampeners",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [],
+							"min_skill": 2,
+							"repair_seconds": 9.0
+						}
+					]
+				},
+				"navigation": {
+					"system_id": "navigation",
+					"dependency_ids": [
+						"power"
+					],
+					"subcomponents": [
+						{
+							"subcomponent_id": "star_charts",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"data_core"
+							],
+							"required_tools": [],
+							"min_skill": 1,
+							"repair_seconds": 6.0
+						},
+						{
+							"subcomponent_id": "nav_computer",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 12.0
+						},
+						{
+							"subcomponent_id": "sensor_array",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"sensor_module"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 2,
+							"repair_seconds": 10.0
+						}
+					]
+				},
+				"propulsion": {
+					"system_id": "propulsion",
+					"dependency_ids": [
+						"power",
+						"navigation"
+					],
+					"subcomponents": [
+						{
+							"subcomponent_id": "thruster_array",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"thruster_nozzle"
+							],
+							"required_tools": [
+								"plasma_cutter"
+							],
+							"min_skill": 4,
+							"repair_seconds": 18.0
+						},
+						{
+							"subcomponent_id": "fuel_injection",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"fuel_line"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 12.0
+						},
+						{
+							"subcomponent_id": "nav_linkage",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [],
+							"min_skill": 2,
+							"repair_seconds": 8.0
+						}
+					]
+				},
+				"scanners": {
+					"system_id": "scanners",
+					"dependency_ids": [
+						"power",
+						"navigation"
+					],
+					"subcomponents": [
+						{
+							"subcomponent_id": "scanner_dish",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"sensor_module"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 12.0
+						},
+						{
+							"subcomponent_id": "signal_processor",
+							"health": 1.0,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"min_skill": 3,
+							"repair_seconds": 11.0
+						},
+						{
+							"subcomponent_id": "power_coupling",
+							"health": 0.2,
+							"operational_threshold": 0.5,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [],
+							"min_skill": 2,
+							"repair_seconds": 7.0
+						}
+					]
+				}
+			},
+			"system_order": [
+				"power",
+				"life_support",
+				"gravity",
+				"navigation",
+				"propulsion",
+				"scanners"
+			],
+			"completed_objective_types": [],
+			"power_grid_summary": {
+				"total_supply_units": 100.0,
+				"available_supply_units": 100.0,
+				"min_operational_ratio": 0.5,
+				"subsystem_order": [
+					"life_support",
+					"propulsion",
+					"stations",
+					"lights",
+					"sustenance"
+				],
+				"baseline_demand_units": {
+					"life_support": 22.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"lights": 8.0,
+					"sustenance": 10.0
+				},
+				"manual_routes_units": {
+					"life_support": 22.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"lights": 8.0,
+					"sustenance": 10.0
+				},
+				"effective_routes_units": {
+					"life_support": 22.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"lights": 8.0,
+					"sustenance": 10.0
+				},
+				"blackout_subsystems": [],
+				"manager_broken_systems": [],
+				"overloaded": false
+			},
+			"life_support_state_summary": {
+				"oxygen_percent": 100.0,
+				"co2_percent": 2.0,
+				"temperature_c": 21.0,
+				"water_liters": 40.0,
+				"nominal_temperature_c": 21.0,
+				"offline_oxygen_drain_per_second": 4.0,
+				"online_oxygen_recovery_per_second": 2.0,
+				"offline_co2_gain_per_second": 3.5,
+				"online_co2_scrub_per_second": 2.0,
+				"offline_temp_drift_per_second": 0.3,
+				"water_use_per_second": 0.2,
+				"life_support_power_threshold": 0.5,
+				"atmosphere_safe_oxygen": 50.0,
+				"atmosphere_safe_co2": 15.0,
+				"max_atmosphere_health_drain": 5.0,
+				"atmosphere_temp_comfort_band": 8.0,
+				"max_atmosphere_thirst_mult": 1.5,
+				"breach_oxygen_leak_per_second": 1.5
+			},
+			"hull_integrity_summary": {
+				"compartments": {
+					"bridge": {
+						"health": 1.0,
+						"breach_open": false,
+						"isolation_rating": 0.9
+					},
+					"engineering": {
+						"health": 1.0,
+						"breach_open": false,
+						"isolation_rating": 0.8
+					},
+					"hydroponics": {
+						"health": 1.0,
+						"breach_open": false,
+						"isolation_rating": 0.7
+					},
+					"cargo": {
+						"health": 0.3,
+						"breach_open": true,
+						"isolation_rating": 0.6
+					}
+				}
+			},
+			"web_infestation_summary": {
+				"hazard_kind": "web_infestation",
+				"attached_to_web": true,
+				"coverage": 0.0
+			},
+			"fire_suppression_summary": {
+				"compartments": [
+					"bridge",
+					"engineering",
+					"hydroponics",
+					"cargo"
+				],
+				"active_fires": {
+					"bridge": 1.3750000000000002
+				},
+				"suppressant_units": 73.12500000000001,
+				"suppression_rate_per_second": 25.0,
+				"power_threshold": 0.5,
+				"adjacency": {
+					"bridge": [
+						"engineering"
+					],
+					"engineering": [
+						"bridge",
+						"hydroponics",
+						"cargo"
+					],
+					"hydroponics": [
+						"engineering"
+					],
+					"cargo": [
+						"engineering"
+					]
+				},
+				"spread_rate_per_second": 0.15,
+				"ignition_rate_per_second": 0.2,
+				"cascade_rate_per_second": 0.5,
+				"arc_compartment": "engineering",
+				"spread_progress": {
+					"engineering": 0.293333333333333
+				},
+				"ignition_progress": {
+					"bridge": 0.4175
+				},
+				"cascade_progress": 0.6250000000000001,
+				"vented_compartments": [],
+				"closed_links": []
+			},
+			"extinguisher_summary": {
+				"charge": 100.0,
+				"max_charge": 100.0,
+				"charge_cost_per_use": 34.0,
+				"recharge_per_second": 5.0
+			},
+			"propulsion_state_summary": {
+				"thrust_percent": 100.0,
+				"engine_temperature_c": 28.0,
+				"fuel_efficiency": 1.0,
+				"power_threshold": 0.5,
+				"operational": true
+			},
+			"sustenance_state_summary": {
+				"facilities": {
+					"hydroponics": {
+						"upgrade_slots": 2.0,
+						"power_band": "sustenance"
+					},
+					"synthesizer": {
+						"upgrade_slots": 2.0,
+						"power_band": "sustenance"
+					},
+					"water_recycler": {
+						"upgrade_slots": 1.0,
+						"power_band": "sustenance"
+					}
+				},
+				"total_power_consumed": 0.0,
+				"total_materials_consumed": 0.0,
+				"purified_water_ready": 0,
+				"harvest_ready": 0,
+				"meals_ready": 0
+			}
+		},
+		"route_control_summary": {
+			"route_gate_count": 1,
+			"active_blocker_count": 1,
+			"opened_gate_count": 0,
+			"powered_gates_open": false,
+			"extraction_unlocked": false,
+			"gate_ids": [
+				"powered_route_gate_01"
+			],
+			"gate_records": {
+				"powered_route_gate_01": {
+					"id": "powered_route_gate_01",
+					"open": false,
+					"required_system": "main_power_restored"
+				}
+			},
+			"route_gate_collision_enabled_count": 1
+		},
+		"oxygen_summary": {
+			"hazard_kind": "oxygen",
+			"oxygen": 100.0,
+			"max_oxygen": 100.0,
+			"drain_rate": 6.0,
+			"effective_drain_rate": 6.0,
+			"drain_multiplier": 1.0,
+			"equipment_drain_multiplier": 1.0,
+			"regen_rate": 3.5,
+			"recovery_threshold": 30.0,
+			"safe_threshold": 35.0,
+			"breach_open": true,
+			"breach_sealed": false,
+			"passability_blocked": false,
+			"player_in_breach_zone": false,
+			"breach_zone_ids": [
+				"corridor_to_reactor"
+			]
+		},
+		"inventory_summary": {
+			"items": {},
+			"item_lots_v1": {
+				"schema": "item-lots-1",
+				"holder_namespace": "player:2558554-4ca4",
+				"sequence": 0,
+				"lots": []
+			},
+			"tool_ids": [],
+			"active_effects": [],
+			"drain_multiplier": 1.0,
+			"total_weight": 0.0,
+			"max_weight": 50.0,
+			"threat_summary": {
+				"schema": "threat-manager-2",
+				"encounter_markers": [],
+				"threats": [],
+				"detection": {
+					"noise_level": 0.0,
+					"light_level": 0.0,
+					"sight_level": 0.0,
+					"crouching": false,
+					"room_id": "",
+					"detect_threshold": 0.75,
+					"memory_seconds": 5.0,
+					"memory_remaining": 0.0,
+					"awareness_score": 0.0,
+					"detected": false,
+					"heard": false,
+					"seen": false,
+					"last_reason": "idle"
+				},
+				"awareness_indicator": 0.0,
+				"combat_engaged": false,
+				"last_attack_result": {
+					"damage_type": "physical",
+					"incoming": 7.125,
+					"flat_reduction": 0.0,
+					"resistance": 0.0,
+					"absorbed": 0.0,
+					"final_damage": 7.125,
+					"durability": 0.0,
+					"profile": {
+						"flat_reduction": {},
+						"resistance": {},
+						"durability": 0.0,
+						"max_durability": 0.0,
+						"wear_factor": 0.35
+					},
+					"stun_seconds": 0.0,
+					"source_id": "flare_pistol",
+					"status_effect_id": "",
+					"noise": 0.75,
+					"ok": true,
+					"weapon_id": "flare_pistol",
+					"target_id": "p10-production-ranged-kill",
+					"ammo_item_id": "flare_round",
+					"ammo_remaining": 2
+				},
+				"damage_pipeline": {
+					"processed_hits": 0,
+					"total_damage_applied": 0.0,
+					"total_noise_generated": 0.0,
+					"last_result": {},
+					"armor_resolver": {
+						"armor_profile": {
+							"flat_reduction": {},
+							"resistance": {},
+							"durability": 0.0,
+							"max_durability": 0.0,
+							"wear_factor": 0.35
+						},
+						"last_resolution": {}
+					}
+				}
+			},
+			"combat_hotbar_text": "Weapon: unarmed | Threat: 0.00 | Hostiles: 5"
+		},
+		"fire_summary": {},
+		"electrical_arc_summary": {
+			"hazard_kind": "electrical_arc",
+			"state": "DISCHARGED",
+			"phase": 0,
+			"time_in_state": 0.0,
+			"cycle_duration": 4.0,
+			"arcing": false,
+			"passability_blocked": false,
+			"arcing_duration": 2.5,
+			"discharged_duration": 1.5,
+			"remaining_in_state": 1.5,
+			"zone_ids": []
+		},
+		"objective_progress_summary": {
+			"2": {
+				"objective_type": "restore_systems",
+				"required_steps": 2,
+				"completed_steps": 0,
+				"completed_step_ids": [],
+				"complete": false,
+				"calibrator_applied": false
+			}
+		},
+		"player_progression_summary": {
+			"schema": "progression-2",
+			"class_id": "engineer",
+			"skills": {
+				"repair": 3,
+				"diagnostics": 2,
+				"fabrication": 1,
+				"welding": 2,
+				"welding_mastery": 0,
+				"first_aid": 0,
+				"surgery": 0,
+				"pharmacology": 0,
+				"quarantine": 0,
+				"piloting": 0,
+				"astrogation": 0,
+				"scanner_operation": 0,
+				"signal_analysis": 0,
+				"biomatter_diagnostics": 0,
+				"scavenging": 0,
+				"cooking": 0,
+				"construction": 0,
+				"resource_management": 0,
+				"leadership": 0,
+				"negotiation": 0,
+				"intimidation": 0,
+				"comms": 0
+			},
+			"skill_xp": {
+				"repair": 0,
+				"diagnostics": 0,
+				"fabrication": 0,
+				"welding": 0,
+				"welding_mastery": 0,
+				"first_aid": 0,
+				"surgery": 0,
+				"pharmacology": 0,
+				"quarantine": 0,
+				"piloting": 0,
+				"astrogation": 0,
+				"scanner_operation": 0,
+				"signal_analysis": 0,
+				"biomatter_diagnostics": 0,
+				"scavenging": 5,
+				"cooking": 0,
+				"construction": 0,
+				"resource_management": 0,
+				"leadership": 0,
+				"negotiation": 0,
+				"intimidation": 0,
+				"comms": 0
+			},
+			"skill_xp_fractional": {
+				"repair": 0.0,
+				"diagnostics": 0.0,
+				"fabrication": 0.0,
+				"welding": 0.0,
+				"welding_mastery": 0.0,
+				"first_aid": 0.0,
+				"surgery": 0.0,
+				"pharmacology": 0.0,
+				"quarantine": 0.0,
+				"piloting": 0.0,
+				"astrogation": 0.0,
+				"scanner_operation": 0.0,
+				"signal_analysis": 0.0,
+				"biomatter_diagnostics": 0.0,
+				"scavenging": 0.0,
+				"cooking": 0.0,
+				"construction": 0.0,
+				"resource_management": 0.0,
+				"leadership": 0.0,
+				"negotiation": 0.0,
+				"intimidation": 0.0,
+				"comms": 0.0
+			},
+			"cross_training": {
+				"repair": 0,
+				"diagnostics": 0,
+				"fabrication": 0,
+				"welding": 0,
+				"welding_mastery": 0,
+				"first_aid": 0,
+				"surgery": 0,
+				"pharmacology": 0,
+				"quarantine": 0,
+				"piloting": 0,
+				"astrogation": 0,
+				"scanner_operation": 0,
+				"signal_analysis": 0,
+				"biomatter_diagnostics": 0,
+				"scavenging": 10,
+				"cooking": 0,
+				"construction": 0,
+				"resource_management": 0,
+				"leadership": 0,
+				"negotiation": 0,
+				"intimidation": 0,
+				"comms": 0
+			},
+			"books_read": {}
+		},
+		"skill_tree_summary": {
+			"unlocked": {}
+		},
+		"settings_summary": {
+			"schema": "settings-state-1",
+			"text_scale": 1.35,
+			"colorblind_mode": "deuteranopia",
+			"motion_reduce": true,
+			"captions": true,
+			"hold_to_tap": false,
+			"difficulty": "standard",
+			"glyph_scheme": "auto",
+			"preset_id": "default"
+		},
+		"audio_summary": {
+			"bus_config": {
+				"kind": "audio_bus_config",
+				"volumes": {
+					"master": 0.0,
+					"sfx": -3.0,
+					"music": -13.375000000000002,
+					"voice": -3.0,
+					"ui": -6.0,
+					"ambient": -9.0,
+					"meta": -6.0
+				},
+				"mutes": {
+					"master": false,
+					"sfx": false,
+					"music": false,
+					"voice": false,
+					"ui": false,
+					"ambient": true,
+					"meta": false
+				}
+			},
+			"ambient": {
+				"kind": "ambient_zone_state",
+				"current_role": "docking",
+				"current_track_id": "amb.docking",
+				"current_intensity": 0.6,
+				"previous_role": "",
+				"previous_intensity": 0.0,
+				"previous_track_id": "",
+				"crossfade_active": false,
+				"crossfade_time": 0.0,
+				"crossfade_seconds": 1.5,
+				"threat_level": 0.0,
+				"threat_threshold": 0.5,
+				"threat_boost": 0.25
+			},
+			"sfx_router": {
+				"kind": "sfx_event_router",
+				"captions_enabled": true,
+				"caption_duration": 2.5,
+				"cooldown_clock": {
+					"ui.objective.advance": 0.0,
+					"ui.panel.open": 0.0,
+					"ui.panel.close": 0.0,
+					"ui.save": 0.0
+				},
+				"routed_count": {
+					"ui.objective.advance": 1,
+					"ui.panel.open": 1,
+					"ui.panel.close": 1,
+					"ui.save": 1
+				},
+				"dropped_count": 12
+			},
+			"music": {
+				"kind": "dynamic_music_state",
+				"state": "EXPLORATION",
+				"crossfade_seconds": 2.0,
+				"engagement_flag": false,
+				"hazard_active": false,
+				"vitals_critical": false,
+				"layer_gains": {
+					"layer.base": 1.0,
+					"layer.tension_drone": 0.0,
+					"layer.combat_percussion": 0.0,
+					"layer.critical_pad": 0.0
+				},
+				"target_gains": {
+					"layer.base": 1.0,
+					"layer.tension_drone": 0.0,
+					"layer.combat_percussion": 0.0,
+					"layer.critical_pad": 0.0
+				}
+			},
+			"spatial": {
+				"kind": "spatial_audio_resolver",
+				"ref_distance": 2.0,
+				"max_distance": 25.0,
+				"max_attenuation_db": -36.0,
+				"occlusion_penalty_db": -6.0
+			},
+			"meta_event": {
+				"kind": "meta_event_state",
+				"run_seed": 0,
+				"elapsed": 0.0,
+				"pending": [
+					{
+						"id": "beacon_distress",
+						"trigger_time": 12.0,
+						"voice_log_id": "log.beacon_01",
+						"volume_db": -3.0
+					},
+					{
+						"id": "biomatter_pulse",
+						"trigger_time": 30.0,
+						"voice_log_id": "log.pulse_01",
+						"volume_db": -6.0
+					},
+					{
+						"id": "hull_groan",
+						"trigger_time": 55.0,
+						"voice_log_id": "",
+						"volume_db": -6.0
+					}
+				],
+				"fired": []
+			},
+			"current_voice_log_id": "p10-active-voice-log"
+		},
+		"spoilage_summary": {
+			"foods": {},
+			"transition_count": 0,
+			"rotten_present": false
+		},
+		"hydroponics_summary": {
+			"crop_id": "",
+			"crop_name": "",
+			"state": 0,
+			"progress_seconds": 0.0,
+			"growth_seconds": 120.0,
+			"progress_ratio": 0.0,
+			"produce_item_id": "",
+			"produce_quantity": 0,
+			"water_cost": 2.0,
+			"power_cost": 3.0,
+			"required_skill_level": 0
+		},
+		"water_recycler_summary": {
+			"input_item_id": "",
+			"output_item_id": "purified_water",
+			"conversion_ratio": 1.0,
+			"recycle_time_seconds": 30.0,
+			"power_cost": 5.0,
+			"state": 0,
+			"progress_seconds": 0.0,
+			"input_quantity": 0,
+			"output_ready": 0,
+			"progress_ratio": 0.0
+		},
+		"crafting_summary": {
+			"recipe_count": 61,
+			"active_craft": {},
+			"station_summaries": {
+				"fabricator": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "fabricator",
+					"level": 0,
+					"tier": 2,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"medbay": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "medbay",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"kitchen": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "kitchen",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"synthesizer": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "synthesizer",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"workbench": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "workbench",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"salvage": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "salvage",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				}
+			},
+			"physical_station_summaries": {
+				"[\"ship_start\",\"station:fabricator@16000,4550,0\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:fabricator@16000,4550,0",
+					"active_job_id": "",
+					"station_kind": "fabricator",
+					"level": 0,
+					"tier": 2,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:medbay@40000,4550,4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:medbay@40000,4550,4000",
+					"active_job_id": "",
+					"station_kind": "medbay",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:kitchen@28000,4550,-4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:kitchen@28000,4550,-4000",
+					"active_job_id": "",
+					"station_kind": "kitchen",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:synthesizer@24000,4550,8000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:synthesizer@24000,4550,8000",
+					"active_job_id": "",
+					"station_kind": "synthesizer",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:workbench@20000,4550,-8000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:workbench@20000,4550,-8000",
+					"active_job_id": "",
+					"station_kind": "workbench",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:salvage@20000,4550,4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:salvage@20000,4550,4000",
+					"active_job_id": "",
+					"station_kind": "salvage",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				}
+			},
+			"craft_jobs_v1": {
+				"schema": "craft-jobs-2",
+				"jobs": [],
+				"owners": []
+			},
+			"physical_station_positions_v1": {
+				"schema": "physical-station-positions-1",
+				"owners": [
+					{
+						"ship_id": "ship_start",
+						"stations": [
+							{
+								"station_kind": "fabricator",
+								"station_instance_id": "station:fabricator@16000,4550,0",
+								"floor_slot_id": "floor@16000,4550,0",
+								"local_position": [
+									16.0,
+									4.550000190734863,
+									0.0
+								]
+							},
+							{
+								"station_kind": "kitchen",
+								"station_instance_id": "station:kitchen@28000,4550,-4000",
+								"floor_slot_id": "floor@28000,4550,-4000",
+								"local_position": [
+									28.0,
+									4.550000190734863,
+									-4.0
+								]
+							},
+							{
+								"station_kind": "medbay",
+								"station_instance_id": "station:medbay@40000,4550,4000",
+								"floor_slot_id": "floor@40000,4550,4000",
+								"local_position": [
+									40.0,
+									4.550000190734863,
+									4.0
+								]
+							},
+							{
+								"station_kind": "salvage",
+								"station_instance_id": "station:salvage@20000,4550,4000",
+								"floor_slot_id": "floor@20000,4550,4000",
+								"local_position": [
+									20.0,
+									4.550000190734863,
+									4.0
+								]
+							},
+							{
+								"station_kind": "synthesizer",
+								"station_instance_id": "station:synthesizer@24000,4550,8000",
+								"floor_slot_id": "floor@24000,4550,8000",
+								"local_position": [
+									24.0,
+									4.550000190734863,
+									8.0
+								]
+							},
+							{
+								"station_kind": "workbench",
+								"station_instance_id": "station:workbench@20000,4550,-8000",
+								"floor_slot_id": "floor@20000,4550,-8000",
+								"local_position": [
+									20.0,
+									4.550000190734863,
+									-8.0
+								]
+							}
+						]
+					}
+				]
+			},
+			"field_crafting": {
+				"recipe_count": 61,
+				"active_craft": {},
+				"station_summaries": {},
+				"physical_station_summaries": {},
+				"craft_jobs_v1": {
+					"schema": "craft-jobs-2",
+					"jobs": [],
+					"owners": []
+				},
+				"field_pending_v1": {
+					"schema": "field-pending-2",
+					"ship_id": "ship_start",
+					"receipt_sequence": 0,
+					"active_receipt_id": "",
+					"pinned_destination_ship_id": "",
+					"pinned_local_position": [],
+					"receipt_history_v1": []
+				}
+			}
+		},
+		"recipe_knowledge_summary": {
+			"schema": "recipe-knowledge-1",
+			"owner_id": "player:2558554-4ca4",
+			"known_recipe_ids": [
+				"cook_alien_flora",
+				"cook_basic_meal",
+				"cook_nutrient_broth",
+				"cook_protein_fry",
+				"cook_synth_stew",
+				"craft_biomatter_filter",
+				"craft_breather_mask",
+				"craft_cryo_unit",
+				"craft_data_core",
+				"craft_docking_brace",
+				"craft_emergency_beacon",
+				"craft_filter_cartridge",
+				"craft_fire_extinguisher",
+				"craft_fuel_line",
+				"craft_graphene_weave",
+				"craft_hull_sealant",
+				"craft_hydraulic_clamp",
+				"craft_junction_calibrator_upgrade",
+				"craft_medkit",
+				"craft_memory_drive",
+				"craft_nanite_patch",
+				"craft_nav_chip",
+				"craft_oxygen_filter",
+				"craft_plasma_cutter",
+				"craft_pneumatic_actuator",
+				"craft_portable_pump_upgrade",
+				"craft_power_cell",
+				"craft_propulsion_coupling",
+				"craft_radiation_badge",
+				"craft_radiation_suit",
+				"craft_reactor_core",
+				"craft_sealant",
+				"craft_sensor_module",
+				"craft_solenoid_rig",
+				"craft_stimulant",
+				"craft_survival_tent",
+				"craft_thermal_pad",
+				"craft_welder",
+				"deconstruct_plasma_cutter",
+				"deconstruct_plating",
+				"deconstruct_power_cell",
+				"deconstruct_scrap",
+				"deconstruct_sensor",
+				"deconstruct_thruster",
+				"deconstruct_welder",
+				"field_bandage",
+				"field_craft_fishing_line",
+				"field_craft_torch",
+				"field_filter_mask",
+				"field_patch",
+				"field_splint",
+				"form_plating_plate",
+				"splice_circuit",
+				"synthesize_adhesive",
+				"synthesize_coolant",
+				"synthesize_fiber_strand",
+				"synthesize_graphene_ink",
+				"synthesize_nanite_slurry",
+				"synthesize_nutrient_paste",
+				"weld_plating"
+			],
+			"event_receipt_ids": [],
+			"event_sequence": 0,
+			"dismantle_counts": {},
+			"migration_origin": "native"
+		},
+		"material_summary": {},
+		"consumable_summary": {
+			"hotbar_slots": [
+				"",
+				"",
+				""
+			],
+			"last_result": {}
+		},
+		"medicine_summary": {
+			"last_item_id": "",
+			"last_cured_statuses": [],
+			"last_results": []
+		},
+		"stimulant_summary": {
+			"active_stims": [],
+			"last_used_item": ""
+		},
+		"addiction_summary": {
+			"profiles": {}
+		},
+		"ammo_summary": {
+			"magazines": {},
+			"reload_active": false,
+			"reload_remaining": 0.0,
+			"reload_weapon_id": "",
+			"reload_target": 0,
+			"total_fired": 0
+		},
+		"utility_summary": {
+			"last_item_id": "",
+			"last_note": "",
+			"active_flags": {}
+		},
+		"vitals_summary": {
+			"health": 100.0,
+			"max_health": 100.0,
+			"stamina": 100.0,
+			"max_stamina": 100.0,
+			"hunger": 100.0,
+			"max_hunger": 100.0,
+			"thirst": 100.0,
+			"max_thirst": 100.0,
+			"health_drain_rate": 0.0,
+			"stamina_drain_rate": 2.0,
+			"hunger_drain_rate": 0.5,
+			"thirst_drain_rate": 0.8,
+			"stamina_recovery_rate": 5.0,
+			"health_recovery_rate": 0.0,
+			"hunger_stamina_cascade_active": false,
+			"thirst_vision_warning_active": false,
+			"hunger_stamina_recovery_mult": 1.0,
+			"vision_mult": 1.0,
+			"move_mult": 1.0,
+			"thirst_stamina_drain_mult": 1.0,
+			"starvation_health_drain": 0.0
+		},
+		"sanity_summary": {
+			"sanity": 100.0,
+			"max_sanity": 100.0,
+			"drain_rate": 1.5,
+			"recovery_rate": 3.0,
+			"in_safe_zone": false,
+			"perception_pressure_active": false
+		},
+		"radiation_summary": {
+			"radiation": 0.0,
+			"max_radiation": 100.0,
+			"accumulation_rate": 2.0,
+			"decay_rate": 0.5,
+			"health_drain_rate": 1.0,
+			"in_radiation_zone": false,
+			"health_drain_active": false,
+			"health_drain_per_second": 0.0
+		},
+		"temperature_summary": {
+			"temperature": 22.0,
+			"safe_min": 18.0,
+			"safe_max": 32.0,
+			"drain_rate": 0.5,
+			"recovery_rate": 1.0,
+			"in_extreme_zone": false,
+			"is_safe": true,
+			"thirst_multiplier": 1.0,
+			"hunger_multiplier": 1.0
+		},
+		"status_effects_summary": {
+			"effects": [],
+			"count": 0
+		},
+		"hallucination_summary": {
+			"seed": 17,
+			"step": 0,
+			"health_drain_per_second": 0.5,
+			"stamina_recovery_mult": 0.5,
+			"active_events": [],
+			"spawn_timers": {},
+			"current_tier": 0,
+			"pool_loaded": true
+		},
+		"module_integrity_summary": {
+			"schema": "module_integrity_map_v1",
+			"deltas": [],
+			"registered": 100
+		},
+		"component_placement_summary": {
+			"schema": "component_placement_v2",
+			"condition_authority_version": 1,
+			"condition_lot_sequence": 3,
+			"seed": 17,
+			"count": 3,
+			"placed": [
+				{
+					"component_instance_id": "spine_01_wall_0",
+					"component_id": "console_generic",
+					"room_id": "spine_01",
+					"slot_kind": "wall",
+					"slot_index": 0,
+					"cell": [
+						6,
+						0
+					],
+					"against_wall": true,
+					"component_slot_profile_id": "wall_console_mount_v1",
+					"condition": 1.0,
+					"item_form": "console_unit",
+					"mass": 12.0,
+					"linked_system": "",
+					"linked_subcomponent": "",
+					"mounted": true,
+					"ship_mod_managed": false,
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000003",
+						"item_id": "console_unit",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {
+							"kind": "generated_component",
+							"ship_id": "ship_start",
+							"slot_id": "spine_01_wall_0",
+							"placement_seed": 17
+						}
+					},
+					"source_lot_id": "ship:ship_start:components/lot-000003"
+				},
+				{
+					"component_instance_id": "cargo_01_wall_0",
+					"component_id": "locker_wall",
+					"room_id": "cargo_01",
+					"slot_kind": "wall",
+					"slot_index": 0,
+					"cell": [
+						5,
+						-2
+					],
+					"against_wall": true,
+					"component_slot_profile_id": "wall_utility_mount_v1",
+					"condition": 1.0,
+					"item_form": "wall_locker",
+					"mass": 8.0,
+					"linked_system": "",
+					"linked_subcomponent": "",
+					"mounted": true,
+					"ship_mod_managed": false,
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000001",
+						"item_id": "wall_locker",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {
+							"kind": "generated_component",
+							"ship_id": "ship_start",
+							"slot_id": "cargo_01_wall_0",
+							"placement_seed": 17
+						}
+					},
+					"source_lot_id": "ship:ship_start:components/lot-000001"
+				},
+				{
+					"component_instance_id": "reactor_01_wall_0",
+					"component_id": "reactor_console",
+					"room_id": "reactor_01",
+					"slot_kind": "wall",
+					"slot_index": 0,
+					"cell": [
+						10,
+						0
+					],
+					"against_wall": true,
+					"component_slot_profile_id": "wall_console_mount_v1",
+					"condition": 0.6,
+					"item_form": "reactor_console",
+					"mass": 15.0,
+					"linked_system": "power",
+					"linked_subcomponent": "power_distribution",
+					"mounted": true,
+					"ship_mod_managed": false,
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000002",
+						"item_id": "reactor_console",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 0.6,
+						"origin": {
+							"kind": "generated_component",
+							"ship_id": "ship_start",
+							"slot_id": "reactor_01_wall_0",
+							"placement_seed": 17
+						}
+					},
+					"source_lot_id": "ship:ship_start:components/lot-000002"
+				}
+			],
+			"rejected_saved_components": []
+		},
+		"work_action_summary": {},
+		"ship_modification_summary": {
+			"schema": "ship_modification_v2",
+			"installed": [],
+			"ship_id": "ship_start",
+			"power_supply": 100.0,
+			"power_demand_baseline": 82.0,
+			"power_draw": 82.0,
+			"power_ok": true,
+			"min_operational_ratio": 0.5,
+			"hull_plating_bonus": 0.0
+		},
+		"play_time_seconds": 0.0,
+		"current_location": "home",
+		"world_seed": 17,
+		"slot_id": "p10-live-manual",
+		"slot_kind": "manual",
+		"is_autosave": false,
+		"is_quicksave": false,
+		"parent_world_slot": "",
+		"run_id": "2558554-4ca4",
+		"slice_version": "gate2-current-run-6",
+		"godot_version": "4.7.2-stable (official)",
+		"saved_at": "2026-09-06T02:54:34",
+		"saved_at_epoch": 1788663274
+	},
+	"meta_progression_summary": {
+		"schema": "meta-progression-1",
+		"meta_currency": 0,
+		"unlocked_class_ids": {},
+		"unlocked_hub_upgrade_ids": {},
+		"unlocked_codex_entry_ids": {},
+		"total_runs_completed": 0,
+		"total_runs_deaths": 0,
+		"highest_skill_level_seen": 0,
+		"last_payout_currency": 0,
+		"last_payout_reason": "",
+		"selected_class_id": "",
+		"saved_at": "2026-09-06T02:54:34"
+	},
+	"unique_item_summary": {
+		"claimed_unique_ids": {},
+		"claimed_seed_keys": {},
+		"unlocked_codex_entry_ids": {}
+	},
+	"home_looted_containers": [],
+	"home_ship_carts": [
+		{
+			"cart_id": "organic_cart_ship_start",
+			"parked_ship_id": "ship_start",
+			"parked_position": [
+				23.5,
+				4.0,
+				-6.0
+			],
+			"push_speed_multiplier": 0.7,
+			"hold": {
+				"items": {},
+				"item_lots_v1": {
+					"schema": "item-lots-1",
+					"holder_namespace": "cart:organic_cart_ship_start",
+					"sequence": 0,
+					"lots": []
+				},
+				"max_weight": 200.0
+			}
+		}
+	],
+	"home_breach_environment": {
+		"hazard_kind": "oxygen",
+		"breach_open": true,
+		"breach_sealed": false,
+		"passability_blocked": false,
+		"breach_zone_ids": [
+			"corridor_to_reactor"
+		]
+	},
+	"visited_ships": {},
+	"current_location": "",
+	"world_time": 0.0,
+	"player_position_in_ship": [
+		20.0,
+		4.550000190734863,
+		4.0
+	],
+	"dock_edges": [
+		{
+			"host": "",
+			"mobile": "lifeboat",
+			"port_type": "airlock",
+			"slot_index": -1
+		}
+	],
+	"piloted_ship_id": "lifeboat",
+	"aboard_ship_id": "ship_start",
+	"opened_ports": [],
+	"run_id": "2558554-4ca4",
+	"slice_version": "world-6",
+	"godot_version": "4.7.2-stable (official)",
+	"saved_at": "2026-09-06T02:54:34",
+	"home_ship_inventory": {
+		"items": {},
+		"item_lots_v1": {
+			"schema": "item-lots-1",
+			"holder_namespace": "ship:ship_start:cargo",
+			"sequence": 0,
+			"lots": []
+		},
+		"max_weight": 500.0
+	},
+	"home_floor_drops_v1": {
+		"schema": "ship-floor-drops-1",
+		"ship_id": "ship_start",
+		"sequence": 0,
+		"drops": []
+	},
+	"home_pending_outputs_v1": {
+		"schema": "pending-outputs-1",
+		"ship_id": "ship_start",
+		"records": []
+	},
+	"home_access_v1": {
+		"owner_id": "player_local",
+		"access_ids": [
+			"player_local"
+		]
+	},
+	"player_equipment": {
+		"slots": {},
+		"slot_lots_v1": {}
+	}
+}

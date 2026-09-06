@@ -74,13 +74,22 @@ func _initialize() -> void:
 		_fail("count after uninstall"); return
 
 	# Round-trip
+	var prepared_authority: Dictionary = placement.prepare_condition_authority(
+		"test-ship", catalog, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not placement.commit_condition_authority(prepared_authority):
+		_fail("condition authority preparation"); return
+	mod.sync_from_placement()
 	var snap: Dictionary = mod.get_summary()
 	var placement_snap: Dictionary = placement.get_summary()
 	var placement2 = ComponentPlacementStateScript.new()
-	placement2.restore_from_layout(layout, catalog, 42, placement_snap)
+	if not placement2.restore_from_layout(layout, catalog, 42, placement_snap):
+		_fail("current-layout placement restore"); return
 	var mod2 = ShipModificationStateScript.new()
-	mod2.apply_summary(snap)
-	mod2.bind_physical_slots("test-ship", placement2.get_physical_slot_descriptors("test-ship"), catalog, placement2)
+	if not mod2.apply_summary(snap):
+		_fail("summary restore"); return
+	if not mod2.bind_physical_slots(
+			"test-ship", placement2.get_physical_slot_descriptors("test-ship"), catalog, placement2):
+		_fail("current physical policy bind"); return
 	if mod2.installed_count() != mod.installed_count():
 		_fail("round-trip count"); return
 	if absf(mod2.total_power_draw() - mod.total_power_draw()) > 0.01:

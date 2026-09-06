@@ -47,7 +47,7 @@ func _validate() -> void:
 	if not playable.open_ship_modification_panel_for_validation():
 		_fail("open"); return
 	var panel = playable.ship_modification_panel
-	if not _free_first_profile_slot("deck_machinery_mount_v1"):
+	if not _prepare_first_profile_slot(panel, "deck_machinery_mount_v1"):
 		_fail("no real machinery slot"); return
 	panel.set_inventory(playable._inventory_qty_dict_for_work())
 	if not panel.install_from_inventory(playable.component_catalog):
@@ -75,17 +75,34 @@ func _validate() -> void:
 	quit(0)
 
 
-func _free_first_profile_slot(profile_id: String) -> bool:
-	var setup_returns: Dictionary = {}
+func _prepare_first_profile_slot(panel, profile_id: String) -> bool:
 	for slot_v in playable.ship_modification_state.get_physical_slots():
 		if not (slot_v is Dictionary):
 			continue
 		var slot: Dictionary = slot_v as Dictionary
 		if str(slot.get("component_slot_profile_id", "")) != profile_id:
 			continue
-		if not bool(slot.get("occupied", false)):
-			return true
-		return bool(playable.ship_modification_state.uninstall(str(slot.get("slot_id", "")), setup_returns).get("ok", false))
+		var slot_id: String = str(slot.get("slot_id", ""))
+		if not panel.select_slot_id(slot_id):
+			return false
+		var position_v: Variant = playable._component_slot_world_position(slot_id)
+		if not (position_v is Vector3):
+			return false
+		var home = playable.get_home_ship_for_validation()
+		if not bool(playable.set_piloted_ship_by_id_for_validation(str(home.ship_id)).get("success", false)):
+			return false
+		playable.player.global_position = position_v as Vector3
+		playable.recompute_occupancy()
+		if playable.get_current_occupancy_for_validation() != home:
+			return false
+		if bool(slot.get("occupied", false)):
+			if not panel.uninstall_selected() or not _complete_active_work():
+				return false
+			panel.refresh()
+			if not panel.select_slot_id(slot_id):
+				return false
+		panel.set_inventory(playable._inventory_qty_dict_for_work())
+		return not playable.component_placement_state.is_mounted(slot_id)
 	return false
 
 

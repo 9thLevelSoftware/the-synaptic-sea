@@ -10,6 +10,9 @@ const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_r
 
 const MAX_WALL_FILLS: int = 3
 const MAX_CENTER_FILLS: int = 1
+const CONDITION_AUTHORITY_VERSION: int = 1
+const CONDITION_MODE_GENERATED: String = "generated_component"
+const CONDITION_MODE_LEGACY: String = "legacy_unrecorded_component"
 
 ## placed: Array of {component_instance_id, component_id, room_id, slot_kind, slot_index, cell, condition, linked_system, linked_subcomponent, item_form, mass}
 var placed: Array = []
@@ -20,12 +23,16 @@ var physical_slots: Array = []
 ## remain serialized for later recovery work, but never occupy or authorize a slot.
 var rejected_saved_components: Array = []
 var seed_value: int = 0
+var condition_authority_version: int = 0
+var condition_lot_sequence: int = 0
 
 
 func clear() -> void:
 	placed.clear()
 	physical_slots.clear()
 	rejected_saved_components.clear()
+	condition_authority_version = 0
+	condition_lot_sequence = 0
 
 
 func populate(layout: Dictionary, catalog: RefCounted, p_seed: int, occupied_cells: Dictionary = {}) -> int:
@@ -426,18 +433,139 @@ func has_slot_collisions() -> bool:
 	return false
 
 
+## ADR-0066 detached lot initialization. Missing lots are legal only while an
+## explicit fresh-generation or P10-trusted legacy candidate is being prepared.
+## The live placement and its persistent sequence remain unchanged until commit.
+func prepare_condition_authority(
+		ship_id: String,
+		catalog: RefCounted,
+		mode: String) -> Dictionary:
+	if ship_id.is_empty() or mode not in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		return {"ok": false, "reason": "invalid_condition_authority_request"}
+	if catalog == null or not catalog.has_method("get_component"):
+		return {"ok": false, "reason": "missing_component_catalog"}
+	if condition_authority_version not in [0, CONDITION_AUTHORITY_VERSION] \
+			or condition_lot_sequence < 0:
+		return {"ok": false, "reason": "invalid_condition_authority"}
+	var base_summary: Dictionary = get_summary()
+	var candidate: Dictionary = base_summary.duplicate(true)
+	var candidate_placed: Array = candidate.get("placed", []) as Array
+	var ordered_indices: Array[int] = []
+	for index in range(candidate_placed.size()):
+		ordered_indices.append(index)
+	ordered_indices.sort_custom(func(left: int, right: int) -> bool:
+		return str((candidate_placed[left] as Dictionary).get("component_instance_id", "")) \
+			< str((candidate_placed[right] as Dictionary).get("component_instance_id", "")))
+	var seen_lot_ids: Dictionary = {}
+	var next_sequence: int = condition_lot_sequence
+	var allocated_count: int = 0
+	for index in ordered_indices:
+		var raw_entry: Variant = candidate_placed[index]
+		if not raw_entry is Dictionary:
+			return {"ok": false, "reason": "invalid_component_entry"}
+		var entry: Dictionary = (raw_entry as Dictionary).duplicate(true)
+		var slot_id: String = str(entry.get("component_instance_id", ""))
+		var component_id: String = str(entry.get("component_id", ""))
+		var definition: Dictionary = catalog.call("get_component", component_id)
+		var item_form: String = str(entry.get("item_form", definition.get("item_form", component_id)))
+		if slot_id.is_empty() or component_id.is_empty() or definition.is_empty() or item_form.is_empty():
+			return {"ok": false, "reason": "unknown_component"}
+		if entry.has("source_lot"):
+			var present_lot: Variant = entry.source_lot
+			if not present_lot is Dictionary \
+					or not _valid_source_lot(present_lot as Dictionary, item_form):
+				return {"ok": false, "reason": "invalid_source_lot"}
+			var present_id: String = str((present_lot as Dictionary).get("lot_id", ""))
+			if seen_lot_ids.has(present_id):
+				return {"ok": false, "reason": "duplicate_component_lot"}
+			seen_lot_ids[present_id] = true
+			continue
+		if condition_authority_version == CONDITION_AUTHORITY_VERSION:
+			return {"ok": false, "reason": "current_component_missing_source_lot"}
+		next_sequence += 1
+		allocated_count += 1
+		var condition: float = clampf(float(
+			entry.get("condition", definition.get("condition_default", 1.0))), 0.0, 1.0)
+		if mode == CONDITION_MODE_GENERATED:
+			condition = clampf(float(definition.get("condition_default", 1.0)), 0.0, 1.0)
+		var lot_id: String = "ship:%s:components/lot-%06d" % [ship_id, next_sequence]
+		if seen_lot_ids.has(lot_id):
+			return {"ok": false, "reason": "duplicate_component_lot"}
+		var origin: Dictionary = {
+			"kind": mode,
+			"ship_id": ship_id,
+			"slot_id": slot_id,
+		}
+		if mode == CONDITION_MODE_GENERATED:
+			origin["placement_seed"] = seed_value
+		var lot: Dictionary = {
+			"lot_id": lot_id,
+			"item_id": item_form,
+			"quantity": 1,
+			"quality_score": 0.5,
+			"quality_tier": "standard",
+			"condition": condition,
+			"origin": origin,
+		}
+		entry["item_form"] = item_form
+		entry["condition"] = condition
+		entry["source_lot"] = lot
+		entry["source_lot_id"] = lot_id
+		candidate_placed[index] = entry
+		seen_lot_ids[lot_id] = true
+	candidate["placed"] = candidate_placed
+	candidate["condition_authority_version"] = CONDITION_AUTHORITY_VERSION
+	candidate["condition_lot_sequence"] = next_sequence
+	return {
+		"ok": true,
+		"reason": "",
+		"base_summary": base_summary,
+		"candidate_summary": candidate,
+		"allocated_count": allocated_count,
+		"ship_id": ship_id,
+		"mode": mode,
+	}
+
+
+## Atomically accepts a prepared authority only while its exact base still owns
+## the placement. Retry/cancel/stale candidates therefore consume no sequence.
+func commit_condition_authority(prepared: Dictionary) -> bool:
+	if not bool(prepared.get("ok", false)) \
+			or not prepared.get("base_summary", null) is Dictionary \
+			or not prepared.get("candidate_summary", null) is Dictionary \
+			or get_summary() != prepared.base_summary:
+		return false
+	# apply_summary intentionally strips serialized fit fields because disk data
+	# cannot be physical policy. This commit is different: it upgrades condition
+	# lots on the already layout-derived live placement, so keep that verified
+	# layout authority across the otherwise atomic summary replacement.
+	var verified_physical_slots: Array = physical_slots.duplicate(true)
+	if not apply_summary(prepared.candidate_summary as Dictionary):
+		return false
+	physical_slots = verified_physical_slots
+	return true
+
+
 func get_summary() -> Dictionary:
 	var dynamic_placed: Array = []
 	for entry_v in placed:
 		if not (entry_v is Dictionary):
 			continue
 		var entry: Dictionary = (entry_v as Dictionary).duplicate(true)
-		# Fit authority belongs to the current generated slot + current catalog.
-		for fit_key in ["footprint_cells", "socket_type", "allowed_component_types"]:
+		# Fit authority and the current systems-link projection are reconstructed
+		# from the generated slot, catalog, and live systems manager. They are not
+		# persisted component authority.
+		if bool(entry.get("soft_linked", false)):
+			entry["linked_system"] = ""
+			entry["linked_subcomponent"] = ""
+		for fit_key in [
+			"footprint_cells", "socket_type", "allowed_component_types", "soft_linked"]:
 			entry.erase(fit_key)
 		dynamic_placed.append(entry)
 	return {
 		"schema": "component_placement_v2",
+		"condition_authority_version": condition_authority_version,
+		"condition_lot_sequence": condition_lot_sequence,
 		"seed": seed_value,
 		"count": dynamic_placed.size(),
 		"placed": dynamic_placed,
@@ -445,26 +573,68 @@ func get_summary() -> Dictionary:
 	}
 
 
-func apply_summary(summary: Dictionary) -> bool:
+func apply_summary(summary: Dictionary, allocator_ship_id: String = "") -> bool:
 	if summary.is_empty():
 		return false
-	seed_value = int(summary.get("seed", 0))
-	var p: Variant = summary.get("placed", [])
-	if typeof(p) != TYPE_ARRAY:
+	if str(summary.get("schema", "")) != "component_placement_v2" \
+			or int(summary.get("condition_authority_version", 0)) != CONDITION_AUTHORITY_VERSION \
+			or not _is_nonnegative_json_integer(summary.get("condition_lot_sequence", null)) \
+			or not _is_json_integer(summary.get("seed", null)) \
+			or not _is_nonnegative_json_integer(summary.get("count", null)):
 		return false
-	placed = (p as Array).duplicate(true)
+	var p: Variant = summary.get("placed", [])
+	var rejected_v: Variant = summary.get("rejected_saved_components", null)
+	if typeof(p) != TYPE_ARRAY or not rejected_v is Array \
+			or int(summary.count) != (p as Array).size():
+		return false
+	var next_placed: Array = []
+	var seen_ids: Dictionary = {}
+	var mounted_lot_ids: Dictionary = {}
+	for raw_entry in p as Array:
+		if not raw_entry is Dictionary:
+			return false
+		var entry: Dictionary = raw_entry as Dictionary
+		var instance_id: String = str(entry.get("component_instance_id", ""))
+		if not entry.has("mounted") or typeof(entry.mounted) != TYPE_BOOL \
+				or instance_id.is_empty() or seen_ids.has(instance_id) \
+				or not _saved_source_lot_is_strict(entry, str(entry.get("item_form", ""))):
+			return false
+		var lot_id: String = str((entry.source_lot as Dictionary).get("lot_id", ""))
+		# Dismount retains the old slot row as immutable placement history while
+		# the same physical lot moves through inventory to another slot or ship.
+		# Only mounted rows own physical authority and therefore must be unique.
+		if entry.mounted:
+			if mounted_lot_ids.has(lot_id):
+				return false
+			mounted_lot_ids[lot_id] = true
+		var authority_sequence: int = _condition_lot_sequence(lot_id)
+		var origin_ship_id: String = str(
+			((entry.source_lot as Dictionary).get("origin", {}) as Dictionary).get(
+				"ship_id", ""))
+		# This ceiling belongs to the ship that allocated the namespace. A lot
+		# moved from another ship retains its immutable source sequence and cannot
+		# consume or forge this destination's counter.
+		if authority_sequence > int(summary.condition_lot_sequence) \
+				and (allocator_ship_id.is_empty() or origin_ship_id == allocator_ship_id):
+			return false
+		seen_ids[instance_id] = true
+		next_placed.append(entry.duplicate(true))
+	seed_value = int(summary.seed)
+	condition_authority_version = int(summary.condition_authority_version)
+	condition_lot_sequence = int(summary.condition_lot_sequence)
+	placed = next_placed
 	# Legacy summaries may contain fit fields/physical_slots. Preserve dynamic
 	# records for migration, but never restore those fields as fit authority.
 	for index in range(placed.size()):
 		if not (placed[index] is Dictionary):
 			continue
 		var entry: Dictionary = (placed[index] as Dictionary).duplicate(true)
-		for fit_key in ["footprint_cells", "socket_type", "allowed_component_types"]:
+		for fit_key in [
+			"footprint_cells", "socket_type", "allowed_component_types", "soft_linked"]:
 			entry.erase(fit_key)
 		placed[index] = entry
 	physical_slots.clear()
-	var rejected_v: Variant = summary.get("rejected_saved_components", [])
-	rejected_saved_components = (rejected_v as Array).duplicate(true) if rejected_v is Array else []
+	rejected_saved_components = (rejected_v as Array).duplicate(true)
 	return true
 
 
@@ -477,18 +647,29 @@ func restore_from_layout(
 		summary: Dictionary,
 		occupied_cells: Dictionary = {}) -> bool:
 	var saved_v: Variant = summary.get("placed", [])
-	if not (saved_v is Array):
+	if not (saved_v is Array) \
+			or int(summary.get("condition_authority_version", 0)) != CONDITION_AUTHORITY_VERSION \
+			or not _is_nonnegative_json_integer(summary.get("condition_lot_sequence", null)):
 		return false
 	var prior_rejected_v: Variant = summary.get("rejected_saved_components", [])
 	var prior_rejected: Array = (prior_rejected_v as Array).duplicate(true) if prior_rejected_v is Array else []
 	var saved_by_slot: Dictionary = {}
 	for saved_entry_v in saved_v as Array:
 		if not (saved_entry_v is Dictionary):
-			continue
+			return false
 		var saved_entry: Dictionary = (saved_entry_v as Dictionary).duplicate(true)
 		var saved_id: String = str(saved_entry.get("component_instance_id", ""))
-		if not saved_id.is_empty():
-			saved_by_slot[saved_id] = saved_entry
+		var component_id: String = str(saved_entry.get("component_id", ""))
+		if not saved_entry.has("mounted") or typeof(saved_entry.mounted) != TYPE_BOOL \
+				or saved_id.is_empty() or saved_by_slot.has(saved_id) or component_id.is_empty():
+			return false
+		var expected_item_form: String = ""
+		if catalog != null and catalog.has_method("get_component"):
+			var definition: Dictionary = catalog.call("get_component", component_id)
+			expected_item_form = str(definition.get("item_form", component_id))
+		if not _saved_source_lot_is_strict(saved_entry, expected_item_form):
+			return false
+		saved_by_slot[saved_id] = saved_entry
 	populate(layout, catalog, p_seed, occupied_cells)
 	rejected_saved_components = prior_rejected
 	var generated_by_slot: Dictionary = {}
@@ -513,7 +694,7 @@ func restore_from_layout(
 		if not bool(fit.get("ok", false)):
 			_quarantine_saved(slot_id, str(fit.get("reason", "incompatible_fit")), saved)
 			continue
-		if not bool(saved.get("mounted", true)):
+		if not saved.mounted:
 			var dismounted: Dictionary = _entry_from_saved(slot, saved, catalog)
 			if not dismounted.is_empty():
 				dismounted["mounted"] = false
@@ -528,6 +709,8 @@ func restore_from_layout(
 		if not restored_slot_ids.has(saved_slot_id):
 			_quarantine_saved(saved_slot_id, "slot_removed", saved_by_slot[saved_slot_v] as Dictionary)
 	placed = restored
+	condition_authority_version = CONDITION_AUTHORITY_VERSION
+	condition_lot_sequence = int(summary.condition_lot_sequence)
 	return not physical_slots.is_empty()
 
 
@@ -820,8 +1003,14 @@ func mount_by_slot_id(
 
 
 static func _valid_source_lot(lot: Dictionary, expected_item_form: String) -> bool:
-	if str(lot.get("lot_id", "")).is_empty() or str(lot.get("item_id", "")) != expected_item_form \
-			or int(lot.get("quantity", 0)) != 1 or str(lot.get("quality_tier", "")).is_empty():
+	for key in ["lot_id", "item_id", "quantity", "quality_score", "quality_tier", "condition", "origin"]:
+		if not lot.has(key):
+			return false
+	if typeof(lot.lot_id) != TYPE_STRING or typeof(lot.item_id) != TYPE_STRING \
+			or typeof(lot.quality_tier) != TYPE_STRING \
+			or str(lot.lot_id).is_empty() or str(lot.item_id) != expected_item_form \
+			or not _is_nonnegative_json_integer(lot.quantity) or int(lot.quantity) != 1 \
+			or str(lot.quality_tier).is_empty():
 		return false
 	if not (lot.get("origin", null) is Dictionary):
 		return false
@@ -835,6 +1024,60 @@ static func _valid_source_lot(lot: Dictionary, expected_item_form: String) -> bo
 			or not is_finite(condition) or condition < 0.0 or condition > 1.0:
 		return false
 	return str(lot.get("quality_tier")) == QualityTierResolverScript.tier_for_score(score)
+
+
+static func _saved_source_lot_is_strict(entry: Dictionary, expected_item_form: String) -> bool:
+	if not entry.has("source_lot"):
+		return false
+	var source_lot: Variant = entry.source_lot
+	if not source_lot is Dictionary or (source_lot as Dictionary).is_empty():
+		return false
+	var expected: String = expected_item_form
+	if expected.is_empty():
+		expected = str((source_lot as Dictionary).get("item_id", ""))
+	if expected.is_empty() or not _valid_source_lot(source_lot as Dictionary, expected):
+		return false
+	var lot: Dictionary = source_lot as Dictionary
+	var origin: Dictionary = lot.origin as Dictionary
+	var origin_kind: String = str(origin.get("kind", ""))
+	var lot_id: String = str(lot.get("lot_id", ""))
+	var reserved_component_namespace: bool = lot_id.begins_with("ship:") \
+		and lot_id.find(":components/lot-") >= 0
+	if reserved_component_namespace \
+			and origin_kind not in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		return false
+	if origin_kind in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		var origin_ship_id: String = str(origin.get("ship_id", ""))
+		# origin.slot_id records where the immutable lot was created. It does not
+		# change when the component is installed into another physical slot.
+		if origin_ship_id.is_empty() or str(origin.get("slot_id", "")).is_empty() \
+				or not lot_id.begins_with("ship:%s:components/lot-" % origin_ship_id):
+			return false
+		if origin_kind == CONDITION_MODE_GENERATED \
+				and not _is_json_integer(origin.get("placement_seed", null)):
+			return false
+	return true
+
+
+static func _condition_lot_sequence(lot_id: String) -> int:
+	var marker: String = ":components/lot-"
+	var marker_index: int = lot_id.find(marker)
+	if marker_index < 0:
+		return 0
+	var suffix: String = lot_id.substr(marker_index + marker.length())
+	return int(suffix) if suffix.is_valid_int() and int(suffix) > 0 else 2147483647
+
+
+static func _is_nonnegative_json_integer(value: Variant) -> bool:
+	return _is_json_integer(value) and float(value) >= 0.0
+
+
+static func _is_json_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return is_finite(number) and absf(number) <= 9007199254740991.0 \
+		and number == floor(number)
 
 
 func mounted_count() -> int:

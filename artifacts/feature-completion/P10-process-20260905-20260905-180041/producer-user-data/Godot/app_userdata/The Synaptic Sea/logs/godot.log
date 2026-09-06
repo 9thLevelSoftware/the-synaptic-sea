@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT COMPLETED item=plating qty=1 quality=poor
+FIELD CRAFT STARTED recipe=field_bandage
+FIELD CRAFT COMPLETED item=field_bandage qty=1 quality=poor
+ERROR: FC P10 PROCESS FAIL: producer field pin did not complete through production frames
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p10_process_smoke.gd:531)
+       [1] _fail_bool (res://scripts/validation/fc_p10_process_smoke.gd:526)
+       [2] _finish_producer (res://scripts/validation/fc_p10_process_smoke.gd:80)
+       [3] _run_producer_step (res://scripts/validation/fc_p10_process_smoke.gd:68)
+       [4] _on_frame (res://scripts/validation/fc_p10_process_smoke.gd:38)

@@ -1,0 +1,445 @@
+{
+  "schema": "p09-native-discovery-summary-1",
+  "preparatory": true,
+  "source_script": ".tmp/p09_native_acquisition_probe_remaining.gd",
+  "source_sha256": "8a6de082658a04ca5a9a4de77c98771eda6bfcc02fe647d9ba92d45b95ac1142",
+  "raw_log": "p09_native_remaining.godot.log",
+  "raw_log_sha256": "f33ded6777119555c4bccbb8e4d9c3bd4c057261858591d6767cd4096dc81147",
+  "marker": "PREPARATORY P09 ACQUISITION PROBE PASS",
+  "diagnostics": [],
+  "world_seed": 17,
+  "reachable_marker_count": 60,
+  "marker_skip": 12,
+  "marker_limit": 48,
+  "selected_marker_ids": [
+    "0:-2:1",
+    "-1:-2:2",
+    "0:1:2",
+    "-2:0:0",
+    "1:0:2",
+    "-2:0:2",
+    "-1:-2:1",
+    "1:0:0",
+    "-1:1:2",
+    "-2:-1:2",
+    "1:-1:2",
+    "0:1:0",
+    "1:-1:0",
+    "-1:1:0",
+    "-1:1:1",
+    "0:-2:2",
+    "0:1:1",
+    "-2:0:1",
+    "1:0:1",
+    "-2:-1:1",
+    "-1:-2:0",
+    "-2:-2:1"
+  ],
+  "visited_marker_ids": [
+    "0:-2:1",
+    "-1:-2:2",
+    "0:1:2",
+    "-2:0:0",
+    "1:0:2",
+    "-2:0:2",
+    "-1:-2:1",
+    "-1:1:2",
+    "-2:-1:2",
+    "0:-2:2",
+    "-2:-1:1",
+    "-1:-2:0",
+    "-2:-2:1"
+  ],
+  "stopped_after_schematic": true,
+  "travel_fixture": "force_repair_systems_for_travel_only",
+  "genuine_schematic_candidates": [
+    {
+      "container_id": "container_53",
+      "generated_seed": 3496796182,
+      "item_id": "fabrication_schematic_basic",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-2:-2:1:container_53:000",
+      "marker_id": "-2:-2:1",
+      "origin": {
+        "loot_container": "container_53",
+        "seed_source": "-2:-2:1:container_53"
+      },
+      "quantity": 1
+    }
+  ],
+  "genuine_native_advanced_ingredient_candidates": [
+    {
+      "container_id": "container_25",
+      "generated_seed": 104773998,
+      "item_id": "ceramic_plate",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:2:container_25:000",
+      "marker_id": "-1:-2:2",
+      "origin": {
+        "loot_container": "container_25",
+        "seed_source": "-1:-2:2:container_25"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_25",
+      "generated_seed": 104773998,
+      "item_id": "optical_lens",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:2:container_25:001",
+      "marker_id": "-1:-2:2",
+      "origin": {
+        "loot_container": "container_25",
+        "seed_source": "-1:-2:2:container_25"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_26",
+      "generated_seed": 104773998,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:2:container_26:000",
+      "marker_id": "-1:-2:2",
+      "origin": {
+        "loot_container": "container_26",
+        "seed_source": "-1:-2:2:container_26"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_35",
+      "generated_seed": 104773998,
+      "item_id": "optical_lens",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:2:container_35:001",
+      "marker_id": "-1:-2:2",
+      "origin": {
+        "loot_container": "container_35",
+        "seed_source": "-1:-2:2:container_35"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_30",
+      "generated_seed": 1772369569,
+      "item_id": "coolant_fluid",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:1:2:container_30:000",
+      "marker_id": "0:1:2",
+      "origin": {
+        "loot_container": "container_30",
+        "seed_source": "0:1:2:container_30"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_33",
+      "generated_seed": 1772369569,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:1:2:container_33:000",
+      "marker_id": "0:1:2",
+      "origin": {
+        "loot_container": "container_33",
+        "seed_source": "0:1:2:container_33"
+      },
+      "quantity": 2
+    },
+    {
+      "container_id": "container_34",
+      "generated_seed": 1772369569,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:1:2:container_34:000",
+      "marker_id": "0:1:2",
+      "origin": {
+        "loot_container": "container_34",
+        "seed_source": "0:1:2:container_34"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_34",
+      "generated_seed": 1772369569,
+      "item_id": "coolant_fluid",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:1:2:container_34:001",
+      "marker_id": "0:1:2",
+      "origin": {
+        "loot_container": "container_34",
+        "seed_source": "0:1:2:container_34"
+      },
+      "quantity": 2
+    },
+    {
+      "container_id": "container_37",
+      "generated_seed": 153569920,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:1:container_37:000",
+      "marker_id": "-1:-2:1",
+      "origin": {
+        "loot_container": "container_37",
+        "seed_source": "-1:-2:1:container_37"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_38",
+      "generated_seed": 153569920,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:1:container_38:000",
+      "marker_id": "-1:-2:1",
+      "origin": {
+        "loot_container": "container_38",
+        "seed_source": "-1:-2:1:container_38"
+      },
+      "quantity": 3
+    },
+    {
+      "container_id": "container_73",
+      "generated_seed": 554105027,
+      "item_id": "sensor_array",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:-2:2:container_73:001",
+      "marker_id": "0:-2:2",
+      "origin": {
+        "loot_container": "container_73",
+        "seed_source": "0:-2:2:container_73"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_74",
+      "generated_seed": 554105027,
+      "item_id": "optical_lens",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:0:-2:2:container_74:001",
+      "marker_id": "0:-2:2",
+      "origin": {
+        "loot_container": "container_74",
+        "seed_source": "0:-2:2:container_74"
+      },
+      "quantity": 1
+    },
+    {
+      "container_id": "container_20",
+      "generated_seed": 3893089840,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:0:container_20:000",
+      "marker_id": "-1:-2:0",
+      "origin": {
+        "loot_container": "container_20",
+        "seed_source": "-1:-2:0:container_20"
+      },
+      "quantity": 2
+    },
+    {
+      "container_id": "container_20",
+      "generated_seed": 3893089840,
+      "item_id": "optical_lens",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:0:container_20:001",
+      "marker_id": "-1:-2:0",
+      "origin": {
+        "loot_container": "container_20",
+        "seed_source": "-1:-2:0:container_20"
+      },
+      "quantity": 2
+    },
+    {
+      "container_id": "container_21",
+      "generated_seed": 3893089840,
+      "item_id": "circuit_board",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-1:-2:0:container_21:000",
+      "marker_id": "-1:-2:0",
+      "origin": {
+        "loot_container": "container_21",
+        "seed_source": "-1:-2:0:container_21"
+      },
+      "quantity": 2
+    },
+    {
+      "container_id": "container_52",
+      "generated_seed": 3496796182,
+      "item_id": "ceramic_plate",
+      "loot_table": "salvage_engineering",
+      "lot_id": "loot:-2:-2:1:container_52:000",
+      "marker_id": "-2:-2:1",
+      "origin": {
+        "loot_container": "container_52",
+        "seed_source": "-2:-2:1:container_52"
+      },
+      "quantity": 1
+    }
+  ],
+  "mounted_donor_candidates": [
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_06_wall_0",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_06",
+      "ship_id": "ship_0:-2:1"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_06_wall_1",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_06",
+      "ship_id": "ship_0:-2:1"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_06_wall_2",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_06",
+      "ship_id": "ship_0:-2:1"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "engineering_06_wall_3",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "engineering_06",
+      "ship_id": "ship_0:1:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_07_wall_0",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-2:0:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_07_wall_1",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-2:0:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_07_wall_2",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-2:0:2"
+    },
+    {
+      "component_id": "machinery_block",
+      "component_instance_id": "reactor_07_center_0",
+      "item_form": "machinery_block",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-2:0:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_07_wall_1",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-1:1:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "reactor_07_wall_2",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "reactor_07",
+      "ship_id": "ship_-1:1:2"
+    },
+    {
+      "component_id": "reactor_console",
+      "component_instance_id": "engineering_06_wall_0",
+      "item_form": "reactor_console",
+      "mounted": true,
+      "room_id": "engineering_06",
+      "ship_id": "ship_-1:-2:0"
+    }
+  ],
+  "travel_failures": [
+    {
+      "marker_id": "1:0:0",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "1:-1:2",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "0:1:0",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "1:-1:0",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "-1:1:0",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "-1:1:1",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "0:1:1",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "-2:0:1",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    },
+    {
+      "marker_id": "1:0:1",
+      "result": {
+        "reason": "unknown_marker",
+        "ship": null,
+        "success": false
+      }
+    }
+  ],
+  "qualification": "Forced repair was used only to enable discovery travel; this is not starter-journey acceptance. Advanced candidates are retained only where origin.seed_source exactly matches the visited marker/container."
+}

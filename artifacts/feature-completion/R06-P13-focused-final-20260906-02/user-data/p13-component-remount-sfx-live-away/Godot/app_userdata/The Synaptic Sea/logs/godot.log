@@ -1,0 +1,5 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true

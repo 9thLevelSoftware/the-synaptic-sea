@@ -17,6 +17,7 @@ const ShipModificationPanelScript := preload("res://scripts/ui/ship_modification
 const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const WorkActionDriverScript := preload("res://scripts/systems/work_action_driver.gd")
 const ShipWorkTransactionScript := preload("res://scripts/systems/ship_work_transaction.gd")
+const ShipWorkContextScript := preload("res://scripts/systems/ship_work_context.gd")
 const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
@@ -50,6 +51,7 @@ const DemoScopeGateScript := preload("res://scripts/systems/demo_scope_gate.gd")
 const SaveLoadMenuScript := preload("res://scripts/ui/save_load_menu.gd")
 const AchievementStateScript := preload("res://scripts/systems/achievement_state.gd")
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
+const SaveRestoreCandidateScript := preload("res://scripts/systems/save_restore_candidate.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
@@ -229,6 +231,9 @@ var _last_ship_work_result: Dictionary = {}
 var _active_ship_work_target_position: Vector3 = Vector3.ZERO
 var _active_ship_work_has_position: bool = false
 var _ship_work_commit_count: int = 0
+var _ship_work_effect_count: int = 0
+var _ship_work_noise_completion_count: int = 0
+var _ship_work_xp_award_count: int = 0
 var wound_state  # WoundState (PKG-C3.1a)
 var ship_modification_state  # ShipModificationState (PKG-D2.6)
 var component_placement_state  # ComponentPlacementState (PKG-B2.3 / D6.1)
@@ -268,6 +273,7 @@ var meta_progression_state # MetaProgressionState (REQ-PM-006)
 var unlock_registry      # UnlockRegistry (REQ-PM-009)
 var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
 var current_occupancy      # ShipInstance the player currently occupies (defaults to home_ship)
+var selected_ship_id: String = ""  # FC-15 explicit inspection/work owner; session-local
 var synaptic_sea_world         # SynapticSeaWorld
 var scanner_state          # ScannerState
 var travel_controller      # TravelController
@@ -303,6 +309,7 @@ var piloted_ship = null                     # the ShipInstance the player curren
 # Phase 5b Task 5: the active host's closed dock-seam barriers (Array[DockPortBarrier]).
 # Spawned closed when the piloted ship docks to a host; the player breaches one to board.
 var dock_barriers: Array = []
+var _initial_lifeboat_spawn_applied: bool = false
 const PLAYER_LOCAL_ID := "player_local"
 var bridge_terminals: Array = []
 var hangar_controls: Array = []             # Array[HangarBayControl]
@@ -372,6 +379,12 @@ var recipe_knowledge_state                  # RecipeKnowledgeState, current-run 
 var deconstruction_resolver                 # DeconstructionResolver
 var crafting_station_root: Node3D = null
 var crafting_stations: Array = []
+## Session-stable ship -> station kind -> local placement plan. The first build
+## chooses an owner-reachable floor cell; binding refreshes and scene revisits
+## reuse that exact placement, so live jobs and pending receipts never re-key
+## because docking topology changed around the owner.
+var _crafting_station_positions_by_owner: Dictionary = {}
+var _crafting_station_unavailable_by_owner: Dictionary = {}
 const CRAFTING_STATION_KINDS: Array[String] = ["fabricator", "medbay", "kitchen", "synthesizer", "workbench", "salvage"]
 var production_stations: Array = []
 var _loot_tables: Dictionary = {}
@@ -514,6 +527,16 @@ var sequence_interactables: Dictionary = {}
 var save_load_service: SaveLoadService
 var last_saved_snapshot: RunSnapshot
 var _is_reloading: bool = false
+# WorldSnapshot keeps home access outside RunSnapshot. These transient fields
+# carry the already-detached/validated owner through the synchronous run reload
+# so _on_ship_loaded never guesses from the previous process-local home handle.
+var _pending_world_home_access_restore_active: bool = false
+var _pending_world_home_access_restore = null
+var _restore_staging_mode: bool = false
+var _staged_restore_candidate = null
+var _staged_restore_ready: bool = false
+var _staged_restore_failure_reason: String = ""
+var _staged_restore_failure_point: String = ""
 # Timed/rotating autosave loop. Additive to the REQ-012 checkpoint save
 # (_auto_save_current_run -> save_world -> current_run.json); writes rotating
 # autosave_a/b/c slots the SaveLoadMenu surfaces. No new RunSnapshot field.
@@ -539,9 +562,329 @@ var _last_derelict_hazards_seeded: Array = []  # validation seam: hazard kinds w
 ## emission of `ship_loaded`, this scene must be adjusted (e.g. move
 ## ready-signal logic out of _ready and gate it on ship_loaded explicitly).
 func _ready() -> void:
-	ensure_default_input_actions()
+	if not _restore_staging_mode:
+		ensure_default_input_actions()
+	elif _staged_restore_candidate != null:
+		_crafting_station_positions_by_owner = (
+			_staged_restore_candidate.get("station_positions_by_owner") as Dictionary).duplicate(true)
 	_build_runtime_nodes()
 	loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+	if _restore_staging_mode:
+		_finish_restore_staging()
+
+
+func configure_restore_staging(candidate, failure_point: String = "") -> bool:
+	if is_inside_tree() or candidate == null \
+			or str(candidate.get("effective_run_id")).is_empty():
+		return false
+	_restore_staging_mode = true
+	_staged_restore_candidate = candidate
+	_staged_restore_failure_point = failure_point
+	process_mode = Node.PROCESS_MODE_DISABLED
+	visible = false
+	return true
+
+
+func is_restore_staging_ready() -> bool:
+	return _restore_staging_mode and _staged_restore_ready \
+		and _staged_restore_failure_reason.is_empty()
+
+
+func get_restore_staging_failure_reason() -> String:
+	return _staged_restore_failure_reason
+
+
+func _finish_restore_staging() -> void:
+	if not playable_started:
+		_staged_restore_failure_reason = (
+			last_failure_reason if not last_failure_reason.is_empty() else "initial_rebuild_failed")
+		return
+	if _staged_restore_failure_point == "after_rebuild":
+		_staged_restore_failure_reason = "injected_after_rebuild"
+		return
+	if _staged_restore_candidate == null \
+			or not _apply_world_snapshot(_staged_restore_candidate.get("world_snapshot")):
+		if _staged_restore_failure_reason.is_empty():
+			_staged_restore_failure_reason = "world_apply_failed"
+		return
+	if _staged_restore_failure_point == "after_world_apply":
+		_staged_restore_failure_reason = "injected_after_world_apply"
+		return
+	var validation_reason: String = _validate_staged_restore(_staged_restore_candidate)
+	if not validation_reason.is_empty():
+		_staged_restore_failure_reason = validation_reason
+		return
+	_staged_restore_ready = true
+
+
+func activate_staged_restore() -> bool:
+	if not is_restore_staging_ready():
+		return false
+	if _staged_restore_failure_point == "before_activation":
+		return false
+	_restore_staging_mode = false
+	_staged_restore_candidate = null
+	_staged_restore_failure_point = ""
+	process_mode = Node.PROCESS_MODE_INHERIT
+	visible = true
+	if is_instance_valid(hud_layer):
+		hud_layer.visible = true
+	dismiss_boot_menu()
+	if save_load_service != null:
+		save_load_service.set_active_run_id(_run_id)
+	if is_instance_valid(audio_manager) \
+			and audio_manager.has_method("activate_deferred_server_writes"):
+		audio_manager.activate_deferred_server_writes()
+	if is_instance_valid(camera_rig) \
+			and camera_rig.has_method("activate_deferred_current"):
+		camera_rig.activate_deferred_current()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_load_available(true)
+	return true
+
+
+func _validate_staged_restore(candidate) -> String:
+	if candidate == null or _run_id != str(candidate.get("effective_run_id")):
+		return "staged_run_identity_mismatch"
+	if inventory_state == null or inventory_state.get_summary() != candidate.get("player_inventory").get_summary():
+		return "staged_player_inventory_mismatch"
+	if recipe_knowledge_state == null \
+			or recipe_knowledge_state.get_summary() != candidate.get("recipe_knowledge_state").get_summary():
+		return "staged_recipe_knowledge_mismatch"
+	if crafting_state == null or field_crafting_state == null:
+		return "staged_crafting_missing"
+	var expected_crafting: Dictionary = candidate.get("crafting_state").get_summary()
+	var actual_crafting: Dictionary = crafting_state.get_summary()
+	if actual_crafting.get("craft_jobs_v1", {}) != expected_crafting.get("craft_jobs_v1", {}):
+		return "staged_craft_jobs_mismatch"
+	var expected_field: Dictionary = candidate.get("field_crafting_state").get_summary()
+	var actual_field: Dictionary = field_crafting_state.get_summary()
+	if actual_field.get("field_crafting", {}) != expected_field.get("field_crafting", {}):
+		print("P10 FIELD AUTHORITY DIFF %s" % _first_authority_difference(
+			expected_field.get("field_crafting", {}),
+			actual_field.get("field_crafting", {}), "field_crafting"))
+		return "staged_field_crafting_mismatch"
+	if home_ship == null or home_ship.get_pending_output_store().get_summary() \
+			!= candidate.get("home_ship").get_pending_output_store().get_summary():
+		return "staged_home_pending_mismatch"
+	var expected_world = candidate.get("world_snapshot")
+	if str(current_ship.marker_id if current_ship != null else "") != str(expected_world.current_location) \
+			or not is_equal_approx(world_time, float(expected_world.world_time)):
+		return "staged_world_location_mismatch"
+	for marker_v in expected_world.visited_ships:
+		var marker_id: String = str(marker_v)
+		var live_ship = visited_ships.get(marker_id, null)
+		var expected_ship = candidate.get("visited_ships").get(marker_id, null)
+		if live_ship == null or expected_ship == null \
+				or live_ship.get_pending_output_store().get_summary() \
+					!= expected_ship.get_pending_output_store().get_summary():
+			return "staged_visited_pending_mismatch"
+	var component_reason: String = _validate_staged_component_placements(candidate)
+	if not component_reason.is_empty():
+		return component_reason
+	var station_reason: String = _validate_staged_station_positions(candidate)
+	if not station_reason.is_empty():
+		return station_reason
+	if _canonical_dock_edges(_current_dock_edges()) \
+			!= _canonical_dock_edges(expected_world.dock_edges):
+		return "staged_dock_edges_mismatch"
+	if str(piloted_ship.ship_id if piloted_ship != null else "") \
+			!= str(expected_world.piloted_ship_id) \
+			or str(current_occupancy.ship_id if current_occupancy != null else "") \
+				!= str(expected_world.aboard_ship_id):
+		return "staged_docking_owner_mismatch"
+	var actual_opened: Array = _opened_port_marker_ids()
+	var expected_opened: Array = expected_world.opened_ports.duplicate()
+	actual_opened.sort()
+	expected_opened.sort()
+	if actual_opened != expected_opened:
+		return "staged_opened_ports_mismatch"
+	var captured = _build_world_snapshot()
+	if captured == null:
+		return "staged_capture_failed"
+	var recaptured: Dictionary = SaveRestoreCandidateScript.build(captured, _run_id)
+	if not bool(recaptured.get("ok", false)):
+		return "staged_recapture_%s" % str(recaptured.get("reason", "invalid"))
+	# Compare the complete persisted authority after applying it to the disposable
+	# sibling. The only excluded fields are save/index stamps regenerated on each
+	# capture; gameplay summaries, owner graphs, positions, world time and every
+	# nested ship remain exact. This catches any rejected or partially applied
+	# nonempty model summary before Main can swap the scene.
+	var actual_authority: Dictionary = _canonical_restore_world(captured)
+	var expected_authority: Dictionary = _canonical_restore_world(expected_world)
+	if actual_authority != expected_authority:
+		print("P10 RESTORE AUTHORITY DIFF %s" % _first_authority_difference(
+			expected_authority, actual_authority))
+		return "staged_world_authority_mismatch"
+	return ""
+
+
+func _first_authority_difference(expected: Variant, actual: Variant, path: String = "world") -> String:
+	if typeof(expected) != typeof(actual):
+		return "%s type expected=%s actual=%s" % [path, typeof(expected), typeof(actual)]
+	if expected is Dictionary:
+		var expected_dict: Dictionary = expected
+		var actual_dict: Dictionary = actual
+		var expected_keys: Array = expected_dict.keys()
+		expected_keys.sort()
+		var actual_keys: Array = actual_dict.keys()
+		actual_keys.sort()
+		if expected_keys != actual_keys:
+			return "%s keys expected=%s actual=%s" % [path, expected_keys, actual_keys]
+		for key_v in expected_keys:
+			var child: String = _first_authority_difference(
+				expected_dict[key_v], actual_dict[key_v], "%s.%s" % [path, str(key_v)])
+			if not child.is_empty():
+				return child
+		return ""
+	if expected is Array:
+		var expected_array: Array = expected
+		var actual_array: Array = actual
+		if expected_array.size() != actual_array.size():
+			return "%s size expected=%d actual=%d" % [
+				path, expected_array.size(), actual_array.size()]
+		for index in range(expected_array.size()):
+			var child: String = _first_authority_difference(
+				expected_array[index], actual_array[index], "%s[%d]" % [path, index])
+			if not child.is_empty():
+				return child
+		return ""
+	if expected != actual:
+		return "%s expected=%s actual=%s" % [path, str(expected), str(actual)]
+	return ""
+
+
+func _canonical_restore_world(world) -> Dictionary:
+	if world == null or not world.has_method("to_dict"):
+		return {}
+	var authority: Dictionary = world.to_dict().duplicate(true)
+	# These fields describe the save operation/index row, not restored gameplay.
+	authority.erase("saved_at")
+	var home_v: Variant = authority.get("home_ship", null)
+	if home_v is Dictionary:
+		var home: Dictionary = (home_v as Dictionary).duplicate(true)
+		for metadata_key in [
+				"slot_id", "slot_kind", "is_autosave", "is_quicksave",
+				"parent_world_slot", "saved_at", "saved_at_epoch"]:
+			home.erase(metadata_key)
+		# This cached flag reports the player's current scene overlap (or active
+		# field atmosphere), which is recomputed by the first production oxygen
+		# tick after activation. It is type-checked by RunSnapshot.from_dict but is
+		# not persisted gameplay authority. Every oxygen value, rate, threshold,
+		# breach flag, passability flag and zone ID remains exact below.
+		var oxygen_v: Variant = home.get("oxygen_summary", null)
+		if oxygen_v is Dictionary:
+			var oxygen: Dictionary = (oxygen_v as Dictionary).duplicate(true)
+			oxygen.erase("player_in_breach_zone")
+			home["oxygen_summary"] = oxygen
+		authority["home_ship"] = home
+	for set_key in ["home_looted_containers", "opened_ports"]:
+		var values_v: Variant = authority.get(set_key, null)
+		if values_v is Array:
+			var values: Array = (values_v as Array).duplicate()
+			values.sort()
+			authority[set_key] = values
+	# MetaProgressionState.to_dict() regenerates this serialization timestamp on
+	# every call and apply_summary intentionally does not consume it. Currency,
+	# unlocks, counters, selected class, and payout evidence remain compared.
+	var meta_v: Variant = authority.get("meta_progression_summary", null)
+	if meta_v is Dictionary:
+		var meta: Dictionary = (meta_v as Dictionary).duplicate(true)
+		meta.erase("saved_at")
+		authority["meta_progression_summary"] = meta
+	authority["dock_edges"] = _canonical_dock_edges(
+		authority.get("dock_edges", []) as Array)
+	var json_value: Variant = JSON.parse_string(JSON.stringify(authority, "", true, true))
+	return json_value as Dictionary if json_value is Dictionary else {}
+
+
+func _validate_staged_component_placements(candidate) -> String:
+	for ship_id_v in candidate.get("component_placements"):
+		var ship_id: String = str(ship_id_v)
+		var expected = candidate.get("component_placements")[ship_id_v]
+		var owner = _find_ship_by_id(ship_id)
+		if owner == null or expected == null:
+			return "staged_component_owner_missing"
+		var expected_summary: Dictionary = expected.get_summary()
+		var live_summary: Dictionary = owner.component_placement_summary
+		if owner.get_live_component_placement() != null:
+			live_summary = owner.get_live_component_placement().get_summary()
+		# Live placement legitimately carries layout-derived fit policy. Compare
+		# through the same detached disk boundary that strips those fields rather
+		# than treating policy reconstruction as a persistent-state mutation.
+		var canonical_live = ComponentPlacementStateScript.new()
+		if not canonical_live.apply_summary(live_summary, ship_id):
+			return "staged_component_placement_mismatch"
+		var canonical_live_json: Variant = JSON.parse_string(JSON.stringify(
+			canonical_live.get_summary(), "", true, true))
+		var expected_json: Variant = JSON.parse_string(JSON.stringify(
+			expected_summary, "", true, true))
+		if canonical_live_json != expected_json:
+			print("P10 COMPONENT AUTHORITY DIFF owner=%s %s" % [
+				ship_id, _first_authority_difference(
+					expected_json, canonical_live_json, "component_placement")])
+			return "staged_component_placement_mismatch"
+	return ""
+
+
+func _validate_staged_station_positions(candidate) -> String:
+	var expected_by_owner: Dictionary = candidate.get("station_positions_by_owner")
+	for ship_id_v in expected_by_owner:
+		var ship_id: String = str(ship_id_v)
+		var owner = _find_ship_by_id(ship_id)
+		if owner == null:
+			return "staged_station_owner_missing"
+		if not is_instance_valid(owner.scene_root):
+			_ensure_derelict_geometry(owner)
+		if not is_instance_valid(owner.scene_root):
+			return "staged_station_layout_missing"
+		var planned: Dictionary = expected_by_owner[ship_id_v]
+		if planned.is_empty():
+			continue
+		if planned.size() != CRAFTING_STATION_KINDS.size():
+			return "staged_station_plan_incomplete"
+		var candidates: Array = _structural_floor_positions_for_ship(owner)
+		for kind_v in CRAFTING_STATION_KINDS:
+			var kind: String = str(kind_v)
+			if not planned.has(kind) \
+					or not _station_position_is_candidate(planned[kind] as Vector3, candidates):
+				return "staged_station_layout_mismatch"
+		var context = _ship_work_context_for(ship_id)
+		if context == null or not context.matches_binding(owner):
+			continue
+		_ensure_crafting_stations_for_owner(owner)
+		for kind_v in CRAFTING_STATION_KINDS:
+			var position: Vector3 = planned[kind_v] as Vector3
+			var station_id: String = _crafting_station_instance_id(str(kind_v), position)
+			var found: bool = false
+			for station in crafting_stations:
+				if is_instance_valid(station) and station.get_parent() == owner.scene_root \
+						and str(station.ship_id) == ship_id \
+						and str(station.station_instance_id) == station_id \
+						and str(station.station_kind) == str(kind_v):
+					found = true
+					break
+			if not found:
+				return "staged_station_node_missing"
+	return ""
+
+
+func _canonical_dock_edges(raw_edges: Array) -> Array:
+	var canonical: Array = []
+	for edge_v in raw_edges:
+		if edge_v is Dictionary:
+			var edge: Dictionary = edge_v
+			canonical.append({
+				"host": str(edge.get("host", "")),
+				"mobile": str(edge.get("mobile", "")),
+				"port_type": str(edge.get("port_type", "airlock")),
+				"slot_index": int(edge.get("slot_index", -1)),
+			})
+	canonical.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return JSON.stringify(left, "", true) < JSON.stringify(right, "", true))
+	return canonical
 
 # A11Y-P1-002 (P1 accessibility: alternate keyboard bindings): movement,
 # interaction, and manual save/load expose at least one alternate keyboard
@@ -1255,6 +1598,13 @@ func _title_from_snake(raw: String) -> String:
 	return " ".join(words)
 
 func _build_runtime_nodes() -> void:
+	# Establish the run identity before constructing any player-owned lot
+	# authority. Fresh runs previously allocated anonymous inventory lots and
+	# only generated the run ID later, which made a production capture fail the
+	# strict detached owner graph on its first save.
+	_run_id = str(_staged_restore_candidate.get("effective_run_id")) \
+		if _restore_staging_mode and _staged_restore_candidate != null \
+		else _generate_run_id()
 	ship_systems_manager = ShipSystemsManagerScript.new()
 	var bp = _load_blueprint_for_systems()
 	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
@@ -1333,7 +1683,7 @@ func _build_runtime_nodes() -> void:
 	# REQ-007 inventory/tool runtime nodes. InventoryState is a pure model
 	# (RefCounted); tool_pickup_root is the parent for any ToolPickup node
 	# the coordinator spawns during ship load.
-	inventory_state = InventoryStateScript.new()
+	inventory_state = InventoryStateScript.new("player:%s" % _run_id)
 	equipment_state = EquipmentStateScript.create()
 	tool_pickup_root = Node3D.new()
 	tool_pickup_root.name = "ToolPickupRoot"
@@ -1391,6 +1741,8 @@ func _build_runtime_nodes() -> void:
 	# uses.
 	audio_manager = AudioManagerScript.new()
 	audio_manager.name = "AudioManager"
+	if _restore_staging_mode and audio_manager.has_method("configure_restore_staging"):
+		audio_manager.configure_restore_staging()
 	if audio_manager.has_signal("voice_log_played") \
 			and not audio_manager.voice_log_played.is_connected(_on_voice_log_played):
 		audio_manager.voice_log_played.connect(_on_voice_log_played)
@@ -1426,7 +1778,6 @@ func _build_runtime_nodes() -> void:
 	# run_id slot-ownership rework: stamp this session's run identity into
 	# the service immediately, so every save this run makes before any
 	# later Continue/F9 load is already attributed to this run's freeze set.
-	_run_id = _generate_run_id()
 	save_load_service.set_active_run_id(_run_id)
 	recipe_knowledge_state = RecipeKnowledgeStateScript.new()
 	recipe_knowledge_state.configure("player:%s" % _run_id, crafting_state.get_recipe_catalog())
@@ -1674,6 +2025,14 @@ func _catch_up_ship(inst) -> void:
 	if inst == null or inst == home_ship:
 		return
 	_runtime_for(inst).catch_up(world_time)
+	# ShipRuntime delivers completed jobs into CraftingState's durable receipt
+	# queue. Settle every receipt against its exact ship/station pending store
+	# before the first revisited frame; otherwise output_ready can remain stuck
+	# until an unrelated hub power tick happens to drain the global queue.
+	var receipt_count: int = crafting_state.completion_receipt_count() \
+		if crafting_state != null and crafting_state.has_method("completion_receipt_count") else 0
+	for _receipt_index in range(receipt_count):
+		_on_craft_completed()
 
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
@@ -1990,9 +2349,11 @@ func recompute_occupancy() -> void:
 		return
 	var resolved = home_ship
 	if player != null and player is Node3D:
-		var r = ShipOccupancyScript.resolve((player as Node3D).global_position, _occupancy_entries())
+		var player_position: Vector3 = (player as Node3D).global_position
+		var r = ShipOccupancyScript.resolve(player_position, _occupancy_entries())
 		if r != null:
 			resolved = r
+		resolved = _resolve_authenticated_dock_overlap(player_position, resolved)
 	current_occupancy = resolved
 	# Phase 5b Task 5: "away" means the player is away from the HOME complex. With
 	# physical docking the player rides the piloted ship; while that ship is docked to
@@ -2001,6 +2362,64 @@ func recompute_occupancy() -> void:
 	var at_home_complex: bool = (current_occupancy == home_ship) \
 		or (piloted_ship != null and current_occupancy == piloted_ship and piloted_ship.parent_ship == home_ship)
 	away_from_start = not at_home_complex
+
+
+## Merged per-room AABBs overlap around a flush dock even though the collision
+## hulls do not. The authenticated connection's exact registered host endpoint
+## plane resolves that overlap: its inward half-space belongs to the host and
+## its outward half-space (including the shared threshold) belongs to mobile.
+func _resolve_authenticated_dock_overlap(
+		player_position: Vector3, fallback_owner):
+	if piloted_ship == null or piloted_ship.parent_ship == null \
+			or not is_instance_valid(piloted_ship.scene_root):
+		return fallback_owner
+	var host = piloted_ship.parent_ship
+	if host.scene_root == null or not is_instance_valid(host.scene_root) \
+			or not piloted_ship.interior_aabb().has_point(player_position) \
+			or not host.interior_aabb().has_point(player_position):
+		return fallback_owner
+	var host_local: Dictionary = DockPortsScript.for_derelict(
+		host.built_layout, _ship_seed(host),
+		0 if host == home_ship else _ship_condition_class(host))
+	var mobile_local: Dictionary = _piloted_port_local()
+	if host_local.is_empty() or mobile_local.is_empty():
+		return fallback_owner
+	var expected_connection_id: String = _dock_connection_id(
+		host, host_local, piloted_ship, mobile_local)
+	var authenticated_barrier: bool = false
+	for barrier in dock_barriers:
+		if is_instance_valid(barrier) \
+				and barrier.get_parent() == piloted_ship.scene_root \
+				and str(barrier.marker_id) == str(host.marker_id) \
+				and str(barrier.host_endpoint_id) == str(
+					host_local.get("endpoint_id", "")) \
+				and str(barrier.mobile_endpoint_id) == str(
+					mobile_local.get("endpoint_id", "")) \
+				and str(barrier.connection_id) == expected_connection_id:
+			authenticated_barrier = true
+			break
+	if not authenticated_barrier:
+		return fallback_owner
+	var host_world: Dictionary = DockingManagerScript.host_port_to_world(
+		host, host_local)
+	if host_world.is_empty():
+		return fallback_owner
+	var plane_position: Vector3 = host_world.get(
+		"position", Vector3.INF) as Vector3
+	var outward: Vector3 = host_world.get("facing", Vector3.ZERO) as Vector3
+	if not plane_position.is_finite() or outward == Vector3.ZERO:
+		return fallback_owner
+	return host if (player_position - plane_position).dot(outward) < 0.0 \
+		else piloted_ship
+
+
+func _dock_connection_id(
+		host, host_port: Dictionary, mobile, mobile_port: Dictionary) -> String:
+	if host == null or mobile == null:
+		return ""
+	return "dock:%s:%s:%s:%s" % [str(host.ship_id),
+		str(host_port.get("endpoint_id", "")), str(mobile.ship_id),
+		str(mobile_port.get("endpoint_id", ""))]
 
 ## A bridge terminal fired login_requested. Gate on the ship being a working
 ## vessel, then claim it for the local player and take command. Refused logins
@@ -2246,15 +2665,13 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 ## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
 ## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
 func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: float = -1.0) -> void:
-	# Live Persistent Ships Phase 4: fast-forward the absent ship's sim by elapsed world_time
-	# before activating it. First visit: dt=0 (seeded), no-op. Revisit: applies the absence.
-	_catch_up_ship(inst)
 	inst.scene_root = new_root
 	add_child(new_root)
 	new_root.position = DERELICT_DOCK_OFFSET   # initial world anchor; piloted ship docks TO it
 	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
 		inst.built_layout = new_root.get_layout_copy()
 	current_ship = inst
+	_select_ship_after_transition(inst)
 	away_from_start = true
 	# Domain 10 Task 5 fix (finding 2): reset the proximity-tooltip focus cache on
 	# board too — objective types repeat across derelicts, so a stale subject_id
@@ -2278,7 +2695,7 @@ func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: fl
 			# Belt-and-suspenders: the travel_to precheck already rules out
 			# incompatibility, but if a dock ever fails after undocking, re-dock to home
 			# so the player is never physically stranded undocked.
-			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
+			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % JSON.stringify(dock_res))
 			_dock_piloted_to(home_ship)
 		else:
 			_emit_dock_land_sfx()
@@ -2331,6 +2748,15 @@ func _attach_derelict_active(inst, new_root: Node3D, preserved_player_oxygen: fl
 	# PKG-D6.1: re-apply sparse integrity after geometry rebuild (revisit path).
 	_restore_module_integrity_for_current_ship()
 	_restore_or_populate_component_placement_for_current_ship()
+	# Keep this attached derelict's physical station nodes and owner-keyed craft
+	# state available for when the player boards it. They are not borrowed from
+	# the home ship and are range-gated until the owner becomes occupied.
+	_ensure_crafting_stations_for_owner(inst)
+	# Catch up only after the restored physical stations have rebound the exact
+	# owner contexts used by the scheduler. A data-only visited ship has no scene
+	# adapters after a fresh load; advancing it earlier would no-op, then consume
+	# last_sim_time and permanently lose the elapsed absence interval.
+	_catch_up_ship(inst)
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2401,20 +2827,31 @@ func _reposition_subtree(captured: Array) -> void:
 
 ## Spawns the closed dock-seam barrier for `inst` at its dock-port world position,
 ## condition from the derelict's seed/condition. Home derelict is always intact.
-func _spawn_dock_barrier(inst) -> void:
+func _spawn_dock_barrier(inst) -> bool:
 	_clear_dock_barriers()
-	if inst == null or not is_instance_valid(inst.scene_root):
-		return
-	var local: Dictionary = DockPortsScript.for_derelict(inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
-	if local.is_empty():
-		return
-	var cond: String = "intact" if inst == home_ship else str(local.get("condition", "intact"))
+	if inst == null or piloted_ship == null \
+			or not is_instance_valid(inst.scene_root) \
+			or not is_instance_valid(piloted_ship.scene_root):
+		return false
+	var host_local: Dictionary = DockPortsScript.for_derelict(
+		inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
+	var mobile_local: Dictionary = _piloted_port_local()
+	if host_local.is_empty() or mobile_local.is_empty():
+		return false
+	var cond: String = "intact" if inst == home_ship else str(host_local.get("condition", "intact"))
 	var barrier = DockPortBarrierScript.new()
-	# Local position under the derelict's scene_root (the port is ship-local).
-	(inst.scene_root as Node3D).add_child(barrier)
-	barrier.configure(String(inst.marker_id), cond, player_progression, local["position"] as Vector3, 6.0, 1.8)
+	# The mobile endpoint owns the seam barrier, so it follows the mobile root
+	# through rigid docking moves and cannot remain on an obsolete host.
+	(piloted_ship.scene_root as Node3D).add_child(barrier)
+	barrier.configure_endpoint(
+		String(inst.marker_id), cond, player_progression, mobile_local, 6.0)
+	barrier.host_endpoint_id = str(host_local.get("endpoint_id", ""))
+	barrier.mobile_endpoint_id = str(mobile_local.get("endpoint_id", ""))
+	barrier.connection_id = _dock_connection_id(
+		inst, host_local, piloted_ship, mobile_local)
 	barrier.breach_opened.connect(_on_dock_barrier_opened)
 	dock_barriers.append(barrier)
+	return true
 
 func _clear_dock_barriers() -> void:
 	for b in dock_barriers:
@@ -2427,6 +2864,7 @@ func _clear_dock_barriers() -> void:
 func _on_dock_barrier_opened(_marker_id: String) -> void:
 	# Boarding the derelict is now possible; occupancy flips as the player crosses.
 	recompute_occupancy()
+	_build_crafting_stations()
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_OPEN)
 
@@ -3796,11 +4234,60 @@ func get_sea_graph_for_validation():
 
 
 func _active_ship_id_for_work() -> String:
-	if current_ship != null and not String(current_ship.ship_id).is_empty():
-		return String(current_ship.ship_id)
-	if home_ship != null and not String(home_ship.ship_id).is_empty():
-		return String(home_ship.ship_id)
-	return "ship_start"
+	return selected_ship_id
+
+
+func select_ship_for_modification(ship_id: String) -> Dictionary:
+	var owner = _find_ship_by_id(ship_id)
+	if owner == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	# Selection is inspection, so ownership/access is deliberately not checked.
+	# The target must nevertheless be a known, physically present ship.
+	if not is_instance_valid(owner.scene_root) or owner.scene_root.get_parent() != self:
+		return {"ok": false, "reason": "target_not_attached"}
+	if not _active_ship_work_id.is_empty() and selected_ship_id != ship_id:
+		_pause_active_ship_work("wrong_ship")
+	selected_ship_id = ship_id
+	if ship_modification_panel != null and ship_modification_panel.is_open():
+		_bind_ship_modification_panel_to_selected_ship(_inventory_qty_dict_for_work())
+	return {"ok": true, "reason": "ok", "ship_id": ship_id}
+
+
+func get_selected_ship_id_for_validation() -> String:
+	return selected_ship_id
+
+
+func select_ship_for_modification_for_validation(ship_id: String) -> Dictionary:
+	return select_ship_for_modification(ship_id)
+
+
+func _ship_work_context_for(ship_id: String):
+	var owner = _find_ship_by_id(ship_id)
+	if owner == null:
+		return null
+	var context = ShipWorkContextScript.new()
+	var access_ok: bool = owner.access != null and owner.get_access().has_access(PLAYER_LOCAL_ID)
+	var configured: Dictionary = context.configure(owner, {
+		"module_integrity": owner.get_live_module_integrity(),
+		"component_placement": owner.get_live_component_placement(),
+		"ship_modification": owner.get_live_ship_modification(),
+		"work_transactions": owner.get_live_work_transactions(),
+		"crafting_state": crafting_state,
+		"binding_generation": owner.get_live_binding_generation(),
+		"is_attached": is_instance_valid(owner.scene_root) and owner.scene_root.get_parent() == self,
+		"is_occupied": current_occupancy == owner,
+		"is_piloted": piloted_ship == owner,
+		"has_access": access_ok,
+	})
+	return context if bool(configured.get("ok", false)) else null
+
+
+func _physical_work_preflight(ship_id: String, require_access: bool) -> Dictionary:
+	recompute_occupancy()
+	var context = _ship_work_context_for(ship_id)
+	if context == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	return context.preflight_physical_mutation(selected_ship_id, require_access)
 
 
 func _ship_work_transaction_for(owner_id: String):
@@ -3814,14 +4301,19 @@ func _ship_work_transaction_for(owner_id: String):
 	return transaction
 
 
-func _ensure_ship_work_transaction_owner() -> bool:
-	var owner_id: String = _active_ship_id_for_work()
-	if owner_id.is_empty():
+func _activate_ship_work_transaction_owner(context) -> bool:
+	if context == null or context.work_transactions == null:
 		return false
-	if not _active_ship_work_id.is_empty():
-		return ship_work_transactions != null and str(ship_work_transactions.get("ship_id")) == owner_id
-	ship_work_transactions = _ship_work_transaction_for(owner_id)
-	return ship_work_transactions != null
+	var owner_id: String = str(context.ship_id)
+	var transaction = context.work_transactions
+	if owner_id.is_empty() or str(transaction.get("ship_id")) != owner_id \
+			or not _ship_work_transactions_by_ship.has(owner_id) \
+			or _ship_work_transactions_by_ship[owner_id] != transaction:
+		return false
+	if not _active_ship_work_id.is_empty() and ship_work_transactions != transaction:
+		return false
+	ship_work_transactions = transaction
+	return true
 
 
 func _selected_lot_ids_for_requirements(requirements: Dictionary) -> PackedStringArray:
@@ -3887,29 +4379,88 @@ func _start_transactional_work(
 		context: Dictionary,
 		payload: Dictionary = {},
 		target_position: Variant = null,
-		preselected_lot_ids: PackedStringArray = PackedStringArray()) -> Dictionary:
+		preselected_lot_ids: PackedStringArray = PackedStringArray(),
+		target_ship_id: String = "") -> Dictionary:
+	if target_ship_id.is_empty():
+		return {"ok": false, "reason": "missing_ship_owner"}
 	if not _active_ship_work_id.is_empty() or work_action_driver == null or inventory_state == null:
 		return {"ok": false, "reason": "work_busy"}
 	if vitals_state != null and float(vitals_state.stamina) <= 0.001:
 		return {"ok": false, "reason": "exhausted"}
-	if not _ensure_ship_work_transaction_owner() or target_revision.is_empty():
-		return {"ok": false, "reason": "missing_work_authority"}
+	var work_owner_id: String = target_ship_id
+	# Attendance is world-position authority. Refresh it before constructing the
+	# owner context so every later target/range/physical admission reads one
+	# current snapshot rather than booleans captured before recomputation.
+	recompute_occupancy()
+	var work_context = _ship_work_context_for(work_owner_id)
+	if work_context == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	var current_target: Dictionary = _work_target_at_start(
+		target_id, target_kind, payload, work_context)
+	if not bool(current_target.get("exists", false)):
+		return {"ok": false, "reason": str(current_target.get("reason", "target_removed"))}
+	if target_revision.is_empty():
+		return {"ok": false, "reason": "missing_target_revision"}
+	if str(current_target.get("revision", "")) != target_revision:
+		return {"ok": false, "reason": "stale_target"}
+	if not (target_position is Vector3):
+		return {"ok": false, "reason": "missing_target_position"}
+	if not _work_position_is_finite(target_position):
+		return {"ok": false, "reason": "invalid_target_position"}
+	var canonical_position: Variant = _canonical_work_target_position(
+		target_id, target_kind, payload, work_context)
+	if not _work_position_is_finite(canonical_position):
+		return {"ok": false, "reason": "missing_target_position"}
+	if (target_position as Vector3).distance_to(canonical_position as Vector3) > 0.01:
+		return {"ok": false, "reason": "stale_target_position"}
+	if not is_instance_valid(player) or not (player is Node3D) \
+			or not _work_position_is_finite((player as Node3D).global_position):
+		return {"ok": false, "reason": "invalid_player_position"}
+	if (player as Node3D).global_position.distance_to(canonical_position as Vector3) \
+			> WORK_ACTION_INTERACT_RANGE:
+		return {"ok": false, "reason": "out_of_range"}
+	var physical_gate: Dictionary = work_context.preflight_physical_mutation(
+		selected_ship_id, target_kind in ["component_install", "component_uninstall"])
+	if not bool(physical_gate.get("ok", false)):
+		return physical_gate
 	if work_action_driver.catalog == null or not work_action_driver.catalog.has_action(action_id):
 		return {"ok": false, "reason": "unknown_action"}
 	var required_tool: String = str(work_action_driver.catalog.get_action(action_id).get("tool_class", ""))
-	if not required_tool.is_empty() and inventory_state.get_quantity(required_tool) <= 0 \
-			and inventory_state.get_quantity("tool_%s" % required_tool) <= 0:
+	if not required_tool.is_empty() and not _has_compatible_work_tool(action_id, required_tool):
 		return {"ok": false, "reason": "missing_tool"}
+	# The catalog class remains WorkActionState's gate. P09 resolves the concrete
+	# owned lot separately so action-specific crafted tools retain their identity
+	# and P05 quality snapshot without becoming broad class aliases.
+	context = context.duplicate(true)
+	context["tool_class"] = required_tool
+	context["selected_tool_lot"] = _selected_work_tool_lot(required_tool, action_id)
 	var requirements: Dictionary = _actual_work_requirements(action_id, payload)
 	var selected_ids: PackedStringArray = preselected_lot_ids.duplicate()
 	if selected_ids.is_empty():
 		selected_ids = _selected_lot_ids_for_requirements(requirements)
 	if not requirements.is_empty() and selected_ids.is_empty():
 		return {"ok": false, "reason": "missing_materials"}
+	if target_kind in ["component_install", "component_uninstall"]:
+		var selected_lot: Dictionary = _selected_inventory_lot(selected_ids)
+		if target_kind == "component_install" and selected_lot.is_empty():
+			return {"ok": false, "reason": "invalid_source_lot"}
+		if not selected_lot.is_empty():
+			selected_lot["quantity"] = 1
+		var component_gate: Dictionary = _preflight_component_work_target(
+			target_kind, payload, work_context, _inventory_qty_dict_for_work(), selected_lot)
+		if not bool(component_gate.get("ok", false)):
+			return component_gate
+		var effect_gate: Dictionary = _ship_mod_effect_authority_preflight(
+			str(payload.get("component_id", "")), work_context,
+			target_kind == "component_install")
+		if not bool(effect_gate.get("ok", false)):
+			return effect_gate
+	if not _activate_ship_work_transaction_owner(work_context):
+		return {"ok": false, "reason": "missing_work_authority"}
 	var work_id: String = ship_work_transactions.create_work_id(action_id)
 	var request: Dictionary = {
 		"work_id": work_id,
-		"ship_id": _active_ship_id_for_work(),
+		"ship_id": work_owner_id,
 		"target_id": target_id,
 		"target_kind": target_kind,
 		"target_revision": target_revision,
@@ -3929,8 +4480,8 @@ func _start_transactional_work(
 	_active_ship_work_id = work_id
 	_last_ship_work_id = work_id
 	_last_ship_work_result = started.duplicate(true)
-	_active_ship_work_has_position = target_position is Vector3
-	_active_ship_work_target_position = target_position as Vector3 if target_position is Vector3 else Vector3.ZERO
+	_active_ship_work_has_position = true
+	_active_ship_work_target_position = canonical_position as Vector3
 	_refresh_inventory_hud()
 	if ship_modification_panel != null:
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
@@ -3938,42 +4489,182 @@ func _start_transactional_work(
 	return started
 
 
-func _component_slot_revision(slot_id: String) -> String:
-	if component_placement_state == null:
+func _work_target_at_start(
+		target_id: String, target_kind: String, payload: Dictionary, work_context) -> Dictionary:
+	if work_context == null or target_id.is_empty():
+		return {"exists": false, "reason": "target_removed", "revision": ""}
+	if target_kind in ["component_install", "component_uninstall"]:
+		var slot_id: String = str(payload.get("slot_id", ""))
+		if slot_id.is_empty() or slot_id != target_id:
+			return {"exists": false, "reason": "target_mismatch", "revision": ""}
+		var revision: String = _component_slot_revision(slot_id, work_context)
+		return {
+			"exists": not revision.is_empty(),
+			"reason": "target_removed" if revision.is_empty() else "",
+			"revision": revision,
+		}
+	if target_kind == "module":
+		var module_revision: String = _module_target_revision(target_id, work_context)
+		return {
+			"exists": not module_revision.is_empty(),
+			"reason": "target_removed" if module_revision.is_empty() else "",
+			"revision": module_revision,
+		}
+	return {"exists": false, "reason": "unknown_target_kind", "revision": ""}
+
+
+func _work_position_is_finite(position_v: Variant) -> bool:
+	if not (position_v is Vector3):
+		return false
+	var position: Vector3 = position_v as Vector3
+	return is_finite(position.x) and is_finite(position.y) and is_finite(position.z)
+
+
+func _canonical_work_target_position(
+		target_id: String, target_kind: String, payload: Dictionary, work_context) -> Variant:
+	if work_context == null or target_id.is_empty():
+		return null
+	if target_kind in ["component_install", "component_uninstall"]:
+		var slot_id: String = str(payload.get("slot_id", ""))
+		if slot_id.is_empty() or slot_id != target_id:
+			return null
+		return _component_slot_world_position(slot_id, work_context)
+	if target_kind == "module":
+		if work_context.module_integrity == null \
+				or not work_context.module_integrity.has_method("get_module") \
+				or work_context.module_integrity.get_module(target_id) == null:
+			return null
+		var wrapper_position: Vector3 = _compiled_wrapper_world_position(
+			target_id, work_context.ship)
+		if _work_position_is_finite(wrapper_position):
+			return wrapper_position
+		var module = work_context.module_integrity.get_module(target_id)
+		var room_id: String = str(module.get("room_id"))
+		var layout: Dictionary = _layout_for_ship(work_context.ship)
+		var room_centers: Dictionary = _room_world_centers(layout, work_context.ship)
+		if not room_id.is_empty() and room_centers.has(room_id) \
+				and _work_position_is_finite(room_centers[room_id]):
+			return room_centers[room_id] as Vector3
+	return null
+
+
+func _canonical_work_record_position(record: Dictionary) -> Variant:
+	var work_context = _ship_work_context_for(str(record.get("ship_id", "")))
+	if work_context == null:
+		return null
+	var payload: Dictionary = record.get("payload", {}) as Dictionary \
+		if record.get("payload", {}) is Dictionary else {}
+	return _canonical_work_target_position(
+		str(record.get("target_id", "")), str(record.get("target_kind", "")),
+		payload, work_context)
+
+
+func _selected_inventory_lot(selected_ids: PackedStringArray) -> Dictionary:
+	if inventory_state == null or selected_ids.size() != 1 \
+			or not inventory_state.has_method("get_lot_summary"):
+		return {}
+	var selected_id: String = selected_ids[0]
+	for lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
+		if lot_v is Dictionary and str((lot_v as Dictionary).get("lot_id", "")) == selected_id:
+			return (lot_v as Dictionary).duplicate(true)
+	return {}
+
+
+func _preflight_component_work_target(
+		target_kind: String,
+		payload: Dictionary,
+		work_context,
+		available_inventory: Dictionary,
+		source_lot: Dictionary = {}) -> Dictionary:
+	if work_context == null or work_context.component_placement == null \
+			or work_context.ship_modification == null or component_catalog == null:
+		return {"ok": false, "reason": "mount_authority_missing"}
+	var slot_id: String = str(payload.get("slot_id", ""))
+	var slot: Dictionary = work_context.component_placement.get_physical_slot(slot_id)
+	if slot_id.is_empty() or slot.is_empty():
+		return {"ok": false, "reason": "unknown_slot"}
+	var entry: Dictionary = work_context.component_placement.get_entry(slot_id)
+	var component_id: String = str(payload.get("component_id", ""))
+	var item_form: String = str(payload.get("item_form", ""))
+	if target_kind == "component_install":
+		if not entry.is_empty() and bool(entry.get("mounted", false)):
+			return {"ok": false, "reason": "slot_occupied"}
+		var fit: Dictionary = component_catalog.validate_component_fit(component_id, slot)
+		if not bool(fit.get("ok", false)):
+			return fit
+		return work_context.ship_modification.preflight_install(
+			slot_id, component_id, item_form, available_inventory,
+			str(work_context.ship_id), source_lot)
+	if target_kind == "component_uninstall":
+		if entry.is_empty() or not bool(entry.get("mounted", false)):
+			return {"ok": false, "reason": "target_removed"}
+		if component_id != str(entry.get("component_id", "")) \
+				or item_form != str(entry.get("item_form", "")):
+			return {"ok": false, "reason": "stale_target"}
+		if inventory_state == null or not inventory_state.can_accept(item_form, 1):
+			return {"ok": false, "reason": "destination_full"}
+		return {"ok": true, "reason": "ok"}
+	return {"ok": false, "reason": "unknown_target_kind"}
+
+
+func _component_slot_revision(slot_id: String, context = null) -> String:
+	var placement = context.component_placement if context != null else component_placement_state
+	if placement == null:
 		return ""
-	var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
+	var slot: Dictionary = placement.get_physical_slot(slot_id)
 	if slot.is_empty():
 		return ""
-	var entry: Dictionary = component_placement_state.get_entry(slot_id)
-	return "%s|%s|%s|%.5f|%s" % [
+	var entry: Dictionary = placement.get_entry(slot_id)
+	var local_revision: String = "%s|%s|%s|%.5f|%s" % [
 		slot_id,
 		str(bool(entry.get("mounted", false))).to_lower(),
 		str(entry.get("component_id", "")),
 		float(entry.get("condition", 0.0)),
 		str(entry.get("source_lot_id", "")),
 	]
+	return context.target_revision(local_revision) if context != null else local_revision
 
 
-func _module_target_revision(module_id: String) -> String:
-	if module_integrity_map == null or not module_integrity_map.has_method("get_module"):
+func _module_target_revision(module_id: String, context = null) -> String:
+	# Callers that omit the context (legacy validation and repair wrappers) still
+	# target the explicitly selected owner. Starting with an unscoped revision and
+	# later revalidating with a generation-scoped revision is always stale.
+	if context == null:
+		context = _ship_work_context_for(_active_ship_id_for_work())
+	var integrity = context.module_integrity if context != null else module_integrity_map
+	if integrity == null or not integrity.has_method("get_module"):
 		return ""
-	var module = module_integrity_map.get_module(module_id)
+	var module = integrity.get_module(module_id)
 	if module == null:
 		return ""
-	return "%s|%s|%.5f" % [module_id, str(module.get("state")), float(module.get("integrity"))]
+	var local_revision: String = "%s|%s|%.5f" % [module_id, str(module.get("state")), float(module.get("integrity"))]
+	return context.target_revision(local_revision) if context != null else local_revision
 
 
 func _current_work_target(record: Dictionary) -> Dictionary:
+	var context = _ship_work_context_for(str(record.get("ship_id", "")))
+	if context == null:
+		return {"exists": false, "revision": "", "reason": "unknown_ship"}
+	if not context.matches_binding(context.ship):
+		return {"exists": false, "revision": "", "reason": "stale_binding"}
 	var kind: String = str(record.get("target_kind", ""))
 	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
 	if kind in ["component_install", "component_uninstall"]:
 		var slot_id: String = str(payload.get("slot_id", record.get("target_id", "")))
-		var revision: String = _component_slot_revision(slot_id)
-		return {"exists": not revision.is_empty(), "revision": revision}
+		var revision: String = _component_slot_revision(slot_id, context)
+		return {
+			"exists": not revision.is_empty(),
+			"revision": revision,
+			"reason": "" if not revision.is_empty() else "target_removed",
+		}
 	if kind == "module":
-		var module_revision: String = _module_target_revision(str(record.get("target_id", "")))
-		return {"exists": not module_revision.is_empty(), "revision": module_revision}
-	return {"exists": true, "revision": str(record.get("target_revision", ""))}
+		var module_revision: String = _module_target_revision(str(record.get("target_id", "")), context)
+		return {
+			"exists": not module_revision.is_empty(),
+			"revision": module_revision,
+			"reason": "" if not module_revision.is_empty() else "target_removed",
+		}
+	return {"exists": true, "revision": str(record.get("target_revision", "")), "reason": ""}
 
 
 func _work_has_required_tool(record: Dictionary) -> bool:
@@ -3985,15 +4676,18 @@ func _work_has_required_tool(record: Dictionary) -> bool:
 	var tool_class: String = str(work_action_driver.catalog.get_action(action_id).get("tool_class", ""))
 	if tool_class.is_empty():
 		return true
-	if inventory_state == null:
+	return _has_compatible_work_tool(action_id, tool_class)
+
+
+func _active_work_in_range(record: Dictionary = {}) -> bool:
+	var target_position: Variant = _canonical_work_record_position(record) \
+		if not record.is_empty() else _active_ship_work_target_position
+	if not _work_position_is_finite(target_position) or not is_instance_valid(player) \
+			or not (player is Node3D) \
+			or not _work_position_is_finite((player as Node3D).global_position):
 		return false
-	return inventory_state.get_quantity(tool_class) > 0 or inventory_state.get_quantity("tool_%s" % tool_class) > 0
-
-
-func _active_work_in_range() -> bool:
-	if not _active_ship_work_has_position:
-		return true
-	return is_instance_valid(player) and (player as Node3D).global_position.distance_to(_active_ship_work_target_position) <= WORK_ACTION_INTERACT_RANGE
+	return (player as Node3D).global_position.distance_to(
+		target_position as Vector3) <= WORK_ACTION_INTERACT_RANGE
 
 
 func _escrow_quantities(record: Dictionary) -> Dictionary:
@@ -4033,24 +4727,35 @@ func _work_gate_inventory(record: Dictionary) -> Dictionary:
 func _stage_ship_work(record: Dictionary) -> Dictionary:
 	var kind: String = str(record.get("target_kind", ""))
 	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
+	var context = _ship_work_context_for(str(record.get("ship_id", "")))
+	if context == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	var physical_gate: Dictionary = context.preflight_physical_mutation(
+		selected_ship_id, kind in ["component_install", "component_uninstall"])
+	if not bool(physical_gate.get("ok", false)):
+		return physical_gate
 	if kind == "component_install":
-		if component_placement_state == null or not component_placement_state.has_method("mount"):
-			return {"ok": false, "reason": "mount_authority_missing"}
 		var paid_lots: Array = record.get("escrow", []) as Array
 		if paid_lots.size() != 1 or not (paid_lots[0] is Dictionary):
 			return {"ok": false, "reason": "invalid_paid_component_lot"}
 		var paid_lot: Dictionary = paid_lots[0] as Dictionary
 		var escrow_inventory: Dictionary = _escrow_quantities(record)
-		return ship_modification_state.preflight_install(
-			str(payload.get("slot_id", "")), str(payload.get("component_id", "")),
-			str(payload.get("item_form", "")), escrow_inventory,
-			str(record.get("ship_id", "")), paid_lot)
+		var component_gate: Dictionary = _preflight_component_work_target(
+			kind, payload, context, escrow_inventory, paid_lot)
+		if not bool(component_gate.get("ok", false)):
+			return component_gate
+		return _ship_mod_effect_authority_preflight(
+			str(payload.get("component_id", "")), context)
 	if kind == "component_uninstall":
-		var item_form: String = str(payload.get("item_form", ""))
-		if item_form.is_empty() or inventory_state == null or not inventory_state.can_accept(item_form, 1):
-			return {"ok": false, "reason": "destination_full"}
-		var mounted_entry: Dictionary = component_placement_state.get_entry(str(payload.get("slot_id", ""))) \
-			if component_placement_state != null else {}
+		var component_gate: Dictionary = _preflight_component_work_target(
+			kind, payload, context, _inventory_qty_dict_for_work())
+		if not bool(component_gate.get("ok", false)):
+			return component_gate
+		var effect_gate: Dictionary = _ship_mod_effect_authority_preflight(
+			str(payload.get("component_id", "")), context, false)
+		if not bool(effect_gate.get("ok", false)):
+			return effect_gate
+		var mounted_entry: Dictionary = context.component_placement.get_entry(str(payload.get("slot_id", "")))
 		var source_lot_v: Variant = mounted_entry.get("source_lot", null)
 		if source_lot_v is Dictionary:
 			var source_lot_id: String = str((source_lot_v as Dictionary).get("lot_id", ""))
@@ -4065,9 +4770,16 @@ func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
 	var payload: Dictionary = record.get("payload", {}) as Dictionary if record.get("payload", {}) is Dictionary else {}
 	var escrow: Array = (record.get("escrow", []) as Array).duplicate(true)
 	var result: Dictionary = {}
+	var context = _ship_work_context_for(str(record.get("ship_id", "")))
+	if context == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	var physical_gate: Dictionary = context.preflight_physical_mutation(
+		selected_ship_id, kind in ["component_install", "component_uninstall"])
+	if not bool(physical_gate.get("ok", false)):
+		return physical_gate
 	if kind == "component_install":
 		result = ComponentMountResolverScript.resolve_mount(
-			work_action_driver.work, component_placement_state, _escrow_quantities(record), component_catalog, {
+			work_action_driver.work, context.component_placement, _escrow_quantities(record), component_catalog, {
 				"room_id": str(payload.get("room_id", "")),
 				"slot_kind": str(payload.get("slot_kind", "")),
 				"slot_index": int(payload.get("slot_index", -1)),
@@ -4075,21 +4787,23 @@ func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
 				"paid_item_lots": escrow,
 			})
 		if bool(result.get("ok", false)):
-			ship_modification_state.sync_from_placement()
-			_rebuild_component_markers()
-			_sync_current_ship_component_placement()
-			_apply_ship_mod_system_link(str(payload.get("component_id", "")), true)
-			_refresh_station_tiers_from_ship_mod()
-			_apply_ship_mod_plating_repair(str(payload.get("component_id", "")))
+			context.ship_modification.sync_from_placement()
+			_rebuild_component_markers(context)
+			_sync_ship_component_placement(context.ship, context.component_placement)
+			_apply_ship_mod_system_link(
+				str(payload.get("component_id", "")), true, context.ship.systems_manager, false)
+			_refresh_station_tiers_from_ship_mod(context)
+			_apply_ship_mod_plating_repair(
+				str(payload.get("component_id", "")), context.module_integrity, context.ship, false)
 	elif kind == "component_uninstall":
 		result = ComponentMountResolverScript.resolve_dismount(
-			work_action_driver.work, component_placement_state, {}, {"defer_inventory": true})
+			work_action_driver.work, context.component_placement, {}, {"defer_inventory": true})
 		if bool(result.get("ok", false)):
 			var returned_lots: Array = []
 			var returned_v: Variant = result.get("item_lot", null)
 			if returned_v is Dictionary:
 				if inventory_state.add_lot(returned_v as Dictionary) != int((returned_v as Dictionary).get("quantity", 0)):
-					component_placement_state.restore_dismounted(str(result.get("instance_id", "")))
+					context.component_placement.restore_dismounted(str(result.get("instance_id", "")))
 					return {"ok": false, "reason": "return_lot_failed"}
 				returned_lots.append((returned_v as Dictionary).duplicate(true))
 			else:
@@ -4098,7 +4812,7 @@ func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
 					if existing_lot_v is Dictionary:
 						lot_ids_before[str((existing_lot_v as Dictionary).get("lot_id", ""))] = true
 				if inventory_state.add_item(str(result.get("item_form", "")), 1) != 1:
-					component_placement_state.restore_dismounted(str(result.get("instance_id", "")))
+					context.component_placement.restore_dismounted(str(result.get("instance_id", "")))
 					return {"ok": false, "reason": "return_item_failed"}
 				for deposited_lot_v in inventory_state.get_lot_summary().get("lots", []) as Array:
 					if deposited_lot_v is Dictionary \
@@ -4107,26 +4821,32 @@ func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
 						returned_lots.append((deposited_lot_v as Dictionary).duplicate(true))
 						break
 			result["returned_lots"] = returned_lots
-			ship_modification_state.sync_from_placement()
-			_rebuild_component_markers()
-			_sync_current_ship_component_placement()
-			_apply_ship_mod_system_link(str(result.get("component_id", "")), false)
-			_refresh_station_tiers_from_ship_mod()
+			context.ship_modification.sync_from_placement()
+			_rebuild_component_markers(context)
+			_sync_ship_component_placement(context.ship, context.component_placement)
+			_apply_ship_mod_system_link(
+				str(result.get("component_id", "")), false, context.ship.systems_manager, false)
+			_refresh_station_tiers_from_ship_mod(context)
 	else:
-		result = work_action_driver.complete(module_integrity_map, {}, {
+		if context.module_integrity == null:
+			return {"ok": false, "reason": "integrity_authority_missing"}
+		result = work_action_driver.complete(context.module_integrity, {}, {
 			"materials_prepaid": true,
 			"repair_material_lots": escrow,
 		})
 		if bool(result.get("ok", false)):
-			_apply_module_integrity_state_to_scene()
+			_apply_module_integrity_state_to_scene(context.module_integrity, context.ship)
 			_apply_work_yields_to_inventory_state(result, false)
 	if not bool(result.get("ok", false)):
 		return result
+	_ship_work_effect_count += 1
 	work_action_driver.last_resolve = result.duplicate(true)
 	work_action_driver.last_noise_pulse = float(result.get("noise", 0.0))
 	work_action_driver.last_xp_event = str(result.get("xp_event", ""))
-	if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
-		work_action_driver.apply_noise_to_detection(threat_manager)
+	if work_action_driver.last_noise_pulse > 0.0:
+		_ship_work_noise_completion_count += 1
+		if threat_manager != null:
+			work_action_driver.apply_noise_to_detection(threat_manager)
 	if is_instance_valid(audio_manager):
 		var event_id: StringName = AudioEventSeamScript.sfx_for_work_verb(str(result.get("verb", "")))
 		if audio_manager.sfx_router != null:
@@ -4136,6 +4856,7 @@ func _apply_ship_work_commit(record: Dictionary) -> Dictionary:
 			audio_manager.play_sfx(event_id)
 	var xp_event: String = str(result.get("xp_event", ""))
 	if not xp_event.is_empty():
+		_ship_work_xp_award_count += 1
 		emit_training_event(xp_event, str(record.get("target_id", "")))
 	_ship_work_commit_count += 1
 	result["awarded_event_ids"] = [xp_event] if not xp_event.is_empty() else []
@@ -4150,13 +4871,23 @@ func _commit_active_ship_work() -> Dictionary:
 	if _active_ship_work_id.is_empty() or ship_work_transactions == null:
 		return {"ok": false, "reason": "no_active_work"}
 	var record: Dictionary = ship_work_transactions.get_record(_active_ship_work_id)
+	var kind: String = str(record.get("target_kind", ""))
 	var current: Dictionary = _current_work_target(record)
+	var current_position: Variant = _canonical_work_record_position(record)
+	var current_position_valid: bool = _work_position_is_finite(current_position)
+	if current_position_valid:
+		_active_ship_work_has_position = true
+		_active_ship_work_target_position = current_position as Vector3
+	var gate: Dictionary = _physical_work_preflight(
+		str(record.get("ship_id", "")), kind in ["component_install", "component_uninstall"])
+	if not bool(gate.get("ok", false)):
+		return _pause_active_ship_work(str(gate.get("reason", "wrong_ship")))
 	var context: Dictionary = {
-		"ship_id": _active_ship_id_for_work(),
+		"ship_id": str(record.get("ship_id", "")),
 		"target_id": str(record.get("target_id", "")),
 		"target_exists": bool(current.get("exists", false)),
 		"target_revision": str(current.get("revision", "")),
-		"in_range": _active_work_in_range(),
+		"in_range": current_position_valid and _active_work_in_range(record),
 		"has_required_tool": _work_has_required_tool(record),
 		"damaged": false,
 		"stage": Callable(self, "_stage_ship_work"),
@@ -4211,7 +4942,10 @@ func _pause_active_ship_work(reason: String) -> Dictionary:
 		return {"ok": false, "reason": "no_active_work"}
 	var paused: bool = false
 	if work_action_driver.get_status() == "paused":
-		paused = true
+		var progress: float = float(work_action_driver.progress_ratio()) \
+			if work_action_driver.has_method("progress_ratio") else 0.0
+		paused = ship_work_transactions.pause_channel(
+			_active_ship_work_id, progress, reason)
 	else:
 		paused = ship_work_transactions.pause(_active_ship_work_id, work_action_driver, reason)
 	if not paused:
@@ -4257,6 +4991,61 @@ func get_ship_work_commit_count_for_validation() -> int:
 	return _ship_work_commit_count
 
 
+func get_ship_work_observable_counts_for_validation() -> Dictionary:
+	return {
+		"commit": _ship_work_commit_count,
+		"effect": _ship_work_effect_count,
+		"noise_completion": _ship_work_noise_completion_count,
+		"xp_award": _ship_work_xp_award_count,
+	}
+
+
+func get_ship_work_authoritative_snapshot_for_validation(ship_id: String) -> Dictionary:
+	var work_context = _ship_work_context_for(ship_id)
+	if work_context == null:
+		return {}
+	var ledger: Dictionary = work_context.work_transactions.get_summary() \
+		if work_context.work_transactions != null else {}
+	var receipt_count: int = 0
+	for record_v in ledger.get("transactions", []) as Array:
+		if record_v is Dictionary \
+				and not str((record_v as Dictionary).get("commit_receipt_id", "")).is_empty():
+			receipt_count += 1
+	var systems: Dictionary = {}
+	if work_context.ship != null and work_context.ship.get("systems_manager") != null \
+			and work_context.ship.systems_manager.has_method("get_summary"):
+		systems = work_context.ship.systems_manager.get_summary()
+	var completion_audio: Dictionary = {}
+	if is_instance_valid(audio_manager) and audio_manager.sfx_router != null \
+			and audio_manager.sfx_router.has_method("get_routed_count"):
+		for verb: String in ["mount", "unbolt", "weld", "cut", "pry", "splice", "patch"]:
+			var event_id: StringName = AudioEventSeamScript.sfx_for_work_verb(verb)
+			if not String(event_id).is_empty():
+				completion_audio[String(event_id)] = audio_manager.sfx_router.get_routed_count(
+					event_id)
+	return {
+		"lots": inventory_state.get_lot_summary() if inventory_state != null else {},
+		"placement": work_context.component_placement.get_summary() \
+			if work_context.component_placement != null else {},
+		"integrity": work_context.module_integrity.get_summary() \
+			if work_context.module_integrity != null else {},
+		"modification": work_context.ship_modification.get_summary() \
+			if work_context.ship_modification != null else {},
+		"systems": systems,
+		"ledger": ledger,
+		"receipt_count": receipt_count,
+		"effects": get_ship_work_observable_counts_for_validation(),
+		"threat_noise": float(threat_manager.player_noise) if threat_manager != null else 0.0,
+		"completion_audio": completion_audio,
+		"training_log": training_event_bus.get_log() if training_event_bus != null else [],
+		"delivered_xp": training_event_bus.get_total_xp_delivered() \
+			if training_event_bus != null else 0,
+		"progression": player_progression.get_summary() if player_progression != null else {},
+		"active_work_id": _active_ship_work_id,
+		"driver_status": work_action_driver.get_status() if work_action_driver != null else "",
+	}
+
+
 func advance_active_ship_work_for_validation(delta: float) -> Dictionary:
 	_work_requires_hold = false
 	_tick_work_action(delta)
@@ -4268,31 +5057,35 @@ func commit_last_ship_work_for_validation() -> Dictionary:
 		return {"ok": false, "reason": "no_last_work"}
 	var record: Dictionary = ship_work_transactions.get_record(_last_ship_work_id)
 	var current: Dictionary = _current_work_target(record)
+	var current_position: Variant = _canonical_work_record_position(record)
 	return ship_work_transactions.commit(_last_ship_work_id, {
-		"ship_id": _active_ship_id_for_work(),
+		"ship_id": str(record.get("ship_id", "")),
 		"target_id": str(record.get("target_id", "")),
 		"target_exists": bool(current.get("exists", false)),
 		"target_revision": str(current.get("revision", "")),
-		"in_range": true,
-		"has_required_tool": true,
+		"in_range": _work_position_is_finite(current_position) \
+			and _active_work_in_range(record),
+		"has_required_tool": _work_has_required_tool(record),
 		"damaged": false,
 		"stage": Callable(self, "_stage_ship_work"),
 		"commit": Callable(self, "_apply_ship_work_commit"),
 	})
 
 
-func _component_slot_world_position(slot_id: String) -> Variant:
-	if component_placement_state == null:
+func _component_slot_world_position(slot_id: String, context = null) -> Variant:
+	var placement = context.component_placement if context != null else component_placement_state
+	if placement == null:
 		return null
-	var entry: Dictionary = component_placement_state.get_entry(slot_id)
+	var entry: Dictionary = placement.get_entry(slot_id)
 	if entry.is_empty():
-		var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
+		var slot: Dictionary = placement.get_physical_slot(slot_id)
 		if slot.is_empty():
 			return null
 		entry = slot
-	var layout: Dictionary = _active_layout_for_work()
-	var index: int = maxi(0, component_placement_state.find_index(slot_id))
-	return _component_marker_world(layout, entry, _room_world_centers(layout), index)
+	var owner = context.ship if context != null else current_ship
+	var layout: Dictionary = _layout_for_ship(owner)
+	var index: int = maxi(0, placement.find_index(slot_id))
+	return _component_marker_world(layout, entry, _room_world_centers(layout, owner), index, owner)
 
 
 func prepare_p12_component_work_fixture_for_validation() -> Dictionary:
@@ -4366,22 +5159,24 @@ func interrupt_active_ship_work_for_validation(reason: String) -> bool:
 
 
 ## PKG-B2.3: mounted components prefer imported prop visuals and retain primitive fallback.
-func _rebuild_component_markers() -> void:
+func _rebuild_component_markers(context = null) -> void:
 	_clear_component_markers()
-	if component_placement_state == null:
+	var placement = context.component_placement if context != null else component_placement_state
+	var owner = context.ship if context != null else current_ship
+	if placement == null:
 		return
 	var parent: Node3D = null
-	if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
-		parent = current_ship.scene_root as Node3D
+	if owner != null and is_instance_valid(owner.scene_root) and owner.scene_root is Node3D:
+		parent = owner.scene_root as Node3D
 	elif is_instance_valid(affordance_root) and affordance_root is Node3D:
 		parent = affordance_root as Node3D
 	if parent == null:
 		return
 	var prop_visual_catalog = PropVisualBindingCatalogScript.new()
 	var prop_visual_catalog_loaded: bool = prop_visual_catalog.load_from_path()
-	var layout: Dictionary = _active_layout_for_work()
-	var centers: Dictionary = _room_world_centers(layout)
-	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
+	var layout: Dictionary = _layout_for_ship(owner)
+	var centers: Dictionary = _room_world_centers(layout, owner)
+	var placed: Array = placement.get("placed") as Array if typeof(placement.get("placed")) == TYPE_ARRAY else []
 	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
@@ -4390,7 +5185,7 @@ func _rebuild_component_markers() -> void:
 		if not bool(e.get("mounted", true)):
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		var pos: Vector3 = _component_marker_world(layout, e, centers, i)
+		var pos: Vector3 = _component_marker_world(layout, e, centers, i, owner)
 		# Convert world → parent-local if parent is offset.
 		var local_pos: Vector3 = pos
 		if parent.is_inside_tree():
@@ -4470,7 +5265,7 @@ func run_work_action_for_validation(action_id: String, target_id: String, invent
 				if int(inv.get(str(mid), 0)) < int((mats as Dictionary)[mid]):
 					inv[str(mid)] = int((mats as Dictionary)[mid])
 		ctx["inventory"] = inv.duplicate(true)
-	ctx["selected_tool_lot"] = _selected_work_tool_lot(str(ctx.get("tool_class", "")))
+	ctx["selected_tool_lot"] = _selected_work_tool_lot(str(ctx.get("tool_class", "")), action_id)
 	if not work_action_driver.start_action(action_id, target_id, ctx):
 		return {"ok": false, "reason": "start_failed"}
 	_work_requires_hold = false
@@ -4623,7 +5418,7 @@ func open_ship_modification_panel_for_validation() -> bool:
 		return false
 	# FC-13: a live panel receives only the current ship's generated/authored
 	# placement descriptors.  Do not revive legacy synthetic hub slots.
-	if not _bind_ship_modification_panel_to_current_physical_slots(_inventory_qty_dict_for_work()):
+	if not _bind_ship_modification_panel_to_selected_ship(_inventory_qty_dict_for_work()):
 		return false
 	if not ship_modification_panel.install_requested.is_connected(_on_ship_mod_install_requested):
 		ship_modification_panel.install_requested.connect(_on_ship_mod_install_requested)
@@ -4639,31 +5434,48 @@ func open_ship_modification_panel_for_validation() -> bool:
 ## Binds P11's pure state/panel to the active ship's actual placement owner.
 ## P13 will generalize ownership across all ships; this intentionally has no
 ## home-ship fallback and fails closed if the active layout lacks descriptors.
-func _bind_ship_modification_panel_to_current_physical_slots(inventory: Dictionary) -> bool:
-	if ship_modification_state == null or ship_modification_panel == null \
-		or component_placement_state == null or component_catalog == null or current_ship == null:
+func _bind_ship_modification_panel_to_selected_ship(inventory: Dictionary) -> bool:
+	if ship_modification_panel == null or component_catalog == null:
 		return false
-	if not component_placement_state.has_method("get_physical_slot_descriptors"):
+	var context = _ship_work_context_for(selected_ship_id)
+	if context == null or context.component_placement == null or context.ship_modification == null:
 		return false
-	var ship_id: String = String(current_ship.ship_id)
-	if ship_id.is_empty():
+	if not context.component_placement.has_method("get_physical_slot_descriptors"):
 		return false
-	var descriptors: Array = component_placement_state.call("get_physical_slot_descriptors", ship_id)
+	var descriptors: Array = context.component_placement.call("get_physical_slot_descriptors", selected_ship_id)
 	if descriptors.is_empty():
 		return false
-	if not ship_modification_state.bind_physical_slots(ship_id, descriptors, component_catalog, component_placement_state):
+	if not context.ship_modification.bind_physical_slots(
+			selected_ship_id, descriptors, component_catalog, context.component_placement):
 		return false
-	ship_modification_panel.bind(ship_modification_state, inventory, component_catalog, descriptors, ship_id, component_placement_state)
+	context.ship_modification.sync_from_placement()
+	ship_modification_panel.bind(
+		context.ship_modification, inventory, component_catalog, descriptors,
+		selected_ship_id, context.component_placement, context.binding_generation)
 	return true
+
+
+func _bind_ship_modification_panel_to_current_physical_slots(inventory: Dictionary) -> bool:
+	return _bind_ship_modification_panel_to_selected_ship(inventory)
 
 
 ## Read-only component admission shared by the panel and its request handler.
 ## The returned lot IDs use the same stable selection policy that the work
 ## transaction receives for reservation; _stage_ship_work remains the commit
 ## authority and validates the exact escrowed row again.
-func _ship_mod_install_preflight(slot_id: String, component_id: String, item_form: String) -> Dictionary:
-	if inventory_state == null or ship_modification_state == null:
+func _ship_mod_install_preflight(
+		ship_id: String, binding_generation: int,
+		slot_id: String, component_id: String, item_form: String) -> Dictionary:
+	if inventory_state == null:
 		return {"ok": false, "reason": "missing_state"}
+	var physical_gate: Dictionary = _physical_work_preflight(ship_id, true)
+	if not bool(physical_gate.get("ok", false)):
+		return physical_gate
+	var context = _ship_work_context_for(ship_id)
+	if context == null or context.ship_modification == null:
+		return {"ok": false, "reason": "missing_state"}
+	if context.binding_generation != binding_generation:
+		return {"ok": false, "reason": "stale_binding"}
 	var selected_ids: PackedStringArray = _selected_lot_ids_for_requirements({item_form: 1})
 	if selected_ids.size() != 1:
 		return {"ok": false, "reason": "missing_item"}
@@ -4678,9 +5490,9 @@ func _ship_mod_install_preflight(slot_id: String, component_id: String, item_for
 	# source lot. The transaction still receives the original lot ID and owns the
 	# authoritative split, escrow identity, and provenance used at commit.
 	selected_lot["quantity"] = 1
-	var result: Dictionary = ship_modification_state.preflight_install(
+	var result: Dictionary = context.ship_modification.preflight_install(
 		slot_id, component_id, item_form, _inventory_qty_dict_for_work(),
-		_active_ship_id_for_work(), selected_lot)
+		ship_id, selected_lot)
 	result["selected_lot_ids"] = selected_ids
 	result["selected_lot"] = selected_lot
 	return result
@@ -4714,17 +5526,21 @@ func open_chart_panel_for_validation() -> bool:
 
 ## Panel actions are requests. Exact component lots enter escrow before the timed
 ## WorkAction begins; physical placement and effects occur only in commit.
-func _on_ship_mod_install_requested(slot_id: String, component_id: String, item_form: String) -> void:
-	if inventory_state == null or component_placement_state == null or component_catalog == null:
+func _on_ship_mod_install_requested(
+		ship_id: String, binding_generation: int,
+		slot_id: String, component_id: String, item_form: String) -> void:
+	var context = _ship_work_context_for(ship_id)
+	if inventory_state == null or context == null or context.component_placement == null or component_catalog == null:
 		return
-	var preflight: Dictionary = _ship_mod_install_preflight(slot_id, component_id, item_form)
+	var preflight: Dictionary = _ship_mod_install_preflight(
+		ship_id, binding_generation, slot_id, component_id, item_form)
 	if not bool(preflight.get("ok", false)):
 		ship_modification_panel.set_request_status("install denied: %s" % str(preflight.get("reason", "failed")))
 		_emit_ship_mod_action_failed_sfx()
 		return
 	var selected_ids: PackedStringArray = preflight.get("selected_lot_ids", PackedStringArray()) as PackedStringArray
-	var slot: Dictionary = component_placement_state.get_physical_slot(slot_id)
-	var position_v: Variant = _component_slot_world_position(slot_id)
+	var slot: Dictionary = context.component_placement.get_physical_slot(slot_id)
+	var position_v: Variant = _component_slot_world_position(slot_id, context)
 	var ctx: Dictionary = {
 		"tool_class": "wrench",
 		"skill_id": "salvage",
@@ -4732,14 +5548,14 @@ func _on_ship_mod_install_requested(slot_id: String, component_id: String, item_
 		"inventory": _inventory_qty_dict_for_work(),
 	}
 	var started: Dictionary = _start_transactional_work(
-		"mount_component", slot_id, "component_install", _component_slot_revision(slot_id), ctx, {
+		"mount_component", slot_id, "component_install", _component_slot_revision(slot_id, context), ctx, {
 			"slot_id": slot_id,
 			"component_id": component_id,
 			"item_form": item_form,
 			"room_id": str(slot.get("room_id", "")),
 			"slot_kind": str(slot.get("slot_kind", "")),
 			"slot_index": int(slot.get("slot_index", -1)),
-		}, position_v, selected_ids)
+		}, position_v, selected_ids, ship_id)
 	if not bool(started.get("ok", false)):
 		ship_modification_panel.set_request_status("install denied: %s" % str(started.get("reason", "failed")))
 		_emit_ship_mod_action_failed_sfx()
@@ -4750,14 +5566,24 @@ func _on_ship_mod_install_requested(slot_id: String, component_id: String, item_
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 
 
-func _on_ship_mod_uninstall_requested(slot_id: String, component_id: String = "", item_form: String = "") -> void:
-	if inventory_state == null or component_placement_state == null:
+func _on_ship_mod_uninstall_requested(
+		ship_id: String, binding_generation: int,
+		slot_id: String, component_id: String = "", item_form: String = "") -> void:
+	var physical_gate: Dictionary = _physical_work_preflight(ship_id, true)
+	var context = _ship_work_context_for(ship_id)
+	if not bool(physical_gate.get("ok", false)):
+		ship_modification_panel.set_request_status("uninstall denied: %s" % str(physical_gate.get("reason", "failed")))
 		return
-	var entry: Dictionary = component_placement_state.get_entry(slot_id)
+	if inventory_state == null or context == null or context.component_placement == null:
+		return
+	if context.binding_generation != binding_generation:
+		ship_modification_panel.set_request_status("uninstall denied: stale_binding")
+		return
+	var entry: Dictionary = context.component_placement.get_entry(slot_id)
 	if entry.is_empty() or not bool(entry.get("mounted", false)):
 		ship_modification_panel.set_request_status("uninstall denied: target removed")
 		return
-	var position_v: Variant = _component_slot_world_position(slot_id)
+	var position_v: Variant = _component_slot_world_position(slot_id, context)
 	var ctx: Dictionary = {
 		"tool_class": "wrench",
 		"skill_id": "salvage",
@@ -4765,11 +5591,11 @@ func _on_ship_mod_uninstall_requested(slot_id: String, component_id: String = ""
 		"inventory": _inventory_qty_dict_for_work(),
 	}
 	var started: Dictionary = _start_transactional_work(
-		"dismount_component", slot_id, "component_uninstall", _component_slot_revision(slot_id), ctx, {
+		"dismount_component", slot_id, "component_uninstall", _component_slot_revision(slot_id, context), ctx, {
 			"slot_id": slot_id,
 			"component_id": component_id if not component_id.is_empty() else str(entry.get("component_id", "")),
 			"item_form": item_form if not item_form.is_empty() else str(entry.get("item_form", "")),
-		}, position_v)
+		}, position_v, PackedStringArray(), ship_id)
 	if not bool(started.get("ok", false)):
 		ship_modification_panel.set_request_status("uninstall denied: %s" % str(started.get("reason", "failed")))
 		_emit_ship_mod_action_failed_sfx()
@@ -4781,14 +5607,23 @@ func _on_ship_mod_uninstall_requested(slot_id: String, component_id: String = ""
 
 
 func _sync_current_ship_component_placement() -> void:
-	if current_ship == null or component_placement_state == null or not component_placement_state.has_method("get_summary"):
+	_sync_ship_component_placement(current_ship, component_placement_state)
+
+
+func _sync_ship_component_placement(owner, placement) -> void:
+	if owner == null or placement == null or not placement.has_method("get_summary"):
 		return
-	current_ship.component_placement_summary = component_placement_state.get_summary().duplicate(true)
+	owner.component_placement_summary = placement.get_summary().duplicate(true)
 
 
 ## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
-func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void:
-	if component_id.is_empty() or component_catalog == null or ship_systems_manager == null:
+func _apply_ship_mod_system_link(
+		component_id: String, installing: bool, systems_owner = null,
+		allow_current_fallback: bool = true) -> void:
+	var manager = systems_owner
+	if manager == null and allow_current_fallback:
+		manager = ship_systems_manager
+	if component_id.is_empty() or component_catalog == null or manager == null:
 		return
 	if not component_catalog.has_method("get_component"):
 		return
@@ -4800,17 +5635,22 @@ func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void
 	if sys_id.is_empty() or sub_id.is_empty():
 		return
 	if installing:
-		if ship_systems_manager.has_method("restore_subcomponent_on_remount"):
-			ship_systems_manager.call("restore_subcomponent_on_remount", sys_id, sub_id, 0.55)
+		if manager.has_method("restore_subcomponent_on_remount"):
+			manager.call("restore_subcomponent_on_remount", sys_id, sub_id, 0.55)
 	else:
-		if ship_systems_manager.has_method("damage_subcomponent"):
+		if manager.has_method("damage_subcomponent"):
 			# Drop below operational threshold so uninstall has mechanical teeth.
-			ship_systems_manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
+			manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
 
 
 ## REQ-SMOD-001: plating installs patch one damaged/breached hub module slightly.
-func _apply_ship_mod_plating_repair(component_id: String) -> void:
-	if component_id.is_empty() or component_catalog == null or module_integrity_map == null:
+func _apply_ship_mod_plating_repair(
+		component_id: String, integrity_owner = null, ship_owner = null,
+		allow_current_fallback: bool = true) -> void:
+	var integrity = integrity_owner
+	if integrity == null and allow_current_fallback:
+		integrity = module_integrity_map
+	if component_id.is_empty() or component_catalog == null or integrity == null:
 		return
 	var is_plating: bool = false
 	if component_catalog.has_method("get_component"):
@@ -4821,18 +5661,40 @@ func _apply_ship_mod_plating_repair(component_id: String) -> void:
 		is_plating = form_hint.find("plating") >= 0 or form_hint.find("plate") >= 0
 	if not is_plating:
 		return
-	if not module_integrity_map.has_method("module_ids"):
+	if not integrity.has_method("module_ids"):
 		return
-	for mid_v in module_integrity_map.call("module_ids"):
+	for mid_v in integrity.call("module_ids"):
 		var mid: String = str(mid_v)
-		var st: String = str(module_integrity_map.get_state(mid))
+		var st: String = str(integrity.get_state(mid))
 		if st not in ["damaged", "breached"]:
 			continue
-		var m = module_integrity_map.call("get_module", mid) if module_integrity_map.has_method("get_module") else null
+		var m = integrity.call("get_module", mid) if integrity.has_method("get_module") else null
 		if m != null and m.has_method("repair"):
 			m.call("repair", 0.15)
-			_apply_module_integrity_scene([mid])
+			_apply_module_integrity_scene([mid], integrity, ship_owner)
 			return
+
+
+## Physical component effects must resolve on the same explicit owner as the
+## placement mutation. Missing selected-ship authorities fail before escrow or
+## placement changes; they never fall through to the coordinator's current ship.
+func _ship_mod_effect_authority_preflight(
+		component_id: String, context, installing: bool = true) -> Dictionary:
+	if component_id.is_empty() or component_catalog == null \
+			or not component_catalog.has_method("get_component"):
+		return {"ok": false, "reason": "component_definition_missing"}
+	var def: Dictionary = component_catalog.call("get_component", component_id)
+	if def.is_empty():
+		return {"ok": false, "reason": "component_definition_missing"}
+	var linked_system: String = str(def.get("linked_system", ""))
+	var linked_subcomponent: String = str(def.get("linked_subcomponent", ""))
+	if (not linked_system.is_empty() or not linked_subcomponent.is_empty()) \
+			and (context == null or context.ship == null or context.ship.systems_manager == null):
+		return {"ok": false, "reason": "systems_authority_missing"}
+	if installing and bool(def.get("plating", false)) \
+			and (context == null or context.module_integrity == null):
+		return {"ok": false, "reason": "integrity_authority_missing"}
+	return {"ok": true}
 
 
 ## After save/load: restore linked hub subs + station tiers from ship-mod manifest.
@@ -4850,19 +5712,23 @@ func _reapply_ship_mod_runtime_effects() -> void:
 
 ## REQ-SMOD-001: ship-mod installs with station_tier_bonus raise hub station tiers.
 ## Combines ship-mod manifest + physical component_placement for derive_tier.
-func _refresh_station_tiers_from_ship_mod() -> void:
+func _refresh_station_tiers_from_ship_mod(context = null) -> void:
 	if crafting_state == null or not crafting_state.has_method("refresh_station_tier"):
 		return
 	var placed: Array = []
-	if ship_modification_state != null:
-		for e in ship_modification_state.installed:
+	var modification = context.ship_modification if context != null else ship_modification_state
+	var placement = context.component_placement if context != null else component_placement_state
+	var target_ship_id: String = str(context.ship_id) \
+		if context != null else (str(current_ship.ship_id) if current_ship != null else "")
+	if modification != null:
+		for e in modification.installed:
 			if typeof(e) != TYPE_DICTIONARY:
 				continue
 			var row: Dictionary = (e as Dictionary).duplicate(true)
 			row["mounted"] = true
 			placed.append(row)
-	if component_placement_state != null:
-		for e in component_placement_state.placed:
+	if placement != null:
+		for e in placement.placed:
 			if typeof(e) == TYPE_DICTIONARY:
 				placed.append((e as Dictionary).duplicate(true))
 	for kind in CRAFTING_STATION_KINDS:
@@ -4873,7 +5739,9 @@ func _refresh_station_tiers_from_ship_mod() -> void:
 		# a same-kind station on another ship.
 		crafting_state.refresh_station_tier(str(kind), placed, component_catalog)
 		for station_node in crafting_stations:
-			if is_instance_valid(station_node) and str(station_node.station_kind) == str(kind):
+			if is_instance_valid(station_node) \
+					and str(station_node.ship_id) == target_ship_id \
+					and str(station_node.station_kind) == str(kind):
 				crafting_state.refresh_station_tier(
 					str(kind), placed, component_catalog,
 					str(station_node.ship_id), str(station_node.station_instance_id))
@@ -4940,9 +5808,16 @@ func _try_work_action_interact(player_body) -> bool:
 			_work_requires_hold = false
 			_refresh_work_action_hud()
 		return true
-	var layout: Dictionary = _active_layout_for_work()
+	recompute_occupancy()
+	var work_context = _ship_work_context_for(selected_ship_id)
+	if work_context == null or not bool(work_context.preflight_physical_mutation(
+			selected_ship_id, false).get("ok", false)):
+		return false
+	var layout: Dictionary = _layout_for_ship(work_context.ship)
 	if layout.is_empty():
 		return false
+	var placement_owner = work_context.component_placement
+	var integrity_owner = work_context.module_integrity
 	var player_pos: Vector3 = (player_body as Node3D).global_position if player_body is Node3D else Vector3.ZERO
 	var inv: Dictionary = _inventory_qty_dict_for_work()
 	var action_id: String = ""
@@ -4953,9 +5828,10 @@ func _try_work_action_interact(player_body) -> bool:
 	var target_position: Variant = player_pos
 
 	var has_wrench: bool = int(inv.get("wrench", 0)) > 0 or int(inv.get("tool_wrench", 0)) > 0
-	if has_wrench and component_placement_state != null:
+	if has_wrench and placement_owner != null:
 		# Prefer remount when inventory holds a stripped item_form (install intent).
-		var remount: Dictionary = _nearest_remount_target(layout, player_pos, inv, WORK_ACTION_INTERACT_RANGE)
+		var remount: Dictionary = _nearest_remount_target(
+			layout, player_pos, inv, WORK_ACTION_INTERACT_RANGE, work_context)
 		if not remount.is_empty():
 			action_id = "mount_component"
 			tool_class = "wrench"
@@ -4971,7 +5847,8 @@ func _try_work_action_interact(player_body) -> bool:
 			}
 			target_position = remount.get("position", player_pos)
 		else:
-			var comp: Dictionary = _nearest_mounted_component(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+			var comp: Dictionary = _nearest_mounted_component(
+				layout, player_pos, WORK_ACTION_INTERACT_RANGE, work_context)
 			if not comp.is_empty():
 				action_id = "dismount_component"
 				tool_class = "wrench"
@@ -4982,23 +5859,25 @@ func _try_work_action_interact(player_body) -> bool:
 					"component_id": str(comp.get("component_id", "")),
 					"item_form": str(comp.get("item_form", "")),
 				}
-				target_position = _component_slot_world_position(target_id)
+				target_position = _component_slot_world_position(target_id, work_context)
 
 	if action_id.is_empty():
-		if module_integrity_map == null:
-			module_integrity_map = ModuleIntegrityMapScript.new()
-		if module_integrity_map.size() == 0:
-			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
-		var has_lance: bool = int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0
+		if integrity_owner == null:
+			return false
+		if integrity_owner.size() == 0:
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(integrity_owner, layout)
+		var has_weld_tool: bool = _has_compatible_work_tool("weld_patch", "welding_lance")
+		var has_cut_tool: bool = _has_compatible_work_tool("cut_wall", "welding_lance")
 		var has_plate: bool = int(inv.get("hull_plate", 0)) > 0 or int(inv.get("plating_plate", 0)) > 0 or int(inv.get("hull_plate_kit", 0)) > 0
 		# REQ-SMOD / WA: weld damaged/breached modules when lance + plate available.
-		if has_lance and has_plate:
-			var damaged: Dictionary = _nearest_damaged_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+		if has_weld_tool and has_plate:
+			var damaged: Dictionary = _nearest_damaged_wall_module(
+				layout, player_pos, WORK_ACTION_INTERACT_RANGE, integrity_owner, work_context.ship)
 			if not damaged.is_empty():
 				target_id = str(damaged.get("module_id", ""))
 				var dkind: String = str(damaged.get("kind", "wall_straight_1x1"))
 				if not target_id.is_empty():
-					module_integrity_map.ensure_module(target_id, dkind, {}, target_id.get_slice("/", 0))
+					integrity_owner.ensure_module(target_id, dkind, {}, target_id.get_slice("/", 0))
 					action_id = "weld_patch"
 					tool_class = "welding_lance"
 					# Catalog consumes hull_plate — alias salvage forms into that key for the gate.
@@ -5008,15 +5887,16 @@ func _try_work_action_interact(player_body) -> bool:
 						elif int(inv.get("hull_plate_kit", 0)) > 0:
 							inv["hull_plate"] = int(inv.get("hull_plate_kit", 0))
 		if action_id.is_empty():
-			var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+			var nearest: Dictionary = _nearest_workable_wall_module(
+				layout, player_pos, WORK_ACTION_INTERACT_RANGE, integrity_owner, work_context.ship)
 			if nearest.is_empty():
 				return false
 			target_id = str(nearest.get("module_id", ""))
 			if target_id.is_empty():
 				return false
 			var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
-			module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
-			if has_lance:
+			integrity_owner.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
+			if has_cut_tool:
 				action_id = "cut_wall"
 				tool_class = "welding_lance"
 			elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
@@ -5047,11 +5927,17 @@ func _try_work_action_interact(player_body) -> bool:
 		"skill_level": skill_level,
 		"inventory": inv,
 	}
-	ctx["selected_tool_lot"] = _selected_work_tool_lot(tool_class)
-	var target_revision: String = _component_slot_revision(str(work_payload.get("slot_id", ""))) \
-		if target_kind in ["component_install", "component_uninstall"] else _module_target_revision(target_id)
+	ctx["selected_tool_lot"] = _selected_work_tool_lot(tool_class, action_id)
+	if target_kind == "module":
+		target_position = _canonical_work_target_position(
+			target_id, target_kind, work_payload, work_context)
+	var target_revision: String = _component_slot_revision(
+		str(work_payload.get("slot_id", "")), work_context) \
+		if target_kind in ["component_install", "component_uninstall"] \
+		else _module_target_revision(target_id, work_context)
 	var started: Dictionary = _start_transactional_work(
-		action_id, target_id, target_kind, target_revision, ctx, work_payload, target_position)
+		action_id, target_id, target_kind, target_revision, ctx, work_payload,
+		target_position, PackedStringArray(), work_context.ship_id)
 	if not bool(started.get("ok", false)):
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
@@ -5064,14 +5950,17 @@ func _try_work_action_interact(player_body) -> bool:
 	return true
 
 
-## P05: snapshot the actual compatible tool lot for work quality. An absent or
-## legacy tool leaves the existing speed unchanged; condition is not consulted.
-func _selected_work_tool_lot(tool_class: String) -> Dictionary:
+## P05/P09: snapshot the actual compatible tool lot for work quality. Exact
+## catalog-class items remain valid for every action requiring that class. A
+## crafted tool is valid only when its authored compatibility names this action.
+## Condition is preserved in the lot but does not alter the quality multiplier.
+func _selected_work_tool_lot(tool_class: String, action_id: String = "") -> Dictionary:
 	if inventory_state == null or tool_class.is_empty() or not inventory_state.has_method("get_lot_summary"):
 		return {}
 	var choices: Array = []
 	for lot_v in (inventory_state.get_lot_summary().get("lots", []) as Array):
-		if lot_v is Dictionary and str((lot_v as Dictionary).get("item_id", "")) == tool_class:
+		if lot_v is Dictionary and int((lot_v as Dictionary).get("quantity", 0)) > 0 \
+				and _work_tool_item_is_compatible(action_id, tool_class, str((lot_v as Dictionary).get("item_id", ""))):
 			choices.append(lot_v as Dictionary)
 	choices.sort_custom(func(a, b):
 		var at: String = str(a.get("quality_tier", "standard"))
@@ -5080,6 +5969,27 @@ func _selected_work_tool_lot(tool_class: String) -> Dictionary:
 		if bt == "standard" and at != "standard": return false
 		return str(a.get("lot_id", "")) < str(b.get("lot_id", "")))
 	return (choices[0] as Dictionary).duplicate(true) if not choices.is_empty() else {}
+
+
+func _has_compatible_work_tool(action_id: String, tool_class: String) -> bool:
+	return not _selected_work_tool_lot(tool_class, action_id).is_empty()
+
+
+func _work_tool_item_is_compatible(action_id: String, tool_class: String, item_id: String) -> bool:
+	if item_id.is_empty() or tool_class.is_empty():
+		return false
+	if item_id == tool_class or item_id == "tool_%s" % tool_class:
+		return true
+	if action_id.is_empty():
+		return false
+	var definition: Dictionary = ItemDefsScript.get_definition(_definitions_for_equip(), item_id)
+	var actions_v: Variant = definition.get("compatible_work_action_ids", [])
+	if not (actions_v is Array):
+		return false
+	for action_v in actions_v as Array:
+		if str(action_v) == action_id:
+			return true
+	return false
 
 
 func _emit_work_tool_missing_sfx() -> void:
@@ -5092,13 +6002,16 @@ func play_work_tool_missing_sfx_for_validation() -> void:
 
 
 ## Nearest mounted component; uses the same slot world position as the visible marker.
-func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
+func _nearest_mounted_component(
+		layout: Dictionary, player_pos: Vector3, max_range: float, context = null) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
-	if component_placement_state == null:
+	var placement = context.component_placement if context != null else component_placement_state
+	var owner = context.ship if context != null else current_ship
+	if placement == null:
 		return best
-	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
-	var room_centers: Dictionary = _room_world_centers(layout)
+	var placed: Array = placement.get("placed") as Array if typeof(placement.get("placed")) == TYPE_ARRAY else []
+	var room_centers: Dictionary = _room_world_centers(layout, owner)
 	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
@@ -5108,7 +6021,7 @@ func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_ran
 		if not bool(e.get("mounted", true)):
 			i += 1
 			continue
-		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i, owner)
 		var d: float = player_pos.distance_to(pos)
 		if d <= best_d:
 			best_d = d
@@ -5123,13 +6036,16 @@ func _nearest_remount_target(
 		layout: Dictionary,
 		player_pos: Vector3,
 		inventory: Dictionary,
-		max_range: float) -> Dictionary:
+		max_range: float,
+		context = null) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
-	if component_placement_state == null:
+	var placement = context.component_placement if context != null else component_placement_state
+	var owner = context.ship if context != null else current_ship
+	if placement == null:
 		return best
-	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
-	var room_centers: Dictionary = _room_world_centers(layout)
+	var placed: Array = placement.get("placed") as Array if typeof(placement.get("placed")) == TYPE_ARRAY else []
+	var room_centers: Dictionary = _room_world_centers(layout, owner)
 	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
@@ -5144,19 +6060,16 @@ func _nearest_remount_target(
 			i += 1
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i, owner)
 		var d: float = player_pos.distance_to(pos)
 		if d > best_d:
 			i += 1
 			continue
 		best_d = d
 		best = {
-			"target_id": "%s|%s|%d|%s" % [
-				rid,
-				str(e.get("slot_kind", "wall")),
-				int(e.get("slot_index", 0)),
-				form,
-			],
+			# Transaction identity is the authored/generated physical slot. The
+			# resolver receives room/kind/index separately in the commit payload.
+			"target_id": str(e.get("component_instance_id", "")),
 			"slot_id": str(e.get("component_instance_id", "")),
 			"room_id": rid,
 			"slot_kind": str(e.get("slot_kind", "wall")),
@@ -5254,7 +6167,8 @@ func _collect_dressing_occupancy(root: Node, occupied: Dictionary) -> void:
 		_collect_dressing_occupancy(child, occupied)
 
 
-func _component_marker_world(layout: Dictionary, entry: Dictionary, centers: Dictionary, i: int) -> Vector3:
+func _component_marker_world(
+		layout: Dictionary, entry: Dictionary, centers: Dictionary, i: int, owner = null) -> Vector3:
 	var rid: String = str(entry.get("room_id", ""))
 	var parsed: Array = LayoutSerializerScript.parse_slot_cell(entry.get("cell", null))
 	if parsed.size() >= 2:
@@ -5268,8 +6182,9 @@ func _component_marker_world(layout: Dictionary, entry: Dictionary, centers: Dic
 		var deck: int = int(room.get("deck", 0))
 		var world: Vector3 = _slot_cell_to_world(layout, room, parsed, deck)
 		if world != Vector3.INF:
-			if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
-				return (current_ship.scene_root as Node3D).global_transform * world
+			var transform_owner = owner if owner != null else current_ship
+			if transform_owner != null and is_instance_valid(transform_owner.scene_root) and transform_owner.scene_root is Node3D:
+				return (transform_owner.scene_root as Node3D).global_transform * world
 			return world
 	var fallback: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
 	return fallback
@@ -5315,7 +6230,7 @@ func _slot_cell_to_world(layout: Dictionary, room: Dictionary, cell: Array, deck
 	return Vector3(float(cell[0]) * 4.0, float(deck) * 4.0 + 0.12, float(cell[1]) * 4.0)
 
 
-func _room_world_centers(layout: Dictionary) -> Dictionary:
+func _room_world_centers(layout: Dictionary, owner = null) -> Dictionary:
 	var out: Dictionary = {}
 	var rooms_v: Variant = layout.get("rooms", [])
 	if typeof(rooms_v) != TYPE_ARRAY:
@@ -5340,15 +6255,20 @@ func _room_world_centers(layout: Dictionary) -> Dictionary:
 		if n <= 0:
 			continue
 		var local: Vector3 = acc / float(n)
-		if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
-			local = (current_ship.scene_root as Node3D).global_transform * local
+		var transform_owner = owner if owner != null else current_ship
+		if transform_owner != null and is_instance_valid(transform_owner.scene_root) and transform_owner.scene_root is Node3D:
+			local = (transform_owner.scene_root as Node3D).global_transform * local
 		out[rid] = local
 	return out
 
 
 func _active_layout_for_work() -> Dictionary:
-	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and not (current_ship.built_layout as Dictionary).is_empty():
-		return current_ship.built_layout as Dictionary
+	return _layout_for_ship(current_ship)
+
+
+func _layout_for_ship(owner) -> Dictionary:
+	if owner != null and typeof(owner.built_layout) == TYPE_DICTIONARY and not (owner.built_layout as Dictionary).is_empty():
+		return owner.built_layout as Dictionary
 	if loader != null and loader.has_method("get_layout_copy"):
 		var lay: Variant = loader.call("get_layout_copy")
 		if typeof(lay) == TYPE_DICTIONARY:
@@ -5372,28 +6292,33 @@ func _inventory_qty_dict_for_work() -> Dictionary:
 
 
 ## Nearest damaged/breached (repairable) wall module for weld_patch interact.
-func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
-	var cand: Dictionary = _nearest_workable_wall_module(layout, player_pos, max_range)
-	if cand.is_empty() or module_integrity_map == null:
+func _nearest_damaged_wall_module(
+		layout: Dictionary, player_pos: Vector3, max_range: float,
+		integrity_owner = null, ship_owner = null) -> Dictionary:
+	var integrity = integrity_owner if integrity_owner != null else module_integrity_map
+	var owner = ship_owner if ship_owner != null else current_ship
+	var cand: Dictionary = _nearest_workable_wall_module(
+		layout, player_pos, max_range, integrity, owner)
+	if cand.is_empty() or integrity == null:
 		return {}
 	var mid: String = str(cand.get("module_id", ""))
 	if mid.is_empty():
 		return {}
-	var st: String = str(module_integrity_map.get_state(mid))
+	var st: String = str(integrity.get_state(mid))
 	if st in ["damaged", "breached"]:
 		return cand
 	# Scan all modules for a damaged one in range (nearest workable may be intact).
 	var best: Dictionary = {}
 	var best_d: float = max_range
-	if module_integrity_map.has_method("module_ids"):
-		var room_centers: Dictionary = _room_world_centers(layout)
-		for mid_v in module_integrity_map.call("module_ids"):
+	if integrity.has_method("module_ids"):
+		var room_centers: Dictionary = _room_world_centers(layout, owner)
+		for mid_v in integrity.call("module_ids"):
 			var id: String = str(mid_v)
-			var st2: String = str(module_integrity_map.get_state(id))
+			var st2: String = str(integrity.get_state(id))
 			if st2 not in ["damaged", "breached"]:
 				continue
-			var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
-			var pos: Vector3 = _compiled_wrapper_world_position(id)
+			var m = integrity.call("get_module", id) if integrity.has_method("get_module") else null
+			var pos: Vector3 = _compiled_wrapper_world_position(id, owner)
 			if pos == Vector3.INF:
 				var rid: String = str(m.get("room_id")) if m != null else ""
 				if rid.is_empty():
@@ -5415,10 +6340,14 @@ func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_r
 ## Returns {module_id, kind, distance} for nearest workable structural module.
 ## Prefers wall kinds from layout placements; falls back to live scene wrappers
 ## stamped with module_key meta (golden hub layouts are floor-heavy).
-func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
+func _nearest_workable_wall_module(
+		layout: Dictionary, player_pos: Vector3, max_range: float,
+		integrity_owner = null, ship_owner = null) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
 	var best_rank: int = 99  # lower = better (0 wall, 1 other structure, 2 floor)
+	var integrity = integrity_owner if integrity_owner != null else module_integrity_map
+	var owner = ship_owner if ship_owner != null else current_ship
 	var rooms_v: Variant = layout.get("rooms", [])
 	if typeof(rooms_v) == TYPE_ARRAY:
 		for room_v in (rooms_v as Array):
@@ -5441,7 +6370,7 @@ func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_
 				var rank: int = _work_target_rank(kind)
 				if rank >= 2 and best_rank < 2:
 					continue
-				if module_integrity_map != null and str(module_integrity_map.get_state(mid)) == "destroyed":
+				if integrity != null and str(integrity.get_state(mid)) == "destroyed":
 					continue
 				var pos_v: Variant = placement.get("world_position", placement.get("position", null))
 				var pos: Vector3 = Vector3.ZERO
@@ -5452,8 +6381,8 @@ func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_
 					pos = Vector3(float(arr[0]), float(arr[1]), float(arr[2]))
 				else:
 					continue
-				if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
-					pos = (current_ship.scene_root as Node3D).global_transform * pos
+				if owner != null and is_instance_valid(owner.scene_root) and owner.scene_root is Node3D:
+					pos = (owner.scene_root as Node3D).global_transform * pos
 				var d: float = player_pos.distance_to(pos)
 				if d > max_range:
 					continue
@@ -5463,8 +6392,8 @@ func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_
 					best = {"module_id": mid, "kind": kind, "distance": d}
 	# Scene wrappers (module_key meta) — catches kits that only stamp floors in layout.
 	var root: Node = null
-	if current_ship != null and is_instance_valid(current_ship.scene_root):
-		root = current_ship.scene_root
+	if owner != null and is_instance_valid(owner.scene_root):
+		root = owner.scene_root
 	elif loader != null and loader.has_method("get_ship_root"):
 		root = loader.call("get_ship_root")
 	if root != null:
@@ -5473,7 +6402,7 @@ func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_
 			"best_d": best_d,
 			"best_rank": best_rank,
 		}
-		_scan_work_targets_in_tree(root, player_pos, max_range, acc)
+		_scan_work_targets_in_tree(root, player_pos, max_range, acc, integrity)
 		best = acc.get("best", best) as Dictionary
 	return best
 
@@ -5487,7 +6416,9 @@ func _work_target_rank(kind: String) -> int:
 	return 1
 
 
-func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: float, acc: Dictionary) -> void:
+func _scan_work_targets_in_tree(
+		node: Node, player_pos: Vector3, max_range: float, acc: Dictionary,
+		integrity_owner = null) -> void:
 	if node == null:
 		return
 	var best_rank: int = int(acc.get("best_rank", 99))
@@ -5498,14 +6429,14 @@ func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: floa
 		if not mid.is_empty():
 			var rank: int = _work_target_rank(kind)
 			if not (rank >= 2 and best_rank < 2):
-				if module_integrity_map == null or str(module_integrity_map.get_state(mid)) != "destroyed":
+				if integrity_owner == null or str(integrity_owner.get_state(mid)) != "destroyed":
 					var d: float = player_pos.distance_to((node as Node3D).global_position)
 					if d <= max_range and (rank < best_rank or (rank == best_rank and d <= best_d)):
 						acc["best_rank"] = rank
 						acc["best_d"] = d
 						acc["best"] = {"module_id": mid, "kind": kind, "distance": d}
 	for child in node.get_children():
-		_scan_work_targets_in_tree(child, player_pos, max_range, acc)
+		_scan_work_targets_in_tree(child, player_pos, max_range, acc, integrity_owner)
 
 
 ## PKG-B2.2b: advance in-progress WorkAction on both process branches.
@@ -5513,13 +6444,49 @@ func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: floa
 func _tick_work_action(delta: float) -> void:
 	if work_action_driver == null or delta <= 0.0:
 		return
+	if _active_ship_work_id.is_empty() and work_action_driver.work != null \
+			and str(work_action_driver.work.get("action_id")) in [
+				"dismount_component", "unbolt_component", "mount_component"]:
+		# Component work cannot tick, drain stamina, emit progress/completion noise,
+		# or reach a resolver without its explicit owner-bound transaction.
+		work_action_driver.last_resolve = {
+			"ok": false, "reason": "missing_work_transaction"}
+		work_action_driver.last_noise_pulse = 0.0
+		work_action_driver.last_xp_event = ""
+		if work_action_driver.work.has_method("reset"):
+			work_action_driver.work.call("reset")
+		_refresh_work_action_hud()
+		return
 	if not _active_ship_work_id.is_empty():
 		var active_record: Dictionary = ship_work_transactions.get_record(_active_ship_work_id)
-		if str(active_record.get("ship_id", "")) != _active_ship_id_for_work():
-			_pause_active_ship_work("wrong_ship")
+		var active_kind: String = str(active_record.get("target_kind", ""))
+		var current_target: Dictionary = _current_work_target(active_record)
+		var stored_revision: String = str(active_record.get("target_revision", ""))
+		var current_revision: String = str(current_target.get("revision", ""))
+		if not bool(current_target.get("exists", false)) or current_revision != stored_revision:
+			var stale_reason: String = str(current_target.get("reason", "stale_target"))
+			if bool(current_target.get("exists", false)) \
+					and stored_revision.get_slice("|", 1).begins_with("binding:") \
+					and current_revision.get_slice("|", 1) != stored_revision.get_slice("|", 1):
+				stale_reason = "stale_binding"
+			if stale_reason.is_empty():
+				stale_reason = "stale_target"
+			_pause_active_ship_work(stale_reason)
 			return
-		if not _active_work_in_range():
+		var current_position: Variant = _canonical_work_record_position(active_record)
+		if not _work_position_is_finite(current_position):
+			_pause_active_ship_work("target_position_invalid")
+			return
+		_active_ship_work_has_position = true
+		_active_ship_work_target_position = current_position as Vector3
+		if not _active_work_in_range(active_record):
 			_pause_active_ship_work("out_of_range")
+			return
+		var physical_gate: Dictionary = _physical_work_preflight(
+			str(active_record.get("ship_id", "")),
+			active_kind in ["component_install", "component_uninstall"])
+		if not bool(physical_gate.get("ok", false)):
+			_pause_active_ship_work(str(physical_gate.get("reason", "wrong_ship")))
 			return
 		if not _work_has_required_tool(active_record):
 			_pause_active_ship_work("missing_tool")
@@ -5579,54 +6546,16 @@ func _tick_work_action(delta: float) -> void:
 		var action_id: String = ""
 		if work_action_driver.work != null:
 			action_id = str(work_action_driver.work.get("action_id"))
-		if action_id == "dismount_component" or action_id == "unbolt_component":
-			res = ComponentMountResolverScript.resolve_dismount(
-				work_action_driver.work, component_placement_state, inv
-			)
-			if bool(res.get("ok", false)):
-				# Stamp verb SFX so emit_completion_sfx routes (resolver is pure).
-				res["audio_event"] = String(AudioEventSeamScript.sfx_for_work_verb(str(res.get("verb", "unbolt"))))
-				work_action_driver.last_resolve = res.duplicate(true)
-				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
-				work_action_driver.last_xp_event = str(res.get("xp_event", "salvage"))
-				if inventory_state != null:
-					var form: String = str(res.get("item_form", ""))
-					if not form.is_empty() and inventory_state.has_method("add_item"):
-						inventory_state.add_item(form, 1)
-				# Physical strip bites the linked ship-system subcomponent.
-				var lsys: String = str(res.get("linked_system", ""))
-				var lsub: String = str(res.get("linked_subcomponent", ""))
-				if not lsys.is_empty() and not lsub.is_empty():
-					var mgr = _active_systems_manager()
-					if mgr != null and mgr.has_method("damage_subcomponent"):
-						mgr.call("damage_subcomponent", lsys, lsub, 1.0)
-				_rebuild_component_markers()
-				_refresh_station_tiers_from_ship_mod()
-		elif action_id == "mount_component":
-			res = ComponentMountResolverScript.resolve_mount(
-				work_action_driver.work, component_placement_state, inv, component_catalog, {}
-			)
-			if bool(res.get("ok", false)):
-				res["audio_event"] = String(AudioEventSeamScript.sfx_for_work_verb(str(res.get("verb", "mount"))))
-				work_action_driver.last_resolve = res.duplicate(true)
-				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
-				work_action_driver.last_xp_event = str(res.get("xp_event", "repair"))
-				if inventory_state != null:
-					var form2: String = str(res.get("item_form", ""))
-					if not form2.is_empty() and inventory_state.has_method("remove_item"):
-						inventory_state.remove_item(form2, 1)
-				# Reconnect linked subcomponent to operational threshold floor (not full repair).
-				var iid: String = str(res.get("instance_id", ""))
-				if component_placement_state != null and not iid.is_empty():
-					var entry: Dictionary = component_placement_state.get_entry(iid)
-					var rsys: String = str(entry.get("linked_system", ""))
-					var rsub: String = str(entry.get("linked_subcomponent", ""))
-					if not rsys.is_empty() and not rsub.is_empty():
-						var rmgr = _active_systems_manager()
-						if rmgr != null and rmgr.has_method("restore_subcomponent_on_remount"):
-							rmgr.call("restore_subcomponent_on_remount", rsys, rsub, 0.55)
-				_rebuild_component_markers()
-				_refresh_station_tiers_from_ship_mod()
+		if action_id in ["dismount_component", "unbolt_component", "mount_component"]:
+			# Physical component mutation has one owner-bound transaction path. A
+			# driver completed without its work ID must fail closed instead of using
+			# current/global placement, inventory, systems, audio, or XP fallbacks.
+			res = {"ok": false, "reason": "missing_work_transaction"}
+			work_action_driver.last_resolve = res.duplicate(true)
+			work_action_driver.last_noise_pulse = 0.0
+			work_action_driver.last_xp_event = ""
+			if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
+				work_action_driver.work.call("reset")
 		else:
 			res = work_action_driver.complete(module_integrity_map, inv)
 			if bool(res.get("ok", false)):
@@ -5962,15 +6891,22 @@ func get_derived_breach_count_for_validation() -> int:
 
 
 ## Apply mesh/collision meta consequences for changed modules.
-func _apply_module_integrity_state_to_scene() -> void:
-	if module_integrity_map == null:
+func _apply_module_integrity_state_to_scene(integrity_owner = null, ship_owner = null) -> void:
+	var integrity = integrity_owner if integrity_owner != null else module_integrity_map
+	if integrity == null:
 		return
-	_apply_module_integrity_scene(module_integrity_map.module_ids())
+	_apply_module_integrity_scene(integrity.module_ids(), integrity, ship_owner)
 
 
-func _apply_module_integrity_scene(module_ids: Array) -> void:
+func _apply_module_integrity_scene(
+		module_ids: Array, integrity_owner = null, ship_owner = null) -> void:
+	var integrity = integrity_owner if integrity_owner != null else module_integrity_map
+	if integrity == null:
+		return
 	var root: Node3D = null
-	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+	if ship_owner != null and is_instance_valid(ship_owner.scene_root):
+		root = ship_owner.scene_root
+	elif away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
 		root = current_ship.scene_root
 	elif is_instance_valid(loader):
 		root = loader
@@ -5978,7 +6914,7 @@ func _apply_module_integrity_scene(module_ids: Array) -> void:
 		return
 	for mid_v in module_ids:
 		var mid: String = str(mid_v)
-		var st: String = str(module_integrity_map.get_state(mid))
+		var st: String = str(integrity.get_state(mid))
 		var node: Node = _find_structural_module_node(root, mid)
 		if node is Node3D:
 			IntegrityVisualResolverScript.apply_visual_state(node as Node3D, st)
@@ -6445,35 +7381,116 @@ func force_ignite_active_compartment_for_validation(cid: String, intensity: floa
 func get_active_fire_state_for_validation():
 	return _active_fire_state()
 
-## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
-## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
-## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
+## P09: ensures one player-reachable CraftingStation per curated kind for each
+## attached ShipInstance. Nodes live below their own ship scene roots; the shared
+## CraftingState scheduler keeps owner-keyed jobs/pending receipts while a scene
+## is absent, and the node is recreated only for a changed live binding.
 func _build_crafting_stations() -> void:
-	_clear_crafting_stations()
-	if away_from_start or not is_instance_valid(home_ship) or not is_instance_valid(home_ship.scene_root):
+	var owner = current_occupancy if current_occupancy != null else current_ship
+	if owner == null:
 		return
-	if crafting_state == null:
+	_ensure_crafting_stations_for_owner(owner)
+
+
+func _try_nearest_crafting_station_interact(player_body: Node) -> bool:
+	if not is_instance_valid(player_body) or not player_body is Node3D \
+			or current_occupancy == null:
+		return false
+	var owner_id: String = str(current_occupancy.ship_id)
+	var ranked: Array = []
+	for station in crafting_stations:
+		if not is_instance_valid(station) or not station is Node3D \
+				or str(station.ship_id) != owner_id:
+			continue
+		var distance: float = (station as Node3D).global_position.distance_to(
+			(player_body as Node3D).global_position)
+		if distance > float(station.interaction_radius):
+			continue
+		ranked.append({
+			"station": station,
+			"distance": distance,
+			"id": str(station.station_instance_id),
+		})
+	ranked.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		if not is_equal_approx(float(left.distance), float(right.distance)):
+			return float(left.distance) < float(right.distance)
+		return str(left.id) < str(right.id))
+	for row_v in ranked:
+		var row: Dictionary = row_v
+		if row.station.try_interact(player_body):
+			return true
+	return false
+
+
+func _ensure_crafting_stations_for_owner(owner) -> void:
+	if owner == null or crafting_state == null or not is_instance_valid(owner.scene_root) \
+			or owner.scene_root.get_parent() != self:
 		return
-	var owner_ship_id: String = str(home_ship.ship_id)
-	if owner_ship_id.is_empty():
+	var context = _ship_work_context_for(str(owner.ship_id))
+	if context == null or context.crafting_state != crafting_state \
+			or not context.matches_binding(owner):
 		return
-	var positions: Array = _home_local_station_positions()
-	if positions.is_empty():
-		# Fallback: spread the stations around the scene_root origin so they always exist
-		# (interactable via range gate / the validation teleport seam) even when the home
-		# structure can't be resolved into floor cells.
-		var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
-		for i in range(CRAFTING_STATION_KINDS.size()):
-			positions.append(Vector3(float(i) * 2.0, y, 0.0))
+	var owner_ship_id: String = str(context.ship_id)
+	var position_plan: Dictionary = (_crafting_station_positions_by_owner.get(
+		owner_ship_id, {}) as Dictionary).duplicate(false)
+	var positions: Array = []
+	if not position_plan.is_empty():
+		# Once selected, station identities are pinned to immutable authored floor
+		# slots. Dynamic hazards, docked neighbors, and interactable nodes may move
+		# between sessions and must not orphan an already persisted scheduler owner.
+		positions = _structural_floor_positions_for_ship(owner)
+		if position_plan.size() != CRAFTING_STATION_KINDS.size():
+			_crafting_station_unavailable_by_owner[owner_ship_id] = \
+				"saved_station_layout_mismatch"
+			_refresh_tracker_system_status_lines()
+			return
+		for kind_v in CRAFTING_STATION_KINDS:
+			if not position_plan.has(kind_v) \
+					or not position_plan[kind_v] is Vector3 \
+					or not _station_position_is_candidate(
+						position_plan[kind_v] as Vector3, positions):
+				_crafting_station_unavailable_by_owner[owner_ship_id] = \
+					"saved_station_layout_mismatch"
+				_refresh_tracker_system_status_lines()
+				return
+	else:
+		positions = _local_station_positions_for_ship(owner)
+		# Every kind needs a distinct authored floor point. A ship without enough
+		# verified floor cells exposes no physical station rather than inventing an
+		# off-layout coordinate or stacking kinds behind fixed-order interaction.
+		if positions.size() < CRAFTING_STATION_KINDS.size():
+			_crafting_station_unavailable_by_owner[owner_ship_id] = \
+				"insufficient_safe_floor_slots"
+			_refresh_tracker_system_status_lines()
+			return
+		positions = _select_spread_station_positions(positions)
+	var existing: Dictionary = {}
+	for index in range(crafting_stations.size() - 1, -1, -1):
+		var prior = crafting_stations[index]
+		if not is_instance_valid(prior):
+			crafting_stations.remove_at(index)
+			continue
+		if str(prior.ship_id) != owner_ship_id:
+			continue
+		if prior.get_parent() != owner.scene_root \
+				or int(prior.binding_generation) != int(context.binding_generation):
+			crafting_stations.remove_at(index)
+			prior.queue_free()
+			continue
+		existing[str(prior.station_instance_id)] = prior
 	var idx: int = 0
 	for kind in CRAFTING_STATION_KINDS:
-		var pos: Vector3 = positions[idx % positions.size()]
+		var pos: Vector3 = position_plan.get(kind, positions[idx]) as Vector3
+		position_plan[kind] = pos
 		idx += 1
-		var st = CraftingStationScript.new()
 		var station_instance_id: String = _crafting_station_instance_id(kind, pos)
-		st.configure(kind, crafting_state, material_state, inventory_state,
+		if existing.has(station_instance_id):
+			continue
+		var st = CraftingStationScript.new()
+		st.configure(kind, context.crafting_state, material_state, inventory_state,
 			deconstruction_resolver, player_progression, pos, 1.8, recipe_knowledge_state,
-			owner_ship_id, station_instance_id, home_ship.get_pending_output_store())
+			owner_ship_id, station_instance_id, owner.get_pending_output_store(),
+			int(context.binding_generation))
 		st.surgery_provider = self  # Stream F medbay surgery
 		if not st.craft_started.is_connected(_on_craft_started):
 			st.craft_started.connect(_on_craft_started)
@@ -6489,10 +7506,17 @@ func _build_crafting_stations() -> void:
 		if st.has_signal("station_destruction_requested") \
 				and not st.station_destruction_requested.is_connected(_on_crafting_station_destruction_requested):
 			st.station_destruction_requested.connect(_on_crafting_station_destruction_requested)
-		if st.has_signal("recipe_picker_requested") and not st.recipe_picker_requested.is_connected(_on_recipe_picker_requested):
-			st.recipe_picker_requested.connect(_on_recipe_picker_requested)
-		home_ship.scene_root.add_child(st)
+		# Physical stations use their owner-aware signal only. The legacy
+		# kind-only signal is still emitted for isolated consumers, but connecting
+		# both here would open the picker twice and lose its owner identity.
+		if st.has_signal("recipe_picker_context_requested") \
+				and not st.recipe_picker_context_requested.is_connected(_on_recipe_picker_context_requested):
+			st.recipe_picker_context_requested.connect(_on_recipe_picker_context_requested)
+		owner.scene_root.add_child(st)
 		crafting_stations.append(st)
+	_crafting_station_positions_by_owner[owner_ship_id] = position_plan
+	_crafting_station_unavailable_by_owner.erase(owner_ship_id)
+	_refresh_tracker_system_status_lines()
 
 
 ## Stable physical identity derived from authored kind + canonical home-local
@@ -6504,6 +7528,44 @@ func _crafting_station_instance_id(station_kind: String, local_position: Vector3
 		roundi(local_position.y * 1000.0),
 		roundi(local_position.z * 1000.0),
 	]
+
+
+func _crafting_station_position_summary() -> Dictionary:
+	var owners: Array = []
+	var ship_ids: Array = _crafting_station_positions_by_owner.keys()
+	ship_ids.sort()
+	for ship_id_v in ship_ids:
+		var ship_id: String = str(ship_id_v)
+		var positions: Dictionary = _crafting_station_positions_by_owner[ship_id_v]
+		var station_rows: Array = []
+		var kinds: Array = positions.keys()
+		kinds.sort()
+		for kind_v in kinds:
+			var kind: String = str(kind_v)
+			var position: Vector3 = positions[kind_v] as Vector3
+			station_rows.append({
+				"station_kind": kind,
+				"station_instance_id": _crafting_station_instance_id(kind, position),
+				"floor_slot_id": _crafting_floor_slot_id(position),
+				"local_position": [position.x, position.y, position.z],
+			})
+		owners.append({"ship_id": ship_id, "stations": station_rows})
+	return {"schema": "physical-station-positions-1", "owners": owners}
+
+
+func _crafting_floor_slot_id(local_position: Vector3) -> String:
+	return "floor@%d,%d,%d" % [
+		roundi(local_position.x * 1000.0),
+		roundi(local_position.y * 1000.0),
+		roundi(local_position.z * 1000.0),
+	]
+
+
+func _station_position_is_candidate(position: Vector3, candidates: Array) -> bool:
+	for candidate_v in candidates:
+		if candidate_v is Vector3 and (candidate_v as Vector3).is_equal_approx(position):
+			return true
+	return false
 
 func _clear_crafting_stations() -> void:
 	for st in crafting_stations:
@@ -6562,28 +7624,117 @@ func _clear_production_stations() -> void:
 			st.queue_free()
 	production_stations.clear()
 
-## HOME-LOCAL station positions, derived from the home ship's actual room nodes (the same
-## "ShipStructure"-child approach interior_aabb()/_lifeboat_local_repair_positions() use), so
-## a station parented under home_ship.scene_root lands ON a real floor cell. Returns [] when
-## the structure can't be resolved (caller then falls back to spread anchors).
-func _home_local_station_positions() -> Array:
+## Ship-local station positions, derived from an owner's actual room nodes. The
+## parented station therefore lands on that ship's floor instead of the home ship.
+func _local_station_positions_for_ship(owner) -> Array:
 	var out: Array = []
-	if home_ship == null or not is_instance_valid(home_ship.scene_root):
+	for position_v in _structural_floor_positions_for_ship(owner):
+		var local_position: Vector3 = position_v
+		if _station_position_overlaps_other_ship(owner, local_position) \
+				or _station_position_has_priority_conflict(owner, local_position):
+			continue
+		out.append(local_position)
+	return out
+
+
+func _structural_floor_positions_for_ship(owner) -> Array:
+	var out: Array = []
+	if owner == null or not is_instance_valid(owner.scene_root):
 		return out
 	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
-	var sr: Node3D = home_ship.scene_root
-	var structure: Node = sr.get_node_or_null("ShipStructure")
-	if structure == null:
-		for c in sr.get_children():
-			if c.get_child_count() > 0:
-				structure = c
-				break
-	if structure == null:
+	var layout: Dictionary = owner.built_layout if owner.built_layout is Dictionary else {}
+	if layout.is_empty() and owner.scene_root.has_method("get_layout_copy"):
+		layout = owner.scene_root.call("get_layout_copy")
+	var rooms_v: Variant = layout.get("rooms", [])
+	if not rooms_v is Array:
 		return out
-	for room_node in structure.get_children():
-		if room_node is Node3D:
-			out.append((room_node as Node3D).position + Vector3(0.0, y, 0.0))
+	var seen: Dictionary = {}
+	for room_v in rooms_v as Array:
+		if not room_v is Dictionary:
+			continue
+		for placement_v in (room_v as Dictionary).get("structural_placements", []) as Array:
+			if not placement_v is Dictionary:
+				continue
+			var placement: Dictionary = placement_v
+			var module_id: String = str(placement.get("module_id", placement.get("module", ""))).to_lower()
+			var position_v: Variant = placement.get("world_position", null)
+			if module_id.find("floor") < 0 or not position_v is Array \
+					or (position_v as Array).size() < 3:
+				continue
+			var local_position := Vector3(
+				float(position_v[0]), float(position_v[1]) + y, float(position_v[2]))
+			var slot_id: String = _crafting_floor_slot_id(local_position)
+			if seen.has(slot_id):
+				continue
+			seen[slot_id] = true
+			out.append(local_position)
 	return out
+
+
+func _select_spread_station_positions(candidates: Array) -> Array:
+	var remaining: Array = candidates.duplicate()
+	remaining.sort_custom(func(left: Vector3, right: Vector3) -> bool:
+		return _crafting_floor_slot_id(left) < _crafting_floor_slot_id(right))
+	var selected: Array = []
+	while not remaining.is_empty() and selected.size() < CRAFTING_STATION_KINDS.size():
+		var best_index: int = 0
+		var best_separation: float = -1.0
+		for index in range(remaining.size()):
+			var position: Vector3 = remaining[index]
+			var separation: float = INF
+			for selected_v in selected:
+				separation = minf(separation, position.distance_to(selected_v as Vector3))
+			if selected.is_empty():
+				separation = 0.0
+			if separation > best_separation + 0.0001:
+				best_separation = separation
+				best_index = index
+		selected.append(remaining[best_index])
+		remaining.remove_at(best_index)
+	return selected
+
+
+func _station_position_has_priority_conflict(owner, local_position: Vector3) -> bool:
+	if owner == null or not is_instance_valid(owner.scene_root) \
+			or not owner.scene_root.is_inside_tree():
+		return false
+	var world_position: Vector3 = owner.scene_root.global_transform * local_position
+	var priority_nodes: Array = []
+	priority_nodes.append_array(dock_barriers)
+	priority_nodes.append_array(fire_suppression_points)
+	priority_nodes.append_array(breach_seal_points)
+	priority_nodes.append_array(bridge_terminals)
+	priority_nodes.append_array(repair_points)
+	for node in priority_nodes:
+		if not is_instance_valid(node) or not node is Node3D \
+				or not node.is_inside_tree():
+			continue
+		if (node as Node3D).global_position.distance_to(world_position) <= 1.8:
+			return true
+	return false
+
+
+func _station_position_overlaps_other_ship(owner, local_position: Vector3) -> bool:
+	if owner == null or not is_instance_valid(owner.scene_root) \
+			or not owner.scene_root.is_inside_tree():
+		return false
+	var world_position: Vector3 = owner.scene_root.global_transform * local_position
+	var seen: Dictionary = {}
+	for other in [piloted_ship, lifeboat_ship, home_ship, current_ship]:
+		if other == null or other == owner or seen.has(other) \
+				or not is_instance_valid(other.scene_root) \
+				or other.scene_root.get_parent() != self:
+			continue
+		seen[other] = true
+		if other.interior_aabb().grow(0.25).has_point(world_position):
+			return true
+	return false
+
+
+## Production stations remain home-only. Keep their existing helper contract
+## while crafting stations use the owner-explicit variant above.
+func _home_local_station_positions() -> Array:
+	return _local_station_positions_for_ship(home_ship)
 
 ## The systems manager of the ship the player is currently aboard: the derelict's when away,
 ## the lifeboat's when home. (Repair points act on the ship under the player's feet; the
@@ -6751,9 +7902,13 @@ func _on_craft_completed() -> void:
 	var qty: int = int(result.get("quantity", 0))
 	if item_id.is_empty() or qty <= 0:
 		return
-	if inventory_state != null and bool(result.get("pending", false)) and home_ship != null:
-		var store = home_ship.get_pending_output_store()
-		store.collect_receipt(str(result.get("receipt_id", "")), inventory_state)
+	if inventory_state != null and bool(result.get("pending", false)):
+		var receipt_owner = _find_ship_by_id(str(result.get("ship_id", "")))
+		if receipt_owner != null and current_occupancy == receipt_owner \
+				and is_instance_valid(receipt_owner.scene_root) \
+				and receipt_owner.scene_root.get_parent() == self:
+			receipt_owner.get_pending_output_store().collect_receipt(
+				str(result.get("receipt_id", "")), inventory_state)
 	elif inventory_state != null:
 		# Stations gate on can_accept() before starting, so a full stack here is only the rare
 		# during-craft fill; surface (not silently drop) any overflow rather than emitting a
@@ -7114,14 +8269,17 @@ func open_recipe_picker_for_validation(station_kind: String) -> bool:
 			if crafting_state != null:
 				crafting_state.get_or_create_station(station_kind).set_power(true)
 			st.set_powered(true)
-			# Live path: interact emits recipe_picker_requested → open panel.
+			# Live path emits the owner-aware picker signal.
 			st.try_interact(player)
 			if recipe_picker_panel.is_open():
 				return true
 			# Fallback if a residual UI modal still blocked the handler: open the
 			# same panel the live path uses so smokes prove confirm → begin_craft.
-			recipe_picker_panel.open_for_station(station_kind)
-			_freeze_player_for_panel()
+			var opened: bool = bool(recipe_picker_panel.open_for_station(
+				station_kind, str(st.ship_id), str(st.station_instance_id),
+				int(st.binding_generation)))
+			if opened:
+				_freeze_player_for_panel()
 			return recipe_picker_panel.is_open()
 	return false
 
@@ -7707,8 +8865,21 @@ func travel_to(marker) -> Dictionary:
 	# so a port-mismatch never leaves a half-undocked state. ports_compatible needs only
 	# type/size (layout-derived), so the target's LOCAL port suffices here (no placement yet).
 	if piloted_ship != null and new_root.has_method("get_layout_copy"):
-		var target_local: Dictionary = DockPortsScript.for_derelict(new_root.get_layout_copy(), int(marker.seed_value), int(marker.condition))
+		var target_verdict: Dictionary = DockPortsScript.registered_port_verdict(
+			new_root.get_layout_copy(), DockPortsScript.condition_from_seed(
+				int(marker.seed_value), int(marker.condition)))
+		var target_local: Dictionary = target_verdict.get("port", {}) as Dictionary
 		var lb_local: Dictionary = _piloted_port_local()
+		if target_local.is_empty() or lb_local.is_empty():
+			new_root.queue_free()
+			synaptic_sea_world.set_player_position(prev_player_pos)
+			if not was_generated:
+				synaptic_sea_world.unmark_generated(String(marker.marker_id))
+			_emit_travel_denied_sfx()
+			return {"success": false,
+				"reason": "target_%s" % str(target_verdict.get(
+					"reason", "dock_endpoint_missing")) if target_local.is_empty() \
+				else "mobile_dock_endpoint_missing", "ship": null}
 		if not DockPortsScript.ports_compatible(target_local, lb_local):
 			new_root.queue_free()
 			# Codex P2: attempt_travel already advanced the scanner position + generated
@@ -7819,6 +8990,7 @@ func travel_home() -> bool:
 			leaving.scene_root = null
 	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
+	_select_ship_after_transition(home_ship)
 	away_from_start = false
 	_restore_module_integrity_for_current_ship()
 	_restore_or_populate_component_placement_for_current_ship()
@@ -7921,6 +9093,7 @@ func _build_hud_layer() -> void:
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	hud_layer = CanvasLayer.new()
+	hud_layer.visible = not _restore_staging_mode
 	hud_layer.name = "PlayableHudLayer"
 	hud_layer.layer = 20
 	add_child(hud_layer)
@@ -8068,7 +9241,7 @@ func _build_hud_layer() -> void:
 		save_load_menu,
 		accessibility_settings,
 		unlock_registry,
-		_build_run_snapshot,
+		_build_world_snapshot,
 		demo_scope_gate,
 		_demo_save_refused,
 	)
@@ -8095,11 +9268,25 @@ func _on_recipe_picker_panel_closed() -> void:
 func _on_recipe_picker_requested(station_kind: String) -> void:
 	_open_shared_recipe_picker(station_kind)
 
+
+func _on_recipe_picker_context_requested(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		binding_generation: int) -> void:
+	var preflight: Dictionary = _physical_crafting_station_preflight(
+		station_kind, ship_id, station_instance_id, binding_generation)
+	if not bool(preflight.get("ok", false)):
+		_on_craft_blocked(station_kind, "stale_binding")
+		return
+	_open_shared_recipe_picker(
+		station_kind, ship_id, station_instance_id, binding_generation)
+
 ## REQ-CS-018: hydroponics crop picker (same panel as craft/salvage).
 func _on_crop_picker_requested(station_kind: String) -> void:
 	_open_shared_recipe_picker(station_kind)
 
-func _open_shared_recipe_picker(station_kind: String) -> void:
+func _open_shared_recipe_picker(
+		station_kind: String, ship_id: String = "", station_instance_id: String = "",
+		binding_generation: int = -1) -> void:
 	if not is_instance_valid(recipe_picker_panel):
 		return
 	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
@@ -8112,15 +9299,42 @@ func _open_shared_recipe_picker(station_kind: String) -> void:
 		_on_craft_blocked(station_kind, "menu_open")
 		return
 	var was_open: bool = recipe_picker_panel.is_open() if recipe_picker_panel.has_method("is_open") else false
-	recipe_picker_panel.open_for_station(station_kind)
+	var opened: bool = bool(recipe_picker_panel.open_for_station(
+		station_kind, ship_id, station_instance_id, binding_generation))
+	if not opened or not recipe_picker_panel.is_open():
+		_on_craft_blocked(station_kind, "station_owner_invalid")
+		return
 	if not was_open and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
 	_freeze_player_for_panel()
 
 ## REQ-CS-016 / 017 / 018: pure listing seam used by RecipePickerPanel + smokes.
-func list_station_recipe_entries(station_kind: String) -> Array:
+func list_station_recipe_entries(
+		station_kind: String, ship_id: String = "", station_instance_id: String = "",
+		binding_generation: int = -1) -> Array:
 	if inventory_state == null:
 		return []
+	var owner_requested: bool = not ship_id.is_empty() or not station_instance_id.is_empty()
+	if owner_requested:
+		var preflight: Dictionary = _physical_crafting_station_preflight(
+			station_kind, ship_id, station_instance_id, binding_generation)
+		if not bool(preflight.get("ok", false)):
+			return []
+		var station = preflight.station
+		if station_kind == "salvage":
+			return deconstruction_resolver.list_salvage_entries(
+				inventory_state, station.pending_output_store != null) \
+				if deconstruction_resolver != null else []
+		var physical_state = crafting_state.get_station_instance(ship_id, station_instance_id) \
+			if crafting_state.has_method("get_station_instance") else null
+		if physical_state == null:
+			return []
+		var owned_skill: int = int(player_progression.get_skill_level("fabrication")) \
+			if player_progression != null and player_progression.has_method("get_skill_level") else 0
+		return crafting_state.list_recipe_entries(
+			station_kind, inventory_state, owned_skill,
+			station._station_tier(), recipe_knowledge_state, owned_skill,
+			bool(physical_state.get("powered")), station.pending_output_store != null)
 	if station_kind == "field_crafting":
 		if field_crafting_state == null:
 			return []
@@ -8157,10 +9371,34 @@ func _has_physical_pending_store(station_kind: String) -> bool:
 	return false
 
 ## REQ-CS-016 / 017 / 018: panel confirm handler.
-func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
+func begin_craft_from_picker(
+		station_kind: String, recipe_id: String, ship_id: String = "",
+		station_instance_id: String = "", binding_generation: int = -1) -> Dictionary:
 	if recipe_id.is_empty() or station_kind.is_empty():
 		_on_craft_blocked(station_kind if not station_kind.is_empty() else "unknown", "bad_args")
 		return {"ok": false, "reason": "bad_args", "recipe_id": recipe_id}
+	var owner_requested: bool = not ship_id.is_empty() or not station_instance_id.is_empty()
+	if owner_requested:
+		var preflight: Dictionary = _physical_crafting_station_preflight(
+			station_kind, ship_id, station_instance_id, binding_generation)
+		if not bool(preflight.get("ok", false)):
+			var denied_reason: String = str(preflight.get("reason", "station_owner_invalid"))
+			_on_craft_blocked(station_kind, denied_reason)
+			return {"ok": false, "reason": denied_reason, "recipe_id": recipe_id}
+		var exact_station = preflight.station
+		if station_kind == "salvage":
+			if exact_station.try_salvage_target(recipe_id):
+				return {"ok": true, "reason": "salvaged", "recipe_id": recipe_id}
+			_on_craft_blocked(station_kind, "salvage_failed")
+			return {"ok": false, "reason": "salvage_failed", "recipe_id": recipe_id}
+		var was_busy: bool = exact_station._is_this_station_busy()
+		if exact_station.try_craft_recipe(recipe_id):
+			return {"ok": true, "reason": "queued" if was_busy else "started", "recipe_id": recipe_id}
+		if crafting_state != null and not crafting_state.is_recipe_known(recipe_id, recipe_knowledge_state):
+			_on_craft_blocked(station_kind, "missing_recipe_knowledge")
+			return {"ok": false, "reason": "missing_recipe_knowledge", "recipe_id": recipe_id}
+		_on_craft_blocked(station_kind, "begin_failed")
+		return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
 	if station_kind == "field_crafting":
 		if field_crafting_state != null and field_crafting_state.is_crafting():
 			_on_craft_blocked(station_kind, "busy")
@@ -8172,15 +9410,11 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 			return {"ok": true, "reason": "started", "recipe_id": recipe_id}
 		# begin_field_craft_recipe already emits deny SFX on failure.
 		return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
-	if station_kind == "salvage":
-		for st in crafting_stations:
-			if is_instance_valid(st) and st.station_kind == "salvage":
-				if st.try_salvage_target(recipe_id):
-					return {"ok": true, "reason": "salvaged", "recipe_id": recipe_id}
-				_on_craft_blocked(station_kind, "salvage_failed")
-				return {"ok": false, "reason": "salvage_failed", "recipe_id": recipe_id}
-		_on_craft_blocked(station_kind, "station_missing")
-		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
+	if station_kind in CRAFTING_STATION_KINDS:
+		# Physical station kinds never choose the first same-kind node. Live
+		# interaction always supplies the exact owner and generation above.
+		_on_craft_blocked(station_kind, "missing_station_owner")
+		return {"ok": false, "reason": "missing_station_owner", "recipe_id": recipe_id}
 	if station_kind == "hydroponics":
 		for st in production_stations:
 			if is_instance_valid(st) and st.station_kind == "hydroponics":
@@ -8190,20 +9424,190 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 				return {"ok": false, "reason": "plant_failed", "recipe_id": recipe_id}
 		_on_craft_blocked(station_kind, "station_missing")
 		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
-	if crafting_state != null and crafting_state.is_crafting():
-		_on_craft_blocked(station_kind, "busy")
-		return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
-	for st in crafting_stations:
-		if is_instance_valid(st) and st.station_kind == station_kind:
-			if st.try_craft_recipe(recipe_id):
-				return {"ok": true, "reason": "started", "recipe_id": recipe_id}
-			if crafting_state != null and not crafting_state.is_recipe_known(recipe_id, recipe_knowledge_state):
-				_on_craft_blocked(station_kind, "missing_recipe_knowledge")
-				return {"ok": false, "reason": "missing_recipe_knowledge", "recipe_id": recipe_id}
-			_on_craft_blocked(station_kind, "begin_failed")
-			return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
 	_on_craft_blocked(station_kind, "station_missing")
 	return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
+
+
+## P09 owner-scoped picker authority. Every physical request names the complete
+## identity captured at open, including its session binding generation. The
+## current selection, occupancy and range are recomputed on every call so a
+## retained panel cannot mutate a replacement scene or an off-board station.
+func _physical_crafting_station_preflight(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		requested_binding_generation: int, require_range: bool = true) -> Dictionary:
+	if station_kind.is_empty() or ship_id.is_empty() or station_instance_id.is_empty():
+		return {"ok": false, "reason": "missing_station_owner"}
+	if requested_binding_generation < 0:
+		return {"ok": false, "reason": "missing_binding_generation"}
+	if crafting_state == null:
+		return {"ok": false, "reason": "crafting_unavailable"}
+	recompute_occupancy()
+	var owner = _find_ship_by_id(ship_id)
+	if owner == null:
+		return {"ok": false, "reason": "unknown_ship"}
+	var context = _ship_work_context_for(ship_id)
+	if context == null or context.crafting_state != crafting_state \
+			or not context.matches_binding(owner):
+		return {"ok": false, "reason": "stale_binding"}
+	if requested_binding_generation != int(context.binding_generation):
+		return {"ok": false, "reason": "stale_binding"}
+	# Crafting shares P13's ordinary attended-work policy: exact transaction
+	# authority, selection, attachment and occupancy are required, while an
+	# unclaimed reachable derelict remains repairable/craftable.
+	var physical_gate: Dictionary = context.preflight_physical_mutation(selected_ship_id, false)
+	if not bool(physical_gate.get("ok", false)):
+		return {"ok": false, "reason": str(physical_gate.get("reason", "station_owner_invalid"))}
+	for station in crafting_stations:
+		if not is_instance_valid(station) or not station.is_inside_tree():
+			continue
+		if str(station.station_kind) != station_kind \
+				or str(station.ship_id) != ship_id \
+				or str(station.station_instance_id) != station_instance_id:
+			continue
+		if station.get_parent() != owner.scene_root \
+				or int(station.binding_generation) != requested_binding_generation \
+				or station.crafting_state != context.crafting_state:
+			return {"ok": false, "reason": "stale_binding"}
+		if require_range and (not is_instance_valid(player) \
+				or not station.has_method("is_player_in_range") \
+				or not bool(station.call("is_player_in_range", player))):
+			return {"ok": false, "reason": "out_of_range"}
+		return {
+			"ok": true,
+			"reason": "ok",
+			"owner": owner,
+			"context": context,
+			"station": station,
+		}
+	return {"ok": false, "reason": "station_missing"}
+
+
+func _resolve_physical_crafting_station(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		requested_binding_generation: int = -1, require_range: bool = true):
+	var result: Dictionary = _physical_crafting_station_preflight(
+		station_kind, ship_id, station_instance_id,
+		requested_binding_generation, require_range)
+	return result.get("station", null) if bool(result.get("ok", false)) else null
+
+
+func get_station_crafting_projection(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		binding_generation: int) -> Dictionary:
+	var preflight: Dictionary = _physical_crafting_station_preflight(
+		station_kind, ship_id, station_instance_id, binding_generation)
+	if not bool(preflight.get("ok", false)):
+		return {"ok": false, "reason": str(preflight.get("reason", "station_owner_invalid"))}
+	var station = preflight.station
+	var station_state = crafting_state.get_station_instance(ship_id, station_instance_id) \
+		if crafting_state.has_method("get_station_instance") else null
+	if station_state == null or str(station_state.get("station_kind")) != station_kind:
+		return {"ok": false, "reason": "station_state_missing"}
+	var jobs: Array = []
+	var queue_depth: int = 0
+	var power_paused: bool = false
+	var scheduler = crafting_state.get_craft_job_scheduler() if crafting_state != null \
+		and crafting_state.has_method("get_craft_job_scheduler") else null
+	if scheduler != null and scheduler.has_method("get_summary_for_ship"):
+		var summary: Dictionary = scheduler.get_summary_for_ship(ship_id)
+		for job_v in summary.get("jobs", []) as Array:
+			if not job_v is Dictionary:
+				continue
+			var job: Dictionary = job_v as Dictionary
+			if str(job.get("station_instance_id", "")) != station_instance_id:
+				continue
+			var state: String = str(job.get("state", ""))
+			if state in ["collected", "cancelled"]:
+				continue
+			var active: bool = state in [
+				"queued", "running", "paused_power", "blocked", "blocked_unreserved"]
+			if active:
+				queue_depth += 1
+			power_paused = power_paused or state == "paused_power"
+			var policy: String = "unavailable"
+			if state in ["queued", "blocked"]:
+				policy = "refund"
+			elif state in ["running", "paused_power"]:
+				policy = "forfeit_inputs"
+			elif state == "blocked_unreserved":
+				policy = "no_inputs_reserved"
+			var progress_seconds: float = maxf(0.0, float(job.get("progress_seconds", 0.0)))
+			var required_seconds: float = maxf(0.0, float(job.get("required_seconds", 0.0)))
+			jobs.append({
+				"job_id": str(job.get("job_id", "")),
+				"state": state,
+				"recipe_id": str(job.get("recipe_id", "")),
+				"progress_seconds": progress_seconds,
+				"required_seconds": required_seconds,
+				"progress_ratio": clampf(progress_seconds / required_seconds, 0.0, 1.0) \
+					if required_seconds > 0.0 else 0.0,
+				"cancel_policy": policy,
+				"cancellable": policy != "unavailable",
+			})
+	var pending_count: int = 0
+	var pending_receipts: Array = []
+	if station.pending_output_store != null \
+			and station.pending_output_store.has_method("list_records_for_station"):
+		var records: Array = station.pending_output_store.call(
+			"list_records_for_station", station_instance_id) as Array
+		pending_count = records.size()
+		for record_variant in records:
+			if record_variant is Dictionary:
+				pending_receipts.append(str((record_variant as Dictionary).get("receipt_id", "")))
+	return {
+		"ok": true,
+		"ship_id": ship_id,
+		"station_instance_id": station_instance_id,
+		"binding_generation": int(station.binding_generation),
+		"station_kind": station_kind,
+		"station_tier": int(station_state.call("effective_tier")) \
+			if station_state.has_method("effective_tier") else int(station_state.get("tier")),
+		"queue_depth": queue_depth,
+		"max_queue": int(station_state.get("max_queue")),
+		"powered": bool(station_state.get("powered")),
+		"power_paused": power_paused,
+		"pending_mass": station.get_pending_output_mass(),
+		"pending_record_count": pending_count,
+		"pending_receipt_ids": pending_receipts,
+		"jobs": jobs,
+	}
+
+
+func collect_station_pending_output(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		binding_generation: int) -> Dictionary:
+	var preflight: Dictionary = _physical_crafting_station_preflight(
+		station_kind, ship_id, station_instance_id, binding_generation)
+	if not bool(preflight.get("ok", false)):
+		return {
+			"ok": false,
+			"reason": str(preflight.get("reason", "station_owner_invalid")),
+			"transferred": 0,
+		}
+	return preflight.station.collect_pending_output()
+
+
+func cancel_station_craft_from_picker(
+		station_kind: String, ship_id: String, station_instance_id: String,
+		job_id: String, binding_generation: int) -> Dictionary:
+	if job_id.is_empty() or crafting_state == null:
+		return {"ok": false, "reason": "missing_owner"}
+	var preflight: Dictionary = _physical_crafting_station_preflight(
+		station_kind, ship_id, station_instance_id, binding_generation)
+	if not bool(preflight.get("ok", false)):
+		return {"ok": false, "reason": str(preflight.get("reason", "station_owner_invalid"))}
+	var scheduler = crafting_state.get_craft_job_scheduler() \
+		if crafting_state.has_method("get_craft_job_scheduler") else null
+	var job: Dictionary = scheduler.get_job(job_id) \
+		if scheduler != null and scheduler.has_method("get_job") else {}
+	if job.is_empty():
+		return {"ok": false, "reason": "unknown_job"}
+	if str(job.get("ship_id", "")) != ship_id:
+		return {"ok": false, "reason": "wrong_ship"}
+	if str(job.get("station_instance_id", "")) != station_instance_id \
+			or str(job.get("station_kind", "")) != station_kind:
+		return {"ok": false, "reason": "owner_mismatch"}
+	return crafting_state.cancel_job(job_id, ship_id, station_instance_id)
 
 func _on_chart_panel_closed() -> void:
 	_emit_panel_close_sfx()
@@ -8503,20 +9907,36 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 	component_placement_state = ComponentPlacementStateScript.new()
 	if current_ship != null and not current_ship.component_placement_summary.is_empty():
 		var current_layout: Dictionary = _active_layout_for_work()
+		var restored: bool = false
 		if not current_layout.is_empty() and component_placement_state.has_method("restore_from_layout"):
-			component_placement_state.restore_from_layout(
+			restored = component_placement_state.restore_from_layout(
 				current_layout,
 				component_catalog,
 				_component_placement_seed_for_current_ship(),
 				current_ship.component_placement_summary,
 				_slot_occupancy_from_loader())
 		else:
-			component_placement_state.apply_summary(current_ship.component_placement_summary)
+			restored = component_placement_state.apply_summary(
+				current_ship.component_placement_summary, str(current_ship.ship_id))
+		if not restored:
+			push_error("PlayableGeneratedShip: refused invalid component placement for ship '%s'" % str(current_ship.ship_id))
+			_bind_current_ship_restoration_owners()
+			_clear_component_markers()
+			return
+		# Soft system links are layout/catalog-derived policy rather than trusted
+		# save data. Rebuild them after the saved mounted dynamics have been fitted
+		# onto the current physical slots so reload preserves the same repair graph.
+		var restored_systems_doc: Dictionary = _load_json_dict(
+			"res://data/ship_systems/systems.json")
+		if not restored_systems_doc.is_empty():
+			component_placement_state.link_ship_systems(restored_systems_doc, component_catalog)
 		_sync_current_ship_component_placement()
+		_bind_current_ship_restoration_owners()
 		_rebuild_component_markers()
 		return
 	var layout: Dictionary = _active_layout_for_work()
 	if layout.is_empty():
+		_bind_current_ship_restoration_owners()
 		_clear_component_markers()
 		return
 	var seed_v: int = _component_placement_seed_for_current_ship()
@@ -8525,9 +9945,71 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 	var systems_doc: Dictionary = _load_json_dict("res://data/ship_systems/systems.json")
 	if not systems_doc.is_empty():
 		component_placement_state.link_ship_systems(systems_doc, component_catalog)
-	if current_ship != null and component_placement_state.placed.size() > 0:
+	if current_ship != null:
+		var prepared_authority: Dictionary = component_placement_state.prepare_condition_authority(
+			str(current_ship.ship_id),
+			component_catalog,
+			ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+		if not bool(prepared_authority.get("ok", false)) \
+				or not component_placement_state.commit_condition_authority(prepared_authority):
+			push_error("PlayableGeneratedShip: failed to initialize component lot authority for ship '%s'" % str(current_ship.ship_id))
+			component_placement_state.clear()
+			_bind_current_ship_restoration_owners()
+			_clear_component_markers()
+			return
 		current_ship.component_placement_summary = component_placement_state.get_summary()
+	_bind_current_ship_restoration_owners()
 	_rebuild_component_markers()
+
+
+func _bind_current_ship_restoration_owners() -> bool:
+	if current_ship == null or component_placement_state == null or component_catalog == null:
+		return false
+	var owner_id: String = str(current_ship.ship_id)
+	if owner_id.is_empty():
+		return false
+	var transaction = _ship_work_transaction_for(owner_id)
+	if transaction == null:
+		return false
+	var modification = ShipModificationStateScript.new()
+	modification.configure({})
+	var descriptors: Array = component_placement_state.get_physical_slot_descriptors(owner_id)
+	if not descriptors.is_empty() and not modification.bind_physical_slots(
+			owner_id, descriptors, component_catalog, component_placement_state):
+		return false
+	modification.sync_from_placement()
+	var bound: Dictionary = current_ship.bind_live_restoration_owners(
+		module_integrity_map, component_placement_state, modification, transaction)
+	if not bool(bound.get("ok", false)):
+		return false
+	ship_modification_state = modification
+	if _active_ship_work_id.is_empty():
+		ship_work_transactions = transaction
+	# P09 physical stations capture the live restoration binding generation.
+	# Any successful owner rebind therefore invalidates the old scene adapters;
+	# rebuild them immediately so ordinary gameplay never presents a station
+	# that can only fail its first owner-scoped interaction as stale.
+	_ensure_crafting_stations_for_owner(current_ship)
+	if ship_modification_panel != null and ship_modification_panel.is_open() \
+			and selected_ship_id == owner_id:
+		_bind_ship_modification_panel_to_selected_ship(_inventory_qty_dict_for_work())
+	return true
+
+
+func _select_ship_after_transition(owner) -> void:
+	if owner == null or str(owner.ship_id).is_empty():
+		return
+	var next_id: String = str(owner.ship_id)
+	if not _active_ship_work_id.is_empty() and selected_ship_id != next_id:
+		_pause_active_ship_work("wrong_ship")
+	selected_ship_id = next_id
+	# Portable field work follows the selected physical owner until its output is
+	# pinned. Keeping this binding current also makes the idle producer summary a
+	# faithful capture of the live owner after travel; a pinned receipt rejects a
+	# move to a different store inside FieldCraftingState.
+	if field_crafting_state != null and owner.has_method("get_pending_output_store"):
+		field_crafting_state.bind_pending_output_store(
+			next_id, owner.get_pending_output_store())
 
 
 func _component_placement_seed_for_current_ship() -> int:
@@ -8730,12 +10212,13 @@ func _apply_integrity_nav_gaps() -> void:
 	ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
 
 
-func _compiled_wrapper_world_position(module_key: String) -> Vector3:
+func _compiled_wrapper_world_position(module_key: String, ship_owner = null) -> Vector3:
 	if module_key.is_empty():
 		return Vector3.INF
 	var root: Node = null
-	if current_ship != null and is_instance_valid(current_ship.scene_root):
-		root = current_ship.scene_root
+	var owner = ship_owner if ship_owner != null else current_ship
+	if owner != null and is_instance_valid(owner.scene_root):
+		root = owner.scene_root
 	elif is_instance_valid(loader):
 		root = loader
 	if root == null:
@@ -8963,10 +10446,30 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# the coordinator's existing ship_systems_manager (Approach A: the starting
 	# slice's systems are untouched). marker_id "" marks it as the home ship.
 	if current_ship == null:
+		var previous_home = home_ship
+		var new_run_bootstrap: bool = previous_home == null
 		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
 		# Sub-project #1: keep a stable reference to the home ship so travel_home
 		# and world-load can restore it.
 		home_ship = current_ship
+		if _pending_world_home_access_restore_active:
+			if _pending_world_home_access_restore != null:
+				home_ship.access = _pending_world_home_access_restore
+			else:
+				# The enclosing validated world omitted home_access_v1, which is the
+				# only recognized legacy-absence migration allowed to claim locally.
+				home_ship.claim_home_access_for_bootstrap(PLAYER_LOCAL_ID, false, true)
+		elif new_run_bootstrap:
+			home_ship.claim_home_access_for_bootstrap(PLAYER_LOCAL_ID, true)
+		elif previous_home.access != null:
+			# Same-process reload preserves an explicit modern owner verbatim. A
+			# foreign owner is never replaced by the local bootstrap claim.
+			home_ship.access = previous_home.access
+		else:
+			# A retained legacy handle with no access payload is the only load
+			# migration allowed to claim the home ship.
+			home_ship.claim_home_access_for_bootstrap(PLAYER_LOCAL_ID, false, true)
+		_select_ship_after_transition(home_ship)
 		if field_crafting_state != null:
 			field_crafting_state.bind_pending_output_store(
 				str(home_ship.ship_id), home_ship.get_pending_output_store())
@@ -8979,8 +10482,15 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
 		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
-		_build_lifeboat_at_home()
+		var lifeboat_boot: Dictionary = _build_lifeboat_at_home()
+		if not bool(lifeboat_boot.get("ok", false)):
+			_on_loader_failed("lifeboat_boot_%s" % str(
+				lifeboat_boot.get("reason", "failed")))
+			return
 	_bind_module_integrity_owner_from_active_loader()
+	# FC-15 binds the home ShipInstance to the placement owner that the HUD
+	# bootstrap created before the home handle existed.
+	_restore_or_populate_component_placement_for_current_ship()
 	_configure_threat_runtime_for_current_ship()
 	_build_interactables()
 	_build_slice_affordance_labels()
@@ -9031,12 +10541,14 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	ready_summary["collision_shape_count"] = loader.count_collision_shapes()
 	ready_summary["playable_interactable_count"] = interactables.size()
 	print("PLAYABLE SHIP READY player_spawned=%s camera_spawned=%s objectives=%d collision_shapes=%d" % [str(player != null).to_lower(), str(camera_rig != null).to_lower(), interactables.size(), loader.count_collision_shapes()])
-	emit_signal("playable_ready", get_playable_summary())
+	if not _restore_staging_mode:
+		emit_signal("playable_ready", get_playable_summary())
 
 func _on_loader_failed(reason: String) -> void:
 	last_failure_reason = reason
 	push_error("PLAYABLE SHIP FAIL reason=%s" % reason)
-	emit_signal("playable_failed", reason)
+	if not _restore_staging_mode:
+		emit_signal("playable_failed", reason)
 
 ## Break the home_ship ↔ lifeboat_ship RefCounted cycle before this Node3D is
 ## freed. Without this, both ShipInstances keep each other alive (and their
@@ -9064,7 +10576,7 @@ func _break_ship_instance_cycles() -> void:
 ## Phase 5a Task 7: build the physical lifeboat and dock it to the home derelict.
 ## Called from the home-wrap path in _on_ship_loaded (guarded by `current_ship == null`).
 ## Safe to call multiple times — frees any prior lifeboat_ship.scene_root first.
-func _build_lifeboat_at_home() -> void:
+func _build_lifeboat_at_home() -> Dictionary:
 	# Free any prior lifeboat root (reload safety — should not be in-tree here since
 	# _reset_runtime_for_reload tears it down, but guard defensively).
 	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
@@ -9081,8 +10593,7 @@ func _build_lifeboat_at_home() -> void:
 	var lifeboat_biome: String = _resolve_current_loot_biome_id()
 	var lb_root: Node3D = LifeBoatBuilderScript.build(lifeboat_biome)
 	if lb_root == null:
-		push_error("PlayableGeneratedShip: LifeBoatBuilder.build() returned null; lifeboat not created")
-		return
+		return {"ok": false, "reason": "build_failed"}
 
 	# Create the ShipInstance: shared systems_manager so #4 opening-damage, travel-gate,
 	# and repair semantics stay exactly as they are.
@@ -9098,10 +10609,19 @@ func _build_lifeboat_at_home() -> void:
 	piloted_ship = lifeboat_ship
 	var dock_result: Dictionary = _dock_piloted_to(home_ship)
 	if not bool(dock_result.get("success", false)):
-		push_error("PlayableGeneratedShip: boot dock failed — reason=%s" % str(dock_result.get("reason", "?")))
+		_abort_lifeboat_boot()
+		return {"ok": false, "reason": "dock_%s" % str(
+			dock_result.get("reason", "failed"))}
 	# Phase 5b Task 6: spawn the boot home barrier so boarding home at the canonical
 	# opening is consistent with boarding a travel target (both require seam interaction).
-	_spawn_dock_barrier(home_ship)
+	if not _spawn_dock_barrier(home_ship):
+		_abort_lifeboat_boot()
+		return {"ok": false, "reason": "barrier_invalid"}
+	var spawn_result: Dictionary = _apply_initial_lifeboat_spawn_once()
+	if not bool(spawn_result.get("ok", false)):
+		_abort_lifeboat_boot()
+		return {"ok": false, "reason": str(
+			spawn_result.get("reason", "spawn_invalid"))}
 	# 5c: the lifeboat's bridge terminal is spawned AFTER _spawn_dock_barrier(home_ship)
 	# because that call clears bridge_terminals (it shares the dock-transition teardown).
 	# Spawned post-add_child so the terminal is in-tree for the login range gate.
@@ -9109,6 +10629,81 @@ func _build_lifeboat_at_home() -> void:
 	_spawn_hangar_control(lifeboat_ship)
 	_spawn_cargo_hold_control(lifeboat_ship)
 	_spawn_cart_controls_for_ship(lifeboat_ship)
+	return {"ok": true, "reason": "ok"}
+
+
+func _apply_initial_lifeboat_spawn_once() -> Dictionary:
+	if _initial_lifeboat_spawn_applied or _restore_staging_mode or _is_reloading:
+		return {"ok": true, "reason": "not_fresh"}
+	var verdict: Dictionary = _validate_initial_lifeboat_spawn(
+		lifeboat_ship.built_layout if lifeboat_ship != null else {})
+	if not bool(verdict.get("ok", false)):
+		return verdict
+	player.teleport_to(verdict.get("world_position", Vector3.INF) as Vector3)
+	recompute_occupancy()
+	if current_occupancy != lifeboat_ship:
+		return {"ok": false, "reason": "spawn_occupancy_mismatch"}
+	_initial_lifeboat_spawn_applied = true
+	return {"ok": true, "reason": "ok"}
+
+
+func _validate_initial_lifeboat_spawn(layout: Dictionary) -> Dictionary:
+	if player == null or lifeboat_ship == null \
+			or not is_instance_valid(lifeboat_ship.scene_root):
+		return {"ok": false, "reason": "spawn_owner_unavailable"}
+	var spawn_variant: Variant = layout.get("initial_player_spawn_v1", null)
+	if not spawn_variant is Dictionary:
+		return {"ok": false, "reason": "spawn_missing"}
+	var spawn: Dictionary = spawn_variant
+	var expected_keys: Array = [
+		"spawn_id", "owner_ship_id", "room_id", "nav_node_id", "local_position"]
+	if spawn.size() != expected_keys.size():
+		return {"ok": false, "reason": "spawn_fields_invalid"}
+	for key in expected_keys:
+		if not spawn.has(key):
+			return {"ok": false, "reason": "spawn_fields_invalid"}
+	if str(spawn.get("owner_ship_id", "")) != str(lifeboat_ship.ship_id):
+		return {"ok": false, "reason": "spawn_owner_mismatch"}
+	var local_position: Vector3 = _dock_vector3(spawn.get("local_position", []))
+	if not local_position.is_finite():
+		return {"ok": false, "reason": "spawn_position_invalid"}
+	var root_transform: Transform3D = (
+		lifeboat_ship.scene_root as Node3D).global_transform
+	var world_position: Vector3 = root_transform * local_position
+	if not lifeboat_ship.interior_aabb().has_point(world_position):
+		return {"ok": false, "reason": "spawn_outside_owner"}
+	var clearance: Dictionary = DockingManagerScript.validate_registered_spawn_clear(
+		layout, root_transform, local_position)
+	if not bool(clearance.get("ok", false)):
+		return clearance
+	return {"ok": true, "reason": "ok", "world_position": world_position}
+
+
+func validate_initial_lifeboat_spawn_for_validation(
+		layout: Dictionary) -> Dictionary:
+	return _validate_initial_lifeboat_spawn(layout)
+
+
+func _abort_lifeboat_boot() -> void:
+	_clear_dock_barriers()
+	if lifeboat_ship != null:
+		DockingManagerScript.undock(lifeboat_ship)
+		if lifeboat_ship.scene_root != null \
+				and is_instance_valid(lifeboat_ship.scene_root):
+			var root: Node3D = lifeboat_ship.scene_root as Node3D
+			if root != null and root.get_parent() == self:
+				remove_child(root)
+			root.queue_free()
+	lifeboat_ship = null
+	piloted_ship = null
+
+
+func _dock_vector3(value: Variant) -> Vector3:
+	if value is Vector3:
+		return value
+	if value is Array and (value as Array).size() == 3:
+		return Vector3(float(value[0]), float(value[1]), float(value[2]))
+	return Vector3.INF
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -9163,6 +10758,8 @@ func _spawn_player() -> void:
 func _spawn_camera() -> void:
 	camera_rig = IsoCameraRigScript.new()
 	camera_rig.name = "IsoCameraRig"
+	if _restore_staging_mode and camera_rig.has_method("configure_restore_staging"):
+		camera_rig.configure_restore_staging()
 	add_child(camera_rig)
 	camera_rig.set_follow_target(player)
 	camera_rig.make_current()
@@ -9261,6 +10858,16 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
 				return
+		# A published floor holder is placed beside the player and can overlap the
+		# station that produced it. Give the exact physical value holder priority
+		# over reusable station UI so ordinary interact can recover the output.
+		if _try_work_yield_drop_interact(player_body):
+			return
+		# Physical crafting stations participate in the ordinary away interaction
+		# path. Nearest arbitration keeps adjacent floor slots independently
+		# reachable instead of allowing array order to hide a later kind.
+		if _try_nearest_crafting_station_interact(player_body):
+			return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
@@ -9290,8 +10897,6 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 		if _try_cart_interact(player_body):
 			return
-		if _try_work_yield_drop_interact(player_body):
-			return
 		# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 		if _try_work_action_interact(player_body):
 			return
@@ -9316,11 +10921,14 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.try_start(player_body):
 			return
+	# Floor holders can share a producer's interaction radius after publication;
+	# collect the value holder before reopening the reusable producer panel.
+	if _try_work_yield_drop_interact(player_body):
+		return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
-	for st in crafting_stations:
-		if is_instance_valid(st) and st.try_interact(player_body):
-			return
+	if _try_nearest_crafting_station_interact(player_body):
+		return
 	# Domain 3: persistent production stations (hydroponics + water_recycler). Same
 	# priority tier as crafting stations; tried right after them.
 	for st in production_stations:
@@ -9344,6 +10952,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# via the same code path.
 	if _try_tool_pickup_interact(junction_calibrator_pickup, player_body):
 		return
+	# Home layouts also materialize authored doors. Dispatch them through the
+	# same range-gated path as boarded derelicts so an ordinary interact can
+	# open the airlock-to-corridor portal instead of leaving its blocker solid.
+	if _try_authored_portal_interact(player_body):
+		return
 	for interactable_variant in interactables:
 		var interactable = interactable_variant
 		if interactable.try_interact(player_body):
@@ -9356,8 +10969,6 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	if _try_cargo_deposit(player_body):
 		return
 	if _try_cart_interact(player_body):
-		return
-	if _try_work_yield_drop_interact(player_body):
 		return
 	# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 	if _try_work_action_interact(player_body):
@@ -9681,6 +11292,11 @@ func _combined_system_status_lines() -> PackedStringArray:
 			if inv_text.begins_with("weight="):
 				continue
 			lines.append(inv_text)
+	if current_occupancy != null:
+		var station_owner: String = str(current_occupancy.ship_id)
+		if _crafting_station_unavailable_by_owner.has(station_owner):
+			lines.append("Crafting stations: unavailable (%s)" % str(
+				_crafting_station_unavailable_by_owner[station_owner]))
 	if not _last_loot_feedback_line.is_empty():
 		lines.append(_last_loot_feedback_line)
 	if not _last_caption_line.is_empty():
@@ -11419,6 +13035,11 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		return null
 	if save_load_service == null:
 		return null
+	# Component-derived station tiers are authoritative crafting state. Refresh
+	# the active compatibility projection and every exact physical owner before
+	# capture so a save cannot contain the stale tier-0 values created before
+	# component placement finished initializing.
+	_synchronize_crafting_station_tiers_for_capture()
 	var snapshot := RunSnapshotScript.new()
 	snapshot.layout_path = layout_path
 	snapshot.kit_path = kit_path
@@ -11447,13 +13068,22 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	# introduced (apply_summary ignores unknown keys; FieldCraftingState reads the nested key).
 	if crafting_state != null:
 		snapshot.crafting_summary = crafting_state.get_summary()
+		snapshot.crafting_summary["physical_station_positions_v1"] = (
+			_crafting_station_position_summary())
 		if field_crafting_state != null:
 			snapshot.crafting_summary["field_crafting"] = field_crafting_state.get_summary().get("field_crafting", {})
+	if recipe_knowledge_state != null:
+		snapshot.recipe_knowledge_summary = recipe_knowledge_state.get_summary()
 	if material_state != null:
 		snapshot.material_summary = material_state.get_summary()
 	if is_instance_valid(threat_manager):
 		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
-		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
+		if use_home_arc_summary:
+			if home_ship != null and not home_ship.combat_summary.is_empty():
+				snapshot.inventory_summary["threat_summary"] = (
+					home_ship.combat_summary as Dictionary).duplicate(true)
+		else:
+			snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
 	# M7-B Task 7: the old timer FireState is retired. Authoritative fire state
 	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
 	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
@@ -11511,12 +13141,20 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		snapshot.utility_summary = utility_item_state.get_summary()
 	# PKG-D6.1 / D8: pillar models on the home run slice.
 	_sync_current_ship_pillar_summaries()
-	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
-		snapshot.module_integrity_summary = module_integrity_map.get_summary()
+	var snapshot_module_integrity = home_ship.get_live_module_integrity() \
+		if use_home_arc_summary and home_ship != null else module_integrity_map
+	var snapshot_component_placement = home_ship.get_live_component_placement() \
+		if use_home_arc_summary and home_ship != null else component_placement_state
+	var snapshot_ship_modification = home_ship.get_live_ship_modification() \
+		if use_home_arc_summary and home_ship != null else ship_modification_state
+	if snapshot_module_integrity != null \
+			and snapshot_module_integrity.has_method("get_summary"):
+		snapshot.module_integrity_summary = snapshot_module_integrity.get_summary()
 	elif current_ship != null and not current_ship.module_integrity_summary.is_empty():
 		snapshot.module_integrity_summary = current_ship.module_integrity_summary.duplicate(true)
-	if component_placement_state != null and component_placement_state.has_method("get_summary"):
-		snapshot.component_placement_summary = component_placement_state.get_summary()
+	if snapshot_component_placement != null \
+			and snapshot_component_placement.has_method("get_summary"):
+		snapshot.component_placement_summary = snapshot_component_placement.get_summary()
 	elif current_ship != null and not current_ship.component_placement_summary.is_empty():
 		snapshot.component_placement_summary = current_ship.component_placement_summary.duplicate(true)
 	if work_action_driver != null and work_action_driver.work != null and work_action_driver.work.has_method("get_summary"):
@@ -11527,8 +13165,9 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 				"active": true,
 				"summary": work_action_driver.work.call("get_summary"),
 			}
-	if ship_modification_state != null and ship_modification_state.has_method("get_summary"):
-		snapshot.ship_modification_summary = ship_modification_state.get_summary()
+	if snapshot_ship_modification != null \
+			and snapshot_ship_modification.has_method("get_summary"):
+		snapshot.ship_modification_summary = snapshot_ship_modification.get_summary()
 	# ADR-0046: real slot metadata — accumulated play time, the active
 	# ship's location (marker id, or "home" for the hub), and the Synaptic
 	# Sea world seed. _index_run_slot reads these instead of placeholders.
@@ -11542,6 +13181,42 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	snapshot.godot_version = Engine.get_version_info()["string"]
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
 	return snapshot
+
+
+func _synchronize_crafting_station_tiers_for_capture() -> void:
+	if crafting_state == null or not crafting_state.has_method("refresh_station_tier"):
+		return
+	_refresh_station_tiers_from_ship_mod()
+	for owner in _all_known_ships():
+		if owner == null:
+			continue
+		var context = _ship_work_context_for(str(owner.ship_id))
+		if context == null or context.component_placement == null:
+			# Detached owners have no live layout-derived placement authority. Their
+			# exact persisted station tier remains authoritative until the owner is
+			# attached and rebound; deriving from an empty context would erase it.
+			continue
+		var placed: Array = []
+		if context.ship_modification != null:
+			for installed_v in context.ship_modification.installed:
+				if installed_v is Dictionary:
+					var installed: Dictionary = (installed_v as Dictionary).duplicate(true)
+					installed["mounted"] = true
+					placed.append(installed)
+		if context.component_placement != null:
+			for placement_v in context.component_placement.placed:
+				if placement_v is Dictionary:
+					placed.append((placement_v as Dictionary).duplicate(true))
+		var owner_positions: Dictionary = _crafting_station_positions_by_owner.get(
+			str(owner.ship_id), {}) as Dictionary
+		for kind_v in owner_positions:
+			var kind: String = str(kind_v)
+			if kind == "salvage" or not owner_positions[kind_v] is Vector3:
+				continue
+			var station_id: String = _crafting_station_instance_id(
+				kind, owner_positions[kind_v] as Vector3)
+			crafting_state.refresh_station_tier(
+				kind, placed, component_catalog, str(owner.ship_id), station_id)
 
 ## Writes the whole world to the single save slot. Routed through the
 ## world-save format (ADR-0012) so every write to user://saves/current_run.json
@@ -11585,14 +13260,16 @@ func _tick_autosave_policy(delta: float) -> void:
 	var r: Dictionary = autosave_policy.tick(_autosave_run_seconds, _autosave_event_count())
 	if not bool(r.get("should_save", false)):
 		return
-	var snap: RunSnapshot = _build_run_snapshot()
-	if snap == null:
+	var world_snapshot = _build_world_snapshot()
+	if world_snapshot == null:
 		return
 	var slot_id: String = str(r.get("slot_id", ""))
 	if slot_id.is_empty():
 		return
-	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
-		last_saved_snapshot = snap
+	if save_load_service.save_to_slot(slot_id, world_snapshot, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
+		last_saved_snapshot = RunSnapshotScript.from_dict(
+			world_snapshot.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION,
+			Engine.get_version_info()["string"])
 		_last_autosave_result = r
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
@@ -11681,14 +13358,16 @@ func request_quicksave() -> bool:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
-	var snap: RunSnapshot = _build_run_snapshot()
-	if snap == null:
+	var world_snapshot = _build_world_snapshot()
+	if world_snapshot == null:
 		return false
 	var slot_id: String = str(gate.get("slot_id", SaveSlotStateScript.QUICKSAVE_SLOT_ID))
 	if slot_id.is_empty():
 		slot_id = SaveSlotStateScript.QUICKSAVE_SLOT_ID
-	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_QUICK, true, "Quicksave"):
-		last_saved_snapshot = snap
+	if save_load_service.save_to_slot(slot_id, world_snapshot, SaveSlotStateScript.SLOT_KIND_QUICK, true, "Quicksave"):
+		last_saved_snapshot = RunSnapshotScript.from_dict(
+			world_snapshot.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION,
+			Engine.get_version_info()["string"])
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		return true
@@ -11794,33 +13473,24 @@ func is_load_available() -> bool:
 func request_load() -> bool:
 	if save_load_service == null:
 		return false
-	var ws = save_load_service.load_world()
-	if ws == null:
-		push_warning("PlayableGeneratedShip: no compatible world save to load")
+	var prepared: Dictionary = save_load_service.prepare_world_load()
+	if not bool(prepared.get("ok", false)):
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
-	var loaded: bool = _apply_world_snapshot(ws)
-	if loaded:
-		# run_id slot-ownership rework: a successful Continue/F9 world load
-		# means this run instance now owns the loaded world.json's run_id --
-		# its pre-existing autosave family is attributed to that same id, so
-		# a death from here freezes them via the normal freeze_run(_run_id)
-		# path. If the loaded world.json predates this field (empty run_id,
-		# legacy save), generate a fresh id instead: this deliberately fails
-		# OPEN (dying before the first save under the fresh id freezes
-		# nothing) rather than writing a backfilled id to disk on load --
-		# see ADR-0043 addendum for the rejected write-on-read alternative.
-		_run_id = ws.run_id if not String(ws.run_id).is_empty() else _generate_run_id()
-		save_load_service.set_active_run_id(_run_id)
-		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
-		if is_instance_valid(menu_coordinator):
-			menu_coordinator.set_load_available(true)
-	else:
-		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+	var loaded: bool = _commit_prepared_load(prepared)
 	return loaded
+
+
+func _commit_prepared_load(prepared: Dictionary) -> bool:
+	var parent := get_parent()
+	if parent != null and parent.has_method("replace_playable_from_prepared"):
+		return bool(parent.call("replace_playable_from_prepared", self, prepared))
+	var token: String = str(prepared.get("token", ""))
+	if save_load_service != null and not token.is_empty():
+		save_load_service.discard_prepared_load(token)
+	push_warning("PlayableGeneratedShip: atomic restore requires Main owner")
+	return false
 
 ## Reconstructs the slice through the normal load path, then applies
 ## the saved model summaries. Designed to be called from a fully
@@ -11855,7 +13525,18 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	run_play_time_seconds = snapshot.play_time_seconds
 	# Apply the saved model state to the freshly-built slice.
 	if ship_systems_manager != null and not snapshot.ship_systems_summary.is_empty():
+		# This legacy API returns whether mutable health changed, not whether the
+		# payload was accepted. Apply it, then require the complete manager-owned
+		# projection to equal the persisted authority so an unchanged valid save
+		# succeeds while missing/unknown/non-applicable rows fail closed.
 		ship_systems_manager.apply_summary(snapshot.ship_systems_summary)
+		var expected_manager_summary: Dictionary = {
+			"systems": snapshot.ship_systems_summary.get("systems", null),
+			"system_order": snapshot.ship_systems_summary.get("system_order", null),
+		}
+		if _canonical_json_value(ship_systems_manager.get_summary()) \
+				!= _canonical_json_value(expected_manager_summary):
+			return _run_restore_failed("ship_systems")
 		if power_grid_state != null:
 			power_grid_state.apply_summary(snapshot.ship_systems_summary.get("power_grid_summary", {}))
 		if life_support_expanded_state != null:
@@ -11884,7 +13565,11 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		# completed types is safe and future-proof.
 		for completed_type in completed_objective_types:
 			_apply_ship_systems_consequences(str(completed_type))
-		_recompute_expanded_ship_systems(0.0)
+		# The expanded summaries above carry persisted manual routes and exact
+		# current subsystem values. Recomputing here overwrote them from manager
+		# health before staged validation (for example supply 100 -> 20), causing
+		# silent load-time drift. Normal simulation resumes recomputation after
+		# activation.
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
 			oxygen_state.apply_ship_systems_summary(_manager_compat_summary())
@@ -11898,9 +13583,24 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# apply_summary calls receive the same crafting_summary dict — CraftingState reads
 	# active_craft/station_summaries, FieldCraftingState reads the nested "field_crafting" key.
 	if crafting_state != null and not snapshot.crafting_summary.is_empty():
-		crafting_state.apply_summary(snapshot.crafting_summary)
+		var restore_ship_id: String = str(home_ship.ship_id) if home_ship != null else "ship_start"
+		var restore_holder_id: String = str(inventory_state.get_holder_namespace()) \
+			if inventory_state != null and inventory_state.has_method("get_holder_namespace") \
+			else "player:%s" % _run_id
+		crafting_state.configure_legacy_restore_owner(restore_ship_id, restore_holder_id)
+		if not crafting_state.apply_summary(snapshot.crafting_summary):
+			return _run_restore_failed("crafting")
 		if field_crafting_state != null:
-			field_crafting_state.apply_summary(snapshot.crafting_summary)
+			field_crafting_state.configure_legacy_restore_owner(restore_ship_id, restore_holder_id)
+			if not field_crafting_state.apply_summary(snapshot.crafting_summary):
+				return _run_restore_failed("field_crafting")
+	if recipe_knowledge_state != null and not snapshot.recipe_knowledge_summary.is_empty():
+		var knowledge_owner: String = str(snapshot.recipe_knowledge_summary.get("owner_id", ""))
+		if knowledge_owner.is_empty():
+			knowledge_owner = "player:%s" % _run_id
+		recipe_knowledge_state.configure(knowledge_owner, crafting_state.get_recipe_catalog())
+		if not recipe_knowledge_state.apply_summary(snapshot.recipe_knowledge_summary):
+			return _run_restore_failed("recipe_knowledge")
 	if material_state != null and not snapshot.material_summary.is_empty():
 		material_state.apply_summary(snapshot.material_summary)
 	if inventory_state != null and not snapshot.inventory_summary.is_empty():
@@ -11929,12 +13629,14 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if skill_tree_state != null and not snapshot.skill_tree_summary.is_empty():
 		skill_tree_state.apply_summary(snapshot.skill_tree_summary)
 	if is_instance_valid(menu_coordinator) and not snapshot.settings_summary.is_empty():
-		menu_coordinator.apply_settings_summary(snapshot.settings_summary)
+		if not menu_coordinator.apply_settings_summary(snapshot.settings_summary):
+			return _run_restore_failed("settings")
 	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load
 	# restores per-bus volume, ambient role, sfx router cooldowns, music
 	# state, spatial resolver config, and meta-event schedule.
 	if is_instance_valid(audio_manager) and not snapshot.audio_summary.is_empty():
-		audio_manager.apply_summary(snapshot.audio_summary)
+		if not audio_manager.apply_summary(snapshot.audio_summary):
+			return _run_restore_failed("audio")
 	_reconcile_captions_with_settings()
 	# REQ-SV: restore survival vitals summaries.
 	if vitals_state != null and not snapshot.vitals_summary.is_empty():
@@ -11998,14 +13700,22 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
 		var component_layout: Dictionary = _active_layout_for_work()
 		if not component_layout.is_empty() and component_placement_state.has_method("restore_from_layout"):
-			component_placement_state.restore_from_layout(
+			var restored_component_policy: bool = component_placement_state.restore_from_layout(
 				component_layout,
 				component_catalog,
 				_component_placement_seed_for_current_ship(),
 				snapshot.component_placement_summary,
 				_slot_occupancy_from_loader())
+			if restored_component_policy:
+				var restored_systems_doc: Dictionary = _load_json_dict(
+					"res://data/ship_systems/systems.json")
+				if not restored_systems_doc.is_empty():
+					component_placement_state.link_ship_systems(
+						restored_systems_doc, component_catalog)
 		else:
-			component_placement_state.apply_summary(snapshot.component_placement_summary)
+			component_placement_state.apply_summary(
+				snapshot.component_placement_summary,
+				str(current_ship.ship_id) if current_ship != null else "ship_start")
 		if current_ship != null:
 			current_ship.component_placement_summary = component_placement_state.get_summary().duplicate(true)
 		_rebuild_component_markers()
@@ -12069,6 +13779,16 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	])
 	return true
 
+
+func _run_restore_failed(subsystem: String) -> bool:
+	if _restore_staging_mode:
+		_staged_restore_failure_reason = "run_apply_%s_failed" % subsystem
+	return false
+
+
+func _canonical_json_value(value: Variant) -> Variant:
+	return JSON.parse_string(JSON.stringify(value, "", true, true))
+
 ## SettingsState is the single source of truth for captions (ADR-0044).
 ## Called after audio_summary restore because a pre-unification save can
 ## carry a divergent router flag (the panel checkbox never worked before
@@ -12086,8 +13806,8 @@ func _reconcile_captions_with_settings() -> void:
 ## are ship-only side-saves, exactly ADR-0031's original text. Returns
 ## true on success; false on a null snapshot or an _apply_run_snapshot
 ## failure (e.g. not yet playable_started).
-func apply_manual_slot(snapshot: RunSnapshot) -> bool:
-	if snapshot == null:
+func apply_manual_slot(prepared: Dictionary) -> bool:
+	if not bool(prepared.get("ok", false)):
 		return false
 	# ADR-0043 review fix: the menu dispatch block (and this call) is reachable
 	# post-death (slice_complete==true) because epitaph/menu browsing must
@@ -12099,8 +13819,11 @@ func apply_manual_slot(snapshot: RunSnapshot) -> bool:
 	# caller (_apply_world_snapshot / request_load) is already reachable only
 	# from pre-death input, so the guard belongs here, not there.
 	if slice_complete:
+		var token: String = str(prepared.get("token", ""))
+		if save_load_service != null and not token.is_empty():
+			save_load_service.discard_prepared_load(token)
 		return false
-	var applied: bool = _apply_run_snapshot(snapshot)
+	var applied: bool = _commit_prepared_load(prepared)
 	if applied and is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("manual_slot_loaded", "any")
 	return applied
@@ -12119,14 +13842,8 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 	var action: String = str(result.get("action", ""))
 	var ok: bool = bool(result.get("ok", false))
 	if action == "load" and ok:
-		var snapshot: RunSnapshot = result.get("snapshot", null) as RunSnapshot
-		apply_manual_slot(snapshot)
-	elif action == "load_world" and ok:
-		# PR #57 Codex P2 (world-row Load): world.json is a WorldSnapshot, not
-		# a RunSnapshot, so menu_coordinator cannot decode/apply it itself (no
-		# gameplay state there). Route through the same proven world-apply
-		# path F9 and the title screen's Continue already use.
-		request_load()
+		var prepared: Dictionary = result.get("prepared", {}) as Dictionary
+		apply_manual_slot(prepared)
 	# action == "save": no bookkeeping needed here. save_to_slot() already
 	# stamped _run_id onto the manual slot's payload and index row inside
 	# SaveLoadService (run_id slot-ownership rework) -- freeze_run(_run_id)
@@ -12167,10 +13884,9 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		ws.home_access_v1 = home_ship.get_access().get_summary()
 		ws.home_floor_drops_v1 = home_ship.get_floor_drop_summary()
-		var pending_summary: Dictionary = home_ship.get_pending_output_store().get_summary()
-		if not (pending_summary.get("records", []) as Array).is_empty():
-			ws.home_pending_outputs_v1 = pending_summary
+		ws.home_pending_outputs_v1 = home_ship.get_pending_output_store().get_summary()
 		ws.home_breach_environment = home_ship.breach_environment_summary.duplicate(true)
 		var home_cart_dicts: Array = []
 		for c in home_ship.get_carts():
@@ -12387,6 +14103,8 @@ func _prepare_world_holder_restore(ws) -> Dictionary:
 		home_summary["floor_drops_v1"] = ws.home_floor_drops_v1.duplicate(true)
 	if not ws.home_pending_outputs_v1.is_empty():
 		home_summary["pending_outputs_v1"] = ws.home_pending_outputs_v1.duplicate(true)
+	if not ws.home_access_v1.is_empty():
+		home_summary["access"] = ws.home_access_v1.duplicate(true)
 	var next_home = ShipInstanceScript.create("ship_start", "", null, null, null)
 	if not next_home.apply_summary(home_summary):
 		return {"ok": false}
@@ -12417,6 +14135,14 @@ func _apply_world_snapshot(ws) -> bool:
 	if home_snap == null:
 		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
 		return false
+	# The hotbar text is a persisted player-global presentation cache. Ship
+	# activation below refreshes combat UI as a scene consequence, so retain the
+	# validated saved value across the complete restore transaction and publish it
+	# only after the active owner has been rebuilt.
+	var has_persisted_combat_hotbar_text: bool = home_snap.inventory_summary.has("combat_hotbar_text")
+	var persisted_combat_hotbar_text: String = ""
+	if has_persisted_combat_hotbar_text:
+		persisted_combat_hotbar_text = home_snap.inventory_summary["combat_hotbar_text"]
 	# Validate every P04-owned holder into detached models before the run reload
 	# mutates scene or player state. Present malformed payloads reject the whole
 	# restore; missing legacy payloads become empty holders.
@@ -12433,7 +14159,12 @@ func _apply_world_snapshot(ws) -> bool:
 	# teleport the player to the origin instead of their saved home position.
 	if home_snap.player_position.size() >= 3:
 		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
-	if not _apply_run_snapshot(home_snap):
+	_pending_world_home_access_restore_active = true
+	_pending_world_home_access_restore = prepared_home.access
+	var home_applied: bool = _apply_run_snapshot(home_snap)
+	_pending_world_home_access_restore_active = false
+	_pending_world_home_access_restore = null
+	if not home_applied:
 		return false
 	# 1b. Restore the home ship's loot-search state and rebuild its containers so
 	#     already-searched starting containers read as searched (prevents starter-part
@@ -12447,9 +14178,19 @@ func _apply_world_snapshot(ws) -> bool:
 		home_ship.floor_drop_sequence = prepared_home.floor_drop_sequence
 		home_ship.floor_drop_descriptors = prepared_home.floor_drop_descriptors.duplicate(true)
 		home_ship.pending_outputs = prepared_home.pending_outputs
+		if prepared_home.access != null:
+			home_ship.access = prepared_home.access
 		if field_crafting_state != null:
 			field_crafting_state.bind_pending_output_store(
 				str(home_ship.ship_id), home_ship.get_pending_output_store())
+		if crafting_state != null:
+			crafting_state.bind_legacy_migration_jobs(
+				home_ship.get_inventory(), recipe_knowledge_state,
+				player_progression, home_ship.get_pending_output_store())
+		if field_crafting_state != null:
+			field_crafting_state.bind_legacy_migration_jobs(
+				home_ship.get_inventory(), recipe_knowledge_state,
+				player_progression, home_ship.get_pending_output_store())
 		if not away_from_start:
 			_build_crafting_stations()
 		# _apply_run_snapshot() has already rebuilt the home scene, so its initial
@@ -12490,10 +14231,10 @@ func _apply_world_snapshot(ws) -> bool:
 		var active = visited_ships.get(String(ws.current_location), null)
 		if active == null:
 			push_warning("PlayableGeneratedShip: world load — current_location '%s' missing from visited_ships" % String(ws.current_location))
-			return true  # home is already correctly restored; treat as on-home
+			return false
 		if not _activate_derelict_from_instance(active, ws.player_position_in_ship):
 			push_warning("PlayableGeneratedShip: world load — failed to re-activate derelict '%s'" % String(ws.current_location))
-			return true
+			return false
 	# 5. Restore opened-port flags (Task 7: dock-edge persistence).
 	# After ships are rebuilt and barriers spawned (step 4 / _attach_derelict_active),
 	# re-open any barriers that were opened at save time. This is not cosmetic: a host
@@ -12522,6 +14263,10 @@ func _apply_world_snapshot(ws) -> bool:
 	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
 	# (a no-op confirm when step 4 already re-docked 5b's single mobile ship).
 	_apply_docking_snapshot(ws)
+	if has_persisted_combat_hotbar_text:
+		_last_weapon_hotbar_text = persisted_combat_hotbar_text
+		if is_instance_valid(hotbar_panel):
+			hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
 	return true
 
 ## Restores the piloted pointer, dock-edge set, and occupancy from the snapshot
@@ -13069,6 +14814,34 @@ func _menus_are_closed() -> bool:
 		return true
 	return menu_coordinator.menu_state.is_in_play()
 
+## P09: one input dispatcher for the production modal and its validation seam.
+## Selectable action rows make collection and exact-job cancellation use the
+## same arrows/accept path as recipes. Inventory closes the modal first so the
+## player can make space, then re-interact and retry collection at live range.
+func _dispatch_recipe_picker_input(event: InputEvent) -> bool:
+	if not is_instance_valid(recipe_picker_panel) or not recipe_picker_panel.is_open():
+		return false
+	if event.is_action_pressed("ui_down"):
+		recipe_picker_panel.move_selection(1)
+	elif event.is_action_pressed("ui_up"):
+		recipe_picker_panel.move_selection(-1)
+	elif event.is_action_pressed("ui_accept"):
+		recipe_picker_panel.confirm_selection()
+	elif event.is_action_pressed("toggle_inventory"):
+		recipe_picker_panel.close()
+		_open_inventory_self()
+	elif event.is_action_pressed("ui_cancel"):
+		recipe_picker_panel.close()
+	return true
+
+func dispatch_recipe_picker_input_for_validation(action_name: String) -> bool:
+	if action_name.is_empty() or not InputMap.has_action(action_name):
+		return false
+	var event := InputEventAction.new()
+	event.action = action_name
+	event.pressed = true
+	return _dispatch_recipe_picker_input(event)
+
 func _input(event: InputEvent) -> void:
 	if not playable_started:
 		return
@@ -13104,21 +14877,10 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
-	# REQ-CS-016: recipe picker navigation while open.
-	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
-		if event.is_action_pressed("ui_down"):
-			recipe_picker_panel.move_selection(1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("ui_up"):
-			recipe_picker_panel.move_selection(-1)
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("ui_accept"):
-			recipe_picker_panel.confirm_selection()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("ui_cancel"):
-			recipe_picker_panel.close()
-			get_viewport().set_input_as_handled()
-		return  # swallow other input while the recipe picker is open
+	# REQ-CS-016 / P09: recipe picker navigation and action rows while open.
+	if _dispatch_recipe_picker_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if is_instance_valid(chart_panel):
 		if chart_panel.is_open():
 			if event.is_action_pressed("ui_open_map") or event.is_action_pressed("ui_cancel"):

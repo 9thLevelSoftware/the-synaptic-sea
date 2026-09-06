@@ -1,0 +1,1 @@
+"C:/Users/dasbl/Downloads/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . --script res://scripts/validation/fc_p10_process_smoke.gd -- --mode=probe --user_data=D:\the-synaptic-sea-feature-completion\artifacts\feature-completion\R03-world-fixture-check-20260905-01\owned-user

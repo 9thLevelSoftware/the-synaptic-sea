@@ -29,15 +29,15 @@ func _initialize() -> void:
 	await process_frame
 	var install_requests: Array = []
 	var uninstall_requests: Array = []
-	panel.install_requested.connect(func(slot_id: String, component_id: String, item_form: String) -> void:
-		install_requests.append({"slot_id": slot_id, "component_id": component_id, "item_form": item_form})
+	panel.install_requested.connect(func(ship_id: String, binding_generation: int, slot_id: String, component_id: String, item_form: String) -> void:
+		install_requests.append({"ship_id": ship_id, "binding_generation": binding_generation, "slot_id": slot_id, "component_id": component_id, "item_form": item_form})
 	)
-	panel.uninstall_requested.connect(func(slot_id: String, component_id: String, item_form: String) -> void:
-		uninstall_requests.append({"slot_id": slot_id, "component_id": component_id, "item_form": item_form})
+	panel.uninstall_requested.connect(func(ship_id: String, binding_generation: int, slot_id: String, component_id: String, item_form: String) -> void:
+		uninstall_requests.append({"ship_id": ship_id, "binding_generation": binding_generation, "slot_id": slot_id, "component_id": component_id, "item_form": item_form})
 	)
 
 	var inv: Dictionary = {"console_unit": 2, "plating_plate": 1}
-	panel.bind(mod, inv, catalog, physical_slots, "panel-ship", placement)
+	panel.bind(mod, inv, catalog, physical_slots, "panel-ship", placement, 11)
 	panel.open()
 	if not panel.is_open():
 		_fail("panel should open"); return
@@ -50,7 +50,9 @@ func _initialize() -> void:
 
 	if not panel.install_into_selected("console_generic", "console_unit", 5.0, 12.0, false):
 		_fail("install: %s" % "\n".join(panel.get_status_lines())); return
-	if install_requests.size() != 1 or mod.installed_count() != 0:
+	if install_requests.size() != 1 or str((install_requests[0] as Dictionary).get("ship_id", "")) != "panel-ship" \
+			or int((install_requests[0] as Dictionary).get("binding_generation", -1)) != 11 \
+			or mod.installed_count() != 0:
 		_fail("install must only emit a request"); return
 	if int(panel.get_inventory_bag().get("console_unit", 0)) != 2:
 		_fail("panel request mutated inventory"); return
@@ -68,7 +70,10 @@ func _initialize() -> void:
 		_fail("no occupied slot selected for uninstall"); return
 	if not panel.uninstall_selected():
 		_fail("uninstall"); return
-	if uninstall_requests.size() != 1 or mod.installed_count() != 1 or not placement.is_mounted(requested_slot):
+	if uninstall_requests.size() != 1 \
+			or str((uninstall_requests[0] as Dictionary).get("ship_id", "")) != "panel-ship" \
+			or int((uninstall_requests[0] as Dictionary).get("binding_generation", -1)) != 0 \
+			or mod.installed_count() != 1 or not placement.is_mounted(requested_slot):
 		_fail("uninstall must only emit a request"); return
 	if int(panel.get_inventory_bag().get("console_unit", 0)) != 2:
 		_fail("uninstall request mutated inventory"); return

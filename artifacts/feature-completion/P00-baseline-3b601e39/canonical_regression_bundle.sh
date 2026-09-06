@@ -1,0 +1,811 @@
+set -euo pipefail
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot 4.7.1 executable}"
+# Known baseline Godot shutdown lines that appear identically in every
+# unchanged smoke (route-control, completion, input, readability, oxygen,
+# hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
+# or any other Gate 1 runtime system. They are filtered out of the strict
+# ERROR/WARNING check below; any other ERROR:/WARNING: line (parse errors,
+# GDScript runtime errors, validation markers pushed via push_error) still
+# fails the bundle. See "Baseline Godot teardown noise" below for the
+# audit trail and the exact evidence-gathering command.
+BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
+REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\\$"
+# The save/load service smoke deliberately writes a slot with an incompatible
+# (newer) slice_version to assert the migration-rejection path; that emits one
+# expected warning, allowlisted exactly like REQ012_WARNING above.
+MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: slot rejected by migration \\(newer than current\\), slot_id=.*\$"
+# save_load_service_smoke deliberately writes a world-99 payload to prove an
+# older build refuses the newer save without moving it into .corrupt; this is
+# the expected warning from that preservation path.
+WORLD_MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: world save rejected by migration \\(newer than current version\\)\$"
+# title_save_query_smoke's corrupt-world case (PR #57 Codex P2) deliberately
+# writes literal garbage over world.json to prove TitleSaveQuery.is_continue_available
+# now calls load_world() (not just has_slot/has_died_in); load_world()'s
+# JSON-parse-failure path emits this one expected warning before returning
+# null, allowlisted the same way as REQ012_WARNING/MIGRATION_REJECT_WARNING.
+CORRUPT_WORLD_WARNING="^WARNING: SaveLoadService: world save file is not valid JSON object\$"
+# The same corrupt-world case's write goes through Godot's own JSON.parse_string,
+# which prints its own native engine-level ERROR (not a push_error) before
+# load_world() ever gets to check the parsed result. This is Godot engine
+# behavior (core/io/json.cpp), not a Synaptic Sea system error -- allowlisted
+# alongside CORRUPT_WORLD_WARNING as the deliberate/expected pair.
+CORRUPT_WORLD_JSON_ERROR="^ERROR: Parse JSON failed\\..*\$"
+# permadeath_freeze_smoke's reclaim-failure stage (PR #57 Codex round 3 P2)
+# deliberately pre-creates a directory at world.json's path so
+# FileAccess.open fails, proving save_world() leaves an existing death
+# record intact when the write itself fails (clear_death now runs only
+# after a confirmed write). That forced failure emits one expected warning,
+# allowlisted the same way as the other deliberate-failure-path warnings
+# above.
+WORLD_WRITE_FAIL_WARNING="^WARNING: SaveLoadService: cannot open world save file for writing, error=.*\$"
+# title_load_failure_smoke (Tranche 1 audit fix) deliberately fires the
+# loader-failure entry point (reason=smoke_forced_failure) to prove the title
+# screen tears down a dead boot instead of polling forever. That forced
+# failure emits exactly one push_error (the playable's existing FAIL line) and
+# one push_warning (TitleMain's new return-to-title handler). Both patterns
+# are pinned to the smoke's sentinel reason so a REAL boot failure in any
+# other smoke still fails the bundle.
+TITLE_BOOT_FAIL_ERROR="^ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure\$"
+TITLE_BOOT_FAIL_WARNING="^WARNING: TitleMain: gameplay boot failed \\(smoke_forced_failure\\).*\$"
+# meta_progression_state_smoke's tolerant-schema case (Session 3 B5)
+# deliberately applies a mismatched-schema meta dict to prove best-effort
+# apply (and a no-known-fields rejection); each emits one expected
+# warn-once line, allowlisted like the deliberate-failure paths above.
+META_SCHEMA_WARNING="^WARNING: MetaProgressionState: schema mismatch \\('.*' != 'meta-progression-1'\\); (best-effort apply of known fields|rejected \\(no known meta fields\\))\$"
+# world_save_service_smoke's rejects_null case (Tranche 3 promotion)
+# deliberately passes a null world snapshot to prove save_world refuses it;
+# that emits this one expected warning.
+NULL_WORLD_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
+# save_slot_state_smoke's corruption case (Tranche 3 promotion) deliberately
+# writes garbage over slot_03.json to prove corruption detection + .corrupt/
+# backup; the engine's JSON parse ERROR is covered by CORRUPT_WORLD_JSON_ERROR
+# and this is the service's own expected warning, pinned to the smoke's slot.
+CORRUPT_SLOT_WARNING="^WARNING: SaveLoadService: slot file is not valid JSON object, slot_id=slot_03\$"
+# Tranche 4 (2026-07-06 audit): play_voice_log now routes each AudioLog
+# entry's authored clip_path through the warn-once stream loader (ADR-0044
+# honest-deferred-assets). The voice clip library is still deferred
+# (data/audio/voice/ absent), so any smoke that plays a voice log — the
+# audio log panel smoke directly, and main_playable_slice_audio_smoke via
+# the 12s/30s scheduled meta events — emits one expected missing-file
+# warning per distinct path. Pinned to the voice directory so a missing
+# SFX/music placeholder in any other smoke still fails the bundle.
+VOICE_CLIP_WARNING="^WARNING: AudioManager: stream file missing, path='res://data/audio/voice/.*'\$"
+# Tranche 5 (2026-07-06 audit): encounter_injector_smoke's missing-table case
+# (Case 11) deliberately points a biome at a nonexistent encounter table to
+# prove the constants fallback + warn-once (ADR-0047). Pinned to the smoke's
+# sentinel id so a genuinely missing production table still fails the bundle.
+ENCOUNTER_TABLE_WARNING="^WARNING: EncounterInjector: encounter table file missing, falling back to role constants: res://data/procgen/encounter_tables/no_such_table\\.json\$"
+# derelict_generator_smoke drives ShipGenerator with the derelict archetype
+# against the legacy spine/bifurcated/stacked template trio, none of whose
+# zone pools can host the archetype's guaranteed "dock" — the assigner's
+# guarantee post-pass (Tranche 5 enforcement) correctly reports the skip.
+# The dock itself is guaranteed by the v3 RoomGraphGenerator layer (the same
+# smoke asserts dock_count==1) and by the derelict_a/b templates. Production
+# generate_from_seed (travel_to / generated_seed_boarded_slice_smoke) can emit
+# the same skip when the selected template has no dock zone.
+DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped\$"
+# Soft-fail when all salted connectivity retries still produce a disconnected layout
+# (best-effort ship still returned; quality gate fails hard on disconnect).
+CONNECTIVITY_SOFT_FAIL_WARNING="^WARNING: ShipLayoutGenerator: layout connectivity soft-fail after [0-9]+ attempts seed="
+# load_from_blueprint_smoke's null_rejected case deliberately passes a null
+# blueprint to prove load_from_blueprint refuses it; this is the expected
+# rejection line.
+BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip.load_from_blueprint: blueprint must not be null\$"
+# release_readiness_ledger_smoke deliberately sends one unknown check id, one
+# invalid status, and one missing external evidence path to prove
+# ReleaseReadinessLedger rejects malformed evidence rows instead of accepting
+# them into the release ledger.
+RELEASE_LEDGER_UNKNOWN_WARNING="^WARNING: ReleaseReadinessLedger: unknown check_id=totally_made_up_check\$"
+RELEASE_LEDGER_STATUS_WARNING="^WARNING: ReleaseReadinessLedger: invalid status=WAT\$"
+RELEASE_LEDGER_EXTERNAL_WARNING="^WARNING: ReleaseReadinessLedger: external evidence rejected, evidence_path is required\$"
+RUN_CLEAN_COUNT=0
+run_clean() {
+  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))
+  label="$1"
+  marker="$2"
+  shift 2
+  echo "=== $label ==="
+  set +e
+  OUT=$("$@" 2>&1)
+  COMMAND_STATUS=$?
+  set -e
+  printf '%s\n' "$OUT"
+  if ! printf '%s\n' "$OUT" | grep -q "$marker"; then
+    echo "MISSING_MARKER in $label"
+    exit 1
+  fi
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING|SCRIPT ERROR):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  if [ -n "$FILTERED" ]; then
+    printf '%s\n' "$FILTERED"
+    echo "UNEXPECTED_ERROR_OR_WARNING in $label"
+    exit 1
+  fi
+  if [ "$COMMAND_STATUS" -ne 0 ]; then
+    echo "COMMAND_FAILED exit=$COMMAND_STATUS in $label"
+    exit "$COMMAND_STATUS"
+  fi
+}
+run_clean 'route control model smoke' 'ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
+run_clean 'main route control smoke' 'MAIN PLAYABLE ROUTE CONTROL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+run_clean 'oxygen model smoke' 'OXYGEN STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/oxygen_state_smoke.gd
+run_clean 'inventory model smoke' 'INVENTORY STATE PASS tools=1 pump=true drain_multiplier=0.5' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_state_smoke.gd
+run_clean 'main inventory smoke' 'MAIN PLAYABLE INVENTORY PASS tool=portable_oxygen_pump acquired=true drain_multiplier=0.5' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_inventory_smoke.gd
+run_clean 'main hazard smoke' 'MAIN PLAYABLE HAZARD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hazard_smoke.gd
+run_clean 'fire suppression model smoke' 'FIRE SUPPRESSION STATE PASS ignite=true persist=true extinguish=true auto_suppress=true vent=true spread=true reignite=true cascade=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_suppression_state_smoke.gd
+run_clean 'extinguisher state smoke' 'EXTINGUISHER STATE PASS consume=true recharge=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extinguisher_state_smoke.gd
+run_clean 'ship systems damage smoke' 'SHIP SYSTEMS DAMAGE PASS damaged=true unknown_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_systems_damage_smoke.gd
+run_clean 'fire suppression point smoke' 'FIRE SUPPRESSION POINT PASS extinguished=true charge_spent=true gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_suppression_point_smoke.gd
+run_clean 'extinguisher recharge port smoke' 'EXTINGUISHER RECHARGE PORT PASS powered_refills=true unpowered_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extinguisher_recharge_port_smoke.gd
+run_clean 'main fire smoke' 'MAIN PLAYABLE FIRE PASS passable=true present=true vent=true vitals_drain=true system_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_fire_smoke.gd
+run_clean 'main fire loop smoke' 'MAIN PLAYABLE FIRE LOOP PASS ignite=true teeth=true extinguish=true reignite=true repair_stops=true recharge=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_fire_loop_smoke.gd
+run_clean 'golden fire zone source marker smoke' 'GOLDEN FIRE ZONE SOURCE MARKER PASS marker_room=cargo_01' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/golden_fire_zone_source_marker_smoke.gd
+run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS power=true breach_sealed=true gates_open=true logs=true reactor=true extraction=true power_pct=100' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ship_systems_smoke.gd
+run_clean 'M7-A ship systems expanded smoke' 'MAIN PLAYABLE SHIP SYSTEMS EXPANDED PASS propulsion=true hull=true fire=true sustenance=true persistence=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ship_systems_expanded_smoke.gd
+run_clean 'Domain 4 web infestation model smoke' 'WEB INFESTATION PASS grows=true recedes=true damage_live=true save_roundtrip=true reject=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_infestation_state_smoke.gd
+run_clean 'Domain 4 ship systems closure smoke' 'SHIP SYSTEMS CLOSURE PASS away_ticks=60 web_grew=true hull_damaged=true breach_to_vitals=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_systems_closure_smoke.gd
+run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
+run_clean 'template b completion smoke' 'MAIN PLAYABLE TEMPLATE B COMPLETE PASS completed=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_template_b_completion_smoke.gd
+run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
+run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_props=5 blocked=1 ramp=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
+run_clean 'main objective variation smoke' 'MAIN PLAYABLE OBJECTIVE VARIATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
+run_clean 'objective progress state smoke' 'OBJECTIVE PROGRESS STATE PASS sequence=2 required=2 completed=2 applied_once=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_state_smoke.gd
+run_clean 'objective progress hud label smoke' 'OBJECTIVE PROGRESS HUD LABEL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_hud_label_smoke.gd
+run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
+run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+run_clean 'ceiling lifetime smoke' 'FC P00 CEILING LIFETIME PASS freed_safe=true rebound=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fc_p00_ceiling_lifetime_smoke.gd
+run_clean 'REQ-012 auto-save sequence smoke' 'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
+run_clean 'template C stacked layout main scenario smoke' 'TEMPLATE C MAIN SCENARIO PASS objectives=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_main_scenario_smoke.gd
+run_clean 'junction calibrator model smoke' 'JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_state_smoke.gd
+run_clean 'main junction calibrator smoke' 'MAIN PLAYABLE JUNCTION CALIBRATOR PASS acquired=true required_steps=2 consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_junction_calibrator_smoke.gd
+run_clean 'main junction calibrator save/load smoke' 'MAIN PLAYABLE JUNCTION CALIBRATOR SAVE LOAD PASS carried_load=true consumed_load=true next_frame_interaction=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_junction_calibrator_save_load_smoke.gd
+run_clean 'alternate input smoke' 'MAIN PLAYABLE ALTERNATE INPUT PASS moves_alt=1 interact_alt=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_alternate_input_smoke.gd
+run_clean 'alternate input events smoke' 'PLAYABLE SLICE ALTERNATE INPUT EVENTS PASS static_bindings=ok moves_alt=1 interact_alt=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/playable_slice_alternate_input_smoke.gd
+run_clean 'A11Y-P1-001 text scale smoke' 'MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_text_scale_smoke.gd
+run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/performance_profiler.gd
+run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
+run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
+run_clean 'derelict arc away-branch smoke' 'DERELICT ARC PASS boarded=true zone_on_derelict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_arc_smoke.gd
+run_clean 'away-branch integrity smoke' 'AWAY BRANCH INTEGRITY PASS boarded=true port_frame=true hud_refresh=true death_guard=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/away_branch_integrity_smoke.gd
+run_clean 'title load-failure recovery smoke' 'TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_load_failure_smoke.gd
+run_clean 'hazard interaction feedback smoke' 'HAZARD FEEDBACK PASS extinguish_blocked=true seal_blocked=true breach_sealed=true sfx_routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_feedback_smoke.gd
+run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
+run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRAFT PASS crafted=true salvaged=true field=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd
+run_clean 'REQ-CS-016 crafting recipe list smoke' 'CRAFTING RECIPE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_recipe_list_smoke.gd
+run_clean 'REQ-CS-016 recipe picker panel smoke' 'RECIPE PICKER PANEL PASS rows=3 move=true confirm=true closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_panel_smoke.gd
+run_clean 'REQ-CS-016 main playable recipe picker smoke' 'MAIN PLAYABLE RECIPE PICKER PASS station=fabricator' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_recipe_picker_smoke.gd
+run_clean 'REQ-CS-017 salvage list smoke' 'SALVAGE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_list_smoke.gd
+run_clean 'REQ-CS-017 main playable salvage picker smoke' 'MAIN PLAYABLE SALVAGE PICKER PASS target=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_salvage_picker_smoke.gd
+run_clean 'REQ-CS-018 hydroponics crop list smoke' 'HYDROPONICS CROP LIST PASS crops=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hydroponics_crop_list_smoke.gd
+run_clean 'REQ-CS-018 main playable hydro crop picker smoke' 'MAIN PLAYABLE HYDRO CROP PICKER PASS crop=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hydro_crop_picker_smoke.gd
+run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
+run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
+run_clean 'compiled lifeboat biome-contract reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
+run_clean 'procgen derelict encounter-injection reachability smoke' 'MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_encounter_injection_smoke.gd
+run_clean 'procgen encounter placement smoke' 'ENCOUNTER PLACEMENT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_placement_smoke.gd
+run_clean 'REQ-FC food consumption reachability smoke' 'MAIN PLAYABLE FOOD CONSUMPTION PASS hunger_restored=true thirst_restored=true spoilage_tracked=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_food_consumption_smoke.gd
+run_clean 'item economy data smoke' 'ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_enforced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/item_economy_smoke.gd
+run_clean 'item data integrity smoke' 'ITEM DATA INTEGRITY PASS recipes=60 loot_ids=31 materials=33 no_shadow_defs=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/item_data_integrity_smoke.gd
+run_clean 'main item economy reachability smoke' 'MAIN PLAYABLE ITEM ECONOMY PASS crafted_sealant=true sealed=true crafted_ext=true extinguished=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_item_economy_smoke.gd
+run_clean 'spoilage stage threaded into eat path smoke' 'SPOILAGE EAT SCALING PASS stale_lt_fresh=true rotten_lt_stale=true fresh_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spoilage_eat_scaling_smoke.gd
+run_clean 'M7-A breach seal point model smoke' 'BREACH SEAL POINT PASS sealed=true breach_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_point_smoke.gd
+run_clean 'M7-A life support vitals loop smoke' 'MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_life_support_vitals_smoke.gd
+run_clean 'Domain 1 survival stakes (home) smoke' 'MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_stakes_smoke.gd
+run_clean 'Domain 1 survival attrition away-path smoke' 'MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true o2_teeth=true away_death=true no_extract_on_death=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_away_smoke.gd
+run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_smoke.gd
+run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
+run_clean 'hallucination director model smoke' 'HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hallucination_director_smoke.gd
+run_clean 'threat placeholder renderer smoke' 'THREAT PLACEHOLDER RENDERER PASS swarm=true anchored=true default=true color=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_placeholder_renderer_smoke.gd
+run_clean 'threat visual catalog smoke' 'THREAT VISUAL CATALOG PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
+run_clean 'gameplay prop visual catalog smoke' 'GAMEPLAY PROP VISUAL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_prop_visual_smoke.gd
+run_clean 'main hallucination loop smoke' 'MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true no_respawn=true teeth=true away_ticks=true clears=true hud=true fx=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_hallucination_smoke.gd
+run_clean 'biome loot_quality_modifier wired into rarity rolls' 'LOOT QUALITY MODIFIER PASS high_gt_base=true mid_between=true default_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_quality_modifier_smoke.gd
+run_clean 'REQ-AU-001 coordinator audio event coupling smoke' 'AUDIO COORDINATOR EVENTS PASS fire=true arc=true breath=true vitals_low_edge=true combat_music=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_coordinator_events_smoke.gd
+run_clean 'REQ-AU-001 callsite audio event coupling smoke' 'AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_callsite_events_smoke.gd
+run_clean 'audio bus config model smoke' 'AUDIO BUS CONFIG PASS buses=7 default=true summary_round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_bus_config_smoke.gd
+run_clean 'ambient zone state model smoke' 'AMBIENT ZONE STATE PASS roles_changed=2 crossfades_completed=1 threat_applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ambient_zone_state_smoke.gd
+run_clean 'sfx event router model smoke' 'SFX EVENT ROUTER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sfx_event_router_smoke.gd
+run_clean 'dynamic music state model smoke' 'DYNAMIC MUSIC STATE PASS states_visited=4 crossfade_changed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dynamic_music_state_smoke.gd
+run_clean 'spatial audio resolver model smoke' 'SPATIAL AUDIO RESOLVER PASS atten_ref=0 atten_max=-36 occluded=-6 determinism=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spatial_audio_resolver_smoke.gd
+run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=0 deterministic_seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_event_state_smoke.gd
+run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
+run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
+run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true voice_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
+run_clean 'Task 1.5 audio content coverage smoke' 'AUDIO CONTENT COVERAGE PASS clips=15 catalog=true non_empty=true decoded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_content_coverage_smoke.gd
+run_clean 'REQ-AU-005 spatial audio playback smoke' 'AUDIO SPATIAL PASS catalogued_playing=true fallback_honest=true production_pickup=true position_tracked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_spatial_playback_smoke.gd
+# --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
+# doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
+# exits non-zero on failure. The kanban-manifest check needs the live Hermes board
+# SQLite DB; when it is absent it prints "KANBAN MANIFEST SKIP" instead of
+# "KANBAN MANIFEST PASS", and the gate accepts either (marker "KANBAN MANIFEST").
+run_clean 'systems map currency' 'SYSTEMS MAP CURRENCY PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" systems-map
+run_clean 'requirement trace' 'REQUIREMENT TRACE PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
+run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/validation/doc_currency_validators.py" kanban-manifest
+# --- System inventory anti-drift check (host-side Python; no Godot) ---
+# build_system_inventory.py auto-detects the repo root from its own path. --check
+# re-renders SYSTEM_INVENTORY.md + system_map.html from system_inventory.json and
+# fails on missing cited files, untraced simulation systems (confidence '?'),
+# dangling integration/loop refs, or stale committed output. Marker carries a
+# systems=/verified= count suffix; the bundle matches the leading marker string.
+run_clean 'system inventory anti-drift check' 'SYSTEM INVENTORY CHECK PASS' python3 "$ROOT/tools/build_system_inventory.py" --check
+# --- REQ-DOC-009 as-built architecture visualizations (host-side Python + locked Mermaid CLI) ---
+run_clean 'architecture diagram anti-drift check' '^ARCHITECTURE DIAGRAMS PASS diagrams=5 exports=5 references=[1-9][0-9]*$' bash -lc 'npm --prefix "$1/tools/architecture" ci --silent && python3 "$1/tools/validate_architecture_diagrams.py" --check' _ "$ROOT"
+run_clean 'fire suppression round-trip smoke' 'FIRE SUPPRESSION ROUND TRIP PASS topo=true fires=true spreads=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_suppression_round_trip_smoke.gd
+run_clean 'ship instance fire persistence smoke' 'SHIP INSTANCE FIRE PERSISTENCE PASS omitted=true restored=true seeded_vents=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_fire_persistence_smoke.gd
+run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_seed_smoke.gd
+run_clean 'main playable derelict fire smoke' 'MAIN PLAYABLE DERELICT FIRE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_fire_smoke.gd
+run_clean 'main playable reachability smoke' 'MAIN PLAYABLE REACHABILITY PASS organic_cart=true home_loot=true hangar_interact=true achievements=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_reachability_smoke.gd
+run_clean 'main playable quicksave smoke' 'MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_quicksave_smoke.gd
+run_clean 'encounter table dead fleet smoke' 'ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_table_dead_fleet_smoke.gd
+run_clean 'status effect icons smoke' 'STATUS EFFECT ICONS PASS entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effect_icons_smoke.gd
+run_clean 'UI icon paths smoke' 'UI ICON PATHS PASS status_entries=8 achievement_entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_icon_paths_smoke.gd
+run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
+run_clean 'detection state model smoke' 'DETECTION STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/detection_state_smoke.gd
+run_clean 'threat detection source smoke' 'THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_detection_source_smoke.gd
+run_clean 'player crouch seam smoke' 'PLAYER CROUCH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_crouch_smoke.gd
+run_clean 'crouch action smoke' 'CROUCH ACTION PASS registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crouch_action_smoke.gd
+run_clean 'threat kill removal smoke' 'THREAT KILL REMOVAL PASS emitted_once=true removed=true loot_table=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_removal_smoke.gd
+run_clean 'combat reward data smoke' 'COMBAT REWARD DATA PASS archetypes=true table=true training=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_reward_data_smoke.gd
+run_clean 'combat closure smoke' 'COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true pending_corpse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_closure_smoke.gd
+run_clean 'combat corpse position smoke' 'MAIN PLAYABLE COMBAT CORPSE POSITION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_corpse_position_smoke.gd
+run_clean 'Domain 3 production station wiring smoke' 'PRODUCTION WIRING PASS hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_smoke.gd
+run_clean 'Domain3 contaminated_water item smoke' 'CONTAMINATED WATER ITEM PASS defined=true supply=true lootable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/contaminated_water_item_smoke.gd
+run_clean 'Domain3 production station unit smoke' 'PRODUCTION STATION PASS hydro_harvest=true recycler_collect=true blocked_in_progress=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_smoke.gd
+run_clean 'Domain3 synthesizer retirement smoke' 'FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true legacy_load_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_synthesizer_retirement_smoke.gd
+run_clean 'Domain3 food away tick smoke' 'FOOD AWAY TICK PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_away_tick_smoke.gd
+run_clean 'Domain3 main playable food production smoke' 'MAIN PLAYABLE FOOD PRODUCTION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_food_production_smoke.gd
+run_clean 'Phase 1 world time persistence smoke' 'WORLD TIME PASS advances=true world_snapshot_roundtrip=true ship_timestamp_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_time_persistence_smoke.gd
+run_clean 'Phase 2 ship instance models smoke' 'SHIP INSTANCE MODELS PASS hull_roundtrip=true web_roundtrip=true web_attached_delegates=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_models_smoke.gd
+run_clean 'Phase 2 ship models seed smoke' 'SHIP MODELS SEED PASS hull_seeded=true web_attached=true timestamp_set=true active_resolves=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_models_seed_smoke.gd
+run_clean 'Phase 4 ship catch-up smoke' 'SHIP CATCHUP PASS web_grew=true hull_degraded=true timestamp_stamped=true bounded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_catchup_smoke.gd
+run_clean 'Domain 5 sealed hatch seed + bypass smoke' 'SEALED HATCH PASS away_ticks=3 seeded=true mechanical_open=true flag_consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_smoke.gd
+run_clean 'Domain 5 thermal consumable smoke' 'THERMAL CONSUMABLE PASS temp_before=12.000 temp_after=20.000 temp_shifted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/thermal_consumable_smoke.gd
+run_clean 'Domain 5 ammo magazine state model smoke' 'AMMO MAGAZINE STATE PASS spent=true empty=true reloaded=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_state_smoke.gd
+run_clean 'Domain 5 ammo magazine away-branch smoke' 'AMMO MAGAZINE PASS away_ticks=30 spent=true dry_fire=true reloaded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_smoke.gd
+run_clean 'Domain 5 weapon/ammo acquisition chain smoke' 'WEAPON AMMO ACQUISITION PASS data_reachable=true looted_ammo=true production_reload=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_ammo_acquisition_smoke.gd
+run_clean 'Domain 5 consumables away tick smoke' 'CONSUMABLES AWAY TICK PASS away_ticks=20 stim_decayed=true addiction_ticked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumables_away_tick_smoke.gd
+run_clean 'Domain 5 sealed hatch node smoke' 'SEALED HATCH NODE PASS locked=true opened=true collision_off=true signalled=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_node_smoke.gd
+run_clean 'Domain 5 flare steady sanity smoke' 'FLARE STEADY PASS drain_no_flare=15.000 drain_flare=7.500 steadier=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/flare_steady_smoke.gd
+run_clean 'Domain 6 training gate model smoke' 'TRAINING GATE PASS gated=true drop=0 unlock_grants=true gated_logged=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_gate_smoke.gd
+run_clean 'Domain 6 class catalog data smoke' 'CLASS CATALOG PASS base=8 unlockable=3 registry_class_ids=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_catalog_smoke.gd
+run_clean 'Domain 6 class gate config smoke' 'CLASS GATE CONFIG PASS available_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_gate_config_smoke.gd
+run_clean 'Domain 6 repair ingest smoke' 'REPAIR INGEST PASS bus_xp=120 single_grant=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_ingest_smoke.gd
+run_clean 'Domain 6 meta progression state smoke' 'META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true class_bridge=true tolerant=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_progression_state_smoke.gd
+run_clean 'Domain 6 player progression full smoke' 'PLAYER PROGRESSION FULL PASS classes=11 cross_training=true books=true meta_payout=70 unlocks=true panels=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_progression_full_smoke.gd
+run_clean 'Domain 6 interactive meta-screens smoke' 'META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_screens_interactive_smoke.gd
+run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held gated_logged=true class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd
+run_clean 'Domain 7 room variant selector smoke' 'ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=14 legacy=3 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_variant_selector_smoke.gd
+run_clean 'Domain 7 procgen variation smoke' 'PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variation_smoke.gd
+run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
+run_clean 'PR 13 authored hazard overlay smoke' 'AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true contents_empty=true unique_gated=true mapped_reserved=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/authored_hazard_overlay_smoke.gd
+run_clean 'Task 1.4 biome atmosphere/lighting smoke' 'SLICE ATMOSPHERE PASS ambient=true fog=true away_fog=true key_light=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slice_atmosphere_smoke.gd
+run_clean 'Domain 8 permadeath freeze smoke' 'PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/permadeath_freeze_smoke.gd
+run_clean 'Domain 8 title save query smoke' 'TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_save_query_smoke.gd
+run_clean 'Domain 8 title screen flow smoke' 'TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_screen_flow_smoke.gd
+run_clean 'Domain 8 title settings smoke' 'TITLE SETTINGS PASS open=true cycle=true back=true applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_settings_smoke.gd
+run_clean 'Domain 8 save load slot screen smoke' 'SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_slot_screen_smoke.gd
+run_clean 'Domain 8 save and exit smoke' 'SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_and_exit_smoke.gd
+run_clean 'Domain 10 tooltip presenter model smoke' 'TOOLTIP PRESENTER PASS title=Circuit Board' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tooltip_presenter_smoke.gd
+run_clean 'Domain 10 menu state model smoke' 'MENU STATE PASS menus=2 navigation=true enable_toggle=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_state_smoke.gd
+run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_state_smoke.gd
+run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
+run_clean 'Task 2.1 tutorial slice coverage smoke' 'TUTORIAL SLICE COVERAGE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_slice_coverage_smoke.gd
+run_clean 'Task 2.2 run results/death screen smoke' 'RUN RESULTS PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/run_results_smoke.gd
+run_clean 'Task 2.3 native first-run derelict candidate contract smoke' 'FIRST RUN CONTRACT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_run_contract_smoke.gd
+run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
+run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
+run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd
+run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_ui_shell_smoke.gd
+run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
+run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
+run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
+run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true credits=true metadata=true ready=true progress=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
+run_clean 'world migration smoke' 'SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_world_smoke.gd
+run_clean 'slot metadata smoke' 'SLOT METADATA PASS location=home play_time_real=true seed_real=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slot_metadata_smoke.gd
+run_clean 'save slot metadata UI smoke' 'SAVE SLOT METADATA UI PASS location=true class=true obj=true play_time=true seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_slot_metadata_ui_smoke.gd
+# --- Tranche 3 (2026-07-06): orphaned-smoke promotion — pure-model batch ---
+run_clean 'Tranche 3 sanity state model smoke' 'SANITY STATE PASS drain=35.0 recovery=35.0 pressure=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_state_smoke.gd
+run_clean 'Tranche 3 radiation state model smoke' 'RADIATION STATE PASS accumulation=true drain=true decay=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/radiation_state_smoke.gd
+run_clean 'Tranche 3 body temperature state model smoke' 'BODY TEMPERATURE STATE PASS safe=false extreme=true recovery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/body_temperature_state_smoke.gd
+run_clean 'Tranche 3 status effects model smoke' 'STATUS EFFECTS PASS count=2 expired=true modifier=1.00' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effects_smoke.gd
+run_clean 'Tranche 3 addiction state model smoke' 'ADDICTION STATE PASS tolerance=0.70 dependence=1.10 withdrawal=true cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/addiction_state_smoke.gd
+run_clean 'Tranche 3 damage pipeline model smoke' 'DAMAGE PIPELINE PASS vitals=65.0 threat=19.0 absorbed=10.0 status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/damage_pipeline_smoke.gd
+run_clean 'Tranche 3 life support state model smoke' 'LIFE SUPPORT STATE PASS offline_drain=true recovery=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/life_support_state_smoke.gd
+run_clean 'Tranche 3 save migration service model smoke' 'SAVE MIGRATION SERVICE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_service_smoke.gd
+run_clean 'Tranche 3 world snapshot model smoke' 'WORLD SNAPSHOT PASS round_trip=true version_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_snapshot_smoke.gd
+run_clean 'Tranche 3 save slot state model smoke' 'SAVE SLOT STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_slot_state_smoke.gd
+run_clean 'Tranche 3 autosave policy model smoke' 'AUTOSAVE POLICY PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_policy_smoke.gd
+run_clean 'Tranche 3 synaptic sea world model smoke' 'SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
+run_clean 'Tranche 3 meta snapshot model smoke' 'META SNAPSHOT PASS meta=true unlocks=true boundary=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_snapshot_smoke.gd
+run_clean 'Tranche 3 world save service smoke' 'WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_service_smoke.gd
+run_clean 'Tranche 3 interactable distance fallback smoke' 'INTERACTABLE DISTANCE FALLBACK PASS completed_count=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_distance_fallback_smoke.gd
+# --- Tranche 3: orphaned-smoke promotion — main-scene batch ---
+run_clean 'Tranche 3 vitals save/load main-scene smoke' 'VITALS SAVE LOAD PASS vitals=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_save_load_smoke.gd
+run_clean 'Tranche 3 vitals full main-scene smoke' 'MAIN PLAYABLE VITALS FULL PASS panel=true health=true stamina=true hunger=true thirst=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_vitals_full_smoke.gd
+run_clean 'Tranche 3 HUD main-scene smoke' 'MAIN PLAYABLE SLICE HUD PASS canvas_layer=true width=520 current_sequence=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hud_smoke.gd
+run_clean 'Tranche 3 derelict gameplay main-scene smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
+run_clean 'Tranche 3 world persist/restore main-scene smoke' 'WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_persist_restore_smoke.gd
+run_clean 'Tranche 3 world save anywhere main-scene smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
+run_clean 'Tranche 3 input-action idempotency smoke' 'IDEMPOTENCY PASS actions=7 no_duplicates_after_second_call=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/a11y_p1_002_idempotency_smoke.gd
+run_clean 'Tranche 3 progression main-scene smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
+# --- Tranche 3: new coverage — PhaseTimer behavior + real Area3D interaction path ---
+run_clean 'Tranche 3 phase timer model smoke' 'PHASE TIMER PASS clamp=true boundary=true carry=true single_flip=true progress=true durations=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/phase_timer_smoke.gd
+run_clean 'Tranche 3 interactable body-entered physics smoke' 'INTERACTABLE BODY ENTERED PASS far_null=true entered=true interact=true exited_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_body_entered_smoke.gd
+# --- Tranche 4 (2026-07-06): UI wiring — audio log panel, difficulty label, menu-modal guard ---
+run_clean 'Tranche 4 audio log panel smoke' 'AUDIO LOG PANEL PASS entries=6 play=true stop=true clip_attempted=true populated_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_log_panel_smoke.gd
+run_clean 'Tranche 4 settings difficulty label smoke' 'SETTINGS DIFFICULTY LABEL PASS standard=x1.0 hardened=x1.4 deep_dive=x1.7 delegation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_difficulty_label_smoke.gd
+run_clean 'Tranche 4 panel menu-modal guard smoke' 'PANEL MENU MODAL GUARD PASS scanner_blocked=true chart_blocked=true inventory_blocked=true reopens=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_menu_modal_guard_smoke.gd
+# --- Tranche 5 (2026-07-07): procgen & data coherence — behavior guards + the promoted procgen layout gate ---
+# Two new Tranche-5 smokes, then the 32 deferred-pending-T5 promotions (run
+# first -> stale pins fixed -> registered; see the orphan classification
+# table). Long-runtime members (derelict generator 100 seeds, layout stress
+# 60 runs, the physics walkers) add several minutes to a full bundle run.
+run_clean 'Tranche 5 layout schema coherence smoke' 'LAYOUT SCHEMA COHERENCE PASS goldens=3 version_match=true keys_match=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_schema_coherence_smoke.gd
+run_clean 'Tranche 5 derelict fire zone marker smoke' 'DERELICT FIRE ZONE MARKER PASS boarded=true marker_position_used=true spec_meta=true fallback_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_zone_marker_smoke.gd
+run_clean 'archetype load smoke' 'ARCHETYPE LOAD PASS archetypes=3 round_trip=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_load_smoke.gd
+run_clean 'biome profile smoke' 'BIOME PROFILE PASS biomes=3 modifiers=ok hazard_override=ok empty_safe=true select_deterministic=true density_scales=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biome_profile_smoke.gd
+run_clean 'room graph smoke' 'ROOM GRAPH PASS rooms=3 links=2 connected=true disconnected_detected=true serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_smoke.gd
+run_clean 'ship blueprint smoke' 'SHIP BLUEPRINT PASS sizes=3 conditions=3 serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_blueprint_smoke.gd
+run_clean 'topology template smoke' 'TOPOLOGY TEMPLATE PASS from_dict=true get_zone=true attached=true count_types=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/topology_template_smoke.gd
+run_clean 'template data smoke' 'TEMPLATE DATA PASS templates=3 all_valid=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_data_smoke.gd
+run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_selector_smoke.gd
+run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
+run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
+run_clean 'socketed enclosure smoke' 'SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
+run_clean 'enclosed slot fill smoke' 'ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
+# seed_determinism's marker ends with the pipeline-output hash, which is
+# stable per code version but changes with ANY legitimate pipeline change —
+# the pin stops at `hash=` on purpose.
+run_clean 'seed determinism smoke' 'SEED DETERMINISM PASS fnv_empty=ok fnv_hello=ok match=true golden_match=true seeds_differ=true hash=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/seed_determinism_smoke.gd
+run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=6 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
+run_clean 'room assigner smoke' 'ROOM ASSIGNER PASS rooms=5 first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_assigner_smoke.gd
+run_clean 'layout serializer smoke' 'LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.2.0 golden_format=true prototype=valid critical_path=valid portals_json=true link_deck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_serializer_smoke.gd
+run_clean 'ship layout generator smoke' 'SHIP LAYOUT GENERATOR PASS spine=true bifurcated=true stacked=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_generator_smoke.gd
+run_clean 'ship layout integration smoke' 'SHIP LAYOUT INTEGRATION PASS generated=21/21 deterministic=true json_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_integration_smoke.gd
+run_clean 'room graph generator smoke' 'ROOM GRAPH GENERATOR PASS life_boat=4 small=5 medium=8 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_generator_smoke.gd
+run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS rooms=10 modules=24 second_rooms=8 second_modules=20 unknown_role_fallback=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_placer_smoke.gd
+run_clean 'encounter injector smoke' 'ENCOUNTER INJECTOR PASS std_markers=0 deep_markers=4 markers_valid=true deterministic=true critical_safe=true legacy_compat=true table_driven=true table_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_injector_smoke.gd
+run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS all 9 layouts produced valid slices loot_containers=true salvage_tables=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
+run_clean 'template c traversal smoke' 'TEMPLATE C TRAVERSAL PASS transitions_checked=1 missing=ok deck=ok cell=ok self=ok critical_path=ok pipeline_transitions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_traversal_smoke.gd
+run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determinism=3 hangar_seeds=80' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_generator_smoke.gd
+# marker pinned to the bracket-free prefix: run_clean greps the marker, and
+# the full line's rooms=[9,12] is a character class under grep.
+run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
+run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
+run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=9 small_rooms=24' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
+run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
+run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=1 interactions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
+run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
+run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
+run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=6 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'hive biomatter kit smoke' 'HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
+run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
+run_clean 'structural wrapper collision footprint smoke' 'STRUCTURAL WRAPPER COLLISION FOOTPRINT PASS walls=true corners=true doors=true aperture=true thickness=0.2 hatch_skipped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_wrapper_collision_footprint_smoke.gd
+run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=1 collision_shapes=225 structural_live=true edge_wrappers=70 floor_wrappers=52' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
+# --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
+run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
+run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
+run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION PASS triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_smoke.gd
+run_clean 'Stream D unlock trigger live actions smoke' 'UNLOCK TRIGGER STREAM D PASS scan=true first_aid=true cook=true fabricate=true repair=true weld=true travel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_d_smoke.gd
+run_clean 'Stream E unlock + junk salvage smoke' 'UNLOCK TRIGGER STREAM E PASS ration=true diagnose=true discover=true extract=true compound=true junk_salvage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_e_smoke.gd
+run_clean 'Stream F unlock + Fire B2 smoke' 'UNLOCK TRIGGER STREAM F PASS surgery=true decode=true shelter=true social=true fire_b2=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_f_smoke.gd
+run_clean 'ADR-0049 ship nav graph smoke' 'SHIP NAV GRAPH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_nav_graph_smoke.gd
+run_clean 'ADR-0049 threat pathfinder smoke' 'THREAT PATHFINDER PASS path=true step=true flee=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_pathfinder_smoke.gd
+run_clean 'ADR-0049 threat path follow smoke' 'THREAT PATH FOLLOW PASS advanced=true no_tunnel=true graph=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_path_follow_smoke.gd
+run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREAT PATHFINDING PASS graph=true advanced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_threat_pathfinding_smoke.gd
+run_clean 'Procgen quality gate smoke' 'PROCGEN QUALITY GATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_quality_gate_smoke.gd
+run_clean 'Current procgen topology parity smoke' 'PROCGEN CURRENT TOPOLOGY PARITY PASS seed=17 placements=48 wrappers=48 portals=8 structural=true visual_only=GLB,material' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
+run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
+# --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
+run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd
+run_clean 'TuningCatalog shell smoke' 'TUNING CATALOG PASS shell=true dir_loaded=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tuning_catalog_smoke.gd
+# --- Pre-polish PKG-A1a: ShipRuntime advance/catch-up ---
+run_clean 'ShipRuntime shell smoke' 'SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_runtime_smoke.gd
+run_clean 'Tick bands smoke' 'TICK BANDS PASS frame=true slow=true lazy=true catchup_lazy=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tick_bands_smoke.gd
+run_clean 'Module integrity pure smoke' 'MODULE INTEGRITY PASS fsm=true sparse=true determinism=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/module_integrity_smoke.gd
+run_clean 'Dressing consumption smoke' 'DRESSING CONSUMPTION PASS presets=true descriptors=true lights=true density=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dressing_consumption_smoke.gd
+run_clean 'WorkAction pure smoke' 'WORK ACTION STATE PASS catalog=true gates=true progress=true interrupt=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_state_smoke.gd
+run_clean 'Module integrity consequences smoke' 'MODULE INTEGRITY CONSEQUENCES PASS fire=true breach_derived=true scene=true nav=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/module_integrity_consequences_smoke.gd
+run_clean 'WorkAction resolve smoke' 'WORK ACTION RESOLVE PASS cut=true weld=true yields=true noise=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_resolve_smoke.gd
+run_clean 'Component slot population smoke' 'COMPONENT SLOT POPULATION PASS catalog=true placed=true deterministic=true no_collision=true linked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_slot_population_smoke.gd
+run_clean 'Crafting quality knowledge smoke' 'CRAFTING QUALITY KNOWLEDGE PASS quality=true knowledge=true reverse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_quality_knowledge_smoke.gd
+run_clean 'Repair unification smoke' 'REPAIR UNIFICATION PASS repair=true seal=true suppress=true interrupt=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_unification_smoke.gd
+run_clean 'Component mount/dismount smoke' 'COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_dismount_smoke.gd
+run_clean 'Station tiers batch smoke' 'STATION TIERS BATCH PASS tier=true queue=true gate=true schema=true batch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_tiers_batch_smoke.gd
+run_clean 'Wound state pure smoke' 'WOUND STATE PASS kinds=true bleed=true infection=true work_speed=true treat=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_state_smoke.gd
+run_clean 'Spatial perception pure smoke' 'SPATIAL PERCEPTION PASS los=true muffle=true blocked=true open=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spatial_perception_smoke.gd
+run_clean 'Vitals curves cross-coupling smoke' 'VITALS CURVES PASS curves=true cross=true wounds=true cold=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_curves_smoke.gd
+run_clean 'Archetype behavior modifiers smoke' 'ARCHETYPE BEHAVIOR PASS ambush=true stalk=true swarm=true anchored=true telegraph=true verbs=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_behavior_smoke.gd
+run_clean 'Manifestation pool schema smoke' 'MANIFESTATION POOL PASS schema=true kinds=true force_room=true force_log=true no_code_entry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/manifestation_pool_smoke.gd
+run_clean 'Sea graph pure smoke' 'SEA GRAPH PASS nodes=true route=true cost=true biomes=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sea_graph_smoke.gd
+run_clean 'Templates wreck mutator smoke' 'TEMPLATES WRECK MUTATOR PASS catalog=true load=true zone=true branch=true wreck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/templates_wreck_mutator_smoke.gd
+run_clean 'Live decay stamp smoke' 'LIVE DECAY STAMP PASS locked=true wreck=true integrity=true links_kept=true quiet_import=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/live_decay_stamp_smoke.gd
+run_clean 'generated seed boarded slice smoke' 'GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+run_clean 'Structural variant wrapper smoke' 'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_variant_wrapper_smoke.gd
+run_clean 'Food sustenance closure smoke' 'FOOD CLOSURE PASS spoil_eat=true harvest=true travel=true loop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_closure_smoke.gd
+run_clean 'Skill effects consumers smoke' 'SKILL EFFECTS PASS audit=true work=true craft=true heal=true travel=true class_kit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/skill_effects_smoke.gd
+run_clean 'Pillar persistence smoke' 'PILLAR PERSISTENCE PASS integrity=true components=true work=true fuzz=true snapshot=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pillar_persistence_smoke.gd
+run_clean 'WorkAction driver smoke' 'WORK ACTION DRIVER PASS cut=true noise=true yield=true interrupt=true overload=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_driver_smoke.gd
+run_clean 'Threat LOS perception smoke' 'THREAT LOS PERCEPTION PASS room_los=true closed_hatch=true raycast=true distance=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_los_perception_smoke.gd
+run_clean 'UI consumers D9 smoke' 'UI CONSUMERS D9 PASS work_hud=true wounds=true chart_route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_consumers_d9_smoke.gd
+run_clean 'Audio event coverage smoke' 'AUDIO EVENT COVERAGE PASS verbs=true seam=true router=true work_driver=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_event_coverage_smoke.gd
+run_clean 'Ship modification smoke' 'SHIP MODIFICATION PASS install=true power=true uninstall=true plating=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_modification_smoke.gd
+run_clean 'Work action integration smoke' 'WORK ACTION INTEGRATION PASS driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_smoke.gd
+run_clean 'Hub explorable verify smoke' 'HUB EXPLORABLE VERIFY PASS home=true stations=true repair=true walk=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hub_explorable_verify_smoke.gd
+run_clean 'Pillar revisit persistence smoke' 'PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pillar_revisit_persistence_smoke.gd
+run_clean 'Ship modification panel smoke' 'SHIP MOD PANEL PASS bind=true install=true uninstall=true power=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_modification_panel_smoke.gd
+run_clean 'Work action interact smoke' 'WORK ACTION INTERACT PASS start=true tick=true complete=true nearest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_interact_smoke.gd
+run_clean 'Component placement runtime smoke' 'COMPONENT PLACEMENT RUNTIME PASS wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_smoke.gd
+run_clean 'Component dismount interact smoke' 'COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_smoke.gd
+run_clean 'Component mount interact smoke' 'COMPONENT MOUNT INTERACT PASS dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_smoke.gd
+run_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
+run_clean 'Component system link smoke' 'COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_system_link_smoke.gd
+run_clean 'Dismount system damage smoke' 'DISMOUNT SYSTEM DAMAGE PASS link=true damage=true remount_no_autoheal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dismount_system_damage_smoke.gd
+run_clean 'Synthetic wall slots smoke' 'SYNTHETIC WALL SLOTS PASS wall=true center=true placed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synthetic_wall_slots_smoke.gd
+run_clean 'Multi-source module damage smoke' 'MULTI SOURCE MODULE DAMAGE PASS fire=true decomp=true threat=true tool=true interrupt=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/multi_source_module_damage_smoke.gd
+run_clean 'Ship mod panel input smoke' 'SHIP MOD PANEL INPUT PASS open=true select=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_panel_input_smoke.gd
+run_clean 'Combat work interrupt smoke' 'COMBAT WORK INTERRUPT PASS start=true hit=true interrupted=true no_yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_work_interrupt_smoke.gd
+run_clean 'Tendril structure damage smoke' 'TENDRIL STRUCTURE DAMAGE PASS archetype=true hit=true damaged=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tendril_structure_damage_smoke.gd
+run_clean 'Work yield inventory smoke' 'WORK YIELD INVENTORY PASS cut=true scrap=true qty=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_inventory_smoke.gd
+run_clean 'Ship mod inventory sync smoke' 'SHIP MOD INVENTORY SYNC PASS install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_smoke.gd
+run_clean 'Work yield drop smoke' 'WORK YIELD DROP PASS overload=true drop=true scoop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_smoke.gd
+run_clean 'Work yield partial scoop smoke' 'WORK YIELD PARTIAL SCOOP PASS deny=true partial=true residual=true finish=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_partial_scoop_smoke.gd
+run_clean 'Work yield partial scoop away smoke' 'WORK YIELD PARTIAL SCOOP AWAY PASS away=true partial=true residual=true finish=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_partial_scoop_away_smoke.gd
+run_clean 'Work yield scoop denied SFX smoke' 'WORK YIELD SCOOP DENIED SFX PASS deny=true sfx=true remain=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_denied_sfx_smoke.gd
+run_clean 'Work yield scoop denied away smoke' 'WORK YIELD SCOOP DENIED AWAY PASS away=true deny=true sfx=true remain=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_denied_away_smoke.gd
+run_clean 'Loot empty grant SFX smoke' 'LOOT EMPTY GRANT SFX PASS empty=true deny=true no_tool=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_empty_grant_sfx_smoke.gd
+run_clean 'Loot empty grant away smoke' 'LOOT EMPTY GRANT AWAY PASS away=true empty=true deny=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_empty_grant_away_smoke.gd
+run_clean 'Tool pickup denied SFX smoke' 'TOOL PICKUP DENIED SFX PASS deny=true sfx=true remain=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_denied_sfx_smoke.gd
+run_clean 'Tool pickup denied away smoke' 'TOOL PICKUP DENIED AWAY PASS away=true deny=true sfx=true remain=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_denied_away_smoke.gd
+run_clean 'Cargo empty transfer SFX smoke' 'CARGO EMPTY TRANSFER SFX PASS deposit=true withdraw=true panel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_empty_transfer_sfx_smoke.gd
+run_clean 'Cargo empty transfer away smoke' 'CARGO EMPTY TRANSFER AWAY PASS away=true deposit=true withdraw=true panel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_empty_transfer_away_smoke.gd
+run_clean 'Transfer quantity denied SFX smoke' 'TRANSFER QUANTITY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_quantity_denied_sfx_smoke.gd
+run_clean 'Transfer quantity denied away smoke' 'TRANSFER QUANTITY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_quantity_denied_away_smoke.gd
+run_clean 'Hatch bypass denied SFX smoke' 'HATCH BYPASS DENIED SFX PASS locked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_bypass_denied_sfx_smoke.gd
+run_clean 'Hatch bypass denied away smoke' 'HATCH BYPASS DENIED AWAY PASS away=true locked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_bypass_denied_away_smoke.gd
+run_clean 'Work tool missing SFX smoke' 'WORK TOOL MISSING SFX PASS near=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_tool_missing_sfx_smoke.gd
+run_clean 'Work tool missing away smoke' 'WORK TOOL MISSING AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_tool_missing_away_smoke.gd
+run_clean 'Production unknown kind consume smoke' 'PRODUCTION UNKNOWN KIND CONSUME PASS blocked=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_unknown_kind_consume_smoke.gd
+run_clean 'Production unknown kind consume away smoke' 'PRODUCTION UNKNOWN KIND CONSUME AWAY PASS away=true blocked=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_unknown_kind_consume_away_smoke.gd
+run_clean 'Inventory toggle smoke' 'INVENTORY TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_smoke.gd
+run_clean 'Inventory toggle away smoke' 'INVENTORY TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_away_smoke.gd
+run_clean 'Chart toggle smoke' 'CHART TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_toggle_smoke.gd
+run_clean 'Chart toggle away smoke' 'CHART TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_toggle_away_smoke.gd
+run_clean 'Ship mod toggle smoke' 'SHIP MOD TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_toggle_smoke.gd
+run_clean 'Ship mod toggle away smoke' 'SHIP MOD TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_toggle_away_smoke.gd
+run_clean 'Wounds toggle smoke' 'WOUNDS TOGGLE PASS open=true close=true validation_stays=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_toggle_smoke.gd
+run_clean 'Wounds toggle away smoke' 'WOUNDS TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_toggle_away_smoke.gd
+run_clean 'Dock barrier channel consume smoke' 'DOCK BARRIER CHANNEL CONSUME PASS start=true channeling=true second=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_channel_consume_smoke.gd
+run_clean 'Dock barrier channel consume away smoke' 'DOCK BARRIER CHANNEL CONSUME AWAY PASS away=true start=true channeling=true second=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_channel_consume_away_smoke.gd
+run_clean 'Hazard channel consume smoke' 'HAZARD CHANNEL CONSUME PASS repair=true breach=true fire=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_channel_consume_smoke.gd
+run_clean 'Hazard channel consume away smoke' 'HAZARD CHANNEL CONSUME AWAY PASS away=true repair=true breach=true fire=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_channel_consume_away_smoke.gd
+run_clean 'Station busy consume smoke' 'STATION BUSY CONSUME PASS craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_smoke.gd
+run_clean 'Station busy consume away smoke' 'STATION BUSY CONSUME AWAY PASS away=true craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_away_smoke.gd
+run_clean 'Recycler busy consume smoke' 'RECYCLER BUSY CONSUME PASS recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_smoke.gd
+run_clean 'Recycler busy consume away smoke' 'RECYCLER BUSY CONSUME AWAY PASS away=true recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_away_smoke.gd
+run_clean 'Production output full consume smoke' 'PRODUCTION OUTPUT FULL CONSUME PASS hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_smoke.gd
+run_clean 'Production output full consume away smoke' 'PRODUCTION OUTPUT FULL CONSUME AWAY PASS away=true hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_away_smoke.gd
+run_clean 'Recycler no input consume smoke' 'RECYCLER NO INPUT CONSUME PASS no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_smoke.gd
+run_clean 'Recycler no input consume away smoke' 'RECYCLER NO INPUT CONSUME AWAY PASS away=true no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_away_smoke.gd
+run_clean 'Plant crop blocked consume smoke' 'PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_smoke.gd
+run_clean 'Plant crop blocked consume away smoke' 'PLANT CROP BLOCKED CONSUME AWAY PASS away=true busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_away_smoke.gd
+run_clean 'Melee reload denied SFX smoke' 'MELEE RELOAD DENIED SFX PASS melee=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/melee_reload_denied_sfx_smoke.gd
+run_clean 'Melee reload denied away smoke' 'MELEE RELOAD DENIED AWAY PASS away=true melee=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/melee_reload_denied_away_smoke.gd
+run_clean 'Attack soft fail SFX smoke' 'ATTACK SOFT FAIL SFX PASS soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_sfx_smoke.gd
+run_clean 'Attack soft fail away smoke' 'ATTACK SOFT FAIL AWAY PASS away=true soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_away_smoke.gd
+run_clean 'Repair blocked consume smoke' 'REPAIR BLOCKED CONSUME PASS blocked=true consume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_blocked_consume_smoke.gd
+run_clean 'Repair blocked consume away smoke' 'REPAIR BLOCKED CONSUME AWAY PASS away=true blocked=true consume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_blocked_consume_away_smoke.gd
+run_clean 'Repair validation channeling smoke' 'REPAIR VALIDATION CHANNELING PASS start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_smoke.gd
+run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
+run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
+run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_smoke.gd
+run_clean 'Remount system restore smoke' 'REMOUNT SYSTEM RESTORE PASS damage=true remount=true floor=true no_full=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/remount_system_restore_smoke.gd
+run_clean 'Ship mod run snapshot smoke' 'SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd
+run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_smoke.gd
+run_clean 'Work hold-to-work away smoke' 'WORK HOLD TO WORK AWAY PASS away=true freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_away_smoke.gd
+run_clean 'Bandage training smoke' 'BANDAGE TRAINING PASS bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_smoke.gd
+run_clean 'Bandage training away smoke' 'BANDAGE TRAINING AWAY PASS away=true bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_away_smoke.gd
+run_clean 'Ship mod install key smoke' 'SHIP MOD INSTALL KEY PASS install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_smoke.gd
+run_clean 'Ship mod system effect smoke' 'SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_smoke.gd
+run_clean 'Ship mod station tier smoke' 'SHIP MOD STATION TIER PASS install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_smoke.gd
+run_clean 'Hull plating resist smoke' 'HULL PLATING RESIST PASS resist=true reduced=true zero_away=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_resist_smoke.gd
+run_clean 'Work stamina drain smoke' 'WORK STAMINA DRAIN PASS start=true drain=true speed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_drain_smoke.gd
+run_clean 'Work stamina drain away smoke' 'WORK STAMINA DRAIN AWAY PASS away=true start=true drain=true speed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_drain_away_smoke.gd
+run_clean 'Work weld damaged smoke' 'WORK WELD DAMAGED PASS start=true repair=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_damaged_smoke.gd
+run_clean 'Ship mod restore effects smoke' 'SHIP MOD RESTORE EFFECTS PASS restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_smoke.gd
+run_clean 'Fire plating resist smoke' 'FIRE PLATING RESIST PASS resist=true reduced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_plating_resist_smoke.gd
+run_clean 'Work stamina interrupt smoke' 'WORK STAMINA INTERRUPT PASS start=true exhaust=true interrupted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_interrupt_smoke.gd
+run_clean 'Work stamina interrupt away smoke' 'WORK STAMINA INTERRUPT AWAY PASS away=true start=true exhaust=true interrupted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_interrupt_away_smoke.gd
+run_clean 'Work weld skill context smoke' 'WORK WELD SKILL CONTEXT PASS skill=true start=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_skill_context_smoke.gd
+run_clean 'Ship mod install XP smoke' 'SHIP MOD INSTALL XP PASS install_xp=true uninstall_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_xp_smoke.gd
+run_clean 'Ship mod install XP away smoke' 'SHIP MOD INSTALL XP AWAY PASS away=true install_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_xp_away_smoke.gd
+run_clean 'Ship mod audio smoke' 'SHIP MOD AUDIO PASS seam=true router=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_audio_smoke.gd
+run_clean 'Hull plating catalog smoke' 'HULL PLATING CATALOG PASS catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_smoke.gd
+run_clean 'Work block zero stamina smoke' 'WORK BLOCK ZERO STAMINA PASS block=true start_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_block_zero_stamina_smoke.gd
+run_clean 'Work block zero stamina away smoke' 'WORK BLOCK ZERO STAMINA AWAY PASS away=true block=true start_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_block_zero_stamina_away_smoke.gd
+run_clean 'Ship mod power budget scene smoke' 'SHIP MOD POWER BUDGET SCENE PASS fill=true reject=true inventory=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_power_budget_scene_smoke.gd
+run_clean 'Work action XP catalog smoke' 'WORK ACTION XP CATALOG PASS cut=true weld=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_xp_catalog_smoke.gd
+run_clean 'Work cut XP live smoke' 'WORK CUT XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_cut_xp_live_smoke.gd
+run_clean 'Work weld XP live smoke' 'WORK WELD XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_smoke.gd
+run_clean 'Ship mod overbudget power smoke' 'SHIP MOD OVERBUDGET POWER PASS over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_smoke.gd
+run_clean 'Work progress UI SFX smoke' 'WORK PROGRESS UI SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_sfx_smoke.gd
+run_clean 'Work progress UI away smoke' 'WORK PROGRESS UI AWAY PASS away=true progress=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_away_smoke.gd
+run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_sfx_smoke.gd
+run_clean 'Wounds panel open away smoke' 'WOUNDS PANEL OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_away_smoke.gd
+run_clean 'Treat wound SFX smoke' 'TREAT WOUND SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_sfx_smoke.gd
+run_clean 'Treat wound away smoke' 'TREAT WOUND AWAY PASS away=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_away_smoke.gd
+run_clean 'Craft complete SFX smoke' 'CRAFT COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_sfx_smoke.gd
+run_clean 'Craft complete away smoke' 'CRAFT COMPLETE AWAY PASS away=true complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_away_smoke.gd
+run_clean 'Repair complete SFX smoke' 'REPAIR COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_complete_sfx_smoke.gd
+run_clean 'Repair complete away smoke' 'REPAIR COMPLETE AWAY PASS away=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_complete_away_smoke.gd
+run_clean 'Work complete SFX live smoke' 'WORK COMPLETE SFX LIVE PASS complete=true audio=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_complete_sfx_live_smoke.gd
+run_clean 'Salvage scavenge XP smoke' 'SALVAGE SCAVENGE XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_scavenge_xp_smoke.gd
+run_clean 'Salvage scavenge XP away smoke' 'SALVAGE SCAVENGE XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_scavenge_xp_away_smoke.gd
+run_clean 'Production harvest XP smoke' 'PRODUCTION HARVEST XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_harvest_xp_smoke.gd
+run_clean 'Production harvest XP away smoke' 'PRODUCTION HARVEST XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_harvest_xp_away_smoke.gd
+run_clean 'Medbay surgery SFX smoke' 'MEDBAY SURGERY SFX PASS surgery=true heal=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_sfx_smoke.gd
+run_clean 'Medbay surgery away smoke' 'MEDBAY SURGERY AWAY PASS away=true surgery=true heal=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_away_smoke.gd
+run_clean 'Decode signal XP smoke' 'DECODE SIGNAL XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/decode_signal_xp_smoke.gd
+run_clean 'Decode signal XP away smoke' 'DECODE SIGNAL XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/decode_signal_xp_away_smoke.gd
+run_clean 'Diagnose fault XP smoke' 'DIAGNOSE FAULT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/diagnose_fault_xp_smoke.gd
+run_clean 'Diagnose fault XP away smoke' 'DIAGNOSE FAULT XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/diagnose_fault_xp_away_smoke.gd
+run_clean 'Social training XP smoke' 'SOCIAL TRAINING XP PASS inspire=true negotiate=true intimidate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/social_training_xp_smoke.gd
+run_clean 'Social training XP away smoke' 'SOCIAL TRAINING XP AWAY PASS away=true inspire=true negotiate=true intimidate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/social_training_xp_away_smoke.gd
+run_clean 'Stream D/E training XP smoke' 'STREAM DE TRAINING XP PASS discover=true extract=true plot=true ration=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/stream_de_training_xp_smoke.gd
+run_clean 'Consumable training XP smoke' 'CONSUMABLE TRAINING XP PASS medicine=true food=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_training_xp_smoke.gd
+run_clean 'Consumable training XP away smoke' 'CONSUMABLE TRAINING XP AWAY PASS away=true medicine=true food=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_training_xp_away_smoke.gd
+run_clean 'Scanner open XP smoke' 'SCANNER OPEN XP PASS open=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_xp_smoke.gd
+run_clean 'Scanner open XP away smoke' 'SCANNER OPEN XP AWAY PASS away=true open=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_xp_away_smoke.gd
+run_clean 'Travel training XP smoke' 'TRAVEL TRAINING XP PASS plot=true astrogation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_training_xp_smoke.gd
+run_clean 'Travel training XP away smoke' 'TRAVEL TRAINING XP AWAY PASS away=true plot=true astrogation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_training_xp_away_smoke.gd
+run_clean 'Threat kill XP smoke' 'THREAT KILL XP PASS kill=true melee=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_xp_smoke.gd
+run_clean 'Threat kill XP away smoke' 'THREAT KILL XP AWAY PASS away=true kill=true melee=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_xp_away_smoke.gd
+run_clean 'Discover room XP smoke' 'DISCOVER ROOM XP PASS discover=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_xp_smoke.gd
+run_clean 'Ship mod plating repair smoke' 'SHIP MOD PLATING REPAIR PASS install=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_plating_repair_smoke.gd
+run_clean 'Build shelter XP smoke' 'BUILD SHELTER XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/build_shelter_xp_smoke.gd
+run_clean 'Decontaminate zone XP smoke' 'DECONTAMINATE ZONE XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/decontaminate_zone_xp_smoke.gd
+run_clean 'Decontaminate zone XP away smoke' 'DECONTAMINATE ZONE XP AWAY PASS away=true emit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/decontaminate_zone_xp_away_smoke.gd
+run_clean 'Breach seal XP smoke' 'BREACH SEAL XP PASS weld=true shelter=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_xp_smoke.gd
+run_clean 'Breach seal XP away smoke' 'BREACH SEAL XP AWAY PASS away=true weld=true shelter=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_xp_away_smoke.gd
+run_clean 'Repair full system XP smoke' 'REPAIR FULL SYSTEM XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_full_system_xp_smoke.gd
+run_clean 'Fabricate part XP smoke' 'FABRICATE PART XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fabricate_part_xp_smoke.gd
+run_clean 'Fabricate part XP away smoke' 'FABRICATE PART XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fabricate_part_xp_away_smoke.gd
+run_clean 'Compound stim XP smoke' 'COMPOUND STIM XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/compound_stim_xp_smoke.gd
+run_clean 'Cook meal XP smoke' 'COOK MEAL XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cook_meal_xp_smoke.gd
+run_clean 'Cook meal XP away smoke' 'COOK MEAL XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cook_meal_xp_away_smoke.gd
+run_clean 'Perform surgery XP smoke' 'PERFORM SURGERY XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/perform_surgery_xp_smoke.gd
+run_clean 'Perform surgery XP away smoke' 'PERFORM SURGERY XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/perform_surgery_xp_away_smoke.gd
+run_clean 'Training catalog coverage smoke' 'TRAINING CATALOG COVERAGE PASS count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_smoke.gd
+run_clean 'Repair subcomponent XP smoke' 'REPAIR SUBCOMPONENT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_smoke.gd
+run_clean 'Repair subcomponent XP away smoke' 'REPAIR SUBCOMPONENT XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_away_smoke.gd
+run_clean 'Discover room XP away smoke' 'DISCOVER ROOM XP AWAY PASS away=true discover=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_xp_away_smoke.gd
+run_clean 'Build shelter XP away smoke' 'BUILD SHELTER XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/build_shelter_xp_away_smoke.gd
+run_clean 'Compound stim XP away smoke' 'COMPOUND STIM XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/compound_stim_xp_away_smoke.gd
+run_clean 'First aid ally XP away smoke' 'FIRST AID ALLY XP AWAY PASS away=true ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_away_smoke.gd
+run_clean 'Repair full system XP away smoke' 'REPAIR FULL SYSTEM XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_full_system_xp_away_smoke.gd
+run_clean 'Stream DE training XP away smoke' 'STREAM DE TRAINING XP AWAY PASS away=true ration=true scan=true transmit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/stream_de_training_xp_away_smoke.gd
+run_clean 'Ship mod uninstall XP away smoke' 'SHIP MOD UNINSTALL XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_uninstall_xp_away_smoke.gd
+run_clean 'Weld panel XP away smoke' 'WELD PANEL XP AWAY PASS away=true weld_panel=true weld=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weld_panel_xp_away_smoke.gd
+run_clean 'Defeat enemy XP away smoke' 'DEFEAT ENEMY XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/defeat_enemy_xp_away_smoke.gd
+run_clean 'Cooking work XP away smoke' 'COOKING WORK XP AWAY PASS away=true cooking=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cooking_work_xp_away_smoke.gd
+run_clean 'Work pry XP live away smoke' 'WORK PRY XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_pry_xp_live_away_smoke.gd
+run_clean 'Work weld XP live away smoke' 'WORK WELD XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_away_smoke.gd
+run_clean 'Work cut XP live away smoke' 'WORK CUT XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_cut_xp_live_away_smoke.gd
+run_clean 'Work patch XP live away smoke' 'WORK PATCH XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_patch_xp_live_away_smoke.gd
+run_clean 'Work splice XP live away smoke' 'WORK SPLICE XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_splice_xp_live_away_smoke.gd
+run_clean 'Work suppress XP live away smoke' 'WORK SUPPRESS XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_xp_live_away_smoke.gd
+run_clean 'Work harvest XP live away smoke' 'WORK HARVEST XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_harvest_xp_live_away_smoke.gd
+run_clean 'Work plant XP live away smoke' 'WORK PLANT XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_plant_xp_live_away_smoke.gd
+run_clean 'Component mount XP live away smoke' 'COMPONENT MOUNT XP LIVE AWAY PASS away=true dismount=true remount=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_xp_live_away_smoke.gd
+run_clean 'Component mount SFX live away smoke' 'COMPONENT MOUNT SFX LIVE AWAY PASS away=true dismount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_sfx_live_away_smoke.gd
+run_clean 'Component remount SFX live away smoke' 'COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_remount_sfx_live_away_smoke.gd
+run_clean 'Work complete SFX live away smoke' 'WORK COMPLETE SFX LIVE AWAY PASS away=true complete=true audio=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_complete_sfx_live_away_smoke.gd
+run_clean 'Work suppress SFX live away smoke' 'WORK SUPPRESS SFX LIVE AWAY PASS away=true complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_sfx_live_away_smoke.gd
+run_clean 'Component mount interact away smoke' 'COMPONENT MOUNT INTERACT AWAY PASS away=true dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_away_smoke.gd
+run_clean 'Component dismount interact away smoke' 'COMPONENT DISMOUNT INTERACT AWAY PASS away=true start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_away_smoke.gd
+run_clean 'Work action interact away smoke' 'WORK ACTION INTERACT AWAY PASS away=true start=true tick=true complete=true nearest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_interact_away_smoke.gd
+run_clean 'Work weld damaged away smoke' 'WORK WELD DAMAGED AWAY PASS away=true start=true repair=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_damaged_away_smoke.gd
+run_clean 'Work weld skill context away smoke' 'WORK WELD SKILL CONTEXT AWAY PASS away=true skill=true start=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_skill_context_away_smoke.gd
+run_clean 'Cut module scene away smoke' 'CUT MODULE SCENE AWAY PASS away=true cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_away_smoke.gd
+run_clean 'Ship mod install key away smoke' 'SHIP MOD INSTALL KEY AWAY PASS away=true install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_away_smoke.gd
+run_clean 'Ship mod inventory sync away smoke' 'SHIP MOD INVENTORY SYNC AWAY PASS away=true install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_away_smoke.gd
+run_clean 'Ship mod plating repair away smoke' 'SHIP MOD PLATING REPAIR AWAY PASS away=true install=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_plating_repair_away_smoke.gd
+run_clean 'Component placement runtime away smoke' 'COMPONENT PLACEMENT RUNTIME AWAY PASS away=true wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_away_smoke.gd
+run_clean 'Ship mod overbudget power away smoke' 'SHIP MOD OVERBUDGET POWER AWAY PASS away=true over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_away_smoke.gd
+run_clean 'Ship mod panel input away smoke' 'SHIP MOD PANEL INPUT AWAY PASS away=true open=true select=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_panel_input_away_smoke.gd
+run_clean 'Ship mod power budget scene away smoke' 'SHIP MOD POWER BUDGET SCENE AWAY PASS away=true fill=true reject=true inventory=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_power_budget_scene_away_smoke.gd
+run_clean 'Ship mod restore effects away smoke' 'SHIP MOD RESTORE EFFECTS AWAY PASS away=true restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_away_smoke.gd
+run_clean 'Ship mod station tier away smoke' 'SHIP MOD STATION TIER AWAY PASS away=true install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_away_smoke.gd
+run_clean 'Ship mod system effect away smoke' 'SHIP MOD SYSTEM EFFECT AWAY PASS away=true restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_away_smoke.gd
+run_clean 'Work verb SFX multi away smoke' 'WORK VERB SFX MULTI AWAY PASS away=true weld=true pry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_multi_away_smoke.gd
+run_clean 'Work verb SFX patch splice away smoke' 'WORK VERB SFX PATCH SPLICE AWAY PASS away=true patch=true splice=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_patch_splice_away_smoke.gd
+run_clean 'Work verb SFX plant harvest away smoke' 'WORK VERB SFX PLANT HARVEST AWAY PASS away=true plant=true harvest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_plant_harvest_away_smoke.gd
+run_clean 'Work action integration away smoke' 'WORK ACTION INTEGRATION AWAY PASS away=true driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_away_smoke.gd
+run_clean 'Hull plating catalog away smoke' 'HULL PLATING CATALOG AWAY PASS away=true catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_away_smoke.gd
+run_clean 'Repair validation channeling away smoke' 'REPAIR VALIDATION CHANNELING AWAY PASS away=true start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_away_smoke.gd
+run_clean 'Work yield inventory away smoke' 'WORK YIELD INVENTORY AWAY PASS away=true cut=true scrap=true qty=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_inventory_away_smoke.gd
+run_clean 'Production station wiring away smoke' 'PRODUCTION WIRING AWAY PASS away=true hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_away_smoke.gd
+run_clean 'Wound bandage inventory away smoke' 'WOUND BANDAGE INVENTORY AWAY PASS away=true wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_away_smoke.gd
+run_clean 'Unlock trigger production away smoke' 'UNLOCK TRIGGER PRODUCTION AWAY PASS away=true triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_away_smoke.gd
+run_clean 'Unlock trigger stream D away smoke' 'UNLOCK TRIGGER STREAM D AWAY PASS away=true scan=true first_aid=true cook=true fabricate=true repair=true weld=true travel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_d_away_smoke.gd
+run_clean 'Unlock trigger stream E away smoke' 'UNLOCK TRIGGER STREAM E AWAY PASS away=true ration=true diagnose=true discover=true extract=true compound=true junk_salvage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_e_away_smoke.gd
+run_clean 'Unlock trigger stream F away smoke' 'UNLOCK TRIGGER STREAM F AWAY PASS away=true surgery=true decode=true shelter=true social=true fire_b2=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_f_away_smoke.gd
+run_clean 'Ship catchup away smoke' 'SHIP CATCHUP AWAY PASS away=true web_grew=true hull_degraded=true timestamp_stamped=true bounded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_catchup_away_smoke.gd
+run_clean 'Component markers away smoke' 'COMPONENT MARKERS AWAY PASS away=true wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_away_smoke.gd
+run_clean 'Training catalog coverage away smoke' 'TRAINING CATALOG COVERAGE AWAY PASS away=true count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_away_smoke.gd
+run_clean 'Hazard feedback away smoke' 'HAZARD FEEDBACK AWAY PASS away=true extinguish_blocked=true seal_blocked=true breach_sealed=true sfx_routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_feedback_away_smoke.gd
+run_clean 'Ammo magazine away smoke' 'AMMO MAGAZINE AWAY PASS away_ticks=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_away_smoke.gd
+run_clean 'Flare steady away smoke' 'FLARE STEADY AWAY PASS drain_no_flare=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/flare_steady_away_smoke.gd
+run_clean 'Combat closure away smoke' 'COMBAT CLOSURE AWAY PASS away=true away_kill=true noise=true crouch=true reward=true removed=true pending_corpse=true coord_feed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_closure_away_smoke.gd
+run_clean 'Derelict fire zone marker away smoke' 'DERELICT FIRE ZONE MARKER AWAY PASS away=true boarded=true marker_position_used=true spec_meta=true fallback_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_zone_marker_away_smoke.gd
+run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
+run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
+run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
+run_clean 'Hatch door open away smoke' 'HATCH DOOR OPEN AWAY PASS away=true hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_away_smoke.gd
+run_clean 'Combat hit SFX smoke' 'COMBAT HIT SFX PASS hit=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_hit_sfx_smoke.gd
+run_clean 'Combat hit away smoke' 'COMBAT HIT AWAY PASS away=true hit=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_hit_away_smoke.gd
+run_clean 'Threat alert SFX smoke' 'THREAT ALERT SFX PASS engage=true edge=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_alert_sfx_smoke.gd
+run_clean 'Threat alert away smoke' 'THREAT ALERT AWAY PASS away=true engage=true edge=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_alert_away_smoke.gd
+run_clean 'Work pry XP live smoke' 'WORK PRY XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_pry_xp_live_smoke.gd
+run_clean 'Work yield scoop SFX smoke' 'WORK YIELD SCOOP SFX PASS scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_sfx_smoke.gd
+run_clean 'Work yield scoop away smoke' 'WORK YIELD SCOOP AWAY PASS away=true scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_away_smoke.gd
+run_clean 'Chart route SFX smoke' 'CHART ROUTE SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_sfx_smoke.gd
+run_clean 'Chart route away smoke' 'CHART ROUTE AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_away_smoke.gd
+run_clean 'Component mount XP live smoke' 'COMPONENT MOUNT XP LIVE PASS dismount=true remount=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_xp_live_smoke.gd
+run_clean 'Sanity hallucination SFX smoke' 'SANITY HALLUCINATION SFX PASS phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_sfx_smoke.gd
+run_clean 'Sanity hallucination away smoke' 'SANITY HALLUCINATION AWAY PASS away=true phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_away_smoke.gd
+run_clean 'Meta hull groan SFX smoke' 'META HULL GROAN SFX PASS breach=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_hull_groan_sfx_smoke.gd
+run_clean 'Meta hull groan away smoke' 'META HULL GROAN AWAY PASS away=true breach=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_hull_groan_away_smoke.gd
+run_clean 'Meta biomatter reactor SFX smoke' 'META BIOMATTER REACTOR SFX PASS pulse=true reactor=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_biomatter_reactor_sfx_smoke.gd
+run_clean 'Meta biomatter reactor away smoke' 'META BIOMATTER REACTOR AWAY PASS away=true pulse=true reactor=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_biomatter_reactor_away_smoke.gd
+run_clean 'Dock land SFX smoke' 'DOCK LAND SFX PASS dock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_land_sfx_smoke.gd
+run_clean 'Dock land away smoke' 'DOCK LAND AWAY PASS away=true dock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_land_away_smoke.gd
+run_clean 'Work splice XP live smoke' 'WORK SPLICE XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_splice_xp_live_smoke.gd
+run_clean 'Work patch XP live smoke' 'WORK PATCH XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_patch_xp_live_smoke.gd
+run_clean 'Meta schedule router smoke' 'META SCHEDULE ROUTER PASS beacon=true routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_schedule_router_smoke.gd
+run_clean 'Work suppress XP live smoke' 'WORK SUPPRESS XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_xp_live_smoke.gd
+run_clean 'Work plant XP live smoke' 'WORK PLANT XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_plant_xp_live_smoke.gd
+run_clean 'Work harvest XP live smoke' 'WORK HARVEST XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_harvest_xp_live_smoke.gd
+run_clean 'Work verb SFX multi smoke' 'WORK VERB SFX MULTI PASS weld=true pry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_multi_smoke.gd
+run_clean 'Work verb SFX patch splice smoke' 'WORK VERB SFX PATCH SPLICE PASS patch=true splice=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_patch_splice_smoke.gd
+run_clean 'Work verb SFX plant harvest smoke' 'WORK VERB SFX PLANT HARVEST PASS plant=true harvest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_plant_harvest_smoke.gd
+run_clean 'Component mount SFX live smoke' 'COMPONENT MOUNT SFX LIVE PASS dismount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_sfx_live_smoke.gd
+run_clean 'Work suppress SFX live smoke' 'WORK SUPPRESS SFX LIVE PASS complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_sfx_live_smoke.gd
+run_clean 'Component remount SFX live smoke' 'COMPONENT REMOUNT SFX LIVE PASS remount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_remount_sfx_live_smoke.gd
+run_clean 'Loot search SFX smoke' 'LOOT SEARCH SFX PASS search=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_search_sfx_smoke.gd
+run_clean 'Loot search away smoke' 'LOOT SEARCH AWAY PASS away=true search=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_search_away_smoke.gd
+run_clean 'Panel close SFX smoke' 'PANEL CLOSE SFX PASS wounds=true shipmod=true chart=true scanner=true recipe=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_close_sfx_smoke.gd
+run_clean 'Panel close away smoke' 'PANEL CLOSE AWAY PASS away=true wounds=true shipmod=true chart=true scanner=true recipe=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_close_away_smoke.gd
+run_clean 'Equip unequip SFX smoke' 'EQUIP UNEQUIP SFX PASS equip=true unequip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_unequip_sfx_smoke.gd
+run_clean 'Equip unequip away smoke' 'EQUIP UNEQUIP AWAY PASS away=true equip=true unequip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_unequip_away_smoke.gd
+run_clean 'Recipe picker open SFX smoke' 'RECIPE PICKER OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_open_sfx_smoke.gd
+run_clean 'Recipe picker open away smoke' 'RECIPE PICKER OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_open_away_smoke.gd
+run_clean 'Scanner open SFX smoke' 'SCANNER OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_sfx_smoke.gd
+run_clean 'Scanner open away smoke' 'SCANNER OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_away_smoke.gd
+run_clean 'Cart grab SFX smoke' 'CART GRAB SFX PASS grab=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_sfx_smoke.gd
+run_clean 'Cart grab away smoke' 'CART GRAB AWAY PASS away=true grab=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_away_smoke.gd
+run_clean 'Transfer panel open SFX smoke' 'TRANSFER PANEL OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_panel_open_sfx_smoke.gd
+run_clean 'Transfer panel open away smoke' 'TRANSFER PANEL OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_panel_open_away_smoke.gd
+run_clean 'Codex open SFX smoke' 'CODEX OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/codex_open_sfx_smoke.gd
+run_clean 'Codex open away smoke' 'CODEX OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/codex_open_away_smoke.gd
+run_clean 'Pause menu open SFX smoke' 'PAUSE MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_sfx_smoke.gd
+run_clean 'Pause menu open away smoke' 'PAUSE MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_away_smoke.gd
+run_clean 'Pause menu close SFX smoke' 'PAUSE MENU CLOSE SFX PASS close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_sfx_smoke.gd
+run_clean 'Pause menu close away smoke' 'PAUSE MENU CLOSE AWAY PASS away=true close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_away_smoke.gd
+run_clean 'Menu confirm resume SFX smoke' 'MENU CONFIRM RESUME SFX PASS resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_sfx_smoke.gd
+run_clean 'Menu confirm resume away smoke' 'MENU CONFIRM RESUME AWAY PASS away=true resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_away_smoke.gd
+run_clean 'Settings menu open SFX smoke' 'SETTINGS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_sfx_smoke.gd
+run_clean 'Settings menu open away smoke' 'SETTINGS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_away_smoke.gd
+run_clean 'Records menu open SFX smoke' 'RECORDS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_sfx_smoke.gd
+run_clean 'Records menu open away smoke' 'RECORDS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_away_smoke.gd
+run_clean 'Settings menu back SFX smoke' 'SETTINGS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_sfx_smoke.gd
+run_clean 'Settings menu back away smoke' 'SETTINGS MENU BACK AWAY PASS away=true back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_away_smoke.gd
+run_clean 'Records menu back SFX smoke' 'RECORDS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_sfx_smoke.gd
+run_clean 'Records menu back away smoke' 'RECORDS MENU BACK AWAY PASS away=true back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_away_smoke.gd
+run_clean 'Weapon reload SFX smoke' 'WEAPON RELOAD SFX PASS reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_sfx_smoke.gd
+run_clean 'Weapon reload away smoke' 'WEAPON RELOAD AWAY PASS away=true reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_away_smoke.gd
+run_clean 'Player attack SFX smoke' 'PLAYER ATTACK SFX PASS attack=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_attack_sfx_smoke.gd
+run_clean 'Player attack away smoke' 'PLAYER ATTACK AWAY PASS away=true attack=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_attack_away_smoke.gd
+run_clean 'Dry fire SFX smoke' 'DRY FIRE SFX PASS dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_sfx_smoke.gd
+run_clean 'Dry fire away smoke' 'DRY FIRE AWAY PASS away=true dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_away_smoke.gd
+run_clean 'Achievement unlock SFX smoke' 'ACHIEVEMENT UNLOCK SFX PASS unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_sfx_smoke.gd
+run_clean 'Achievement unlock away smoke' 'ACHIEVEMENT UNLOCK AWAY PASS away=true unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_away_smoke.gd
+run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_sfx_smoke.gd
+run_clean 'Tool pickup away smoke' 'TOOL PICKUP AWAY PASS away=true pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_away_smoke.gd
+run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
+run_clean 'Craft blocked away smoke' 'CRAFT BLOCKED AWAY PASS away=true blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_away_smoke.gd
+run_clean 'Production start SFX smoke' 'PRODUCTION START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_start_sfx_smoke.gd
+run_clean 'Production start away smoke' 'PRODUCTION START AWAY PASS away=true start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_start_away_smoke.gd
+run_clean 'Footstep SFX smoke' 'FOOTSTEP SFX PASS moving=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/footstep_sfx_smoke.gd
+run_clean 'Footstep away smoke' 'FOOTSTEP AWAY PASS away=true moving=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/footstep_away_smoke.gd
+run_clean 'Hatch door close SFX smoke' 'HATCH DOOR CLOSE SFX PASS reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_sfx_smoke.gd
+run_clean 'Hatch door close away smoke' 'HATCH DOOR CLOSE AWAY PASS away=true reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_away_smoke.gd
+run_clean 'Production blocked SFX smoke' 'PRODUCTION BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_blocked_sfx_smoke.gd
+run_clean 'Production blocked away smoke' 'PRODUCTION BLOCKED AWAY PASS away=true blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_blocked_away_smoke.gd
+run_clean 'End run SFX smoke' 'END RUN SFX PASS death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_sfx_smoke.gd
+run_clean 'End run away smoke' 'END RUN AWAY PASS away=true death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_away_smoke.gd
+run_clean 'Craft start SFX smoke' 'CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_start_sfx_smoke.gd
+run_clean 'Craft start away smoke' 'CRAFT START AWAY PASS away=true start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_start_away_smoke.gd
+run_clean 'Field craft start SFX smoke' 'FIELD CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_start_sfx_smoke.gd
+run_clean 'Field craft start away smoke' 'FIELD CRAFT START AWAY PASS away=true start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_start_away_smoke.gd
+run_clean 'Inventory transfer SFX smoke' 'INVENTORY TRANSFER SFX PASS transfer=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_transfer_sfx_smoke.gd
+run_clean 'Inventory transfer away smoke' 'INVENTORY TRANSFER AWAY PASS away=true transfer=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_transfer_away_smoke.gd
+run_clean 'Hazard blocked SFX smoke' 'HAZARD BLOCKED SFX PASS repair=true extinguish=true seal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_blocked_sfx_smoke.gd
+run_clean 'Hazard blocked away smoke' 'HAZARD BLOCKED AWAY PASS away=true repair=true extinguish=true seal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_blocked_away_smoke.gd
+run_clean 'Hangar dock launch SFX smoke' 'HANGAR DOCK LAUNCH SFX PASS dock=true launch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_dock_launch_sfx_smoke.gd
+run_clean 'Hangar dock launch away smoke' 'HANGAR DOCK LAUNCH AWAY PASS away=true dock=true launch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_dock_launch_away_smoke.gd
+run_clean 'Discover room SFX smoke' 'DISCOVER ROOM SFX PASS discover=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_sfx_smoke.gd
+run_clean 'Discover room away smoke' 'DISCOVER ROOM AWAY PASS away=true discover=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_away_smoke.gd
+run_clean 'Cargo bulk transfer SFX smoke' 'CARGO BULK TRANSFER SFX PASS deposit=true withdraw=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_bulk_transfer_sfx_smoke.gd
+run_clean 'Cargo bulk transfer away smoke' 'CARGO BULK TRANSFER AWAY PASS away=true deposit=true withdraw=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_bulk_transfer_away_smoke.gd
+run_clean 'UI load SFX smoke' 'UI LOAD SFX PASS save=true load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_load_sfx_smoke.gd
+run_clean 'UI load away smoke' 'UI LOAD AWAY PASS away=true save=true load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_load_away_smoke.gd
+run_clean 'Inspire crew SFX smoke' 'INSPIRE CREW SFX PASS inspire=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inspire_crew_sfx_smoke.gd
+run_clean 'Inspire crew away smoke' 'INSPIRE CREW AWAY PASS away=true inspire=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inspire_crew_away_smoke.gd
+run_clean 'Junction calibrator SFX smoke' 'JUNCTION CALIBRATOR SFX PASS applied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_sfx_smoke.gd
+run_clean 'Junction calibrator away smoke' 'JUNCTION CALIBRATOR AWAY PASS away=true applied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_away_smoke.gd
+run_clean 'First aid ally XP smoke' 'FIRST AID ALLY XP PASS ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_smoke.gd
+run_clean 'Extract data SFX smoke' 'EXTRACT DATA SFX PASS extract=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extract_data_sfx_smoke.gd
+run_clean 'Extract data away smoke' 'EXTRACT DATA AWAY PASS away=true extract=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extract_data_away_smoke.gd
+run_clean 'Field craft blocked live SFX smoke' 'FIELD CRAFT BLOCKED LIVE SFX PASS busy=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_blocked_live_sfx_smoke.gd
+run_clean 'Field craft blocked live away smoke' 'FIELD CRAFT BLOCKED LIVE AWAY PASS away=true busy=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_blocked_live_away_smoke.gd
+run_clean 'Work interrupt SFX smoke' 'WORK INTERRUPT SFX PASS interrupt=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_interrupt_sfx_smoke.gd
+run_clean 'Work interrupt away smoke' 'WORK INTERRUPT AWAY PASS away=true interrupt=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_interrupt_away_smoke.gd
+run_clean 'Travel home SFX smoke' 'TRAVEL HOME SFX PASS home=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_home_sfx_smoke.gd
+run_clean 'Travel home away smoke' 'TRAVEL HOME AWAY PASS away=true home=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_home_away_smoke.gd
+run_clean 'Travel denied SFX smoke' 'TRAVEL DENIED SFX PASS denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_denied_sfx_smoke.gd
+run_clean 'Travel denied away smoke' 'TRAVEL DENIED AWAY PASS away=true denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_denied_away_smoke.gd
+run_clean 'Dock barrier SFX smoke' 'DOCK BARRIER SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_sfx_smoke.gd
+run_clean 'Dock barrier away smoke' 'DOCK BARRIER AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_away_smoke.gd
+run_clean 'Bridge login SFX smoke' 'BRIDGE LOGIN SFX PASS login=true deny=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_login_sfx_smoke.gd
+run_clean 'Bridge login away smoke' 'BRIDGE LOGIN AWAY PASS away=true deny=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_login_away_smoke.gd
+run_clean 'Field craft begin blocked SFX smoke' 'FIELD CRAFT BEGIN BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_begin_blocked_sfx_smoke.gd
+run_clean 'Field craft begin blocked away smoke' 'FIELD CRAFT BEGIN BLOCKED AWAY PASS away=true blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_begin_blocked_away_smoke.gd
+run_clean 'Encumbrance overload SFX smoke' 'ENCUMBRANCE OVERLOAD SFX PASS overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_sfx_smoke.gd
+run_clean 'Encumbrance overload away smoke' 'ENCUMBRANCE OVERLOAD AWAY PASS away=true overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_away_smoke.gd
+run_clean 'Ship mod install fail SFX smoke' 'SHIP MOD INSTALL FAIL SFX PASS fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_fail_sfx_smoke.gd
+run_clean 'Ship mod install fail away smoke' 'SHIP MOD INSTALL FAIL AWAY PASS away=true fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_fail_away_smoke.gd
+run_clean 'Consumable use SFX smoke' 'CONSUMABLE USE SFX PASS ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_sfx_smoke.gd
+run_clean 'Consumable use away smoke' 'CONSUMABLE USE AWAY PASS away=true ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_away_smoke.gd
+run_clean 'Work start SFX smoke' 'WORK START SFX PASS start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_sfx_smoke.gd
+run_clean 'Work start away smoke' 'WORK START AWAY PASS away=true start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_away_smoke.gd
+run_clean 'Quicksave denied SFX smoke' 'QUICKSAVE DENIED SFX PASS deny=true save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/quicksave_denied_sfx_smoke.gd
+run_clean 'Quicksave denied away smoke' 'QUICKSAVE DENIED AWAY PASS away=true deny=true save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/quicksave_denied_away_smoke.gd
+run_clean 'Autosave SFX smoke' 'AUTOSAVE SFX PASS save=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_sfx_smoke.gd
+run_clean 'Autosave away smoke' 'AUTOSAVE AWAY PASS away=true save=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_away_smoke.gd
+run_clean 'Save denied SFX smoke' 'SAVE DENIED SFX PASS denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_denied_sfx_smoke.gd
+run_clean 'Save denied away smoke' 'SAVE DENIED AWAY PASS away=true denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_denied_away_smoke.gd
+run_clean 'Tutorial SFX smoke' 'TUTORIAL SFX PASS trigger=true dismiss=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_sfx_smoke.gd
+run_clean 'Tutorial away smoke' 'TUTORIAL AWAY PASS away=true trigger=true dismiss=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_away_smoke.gd
+run_clean 'Chart denied SFX smoke' 'CHART DENIED SFX PASS denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_denied_sfx_smoke.gd
+run_clean 'Chart denied away smoke' 'CHART DENIED AWAY PASS away=true denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_denied_away_smoke.gd
+run_clean 'Scanner confirm deny SFX smoke' 'SCANNER CONFIRM DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_confirm_deny_sfx_smoke.gd
+run_clean 'Scanner confirm deny away smoke' 'SCANNER CONFIRM DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_confirm_deny_away_smoke.gd
+run_clean 'Recipe picker deny SFX smoke' 'RECIPE PICKER DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_deny_sfx_smoke.gd
+run_clean 'Recipe picker deny away smoke' 'RECIPE PICKER DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_deny_away_smoke.gd
+run_clean 'Wounds treat deny SFX smoke' 'WOUNDS TREAT DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_treat_deny_sfx_smoke.gd
+run_clean 'Wounds treat deny away smoke' 'WOUNDS TREAT DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_treat_deny_away_smoke.gd
+run_clean 'Transfer denied SFX smoke' 'TRANSFER DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_denied_sfx_smoke.gd
+run_clean 'Transfer denied away smoke' 'TRANSFER DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_denied_away_smoke.gd
+run_clean 'Equip denied SFX smoke' 'EQUIP DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_denied_sfx_smoke.gd
+run_clean 'Equip denied away smoke' 'EQUIP DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_denied_away_smoke.gd
+run_clean 'Unequip empty SFX smoke' 'UNEQUIP EMPTY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unequip_empty_sfx_smoke.gd
+run_clean 'Unequip empty away smoke' 'UNEQUIP EMPTY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unequip_empty_away_smoke.gd
+run_clean 'Reload denied SFX smoke' 'RELOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_sfx_smoke.gd
+run_clean 'Reload denied away smoke' 'RELOAD DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_away_smoke.gd
+run_clean 'Interact miss SFX smoke' 'INTERACT MISS SFX PASS miss=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interact_miss_sfx_smoke.gd
+run_clean 'Interact miss away smoke' 'INTERACT MISS AWAY PASS away=true miss=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interact_miss_away_smoke.gd
+run_clean 'Craft from picker deny SFX smoke' 'CRAFT FROM PICKER DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_from_picker_deny_sfx_smoke.gd
+run_clean 'Craft from picker deny away smoke' 'CRAFT FROM PICKER DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_from_picker_deny_away_smoke.gd
+run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_denied_sfx_smoke.gd
+run_clean 'Load denied away smoke' 'LOAD DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_denied_away_smoke.gd
+run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
+run_clean 'Cart grab denied away smoke' 'CART GRAB DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_away_smoke.gd
+run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
+run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
+run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
+run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
+echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"
+# Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.

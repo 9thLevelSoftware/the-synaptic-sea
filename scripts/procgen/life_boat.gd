@@ -16,6 +16,7 @@ class_name LifeBoatBuilder
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
 
 const SCHEMA_VERSION: String = "1.2.0"
 const CELL_SIZE: float = 4.0
@@ -180,6 +181,10 @@ static func build_layout(biome: String = "") -> Dictionary:
 	if not bool(verdict.get("ok", false)):
 		push_error("LifeBoatBuilder: structural plan validation failed: %s" % str(verdict.get("errors", [])))
 	layout["structural_plan"] = structural_plan
+	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
+		layout, true, _dock_collision_projection())
+	if not bool(endpoint_result.get("ok", false)):
+		push_error("LifeBoatBuilder: dock endpoint authoring failed: %s" % str(endpoint_result.get("reason", "")))
 	_apply_plan_to_rooms(layout, structural_plan, portals)
 	return layout
 
@@ -216,6 +221,14 @@ static func _kit_id_for_biome(biome: String) -> String:
 			return "ship_structural_industrial"
 		_:
 			return DEFAULT_KIT_ID
+
+
+static func _dock_collision_projection() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(DEFAULT_KIT_PATH))
+	if not parsed is Dictionary:
+		return {}
+	var projection: Variant = (parsed as Dictionary).get("dock_collision_projection_v1", null)
+	return (projection as Dictionary).duplicate(true) if projection is Dictionary else {}
 
 
 static func _apply_plan_to_rooms(layout: Dictionary, plan: Dictionary, portals: Array) -> void:

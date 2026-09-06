@@ -53,6 +53,7 @@ func _initialize() -> void:
 		"home_ship": {
 			"slice_version": SaveMigrationServiceScript.KNOWN_VERSIONS[0],
 			"player_position": [1.0, 0.0, 2.0],
+			"inventory_summary": {"tools": []},
 		},
 	}
 	var legacy_result: Dictionary = svc.migrate_world(legacy_world)
@@ -72,30 +73,43 @@ func _initialize() -> void:
 		_fail("embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [inner_version, SaveMigrationServiceScript.TARGET_VERSION])
 		return
 
-	# --- 3. Current world-4 files may still contain older home_ship slices ---
+	# --- 3. Historical pairings are explicit; current world-6 pins run-6. ---
 	var current_world: Dictionary = {
 		"slice_version": SaveMigrationServiceScript.WORLD_TARGET_VERSION,
 		"home_ship": {
 			"slice_version": SaveMigrationServiceScript.KNOWN_VERSIONS[2],
 			"player_position": [4.0, 0.0, 8.0],
+			"inventory_summary": {"tools": []},
 		},
 	}
 	var current_result: Dictionary = svc.migrate_world(current_world)
-	var current_out: Variant = current_result.get("dict", null)
-	if not (current_out is Dictionary):
-		_fail("current world migration returned null")
+	if current_result.get("dict", null) != null \
+			or str(current_result.get("reason", "")) \
+				!= "world_home_version_mismatch:world-6:expected=gate2-current-run-6:actual=gate2-current-run-3":
+		_fail("current world accepted impossible embedded run or lost reason: %s" % str(current_result))
 		return
-	var current_inner: Variant = (current_out as Dictionary).get("home_ship", null)
-	if not (current_inner is Dictionary):
-		_fail("current world home_ship missing after migration")
+
+	var historical_world4: Dictionary = current_world.duplicate(true)
+	historical_world4["slice_version"] = "world-4"
+	var historical_result: Dictionary = svc.migrate_world(historical_world4)
+	if not historical_result.get("dict", null) is Dictionary \
+			or str((historical_result.dict as Dictionary).home_ship.slice_version) \
+				!= SaveMigrationServiceScript.TARGET_VERSION:
+		_fail("historical world-4/run-3 did not migrate: %s" % str(historical_result))
 		return
-	var current_inner_version: String = str((current_inner as Dictionary).get("slice_version", ""))
-	if current_inner_version != SaveMigrationServiceScript.TARGET_VERSION:
-		_fail("current world embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [current_inner_version, SaveMigrationServiceScript.TARGET_VERSION])
-		return
-	if not bool(current_result.get("migrated", false)):
-		_fail("current world embedded home_ship migration did not report migrated=true")
-		return
+
+	for impossible_run in ["gate2-current-run-4", "gate2-current-run-6"]:
+		var world5: Dictionary = historical_world4.duplicate(true)
+		world5["slice_version"] = "world-5"
+		world5.home_ship["slice_version"] = impossible_run
+		var rejected_pair: Dictionary = svc.migrate_world(world5)
+		var expected_reason: String = \
+			"world_home_version_mismatch:world-5:expected=gate2-current-run-5:actual=%s" \
+			% impossible_run
+		if rejected_pair.get("dict", null) != null \
+				or str(rejected_pair.get("reason", "")) != expected_reason:
+			_fail("world-5 accepted impossible pair or lost exact reason: %s" % str(rejected_pair))
+			return
 
 	print("SAVE MIGRATION WORLD PASS unknown_version_passthrough=%s legacy_home_ship_migrated=true current_world_home_ship_migrated=true" % str(passthrough_ok).to_lower())
 	quit(0)

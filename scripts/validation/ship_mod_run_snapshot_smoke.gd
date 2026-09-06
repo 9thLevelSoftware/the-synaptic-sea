@@ -28,15 +28,27 @@ func _initialize() -> void:
 	}]}
 	var placement = ComponentPlacementStateScript.new()
 	placement.populate(layout, catalog, 1)
-	placement.dismount("eng_wall_0")
+	var prepared_lots: Dictionary = placement.prepare_condition_authority(
+		"home", catalog, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not bool(prepared_lots.get("ok", false)) \
+			or not placement.commit_condition_authority(prepared_lots):
+		_fail("condition authority"); return
+	var dismounted: Dictionary = placement.dismount("eng_wall_0")
+	var source_lot: Dictionary = dismounted.get("item_lot", {}) as Dictionary
+	if not bool(dismounted.get("ok", false)) or source_lot.is_empty():
+		_fail("dismount lot"); return
+	var item_form: String = str(dismounted.get("item_form", ""))
+	var inv: Dictionary = {item_form: 1}
+	var mounted: Dictionary = placement.mount_by_slot_id(
+		"eng_wall_0", item_form, inv, catalog, source_lot)
+	if not bool(mounted.get("ok", false)) or not inv.is_empty():
+		_fail("remount lot result=%s item=%s lot=%s" % [str(mounted), item_form, str(source_lot)]); return
 	var mod = ShipModificationStateScript.new()
 	mod.configure({"power_supply": 80.0})
 	if not mod.bind_physical_slots("home", placement.get_physical_slot_descriptors("home"), catalog, placement):
 		_fail("bind"); return
-	var inv: Dictionary = {"console_unit": 1}
-	var inst: Dictionary = mod.install("eng_wall_0", "console_generic", "console_unit", inv)
-	if not bool(inst.get("ok", false)):
-		_fail("install"); return
+	if mod.installed_count() != 1:
+		_fail("installed source lot"); return
 
 	var map = ModuleIntegrityMapScript.new()
 	map.apply_damage("eng/wall_0", 0.4, "wall_straight_1x1")
@@ -70,6 +82,10 @@ func _initialize() -> void:
 		_fail("restored bind"); return
 	if mod2.installed_count() != 1:
 		_fail("install lost"); return
+	var restored_entry: Dictionary = placement2.get_entry("eng_wall_0")
+	if not bool(restored_entry.get("mounted", false)) \
+			or restored_entry.get("source_lot", {}) != source_lot:
+		_fail("source lot lost"); return
 	if float(mod2.power_supply) <= 0.0:
 		_fail("power supply lost"); return
 	var map2 = ModuleIntegrityMapScript.new()

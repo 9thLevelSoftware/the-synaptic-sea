@@ -184,12 +184,14 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 **Files:** `scripts/systems/component_placement_state.gd`, `component_mount_resolver.gd`, `ship_work_transaction.gd`, `ship_work_context.gd`, `ship_access_state.gd`; coordinator work targeting; `scripts/validation/fc_p11_smoke.gd`, `fc_p12_smoke.gd`, `fc_p13_smoke.gd`.
 
-- [ ] Validate physical slot identity/type/size, selected ship, ownership policy, occupancy, range, and target revision at start and commit. Water, unknown items, foreign/stale/missing owners, and synthetic fallback slots must deny without spend.
-- [ ] Prove timed work has no early consequence, pause retains escrow/progress, explicit physical-work cancel refunds exact lots, and duplicate/reentrant completion yields one receipt/effect/XP award.
-- [ ] Revalidate two-ship relocation and loaded owner pointers using exact component lot origins and counts. Never solve valid stack-cap denials by discarding displaced parts.
-- [ ] Run focused P11–P13 and component/mount/away-access regressions on stable P10 integration; review changed ownership and transaction code independently.
+- [x] Validate physical slot identity/type/size, selected ship, ownership policy, occupancy, range, and target revision at start and commit. Water, unknown items, foreign/stale/missing owners, and synthetic fallback slots must deny without spend.
+- [x] Prove timed work has no early consequence, pause retains escrow/progress, explicit physical-work cancel refunds exact lots, and duplicate/reentrant completion yields one receipt/effect/XP award.
+- [x] Revalidate two-ship relocation and loaded owner pointers using exact component lot origins and counts. Never solve valid stack-cap denials by discarding displaced parts.
+- [x] Run focused P11–P13 and component/mount/away-access regressions on stable P10 integration; review changed ownership and transaction code independently.
 
 **Exit:** P14/P15/P17 receive one dependable work/owner boundary, with no separate UI mutation path.
+
+**Reviewed outcome:** R06 passed the accepted fix-round-2 review (`2e6407eda76990daf265cdec5fb7017d83633aadc9e0b4ec879e01a4e171a453`). Four canonical P10–P13 runs and twelve focused P11–P13 cases passed with clean diagnostics, plus 36 Python runner tests; the retained direct snapshot proof from fix round 1 remains credited separately. Acceptance is pinned to the reviewed package/runtime boundary and its source/evidence manifests, not the inherited moving HEAD. This closes the R06 physical-work ownership boundary only; it does not claim G1, G2, the known-RED natural route, or later R10/P14 integration.
 
 ### Task 7: R07 — Implement durable machinery condition and reversible effects
 

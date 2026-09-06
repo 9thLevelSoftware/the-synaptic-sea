@@ -1,0 +1,42 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+ERROR: P17 candidate nav: res://data/procgen/golden/coherent_ship_002/layout.json internal classification drift { "internal_pair": 43, "external_endpoint": 55, "unresolved": 0, "vertical_pair": 0 }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:69)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: res://data/procgen/golden/coherent_ship_002/layout.json unresolved classification drift { "internal_pair": 43, "external_endpoint": 55, "unresolved": 0, "vertical_pair": 0 }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:71)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: coherent 002 unresolved edge identity drift
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:80)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: closed unlocked portal was treated as open
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _test_candidate_paths_and_immutability (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:127)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:16)
+ERROR: P17 candidate nav: closed normal portal was treated as open
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _test_candidate_paths_and_immutability (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:129)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:16)
+ERROR: P17 candidate nav: unresolved internal edge did not deny invalid_candidate_projection: { "ok": false, "reason": "portal_state_mismatch", "scene_authorized": false, "ship_id": "ship/local", "target_module_id": "edge/0|v|1|0", "actor_exit": {  }, "local_connection_paths": [], "overlay": {  } }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:415)
+       [2] _test_fail_closed_mutants (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:187)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:17)

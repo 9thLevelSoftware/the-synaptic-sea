@@ -1,0 +1,7 @@
+ERROR: FC P11 FAIL: current-policy condition authority fixture: { "ok": false, "reason": "invalid_condition_authority_request" }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p11_smoke.gd:345)
+       [1] _verify_current_policy_overrides_saved (res://scripts/validation/fc_p11_smoke.gd:267)
+       [2] _initialize (res://scripts/validation/fc_p11_smoke.gd:92)
+       [3] _verify_panel_catalog_search (res://scripts/validation/fc_p11_smoke.gd:258)

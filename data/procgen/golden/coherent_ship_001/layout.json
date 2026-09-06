@@ -864,6 +864,53 @@
       "to_room": "reactor_01"
     }
   ],
+  "boarding_endpoints_v1": [
+    {
+      "endpoint_id": "boarding:0|v|0|-1",
+      "port_id": "airlock:0|v|0|-1",
+      "portal_id": "boarding_portal:0|v|0|-1",
+      "type": "airlock",
+      "size_class": 1,
+      "room_id": "airlock_01",
+      "deck": 0,
+      "edge_cell": [
+        0,
+        0,
+        0
+      ],
+      "edge_direction": "west",
+      "structural_edge_key": "0|v|0|-1",
+      "target_module_id": "doorway_frame_open_1x1",
+      "structural_module_id": "doorway_frame_open_1x1",
+      "local_position": [
+        -2.1,
+        0.0,
+        0.0
+      ],
+      "outward_normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "threshold_nav_node_id": "dock-threshold:0|v|0|-1",
+      "interior_nav_node_id": "dock-interior:0|0|0",
+      "threshold_clearance_point_local": [
+        -1.75,
+        0.550000011920929,
+        0.0
+      ],
+      "interior_clearance_point_local": [
+        -1.1,
+        0.550000011920929,
+        0.0
+      ],
+      "join_piece_placement_ids": [
+        "edge:0|v|0|-1",
+        "floor:0|0|0"
+      ],
+      "join_collision_fingerprint": "40410dffdd6602ba7ea4dbe900e1893832d3e388652f30d30014543820d5b63e"
+    }
+  ],
   "structural_plan": {
     "edges": {
       "0|h|-1|0": {
@@ -1393,13 +1440,13 @@
         "exterior": true,
         "id": "edge:0|v|0|-1",
         "key": "0|v|0|-1",
-        "kind": "SOLID",
-        "module_id": "wall_straight_1x1",
+        "kind": "DOOR",
+        "module_id": "doorway_frame_open_1x1",
         "opposite_direction": "east",
         "other_room": "",
         "owner_room": "airlock_01",
         "placement_required": true,
-        "portal": false,
+        "portal": true,
         "position": [
           -2.0,
           0.0,
@@ -1421,9 +1468,10 @@
             0
           ]
         ],
-        "state": "SOLID",
+        "state": "DOOR",
         "wrapper_required": true,
-        "yaw_degrees": 90.0
+        "yaw_degrees": 90.0,
+        "portal_id": "boarding_portal:0|v|0|-1"
       },
       "0|v|0|0": {
         "cell": [
@@ -5544,14 +5592,14 @@
         "exterior": true,
         "id": "edge:0|v|0|-1",
         "key": "0|v|0|-1",
-        "kind": "SOLID",
-        "module_id": "wall_straight_1x1",
+        "kind": "DOOR",
+        "module_id": "doorway_frame_open_1x1",
         "opposite_direction": "east",
         "other_room": "",
         "owner_room": "airlock_01",
         "placement_id": "edge:0|v|0|-1",
         "placement_required": true,
-        "portal": false,
+        "portal": true,
         "position": [
           -2.0,
           0.0,
@@ -5573,9 +5621,10 @@
             0
           ]
         ],
-        "state": "SOLID",
+        "state": "DOOR",
         "wrapper_required": true,
-        "yaw_degrees": 90.0
+        "yaw_degrees": 90.0,
+        "portal_id": "boarding_portal:0|v|0|-1"
       },
       {
         "cell": [

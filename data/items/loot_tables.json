@@ -23,7 +23,10 @@
       { "item_id": "corroded_data_shard", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
       { "item_id": "fire_extinguisher", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
       { "item_id": "flare_round",   "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
-      { "item_id": "flare_pistol",  "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "rare" }
+      { "item_id": "flare_pistol",  "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "rare" },
+      { "item_id": "medical_gauze", "qty_min": 1, "qty_max": 3, "weight": 2, "rarity": "common" },
+      { "item_id": "antiseptic_vial", "qty_min": 1, "qty_max": 2, "weight": 1, "rarity": "uncommon" },
+      { "item_id": "scavenged_protein", "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" }
     ]
   },
   "salvage_engineering": {
@@ -40,7 +43,19 @@
       { "item_id": "fuel_canister",  "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
       { "item_id": "capacitor_cell", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
       { "item_id": "welding_lance",  "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" },
-      { "item_id": "shock_probe",    "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" }
+      { "item_id": "shock_probe",    "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" },
+      { "item_id": "ceramic_plate", "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
+      { "item_id": "coolant_fluid", "qty_min": 1, "qty_max": 2, "weight": 1.5, "rarity": "uncommon" },
+      { "item_id": "cryo_stabilizer", "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "rare" },
+      { "item_id": "enzyme_catalyst", "qty_min": 1, "qty_max": 2, "weight": 1.5, "rarity": "uncommon" },
+      { "item_id": "fusion_igniter", "qty_min": 1, "qty_max": 1, "weight": 0.5, "rarity": "rare" },
+      { "item_id": "graphene_sheet", "qty_min": 1, "qty_max": 3, "weight": 2, "rarity": "common" },
+      { "item_id": "hydraulic_piston", "qty_min": 1, "qty_max": 2, "weight": 1.5, "rarity": "uncommon" },
+      { "item_id": "optical_lens", "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
+      { "item_id": "radiation_shielding", "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "uncommon" },
+      { "item_id": "sensor_array", "qty_min": 1, "qty_max": 1, "weight": 1, "rarity": "uncommon" },
+      { "item_id": "solenoid_coil", "qty_min": 1, "qty_max": 2, "weight": 1.5, "rarity": "uncommon" },
+      { "item_id": "synthesizer_base", "qty_min": 1, "qty_max": 3, "weight": 2, "rarity": "common" }
     ]
   },
   "salvage_cargo": {
@@ -54,7 +69,8 @@
       { "item_id": "biomatter_tangle", "qty_min": 1, "qty_max": 2, "weight": 3, "rarity": "common", "biome_weights": { "breach_field": 1.6 } },
       { "item_id": "synaptic_sea_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.25, "rarity": "epic", "unique_id": "synaptic_sea_reliquary", "codex_entry_id": "synaptic_sea_reliquary", "biome_weights": { "dead_fleet": 1.6, "abyssal_synaptic_sea": 1.1 }, "container_weights": { "hidden_cache": 2.2, "industrial_crate": 0.5 } },
       { "item_id": "hull_sealant", "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "uncommon" },
-      { "item_id": "web_chart", "qty_min": 1, "qty_max": 1, "weight": 1.5, "rarity": "common" }
+      { "item_id": "web_chart", "qty_min": 1, "qty_max": 1, "weight": 1.5, "rarity": "common" },
+      { "item_id": "synth_fiber", "qty_min": 2, "qty_max": 5, "weight": 3, "rarity": "common" }
     ]
   },
   "repair_parts_common": {

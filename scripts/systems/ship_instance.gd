@@ -9,6 +9,7 @@ class_name ShipInstance
 ## a stable shape; they are unused this phase.
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const ThreatSaveContractScript := preload("res://scripts/systems/threat_save_contract.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
 const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.gd")
@@ -20,6 +21,7 @@ const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppress
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
 const PendingOutputStoreScript := preload("res://scripts/systems/pending_output_store.gd")
+const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -137,6 +139,16 @@ var last_sim_time: float = 0.0
 var module_integrity_summary: Dictionary = {}
 var component_placement_summary: Dictionary = {}
 
+# FC-15: nonserialized restoration handles. ComponentPlacementState remains the
+# durable component authority; ShipModificationState is only its live derived
+# projection. A changed handle invalidates in-memory callbacks through the
+# monotonic binding generation.
+var live_module_integrity: RefCounted = null
+var live_component_placement: RefCounted = null
+var live_ship_modification: RefCounted = null
+var live_work_transactions: RefCounted = null
+var _live_binding_generation: int = 0
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -149,6 +161,76 @@ static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_system
 	inst.scene_root = p_scene_root
 	return inst
 
+
+func bind_live_restoration_owners(
+		module_owner: RefCounted,
+		placement_owner: RefCounted,
+		modification_projection: RefCounted,
+		transaction_owner: RefCounted) -> Dictionary:
+	if ship_id.is_empty():
+		return {"ok": false, "reason": "unknown_ship"}
+	if transaction_owner == null:
+		return {"ok": false, "reason": "missing_transaction_owner"}
+	var tx_ship_id: String = _string_property(transaction_owner, "ship_id")
+	if tx_ship_id.is_empty() or tx_ship_id != ship_id:
+		return {"ok": false, "reason": "wrong_transaction_owner"}
+	if modification_projection != null:
+		var mod_ship_id: String = _string_property(modification_projection, "_ship_id")
+		if not mod_ship_id.is_empty() and mod_ship_id != ship_id:
+			return {"ok": false, "reason": "wrong_modification_owner"}
+	var changed: bool = live_module_integrity != module_owner \
+		or live_component_placement != placement_owner \
+		or live_ship_modification != modification_projection \
+		or live_work_transactions != transaction_owner
+	live_module_integrity = module_owner
+	live_component_placement = placement_owner
+	live_ship_modification = modification_projection
+	live_work_transactions = transaction_owner
+	if changed:
+		_live_binding_generation += 1
+	return {"ok": true, "reason": "ok", "binding_generation": _live_binding_generation}
+
+
+func get_live_binding_generation() -> int:
+	return _live_binding_generation
+
+
+func get_live_module_integrity() -> RefCounted:
+	return live_module_integrity
+
+
+func get_live_component_placement() -> RefCounted:
+	return live_component_placement
+
+
+func get_live_ship_modification() -> RefCounted:
+	return live_ship_modification
+
+
+func get_live_work_transactions() -> RefCounted:
+	return live_work_transactions
+
+
+func claim_home_access_for_bootstrap(
+		player_id: String, is_new_run: bool, verified_legacy_absent: bool = false) -> bool:
+	if player_id.is_empty():
+		return false
+	if access != null:
+		var existing_owner: String = str(access.get("owner_id"))
+		if not existing_owner.is_empty():
+			return existing_owner == player_id
+		if not verified_legacy_absent:
+			return false
+	if not is_new_run and not verified_legacy_absent:
+		return false
+	return get_access().claim(player_id)
+
+
+static func _string_property(owner: Object, property_name: String) -> String:
+	for descriptor_v in owner.get_property_list():
+		if descriptor_v is Dictionary and str((descriptor_v as Dictionary).get("name", "")) == property_name:
+			return str(owner.get(property_name))
+	return ""
 
 func get_summary() -> Dictionary:
 	var bp_dict: Dictionary = {}
@@ -191,9 +273,11 @@ func get_summary() -> Dictionary:
 	if floor_drop_sequence > 0 or not floor_drop_descriptors.is_empty():
 		result["floor_drops_v1"] = get_floor_drop_summary()
 	if pending_outputs != null and pending_outputs.has_method("get_summary"):
-		var pending_summary: Dictionary = pending_outputs.get_summary()
-		if not (pending_summary.get("records", []) as Array).is_empty():
-			result["pending_outputs_v1"] = pending_summary
+		result["pending_outputs_v1"] = pending_outputs.get_summary()
+	else:
+		var empty_pending = PendingOutputStoreScript.new()
+		if empty_pending.configure(ship_id):
+			result["pending_outputs_v1"] = empty_pending.get_summary()
 	# Persist whenever seeded or vented, not only while something still burns.
 	# A vents-only / extinguished derelict keeps fire_seeded=true; omitting the
 	# blob would skip seed on load and drop vented_compartments.
@@ -225,6 +309,23 @@ func apply_summary(summary) -> bool:
 	var restored_ship_id: String = str(summary.get("ship_id", ship_id))
 	if restored_ship_id.is_empty() or (not ship_id.is_empty() and restored_ship_id != ship_id):
 		return false
+	var restored_component_summary: Dictionary = {}
+	var restored_combat_summary: Dictionary = {}
+	if summary.has("combat"):
+		var combat_result: Dictionary = ThreatSaveContractScript.validate_current(
+			summary.get("combat", null))
+		if not bool(combat_result.get("ok", false)):
+			return false
+		restored_combat_summary = (combat_result.summary as Dictionary).duplicate(true)
+	if summary.has("component_placement"):
+		var component_variant: Variant = summary.get("component_placement")
+		if not component_variant is Dictionary or (component_variant as Dictionary).is_empty():
+			return false
+		var restored_component = ComponentPlacementStateScript.new()
+		if not restored_component.apply_summary(
+				component_variant as Dictionary, restored_ship_id):
+			return false
+		restored_component_summary = restored_component.get_summary()
 	var restored_inventory = null
 	if summary.has("inventory"):
 		var inventory_summary: Variant = summary["inventory"]
@@ -306,9 +407,8 @@ func apply_summary(summary) -> bool:
 		authored_open_portal_ids = []
 		for portal_id in (open_portals_variant as Array):
 			authored_open_portal_ids.append(String(portal_id))
-	var combat_variant: Variant = summary.get("combat", null)
-	if typeof(combat_variant) == TYPE_DICTIONARY:
-		combat_summary = (combat_variant as Dictionary).duplicate(true)
+	if summary.has("combat"):
+		combat_summary = restored_combat_summary
 	var access_summary: Variant = summary.get("access", null)
 	if typeof(access_summary) == TYPE_DICTIONARY and not (access_summary as Dictionary).is_empty():
 		get_access().apply_summary(access_summary as Dictionary)
@@ -344,9 +444,8 @@ func apply_summary(summary) -> bool:
 	var mi_variant: Variant = summary.get("module_integrity", null)
 	if typeof(mi_variant) == TYPE_DICTIONARY:
 		module_integrity_summary = (mi_variant as Dictionary).duplicate(true)
-	var cp_variant: Variant = summary.get("component_placement", null)
-	if typeof(cp_variant) == TYPE_DICTIONARY:
-		component_placement_summary = (cp_variant as Dictionary).duplicate(true)
+	if summary.has("component_placement"):
+		component_placement_summary = restored_component_summary.duplicate(true)
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.

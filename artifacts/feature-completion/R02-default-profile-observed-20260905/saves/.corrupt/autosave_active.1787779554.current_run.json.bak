@@ -1,0 +1,674 @@
+{
+	"addiction_summary": {
+		"profiles": {
+			"focus_ampoule": {
+				"dependence": 1.2,
+				"tolerance": 0.4,
+				"withdrawal_duration": 28.0,
+				"withdrawal_effects": [
+					"withdrawal_shakes"
+				],
+				"withdrawal_remaining": 8.0
+			}
+		}
+	},
+	"ammo_summary": {
+		"last_ammo_kind": "pistol",
+		"reserves": {
+			"pistol": 12
+		},
+		"total_consumed": 0
+	},
+	"audio_summary": {
+		"ambient": {
+			"crossfade_active": true,
+			"crossfade_seconds": 1.5,
+			"crossfade_time": 0.5,
+			"current_intensity": 0.45,
+			"current_role": "med_bay",
+			"current_track_id": "amb.med_bay",
+			"kind": "ambient_zone_state",
+			"previous_intensity": 0.7,
+			"previous_role": "engine",
+			"previous_track_id": "amb.engine",
+			"threat_boost": 0.25,
+			"threat_level": 0.6,
+			"threat_threshold": 0.5
+		},
+		"bus_config": {
+			"kind": "audio_bus_config",
+			"mutes": {
+				"ambient": false,
+				"master": false,
+				"meta": false,
+				"music": false,
+				"sfx": false,
+				"ui": false,
+				"voice": false
+			},
+			"volumes": {
+				"ambient": -9.0,
+				"master": 0.0,
+				"meta": -6.0,
+				"music": -6.0,
+				"sfx": -6.0,
+				"ui": -6.0,
+				"voice": -3.0
+			}
+		},
+		"current_voice_log_id": "",
+		"listener_attached": false,
+		"meta_event": {
+			"elapsed": 15.0,
+			"fired": [
+				{
+					"fired_at": 15.0,
+					"id": "beacon_distress",
+					"trigger_time": 12.0,
+					"voice_log_id": "log.beacon_01",
+					"volume_db": -3.0
+				}
+			],
+			"kind": "meta_event_state",
+			"pending": [
+				{
+					"id": "biomatter_pulse",
+					"trigger_time": 30.0,
+					"voice_log_id": "log.pulse_01",
+					"volume_db": -6.0
+				},
+				{
+					"id": "hull_groan",
+					"trigger_time": 55.0,
+					"voice_log_id": "",
+					"volume_db": -6.0
+				}
+			],
+			"run_seed": 42
+		},
+		"music": {
+			"crossfade_seconds": 2.0,
+			"engagement_flag": false,
+			"hazard_active": true,
+			"kind": "dynamic_music_state",
+			"layer_gains": {
+				"layer.base": 0.6,
+				"layer.combat_percussion": 0.0,
+				"layer.critical_pad": 0.0,
+				"layer.tension_drone": 0.7
+			},
+			"state": "TENSION",
+			"target_gains": {
+				"layer.base": 0.6,
+				"layer.combat_percussion": 0.0,
+				"layer.critical_pad": 0.0,
+				"layer.tension_drone": 0.7
+			},
+			"vitals_critical": false
+		},
+		"sfx_router": {
+			"caption_duration": 3.0,
+			"caption_queue_size": 1,
+			"captions_enabled": true,
+			"cooldown_clock": {
+				"sfx.tool.pickup": 0.0
+			},
+			"dropped_count": 0,
+			"kind": "sfx_event_router",
+			"routed_count": {
+				"sfx.tool.pickup": 1
+			}
+		},
+		"spatial": {
+			"kind": "spatial_audio_resolver",
+			"max_attenuation_db": -36.0,
+			"max_distance": 30.0,
+			"occlusion_penalty_db": -6.0,
+			"ref_distance": 1.5
+		}
+	},
+	"component_placement_summary": {},
+	"consumable_summary": {
+		"hotbar_slots": [
+			"bandage_kit",
+			"focus_ampoule",
+			"pistol_ammo_box"
+		],
+		"last_item_id": "flare",
+		"total_uses": 4
+	},
+	"crafting_summary": {
+		"active_craft": {
+			"quality_multiplier": 1.0,
+			"quality_score": 0.416,
+			"quality_tier": "standard",
+			"recipe_id": "craft_power_cell",
+			"station_kind": "fabricator"
+		},
+		"recipe_count": 60,
+		"station_summaries": {
+			"fabricator": {
+				"active_recipe_id": "craft_power_cell",
+				"level": 0,
+				"max_queue": 8,
+				"powered": true,
+				"progress_seconds": 10.0,
+				"queue": [],
+				"required_seconds": 30.0,
+				"station_kind": "fabricator",
+				"status": 1,
+				"tier": 0
+			}
+		}
+	},
+	"current_location": "",
+	"current_objective_sequence": 1,
+	"electrical_arc_summary": {
+		"arcing": true,
+		"arcing_duration": 2.5,
+		"cycle_duration": 4.0,
+		"discharged_duration": 1.5,
+		"hazard_kind": "electrical_arc",
+		"passability_blocked": true,
+		"phase": 1,
+		"remaining_in_state": 1.9,
+		"state": "ARCING",
+		"time_in_state": 0.6,
+		"zone_ids": [
+			"side_corridor_arc"
+		]
+	},
+	"fire_summary": {
+		"hazard_kind": "fire",
+		"state": "CLEARED"
+	},
+	"gameplay_slice_path": "",
+	"godot_version": "4.7.2-stable (official)",
+	"hallucination_summary": {},
+	"hydroponics_summary": {
+		"crop_id": "hydroponic_greens",
+		"crop_name": "Hydroponic Greens",
+		"growth_seconds": 120.0,
+		"power_cost": 3.0,
+		"produce_item_id": "hydroponic_greens",
+		"produce_quantity": 3,
+		"progress_ratio": 0.25,
+		"progress_seconds": 30.0,
+		"required_skill_level": 0,
+		"state": 1,
+		"water_cost": 2.0
+	},
+	"inventory_summary": {
+		"active_effects": [
+			{
+				"tool_id": "portable_oxygen_pump",
+				"type": "oxygen_drain_multiplier",
+				"value": 0.5
+			}
+		],
+		"drain_multiplier": 0.5,
+		"items": {
+			"portable_oxygen_pump": 1
+		},
+		"max_weight": 50.0,
+		"tool_ids": [
+			"portable_oxygen_pump"
+		],
+		"total_weight": 2.0
+	},
+	"is_autosave": true,
+	"is_quicksave": false,
+	"kit_path": "",
+	"layout_path": "res://data/procgen/smoke/seed_000017/layout.json",
+	"material_summary": {
+		"defined_count": 33,
+		"material_quality": {
+			"reactive_gel": 0.9,
+			"scrap_metal": 0.8,
+			"wiring_bundle": 0.7
+		}
+	},
+	"medicine_summary": {
+		"last_cured_statuses": [
+			"radiation_sickness"
+		],
+		"last_item_id": "bandage_kit",
+		"last_results": []
+	},
+	"module_integrity_summary": {},
+	"objective_progress_summary": {
+		"1": {
+			"calibrator_applied": false,
+			"complete": false,
+			"completed_step_ids": [
+				"step_a"
+			],
+			"completed_steps": 1,
+			"objective_type": "restore_systems",
+			"required_steps": 2
+		}
+	},
+	"oxygen_summary": {
+		"breach_open": true,
+		"breach_sealed": false,
+		"breach_zone_ids": [
+			"corridor_to_reactor"
+		],
+		"drain_multiplier": 1.0,
+		"drain_rate": 6.0,
+		"effective_drain_rate": 6.0,
+		"equipment_drain_multiplier": 1.0,
+		"hazard_kind": "oxygen",
+		"max_oxygen": 100.0,
+		"oxygen": 88.0,
+		"passability_blocked": false,
+		"player_in_breach_zone": true,
+		"recovery_threshold": 30.0,
+		"regen_rate": 3.5,
+		"safe_threshold": 35.0
+	},
+	"parent_world_slot": "",
+	"play_time_seconds": 0.0,
+	"player_position": [
+		0.0,
+		0.0,
+		0.0
+	],
+	"player_progression_summary": {},
+	"procgen_request": {},
+	"procgen_semantic_hash": "",
+	"radiation_summary": {},
+	"route_control_summary": {
+		"active_blocker_count": 1,
+		"extraction_unlocked": false,
+		"gate_ids": [
+			"powered_route_gate_01"
+		],
+		"gate_records": {
+			"powered_route_gate_01": {
+				"id": "powered_route_gate_01",
+				"open": false,
+				"required_system": "main_power_restored"
+			}
+		},
+		"opened_gate_count": 0,
+		"powered_gates_open": false,
+		"route_gate_count": 1
+	},
+	"run_id": "",
+	"sanity_summary": {},
+	"saved_at": "2026-08-26T21:25:54",
+	"saved_at_epoch": 1787779554,
+	"settings_summary": {},
+	"ship_modification_summary": {},
+	"ship_systems_summary": {
+		"system_order": [
+			"power",
+			"life_support",
+			"gravity",
+			"navigation",
+			"propulsion",
+			"scanners"
+		],
+		"systems": {
+			"gravity": {
+				"dependency_ids": [
+					"power"
+				],
+				"subcomponents": [
+					{
+						"health": 1.0,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 14.0,
+						"required_parts": [
+							"plating"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "gravity_plating"
+					},
+					{
+						"health": 0.2,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 12.0,
+						"required_parts": [
+							"circuit_board"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "field_emitter"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 9.0,
+						"required_parts": [
+							"circuit_board"
+						],
+						"required_tools": [],
+						"subcomponent_id": "inertial_dampeners"
+					}
+				],
+				"system_id": "gravity"
+			},
+			"life_support": {
+				"dependency_ids": [
+					"power"
+				],
+				"oxygen": {
+					"breach_open": true,
+					"breach_sealed": false,
+					"breach_zone_ids": [
+						"life_support"
+					],
+					"drain_multiplier": 1.0,
+					"drain_rate": 6.0,
+					"effective_drain_rate": 6.0,
+					"equipment_drain_multiplier": 1.0,
+					"hazard_kind": "oxygen",
+					"max_oxygen": 100.0,
+					"oxygen": 100.0,
+					"passability_blocked": false,
+					"player_in_breach_zone": false,
+					"recovery_threshold": 30.0,
+					"regen_rate": 3.5,
+					"safe_threshold": 35.0
+				},
+				"subcomponents": [
+					{
+						"health": 1.0,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 12.0,
+						"required_parts": [
+							"oxygen_filter"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "air_recycler"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 1,
+						"operational_threshold": 0.5,
+						"repair_seconds": 8.0,
+						"required_parts": [
+							"oxygen_filter"
+						],
+						"required_tools": [],
+						"subcomponent_id": "co2_scrubber"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 10.0,
+						"required_parts": [
+							"sealant"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "oxygen_tanks"
+					}
+				],
+				"system_id": "life_support"
+			},
+			"navigation": {
+				"dependency_ids": [
+					"power"
+				],
+				"subcomponents": [
+					{
+						"health": 0.2,
+						"min_skill": 1,
+						"operational_threshold": 0.5,
+						"repair_seconds": 6.0,
+						"required_parts": [
+							"data_core"
+						],
+						"required_tools": [],
+						"subcomponent_id": "star_charts"
+					},
+					{
+						"health": 0.2,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 12.0,
+						"required_parts": [
+							"circuit_board"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "nav_computer"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 10.0,
+						"required_parts": [
+							"sensor_module"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "sensor_array"
+					}
+				],
+				"system_id": "navigation"
+			},
+			"power": {
+				"dependency_ids": [],
+				"subcomponents": [
+					{
+						"health": 0.2,
+						"min_skill": 4,
+						"operational_threshold": 0.5,
+						"repair_seconds": 20.0,
+						"required_parts": [
+							"reactor_core"
+						],
+						"required_tools": [
+							"plasma_cutter"
+						],
+						"subcomponent_id": "reactor_core"
+					},
+					{
+						"health": 0.2,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 10.0,
+						"required_parts": [
+							"power_cell"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "power_distribution"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 1,
+						"operational_threshold": 0.5,
+						"repair_seconds": 6.0,
+						"required_parts": [
+							"power_cell"
+						],
+						"required_tools": [],
+						"subcomponent_id": "battery_cells"
+					}
+				],
+				"system_id": "power"
+			},
+			"propulsion": {
+				"dependency_ids": [
+					"power",
+					"navigation"
+				],
+				"subcomponents": [
+					{
+						"health": 1.0,
+						"min_skill": 4,
+						"operational_threshold": 0.5,
+						"repair_seconds": 18.0,
+						"required_parts": [
+							"thruster_nozzle"
+						],
+						"required_tools": [
+							"plasma_cutter"
+						],
+						"subcomponent_id": "thruster_array"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 12.0,
+						"required_parts": [
+							"fuel_line"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "fuel_injection"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 8.0,
+						"required_parts": [
+							"circuit_board"
+						],
+						"required_tools": [],
+						"subcomponent_id": "nav_linkage"
+					}
+				],
+				"system_id": "propulsion"
+			},
+			"scanners": {
+				"dependency_ids": [
+					"power",
+					"navigation"
+				],
+				"subcomponents": [
+					{
+						"health": 0.2,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 12.0,
+						"required_parts": [
+							"sensor_module"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "scanner_dish"
+					},
+					{
+						"health": 1.0,
+						"min_skill": 3,
+						"operational_threshold": 0.5,
+						"repair_seconds": 11.0,
+						"required_parts": [
+							"circuit_board"
+						],
+						"required_tools": [
+							"welder"
+						],
+						"subcomponent_id": "signal_processor"
+					},
+					{
+						"health": 0.2,
+						"min_skill": 2,
+						"operational_threshold": 0.5,
+						"repair_seconds": 7.0,
+						"required_parts": [
+							"power_cell"
+						],
+						"required_tools": [],
+						"subcomponent_id": "power_coupling"
+					}
+				],
+				"system_id": "scanners"
+			}
+		}
+	},
+	"skill_tree_summary": {},
+	"slice_version": "incompatible-version",
+	"slot_id": "autosave_active",
+	"slot_kind": "auto",
+	"spoilage_summary": {
+		"foods": {
+			"ration_pack": {
+				"display_name": "Ration Pack",
+				"elapsed_seconds": 1200.0,
+				"fresh_multiplier": 1.0,
+				"hunger_restore": 15.0,
+				"icon": "",
+				"item_id": "ration_pack",
+				"rotten_multiplier": 0.2,
+				"rotten_sickness_risk": 0.25,
+				"sanity_restore": 2.0,
+				"stage": 0,
+				"stale_multiplier": 0.6,
+				"thirst_restore": 5.0,
+				"total_spoilage_seconds": 3600.0
+			}
+		},
+		"rotten_present": false,
+		"transition_count": 0
+	},
+	"status_effects_summary": {},
+	"stimulant_summary": {
+		"active_stims": [
+			{
+				"base_duration": 20.0,
+				"effects": [
+					"stim_focus"
+				],
+				"item_id": "focus_ampoule",
+				"remaining": 12.0,
+				"withdrawal_effects": [
+					"withdrawal_shakes"
+				]
+			}
+		],
+		"last_used_item": "focus_ampoule"
+	},
+	"temperature_summary": {},
+	"utility_summary": {
+		"active_flags": {
+			"flare": {
+				"count": 1,
+				"item_id": "flare",
+				"note": "Flares mark routes and steady the player in dark corridors."
+			}
+		},
+		"last_item_id": "flare",
+		"last_note": "Flares mark routes and steady the player in dark corridors."
+	},
+	"vitals_summary": {},
+	"water_recycler_summary": {
+		"conversion_ratio": 1.0,
+		"input_item_id": "contaminated_water",
+		"input_quantity": 3,
+		"output_item_id": "purified_water",
+		"output_ready": 0,
+		"power_cost": 5.0,
+		"progress_ratio": 0.4,
+		"progress_seconds": 12.0,
+		"recycle_time_seconds": 30.0,
+		"state": 1
+	},
+	"work_action_summary": {},
+	"world_seed": 0
+}

@@ -1,0 +1,66 @@
+{
+  "name": "world-save",
+  "script": "world_save_service_smoke.gd",
+  "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+  "environment": {
+    "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+    "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+    "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+    "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user"
+  },
+  "probe": {
+    "command": [
+      "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+      "--headless",
+      "--path",
+      "D:\\the-synaptic-sea-feature-completion",
+      "--log-file",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\probe-godot.log",
+      "--user-data-dir",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+      "--script",
+      "res://scripts/validation/fc_p10_process_smoke.gd",
+      "--",
+      "--mode=probe",
+      "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "markers": [
+      "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user"
+    ],
+    "diagnostics": [],
+    "passed": true
+  },
+  "body": {
+    "command": [
+      "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+      "--headless",
+      "--path",
+      "D:\\the-synaptic-sea-feature-completion",
+      "--log-file",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\body-godot.log",
+      "--user-data-dir",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+      "--script",
+      "res://scripts/validation/world_save_service_smoke.gd"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_prefix": "WORLD SAVE SERVICE PASS ",
+    "marker_lines": [
+      "WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true"
+    ],
+    "marker_count": 1,
+    "diagnostics": [],
+    "intentional_injected_diagnostics": false,
+    "expected_diagnostics": [],
+    "diagnostics_classification": "clean",
+    "stdout_bytes": 248,
+    "stderr_bytes": 0,
+    "passed": true
+  },
+  "duration_seconds": 3.125,
+  "passed": true
+}

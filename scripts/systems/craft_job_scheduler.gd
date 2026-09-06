@@ -6,7 +6,7 @@ class_name CraftJobScheduler
 const CraftJobStateScript := preload("res://scripts/systems/craft_job_state.gd")
 const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 
-const SCHEMA: String = "craft-jobs-1"
+const SCHEMA: String = "craft-jobs-2"
 const MAX_QUEUED_PER_STATION: int = 8
 
 var _jobs: Dictionary = {} # job_id -> CraftJobState
@@ -109,6 +109,9 @@ func enqueue(request: Dictionary, context: Dictionary) -> Dictionary:
 		"station_effective_tier": -1,
 		"station_powered_at_start": false,
 		"receipt_emitted": false,
+		"refunded_lots_v1": [],
+		"legacy_unreserved_cancelled_v1": false,
+		"legacy_unrecorded_cancelled_v1": false,
 	}
 	if not job.apply_summary(initial):
 		_restore_lots(inventory, escrow)
@@ -122,6 +125,47 @@ func enqueue(request: Dictionary, context: Dictionary) -> Dictionary:
 	if inventory.has_method("bind_craft_reservation_authority"):
 		inventory.call("bind_craft_reservation_authority", self)
 	return {"ok": true, "reason": "", "job_id": job_id, "state": job.phase}
+
+
+func admit_blocked_unreserved(
+		job_id: String, selected_lot_ids: Dictionary, context: Dictionary) -> Dictionary:
+	var job: RefCounted = _jobs.get(job_id, null) as RefCounted
+	if job == null or str(job.get("phase")) != CraftJobStateScript.PHASE_BLOCKED_UNRESERVED:
+		return _denied("not_blocked_unreserved")
+	var request: Dictionary = {
+		"ship_id": str(job.get("ship_id")),
+		"station_instance_id": str(job.get("station_instance_id")),
+		"station_kind": str(job.get("station_kind")),
+		"recipe_id": str(job.get("recipe_id")),
+		"source_holder_id": str(job.get("source_holder_id")),
+		"selected_lot_ids": selected_lot_ids,
+	}
+	var eligibility: Dictionary = _resolve_request(request, context)
+	if not bool(eligibility.get("ok", false)):
+		return eligibility
+	var inventory: RefCounted = _source_inventory(str(job.get("source_holder_id")), context)
+	if inventory == null:
+		return _denied("missing_source_holder")
+	var recipe: Dictionary = _get_recipe_authority().call("get_recipe", str(job.get("recipe_id")))
+	var ingredients: Dictionary = recipe.get("ingredients", {}) as Dictionary
+	var escrow: Array = []
+	var ingredient_ids: Array = ingredients.keys()
+	ingredient_ids.sort()
+	for item_variant in ingredient_ids:
+		var item_id: String = str(item_variant)
+		var preferred: PackedStringArray = _selected_ids(selected_lot_ids.get(item_id, []))
+		var taken: Array = inventory.call("take_lots", item_id, int(ingredients[item_variant]), preferred)
+		if taken.is_empty():
+			_restore_lots(inventory, escrow)
+			return _denied("missing_materials")
+		for lot_variant in taken:
+			escrow.append((lot_variant as Dictionary).duplicate(true))
+	job.set("ingredient_escrow", escrow)
+	job.set("phase", CraftJobStateScript.PHASE_QUEUED)
+	job.set("blocked_reason", "")
+	if inventory.has_method("bind_craft_reservation_authority"):
+		inventory.call("bind_craft_reservation_authority", self)
+	return {"ok": true, "reason": "", "job_id": job_id, "state": "queued"}
 
 
 ## Advances every station independently. Large catch-up deltas are spent serially
@@ -237,6 +281,9 @@ func cancel(job_id: String, context: Dictionary) -> Dictionary:
 		if not restored:
 			return _denied("refund_failed")
 		job.set("ingredient_escrow", [])
+		job.set("refunded_lots_v1", escrow.duplicate(true))
+		job.set("legacy_unreserved_cancelled_v1", false)
+		job.set("legacy_unrecorded_cancelled_v1", false)
 		job.set("blocked_reason", "")
 		job.set("phase", CraftJobStateScript.PHASE_CANCELLED)
 		_remove_from_owner_queue(job)
@@ -245,6 +292,9 @@ func cancel(job_id: String, context: Dictionary) -> Dictionary:
 	job.set("phase", CraftJobStateScript.PHASE_CANCELLED)
 	job.set("blocked_reason", "")
 	job.set("output_lots", [])
+	job.set("refunded_lots_v1", [])
+	job.set("legacy_unreserved_cancelled_v1", phase == CraftJobStateScript.PHASE_BLOCKED_UNRESERVED)
+	job.set("legacy_unrecorded_cancelled_v1", false)
 	_remove_from_owner_queue(job)
 	_sync_station_projection(owner_station, null)
 	return {"ok": true, "reason": "", "result": "cancelled", "warning": "inputs_forfeited"}
@@ -325,6 +375,9 @@ func acknowledge_refund_recovery(job_id: String, receipt_id: String, context: Di
 		return _denied("receipt_mismatch")
 	var job: RefCounted = _jobs[job_id]
 	job.set("ingredient_escrow", [])
+	job.set("refunded_lots_v1", (peeked.get("refund_lots", []) as Array).duplicate(true))
+	job.set("legacy_unreserved_cancelled_v1", false)
+	job.set("legacy_unrecorded_cancelled_v1", false)
 	job.set("blocked_reason", "")
 	job.set("phase", CraftJobStateScript.PHASE_CANCELLED)
 	_remove_from_owner_queue(job)
@@ -413,6 +466,217 @@ func get_summary_for_ship(ship_id: String) -> Dictionary:
 		if owner_variant is Dictionary and str((owner_variant as Dictionary).get("ship_id", "")) == ship_id:
 			owners.append((owner_variant as Dictionary).duplicate(true))
 	return {"schema": SCHEMA, "jobs": jobs, "owners": owners}
+
+
+## Consumes the P10 structural bridge into the one current scheduler authority.
+## No inventory is touched: the active record is already-paid history and queued
+## intent remains value-free until a separate current admission operation.
+func build_legacy_migration_summary(
+		bridge: Dictionary, ship_id: String, source_holder_id: String) -> Dictionary:
+	if ship_id.is_empty() or source_holder_id.is_empty() \
+			or str(bridge.get("schema", "")) != "legacy-craft-migration-1" \
+			or str(bridge.get("source_version", "")) != "gate2-current-run-4" \
+			or not bridge.get("unreserved_queue", null) is Array:
+		return {}
+	var jobs: Array = []
+	var owner_rows: Dictionary = {}
+	var owner_sequences: Dictionary = {}
+	var paid_v: Variant = bridge.get("paid_active", null)
+	if paid_v != null:
+		if not paid_v is Dictionary:
+			return {}
+		var paid: Dictionary = paid_v
+		var station_kind: String = str(paid.get("station_kind", ""))
+		var station_id: String = "legacy:%s:%s" % [ship_id, station_kind]
+		var job: Dictionary = _legacy_paid_job(paid, ship_id, station_id, source_holder_id, 1)
+		if job.is_empty():
+			return {}
+		jobs.append(job)
+		var owner_key: String = _owner_key(ship_id, station_id)
+		owner_sequences[owner_key] = 1
+		owner_rows[owner_key] = {
+			"ship_id": ship_id, "station_instance_id": station_id,
+			"sequence": 1,
+			"job_ids": [] if str(job.state) in ["output_ready", "collected"] else [str(job.job_id)],
+			"station_kind": station_kind,
+		}
+	var queue: Array = bridge.unreserved_queue
+	var previous_ordinal: int = -1
+	for raw_entry in queue:
+		if not raw_entry is Dictionary:
+			return {}
+		var entry: Dictionary = raw_entry
+		var ordinal: int = _strict_nonnegative_int(entry.get("ordinal", null))
+		var station_kind: String = str(entry.get("station_kind", ""))
+		var recipe_id: String = str(entry.get("recipe_id", ""))
+		if ordinal != previous_ordinal + 1 or station_kind.is_empty() or recipe_id.is_empty():
+			return {}
+		previous_ordinal = ordinal
+		var recipe: Dictionary = _get_recipe_authority().call("get_recipe", recipe_id) \
+			if _get_recipe_authority() != null else {}
+		if recipe.is_empty() or str(recipe.get("station_kind", "")) != station_kind:
+			return {}
+		var station_id: String = "legacy:%s:%s" % [ship_id, station_kind]
+		var owner_key: String = _owner_key(ship_id, station_id)
+		var sequence: int = int(owner_sequences.get(owner_key, 0)) + 1
+		owner_sequences[owner_key] = sequence
+		var job_id: String = "%s/%s/job-%06d" % [ship_id, station_id, sequence]
+		var blocked: Dictionary = {
+			"job_id": job_id, "ship_id": ship_id,
+			"station_instance_id": station_id, "station_kind": station_kind,
+			"recipe_id": recipe_id, "state": "blocked_unreserved", "phase": "blocked_unreserved",
+			"source_holder_id": source_holder_id,
+			"escrow_holder_id": "%s/%s/escrow" % [ship_id, station_id],
+			"ingredient_escrow": [], "consumed_lots": [], "progress": 0.0,
+			"progress_seconds": 0.0, "required_seconds": float(recipe.get("craft_time_seconds", 0.0)),
+			"output_lots": [], "output_receipt_id": "", "sequence": sequence,
+			"blocked_reason": "legacy_unreserved", "input_quality_score": -1.0,
+			"input_skill_level": -1, "station_effective_tier": -1,
+			"station_powered_at_start": false, "receipt_emitted": false,
+			"refunded_lots_v1": [], "legacy_unreserved_cancelled_v1": false,
+			"legacy_unrecorded_cancelled_v1": false,
+		}
+		var blocked_state = CraftJobStateScript.new()
+		if not blocked_state.apply_summary(blocked):
+			return {}
+		jobs.append(blocked)
+		if not owner_rows.has(owner_key):
+			owner_rows[owner_key] = {
+				"ship_id": ship_id, "station_instance_id": station_id,
+				"sequence": sequence, "job_ids": [], "station_kind": station_kind,
+			}
+		owner_rows[owner_key].sequence = sequence
+		owner_rows[owner_key].job_ids.append(job_id)
+	var owners: Array = []
+	var station_projections: Dictionary = {}
+	var sorted_owner_keys: Array = owner_rows.keys()
+	sorted_owner_keys.sort()
+	for owner_key_variant in sorted_owner_keys:
+		var row: Dictionary = owner_rows[owner_key_variant]
+		var station_kind: String = str(row.station_kind)
+		row.erase("station_kind")
+		owners.append(row)
+		var active_job_id: String = str(row.job_ids[0]) if not row.job_ids.is_empty() else ""
+		var active_job: Dictionary = {}
+		for job_variant in jobs:
+			if str((job_variant as Dictionary).job_id) == active_job_id:
+				active_job = job_variant
+				break
+		station_projections[str(owner_key_variant)] = _legacy_station_projection(
+			ship_id, str(row.station_instance_id), station_kind, active_job)
+	var result: Dictionary = {"schema": SCHEMA, "jobs": jobs, "owners": owners}
+	var candidate = get_script().new()
+	candidate.configure_recipe_authority(_get_recipe_authority())
+	if not candidate.apply_summary(result):
+		return {}
+	return {"craft_jobs_v1": result, "physical_station_summaries": station_projections}
+
+
+func _legacy_paid_job(
+		paid: Dictionary, ship_id: String, station_id: String,
+		source_holder_id: String, sequence: int) -> Dictionary:
+	var recipe_id: String = str(paid.get("recipe_id", ""))
+	var recipe: Dictionary = _get_recipe_authority().call("get_recipe", recipe_id) \
+		if _get_recipe_authority() != null else {}
+	var ingredients_v: Variant = recipe.get("ingredients", null)
+	var produces: Dictionary = _get_recipe_authority().call("get_produces", recipe_id) \
+		if _get_recipe_authority() != null else {}
+	if recipe.is_empty() or not ingredients_v is Dictionary or (ingredients_v as Dictionary).is_empty() \
+			or produces.is_empty() or str(recipe.get("station_kind", "")) != str(paid.get("station_kind", "")):
+		return {}
+	var job_id: String = "%s/%s/job-%06d" % [ship_id, station_id, sequence]
+	var consumed: Array = []
+	var history_ingredients: Array = []
+	var item_ids: Array = (ingredients_v as Dictionary).keys()
+	item_ids.sort()
+	var lot_index: int = 0
+	for item_variant in item_ids:
+		var item_id: String = str(item_variant)
+		var quantity: int = _strict_positive_int((ingredients_v as Dictionary)[item_variant])
+		if item_id.is_empty() or quantity <= 0:
+			return {}
+		history_ingredients.append({"item_id": item_id, "quantity": quantity})
+		consumed.append({
+			"lot_id": "%s/legacy-input/%03d" % [job_id, lot_index],
+			"item_id": item_id, "quantity": quantity, "quality_score": 0.5,
+			"quality_tier": "standard", "condition": 1.0,
+			"origin": {
+				"kind": "legacy_consumed_history", "source_version": "gate2-current-run-4",
+				"paid_before_snapshot": true, "metadata_reconstructable": false,
+			},
+		})
+		lot_index += 1
+	var score: float = float(paid.get("quality_score", -1.0))
+	var tier: String = str(paid.get("quality_tier", ""))
+	var progress: float = float(paid.get("progress_seconds", -1.0))
+	var required: float = float(paid.get("required_seconds", -1.0))
+	var legacy_status: int = _strict_nonnegative_int(paid.get("legacy_status", null))
+	if not is_finite(score) or score < 0.0 or score > 1.0 \
+			or tier != QualityTierResolverScript.tier_for_score(score) \
+			or not is_finite(progress) or not is_finite(required) or required <= 0.0 \
+			or progress < 0.0 or progress > required or not [1, 2, 3].has(legacy_status):
+		return {}
+	var output: Dictionary = {
+		"lot_id": "%s/output-1" % job_id,
+		"item_id": str(produces.get("item_id", "")), "quantity": int(produces.get("quantity", 0)),
+		"quality_score": score, "quality_tier": tier, "condition": 1.0,
+		"origin": {
+			"job_id": job_id, "recipe_id": recipe_id, "input_quality_score": score,
+			"input_lot_ids": _lot_ids(consumed), "input_skill_level": 0,
+			"station_effective_tier": 0,
+		},
+	}
+	if str(output.item_id).is_empty() or int(output.quantity) <= 0:
+		return {}
+	var phase: String = "paused_power" if legacy_status == 2 else "running"
+	var receipt_id: String = ""
+	var receipt_emitted: bool = false
+	if legacy_status == 3:
+		phase = "output_ready"
+		progress = required
+		receipt_id = "%s/output" % job_id
+		receipt_emitted = true
+	return {
+		"job_id": job_id, "ship_id": ship_id, "station_instance_id": station_id,
+		"station_kind": str(paid.station_kind), "recipe_id": recipe_id,
+		"state": phase, "phase": phase, "source_holder_id": source_holder_id,
+		"escrow_holder_id": "%s/%s/escrow" % [ship_id, station_id],
+		"ingredient_escrow": [], "consumed_lots": consumed,
+		"progress": progress, "progress_seconds": progress, "required_seconds": required,
+		"output_lots": [output], "output_receipt_id": receipt_id, "sequence": sequence,
+		"blocked_reason": "", "input_quality_score": score, "input_skill_level": 0,
+		"station_effective_tier": 0, "station_powered_at_start": true,
+		"receipt_emitted": receipt_emitted,
+		"refunded_lots_v1": [], "legacy_unreserved_cancelled_v1": false,
+		"legacy_unrecorded_cancelled_v1": false,
+		"legacy_consumed_history_v1": {
+			"schema": "legacy-consumed-history-1", "source_version": "gate2-current-run-4",
+			"paid_before_snapshot": true, "lot_metadata_reconstructable": false,
+			"historical_quality_score": score, "historical_quality_tier": tier,
+			"historical_quality_multiplier": float(paid.get("quality_multiplier", 1.0)),
+			"ingredients": history_ingredients,
+		},
+	}
+
+
+func _legacy_station_projection(
+		ship_id: String, station_id: String, station_kind: String,
+		active_job: Dictionary) -> Dictionary:
+	var status: int = 0
+	match str(active_job.get("state", "")):
+		"running": status = 1
+		"paused_power": status = 2
+		"output_ready", "collected": status = 3
+		"blocked", "blocked_unreserved": status = 4
+	return {
+		"ship_id": ship_id, "station_instance_id": station_id,
+		"active_job_id": str(active_job.get("job_id", "")), "station_kind": station_kind,
+		"level": 0, "tier": 0, "max_queue": 8, "powered": status != 2,
+		"active_recipe_id": str(active_job.get("recipe_id", "")),
+		"progress_seconds": float(active_job.get("progress_seconds", 0.0)),
+		"required_seconds": float(active_job.get("required_seconds", 0.0)),
+		"status": status, "queue": [],
+	}
 
 
 ## Strictly replaces one ship slice while preserving all other ship owners/jobs.
@@ -691,6 +955,9 @@ func _job_matches_recipe_authority(job: RefCounted) -> bool:
 	var phase: String = str(job.get("phase"))
 	var escrow: Array = job.get("ingredient_escrow") as Array
 	var consumed: Array = job.get("consumed_lots") as Array
+	if phase == CraftJobStateScript.PHASE_BLOCKED_UNRESERVED:
+		return escrow.is_empty() and consumed.is_empty() \
+			and (job.get("output_lots") as Array).is_empty()
 	var authoritative_inputs: Array = escrow if bool(job.call("is_unstarted")) else consumed
 	if phase == CraftJobStateScript.PHASE_CANCELLED and authoritative_inputs.is_empty():
 		# An unstarted cancellation has already returned its exact escrow.
@@ -699,7 +966,20 @@ func _job_matches_recipe_authority(job: RefCounted) -> bool:
 		return false
 	var outputs: Array = job.get("output_lots") as Array
 	if phase == CraftJobStateScript.PHASE_CANCELLED:
-		return outputs.is_empty()
+		var refunded: Array = job.get("refunded_lots_v1") as Array
+		var legacy_unreserved: bool = bool(job.get("legacy_unreserved_cancelled_v1"))
+		var legacy_unrecorded: bool = bool(job.get("legacy_unrecorded_cancelled_v1"))
+		if not outputs.is_empty():
+			return false
+		if not consumed.is_empty():
+			# Cancelling after work starts forfeits the exact consumed ingredients.
+			# No refund authority or legacy terminal marker may coexist with them.
+			return refunded.is_empty() and not legacy_unreserved and not legacy_unrecorded
+		if legacy_unreserved or legacy_unrecorded:
+			return refunded.is_empty()
+		# Cancelling before work starts returns the exact escrow lots. Their
+		# immutable identity is linked to the pending receipt by the candidate.
+		return _lots_match_ingredients(refunded, recipe.get("ingredients", {}))
 	if bool(job.call("is_unstarted")):
 		return outputs.is_empty()
 	if outputs.size() != 1:
@@ -709,8 +989,15 @@ func _job_matches_recipe_authority(job: RefCounted) -> bool:
 			or int(output.get("quantity", 0)) != int(produces.get("quantity", 0)):
 		return false
 	var input_quality: float = _weighted_quality(consumed)
+	var legacy_history: Dictionary = job.get("legacy_consumed_history_v1") as Dictionary
+	if not legacy_history.is_empty():
+		input_quality = float(legacy_history.get("historical_quality_score", -1.0))
 	if absf(input_quality - float(job.get("input_quality_score"))) > 0.0001:
 		return false
+	if not legacy_history.is_empty():
+		return absf(float(output.get("quality_score", -1.0)) - input_quality) <= 0.0001 \
+			and str(output.get("quality_tier", "")) \
+				== str(legacy_history.get("historical_quality_tier", ""))
 	var expected: Dictionary = QualityTierResolverScript.new().resolve(
 		input_quality,
 		int(job.get("input_skill_level")),
@@ -922,6 +1209,13 @@ func _denied(reason: String) -> Dictionary:
 
 
 func _strict_nonnegative_int(value: Variant) -> int:
-	if typeof(value) == TYPE_INT:
-		return int(value) if int(value) >= 0 else -1
+	if (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) \
+			and is_finite(float(value)) and float(value) == floor(float(value)) \
+			and float(value) >= 0.0 and float(value) <= 9007199254740991.0:
+		return int(value)
 	return -1
+
+
+func _strict_positive_int(value: Variant) -> int:
+	var parsed: int = _strict_nonnegative_int(value)
+	return parsed if parsed > 0 else -1

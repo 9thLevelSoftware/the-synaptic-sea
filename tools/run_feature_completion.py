@@ -21,6 +21,8 @@ VALIDATION_PLAN = ROOT / "docs/game/06_validation_plan.md"
 REGRESSION_HEADER = "## Regression bundle"
 REGRESSION_MARKER = re.compile(r"^echo (?:'SYNAPTIC_SEA REGRESSION PASS commands=\d+ clean_output=true'|\"SYNAPTIC_SEA REGRESSION PASS commands=\$\{RUN_CLEAN_COUNT\} clean_output=true\")$", re.M)
 DIAGNOSTIC = re.compile(r"^(?:ERROR|WARNING|SCRIPT ERROR):.*$", re.M)
+CONTAINMENT_MARKER_PREFIX = "FC P10 USER DATA PROBE PASS resolved_user="
+CONTAINMENT_SCRIPT = "res://scripts/validation/fc_p10_process_smoke.gd"
 Run = Callable[..., subprocess.CompletedProcess[str]]
 
 
@@ -122,9 +124,84 @@ def _prepared_bundle(body: str) -> str:
     """Instrument the temporary copy so its terminal count is computed, never copied."""
     if "run_clean() {" not in body:
         raise RunnerError("Regression bundle has no recognized run_clean function")
-    if "RUN_CLEAN_COUNT=0" in body and "RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))" in body:
-        return body
-    body = body.replace("run_clean() {", "RUN_CLEAN_COUNT=0\nrun_clean() {\n  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))", 1)
+    if "RUN_CLEAN_COUNT=0" not in body or "RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))" not in body:
+        body = body.replace("run_clean() {", "RUN_CLEAN_COUNT=0\nrun_clean() {\n  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))", 1)
+    capture = '  set +e\n  OUT=$("$@" 2>&1)\n  COMMAND_STATUS=$?\n  set -e'
+    if capture in body and "FEATURE_COMPLETION_CASE_USER_DATA" not in body:
+        isolated_capture = r'''  if [ "$1" = "$GODOT" ]; then
+    FEATURE_COMPLETION_PROBE_SCRIPT="${FEATURE_COMPLETION_PROBE_SCRIPT:-res://scripts/validation/fc_p10_process_smoke.gd}"
+    FEATURE_COMPLETION_CASE_ID=$(printf '%04d' "$RUN_CLEAN_COUNT")
+    FEATURE_COMPLETION_CASE_USER_DATA="$FEATURE_COMPLETION_USER_ROOT/case-$FEATURE_COMPLETION_CASE_ID"
+    FEATURE_COMPLETION_CASE_EVIDENCE="$FEATURE_COMPLETION_EVIDENCE/cases/case-$FEATURE_COMPLETION_CASE_ID"
+    if [ -e "$FEATURE_COMPLETION_CASE_USER_DATA" ] || [ -e "$FEATURE_COMPLETION_CASE_EVIDENCE" ]; then
+      echo "REUSED_GODOT_EVIDENCE in $label"
+      exit 1
+    fi
+    mkdir -p "$FEATURE_COMPLETION_USER_ROOT" "$FEATURE_COMPLETION_EVIDENCE/cases"
+    mkdir "$FEATURE_COMPLETION_CASE_USER_DATA" "$FEATURE_COMPLETION_CASE_EVIDENCE"
+    printf 'APPDATA=%s\nLOCALAPPDATA=%s\nGODOT_USER_PATH=%s\nXDG_DATA_HOME=%s\n' \
+      "$FEATURE_COMPLETION_CASE_USER_DATA" "$FEATURE_COMPLETION_CASE_USER_DATA" \
+      "$FEATURE_COMPLETION_CASE_USER_DATA" "$FEATURE_COMPLETION_CASE_USER_DATA" \
+      > "$FEATURE_COMPLETION_CASE_EVIDENCE/environment.txt"
+    printf '%q ' "$GODOT" --headless --path "$ROOT" --log-file \
+      "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.godot.log" --script \
+      "$FEATURE_COMPLETION_PROBE_SCRIPT" -- --mode=probe \
+      "--user_data=$FEATURE_COMPLETION_CASE_USER_DATA" \
+      > "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.command.txt"
+    printf '\n' >> "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.command.txt"
+    set +e
+    APPDATA="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    LOCALAPPDATA="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    GODOT_USER_PATH="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    XDG_DATA_HOME="$FEATURE_COMPLETION_CASE_USER_DATA" \
+      "$GODOT" --headless --path "$ROOT" \
+      --log-file "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.godot.log" \
+      --script "$FEATURE_COMPLETION_PROBE_SCRIPT" -- --mode=probe \
+      "--user_data=$FEATURE_COMPLETION_CASE_USER_DATA" \
+      > "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stdout.log" \
+      2> "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stderr.log"
+    FEATURE_COMPLETION_PROBE_STATUS=$?
+    set -e
+    printf '%s\n' "$FEATURE_COMPLETION_PROBE_STATUS" \
+      > "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.exit.txt"
+    FEATURE_COMPLETION_PROBE_MARKERS=$(grep -c '^FC P10 USER DATA PROBE PASS resolved_user=' \
+      "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stdout.log" || true)
+    FEATURE_COMPLETION_PROBE_DIAGNOSTICS=$(cat \
+      "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stdout.log" \
+      "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stderr.log" | \
+      grep -E '^(ERROR|WARNING|SCRIPT ERROR):' || true)
+    if [ "$FEATURE_COMPLETION_PROBE_STATUS" -ne 0 ] || \
+       [ "$FEATURE_COMPLETION_PROBE_MARKERS" -ne 1 ] || \
+       [ -s "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stderr.log" ] || \
+       [ -n "$FEATURE_COMPLETION_PROBE_DIAGNOSTICS" ] || \
+       ! grep -Fq " root=$FEATURE_COMPLETION_CASE_USER_DATA" \
+         "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stdout.log"; then
+      cat "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stdout.log"
+      cat "$FEATURE_COMPLETION_CASE_EVIDENCE/probe.stderr.log"
+      echo "CONTAINMENT_PROBE_FAILED in $label"
+      exit 1
+    fi
+    printf '%q ' "$@" > "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.command.txt"
+    printf '\n' >> "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.command.txt"
+    set +e
+    APPDATA="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    LOCALAPPDATA="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    GODOT_USER_PATH="$FEATURE_COMPLETION_CASE_USER_DATA" \
+    XDG_DATA_HOME="$FEATURE_COMPLETION_CASE_USER_DATA" \
+      "$@" > "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.stdout.log" \
+      2> "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.stderr.log"
+    COMMAND_STATUS=$?
+    set -e
+    printf '%s\n' "$COMMAND_STATUS" > "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.exit.txt"
+    OUT=$(cat "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.stdout.log" \
+      "$FEATURE_COMPLETION_CASE_EVIDENCE/smoke.stderr.log")
+  else
+    set +e
+    OUT=$("$@" 2>&1)
+    COMMAND_STATUS=$?
+    set -e
+  fi'''
+        body = body.replace(capture, isolated_capture, 1)
     return REGRESSION_MARKER.sub('echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"', body)
 
 
@@ -151,6 +228,70 @@ def _environment(user_data: Path) -> dict[str, str]:
     return env
 
 
+def _prepare_evidence_root(evidence: Path) -> None:
+    if evidence.exists() and any(evidence.iterdir()):
+        raise RunnerError("evidence directory must be a new empty unique directory")
+    evidence.mkdir(parents=True, exist_ok=True)
+
+
+def _prepare_owned_home(user_data: Path) -> None:
+    if user_data.exists():
+        raise RunnerError(f"owned Godot user-data directory already exists: {user_data}")
+    user_data.mkdir(parents=True)
+
+
+def _execute_containment_probe(label: str, godot: Path, evidence: Path,
+                               user_data: Path, run: Run = subprocess.run,
+                               timeout: float = 30.0) -> dict[str, Any]:
+    stem = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "case"
+    command = [str(godot), "--headless", "--path", str(ROOT),
+               "--log-file", str(evidence / f"{stem}.probe.godot.log"),
+               "--script", CONTAINMENT_SCRIPT, "--", "--mode=probe",
+               f"--user_data={user_data}"]
+    environment = _environment(user_data)
+    started = time.monotonic()
+    stdout, stderr, exit_code, timed_out, cleanup_error = _capture(
+        command, cwd=ROOT, env=environment, timeout=timeout, run=run)
+    stdout_name = f"{stem}.probe.stdout.log"
+    stderr_name = f"{stem}.probe.stderr.log"
+    (evidence / stdout_name).write_text(stdout, encoding="utf-8")
+    (evidence / stderr_name).write_text(stderr, encoding="utf-8")
+    (evidence / f"{stem}.probe.command.txt").write_text(
+        subprocess.list2cmdline(command) + "\n", encoding="utf-8")
+    (evidence / f"{stem}.probe.environment.json").write_text(
+        json.dumps({key: environment[key] for key in
+                    ("APPDATA", "LOCALAPPDATA", "GODOT_USER_PATH", "XDG_DATA_HOME")},
+                   indent=2) + "\n", encoding="utf-8")
+    marker_lines = [line for line in stdout.splitlines()
+                    if line.startswith(CONTAINMENT_MARKER_PREFIX)]
+    expected_roots = {str(user_data), str(user_data).replace("\\", "/")}
+    resolved_owned = len(marker_lines) == 1 and any(
+        f" root={expected}" in marker_lines[0] for expected in expected_roots)
+    diagnostics = _diagnostics(stdout, stderr)
+    unexpected_stdout = [line for line in stdout.splitlines() if line and not line.startswith(
+        ("Godot Engine ", "Initialize godot-rust", CONTAINMENT_MARKER_PREFIX))]
+    unexpected_stderr = [line for line in stderr.splitlines() if line]
+    passed = (exit_code == 0 and not timed_out and not cleanup_error
+              and resolved_owned and not diagnostics and not unexpected_stdout
+              and not unexpected_stderr)
+    return {
+        "passed": passed,
+        "reason": "passed" if passed else "containment probe failed",
+        "exit_code": exit_code,
+        "timed_out": timed_out,
+        "cleanup_error": cleanup_error,
+        "duration_seconds": round(time.monotonic() - started, 6),
+        "marker_count": len(marker_lines),
+        "resolved_user_data": marker_lines[0] if len(marker_lines) == 1 else "",
+        "expected_root": str(user_data),
+        "diagnostics": diagnostics,
+        "unexpected_stdout": unexpected_stdout,
+        "unexpected_stderr": unexpected_stderr,
+        "stdout_log": stdout_name,
+        "stderr_log": stderr_name,
+    }
+
+
 def execute_case(case: dict[str, Any], godot: Path, evidence: Path, user_data: Path,
                  run: Run = subprocess.run, timeout: float = 120.0) -> dict[str, Any]:
     script = ROOT / case["script"]
@@ -162,7 +303,8 @@ def execute_case(case: dict[str, Any], godot: Path, evidence: Path, user_data: P
     if not script.is_file():
         result.update({"passed": False, "reason": "missing script", "duration_seconds": 0.0})
     else:
-        command = [str(godot), "--headless", "--path", str(ROOT), "--user-data-dir", str(user_data), "--script", "res://" + case["script"]]
+        command = [str(godot), "--headless", "--path", str(ROOT),
+                   "--script", "res://" + case["script"]]
         stdout, stderr, exit_code, timeout_hit, cleanup_error = _capture(command, cwd=ROOT, env=_environment(user_data), timeout=timeout, run=run)
         diagnostics = _diagnostics(stdout, stderr)
         marker_found = case["marker"] in stdout.splitlines()
@@ -175,6 +317,31 @@ def execute_case(case: dict[str, Any], godot: Path, evidence: Path, user_data: P
     (evidence / f"{stem}.stdout.log").write_text(stdout, encoding="utf-8")
     (evidence / f"{stem}.stderr.log").write_text(stderr, encoding="utf-8")
     result.update({"stdout_log": f"{stem}.stdout.log", "stderr_log": f"{stem}.stderr.log"})
+    return result
+
+
+def execute_isolated_case(case: dict[str, Any], godot: Path, evidence: Path,
+                          user_data: Path, run: Run = subprocess.run,
+                          timeout: float = 120.0) -> dict[str, Any]:
+    _prepare_owned_home(user_data)
+    probe = _execute_containment_probe(
+        case["id"], godot, evidence, user_data, run=run,
+        timeout=min(timeout, 30.0))
+    if not probe["passed"]:
+        return {
+            "id": case["id"],
+            "scope": case["scope"],
+            "script": case["script"],
+            "marker": case["marker"],
+            "player_accepted": False,
+            "passed": False,
+            "reason": "containment probe failed",
+            "containment_probe": probe,
+        }
+    result = execute_case(
+        case, godot, evidence, user_data, run=run, timeout=timeout)
+    result["containment_probe"] = probe
+    result["user_data_dir"] = str(user_data)
     return result
 
 
@@ -216,7 +383,10 @@ def execute_bundle(godot: Path, evidence: Path, user_data: Path, run: Run = subp
     temp.write_text(_prepared_bundle(body), encoding="utf-8", newline="\n")
     shim_dir, python_executable = _canonical_python_shim(evidence)
     env = {**_environment(user_data), "ROOT": str(ROOT), "GODOT": str(godot),
-           "FEATURE_COMPLETION_PYTHON": str(python_executable)}
+           "FEATURE_COMPLETION_PYTHON": str(python_executable),
+           "FEATURE_COMPLETION_USER_ROOT": user_data.as_posix(),
+           "FEATURE_COMPLETION_EVIDENCE": evidence.as_posix(),
+           "FEATURE_COMPLETION_PROBE_SCRIPT": CONTAINMENT_SCRIPT}
     env["PATH"] = str(shim_dir) + os.pathsep + env.get("PATH", "")
     started = time.monotonic()
     stdout, stderr, exit_code, timed_out, cleanup_error = _capture([bash, str(temp)], cwd=ROOT,
@@ -246,22 +416,37 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not args.godot.is_file():
         parser.error(f"--godot does not name a file: {args.godot}")
-    evidence = args.evidence_dir.resolve(); evidence.mkdir(parents=True, exist_ok=True)
-    user_data = evidence / "user-data"; user_data.mkdir(exist_ok=True)
-    summary: dict[str, Any] = {"metadata": metadata(args.godot), "user_data_dir": str(user_data), "results": []}
+    evidence = args.evidence_dir.resolve()
+    try:
+        _prepare_evidence_root(evidence)
+    except RunnerError as error:
+        print(f"feature completion FAIL: {error}", file=sys.stderr)
+        return 1
+    user_data_root = evidence / "user-data"
+    user_data_root.mkdir()
+    summary: dict[str, Any] = {"metadata": metadata(args.godot),
+                               "user_data_root": str(user_data_root), "results": []}
     try:
         cases = load_cases()
         if args.case:
             lookup = {case["id"]: case for case in cases}
             if args.case not in lookup:
                 raise RunnerError(f"unknown or unregistered case: {args.case}")
-            summary["results"].append(execute_case(lookup[args.case], args.godot, evidence, user_data))
+            summary["results"].append(execute_isolated_case(
+                lookup[args.case], args.godot, evidence,
+                user_data_root / args.case.lower()))
         else:
             if args.profile in ("baseline", "all"):
-                summary["results"].append(execute_bundle(args.godot, evidence, user_data, timeout=args.bundle_timeout))
+                baseline_root = user_data_root / "baseline"
+                baseline_root.mkdir()
+                summary["results"].append(execute_bundle(
+                    args.godot, evidence, baseline_root,
+                    timeout=args.bundle_timeout))
             if args.profile != "baseline":
                 wanted = cases if args.profile == "all" else [c for c in cases if c["profile"] == args.profile]
-                summary["results"].extend(execute_case(case, args.godot, evidence, user_data) for case in wanted)
+                summary["results"].extend(execute_isolated_case(
+                    case, args.godot, evidence,
+                    user_data_root / case["id"].lower()) for case in wanted)
     except RunnerError as error:
         summary["runner_error"] = str(error)
     summary["passed"] = not summary.get("runner_error") and bool(summary["results"]) and all(r["passed"] for r in summary["results"])

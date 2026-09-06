@@ -11,13 +11,17 @@ const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_p
 const PlayerProgressionStateScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
-const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
+const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
 const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
 const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
 const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
+const ThreatManagerScript := preload("res://scripts/systems/threat_manager.gd")
+const P10_WORLD_FIXTURE_PATH: String = \
+	"res://tests/fixtures/feature_completion/p10_world_v5_transactional.json"
+const SMOKE_RUN_ID: String = "save-load-service-smoke"
 
 func _initialize() -> void:
 	# Direct service smoke (REQ-012).
@@ -28,6 +32,7 @@ func _initialize() -> void:
 	# spec contract.
 
 	var service := SaveLoadServiceScript.new()
+	service.set_active_run_id(SMOKE_RUN_ID)
 	service.delete_current_run()
 
 	# Build real model instances and seed them with a known state.
@@ -52,7 +57,7 @@ func _initialize() -> void:
 	# the runtime number (not just the default).
 	oxygen.tick(2.0, true)
 
-	var inventory := InventoryStateScript.new()
+	var inventory := InventoryStateScript.new("player:%s" % SMOKE_RUN_ID)
 	inventory.add_tool("portable_oxygen_pump")
 
 	# M7-B Task 7: the old timer FireState is retired. The RunSnapshot still
@@ -87,6 +92,11 @@ func _initialize() -> void:
 	original.route_control_summary = route.get_summary()
 	original.oxygen_summary = oxygen.get_summary()
 	original.inventory_summary = inventory.get_summary()
+	# Current run v6 owns a complete combat manager even before an encounter.
+	# An initialized-empty summary is authoritative and must round-trip without
+	# spawning or being mistaken for legacy absence.
+	original.inventory_summary["threat_summary"] = _empty_threat_summary()
+	original.inventory_summary["combat_hotbar_text"] = "Weapon: Unarmed"
 	original.fire_summary = fire_summary
 	original.electrical_arc_summary = arc.get_summary()
 	original.objective_progress_summary = progress.get_summary()
@@ -108,19 +118,20 @@ func _initialize() -> void:
 	original.addiction_summary = {"profiles": {"focus_ampoule": {"tolerance": 0.4, "dependence": 1.2, "withdrawal_remaining": 8.0, "withdrawal_duration": 28.0, "withdrawal_effects": ["withdrawal_shakes"]}}}
 	original.ammo_summary = {"reserves": {"pistol": 12}, "last_ammo_kind": "pistol", "total_consumed": 0}
 	original.utility_summary = {"last_item_id": "flare", "last_note": "Flares mark routes and steady the player in dark corridors.", "active_flags": {"flare": {"item_id": "flare", "note": "Flares mark routes and steady the player in dark corridors.", "count": 1}}}
-	var crafting := CraftingStateScript.new()
-	var materials := MaterialStateScript.new()
-	var craft_inv := InventoryStateScript.new()
-	craft_inv.add_item("scrap_metal", 3)
-	craft_inv.add_item("wiring_bundle", 4)
-	craft_inv.add_item("reactive_gel", 2)
-	materials.set_quality("scrap_metal", 0.8)
-	materials.set_quality("wiring_bundle", 0.7)
-	materials.set_quality("reactive_gel", 0.9)
-	assert(crafting.begin_craft("craft_power_cell", craft_inv, materials, 2), "crafting smoke fixture should start")
-	crafting.tick(10.0)
-	original.crafting_summary = crafting.get_summary()
-	original.material_summary = materials.get_summary()
+	# Use the canonical initialized-empty transactional owner. The prior running
+	# job consumed lots from a separate anonymous inventory that was never part
+	# of this world envelope, making the fixture itself an unclosed owner graph.
+	var current_crafting := CraftingStateScript.new()
+	var current_field_crafting := FieldCraftingStateScript.new()
+	original.crafting_summary = current_crafting.get_summary()
+	original.crafting_summary["physical_station_positions_v1"] = {
+		"schema": "physical-station-positions-1", "owners": [],
+	}
+	original.crafting_summary["field_crafting"] = (
+		current_field_crafting.get_summary().field_crafting as Dictionary).duplicate(true)
+	# Item lots are the current quality authority; the candidate intentionally
+	# retires the former parallel material-quality projection.
+	original.material_summary = {}
 	# Session 3 B3 (audit): HallucinationDirector state (active events, rng
 	# step, tier teeth) was never persisted. Build a director in a real
 	# mid-hallucination state (tier 3, active events with Vector3 anchors)
@@ -165,7 +176,6 @@ func _initialize() -> void:
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
-
 	if not service.save_current_run(original):
 		_fail("save_current_run returned false")
 		return
@@ -322,37 +332,25 @@ func _initialize() -> void:
 		_fail("status effects count=%d expected 2" % int(loaded.status_effects_summary.get("count", 0)))
 		return
 
-	# Version mismatch rejection: write a snapshot with the wrong slice_version
-	# and confirm load returns null instead of accepting it.
-	var bad := RunSnapshotScript.new()
-	bad.slice_version = "incompatible-version"
-	bad.godot_version = Engine.get_version_info()["string"]
-	bad.layout_path = original.layout_path
-	bad.current_objective_sequence = 1
-	bad.ship_systems_summary = ship.get_summary()
-	bad.route_control_summary = route.get_summary()
-	bad.oxygen_summary = oxygen.get_summary()
-	bad.inventory_summary = inventory.get_summary()
-	bad.fire_summary = fire_summary
-	bad.electrical_arc_summary = arc.get_summary()
-	bad.objective_progress_summary = progress.get_summary()
-	bad.audio_summary = original.audio_summary
-	# ADR-0034: add food summaries
-	bad.spoilage_summary = original.spoilage_summary
-	bad.hydroponics_summary = original.hydroponics_summary
-	bad.water_recycler_summary = original.water_recycler_summary
-	bad.consumable_summary = original.consumable_summary
-	bad.medicine_summary = original.medicine_summary
-	bad.stimulant_summary = original.stimulant_summary
-	bad.addiction_summary = original.addiction_summary
-	bad.ammo_summary = original.ammo_summary
-	bad.utility_summary = original.utility_summary
-	bad.crafting_summary = original.crafting_summary
-	bad.material_summary = original.material_summary
-	# save_current_run should accept the snapshot (it is well-formed JSON);
-	# load_current_run must reject it because of the slice_version mismatch.
-	if not service.save_current_run(bad):
-		_fail("saving incompatible-version snapshot failed unexpectedly")
+	# Version mismatch rejection begins with another schema-valid current save,
+	# then mutates only the embedded run version on disk. The write boundary
+	# canonicalizes live captures to the current version, so constructing a live
+	# object with an incompatible marker would not exercise the load gate.
+	if not service.save_current_run(loaded):
+		_fail("saving current version-gate fixture failed")
+		return
+	var incompatible_v: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(SaveLoadServiceScript.SAVE_PATH))
+	if not incompatible_v is Dictionary \
+			or not (incompatible_v as Dictionary).get("home_ship", null) is Dictionary:
+		_fail("current version-gate fixture did not decode as a world envelope")
+		return
+	var incompatible: Dictionary = (incompatible_v as Dictionary).duplicate(true)
+	incompatible.home_ship["slice_version"] = "incompatible-version"
+	if not _write_text(
+			SaveLoadServiceScript.SAVE_PATH,
+			JSON.stringify(incompatible, "\t", false, true)):
+		_fail("could not write incompatible embedded run fixture")
 		return
 	var rejected: RunSnapshot = service.load_current_run()
 	if rejected != null:
@@ -370,14 +368,10 @@ func _initialize() -> void:
 	var resolver = resolver_script.new()
 	resolver.clear_death("world")
 	var world_script := load("res://scripts/systems/world_snapshot.gd")
-	var ws = world_script.new()
-	ws.world_summary = {"world_seed": 5, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["2:0:1"]}
-	ws.home_ship = {"slice_version": "gate2-current-run-1"}
-	ws.slice_version = world_script.WORLD_SLICE_VERSION
-	ws.godot_version = Engine.get_version_info()["string"]
-	ws.saved_at = "2026-06-21T00:00:00"
-	if not service.save_world(ws):
-		_fail("save_world failed while seeding the permadeath-gate assertion")
+	# The permadeath check runs before parsing. Seed inert bytes directly so this
+	# assertion does not depend on constructing an unrelated coherent world.
+	if not _write_text(SaveLoadServiceScript.WORLD_SLOT_FILE, "{}"):
+		_fail("could not seed the permadeath-gate assertion")
 		return
 	resolver.record_death("world", "death", "test epitaph", 12.0, 1)
 	if service.load_world() != null:
@@ -392,18 +386,11 @@ func _initialize() -> void:
 	# PR #64 Codex P2: a future world save from a newer build is not corrupt.
 	# The older build must refuse to load it, but leave world.json intact so
 	# the newer build can still use it after sync/downgrade churn.
-	var future_world = world_script.new()
-	future_world.world_summary = {"world_seed": 99, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["future"]}
-	future_world.home_ship = {"slice_version": SaveLoadServiceScript.CURRENT_SLICE_VERSION}
-	future_world.slice_version = world_script.WORLD_SLICE_VERSION
-	future_world.godot_version = Engine.get_version_info()["string"]
-	future_world.saved_at = "2026-07-07T00:00:00"
-	if not service.save_world(future_world):
-		_fail("future world preserve: save_world fixture failed")
-		return
-	var future_dict: Dictionary = future_world.to_dict()
-	future_dict["slice_version"] = "world-99"
-	future_dict["future_sentinel"] = "keep_me"
+	var future_dict: Dictionary = {
+		"slice_version": "world-99",
+		"future_sentinel": "keep_me",
+		"home_ship": {"slice_version": "gate2-current-run-99"},
+	}
 	var future_file := FileAccess.open(SaveLoadServiceScript.WORLD_SLOT_FILE, FileAccess.WRITE)
 	if future_file == null:
 		_fail("future world preserve: could not overwrite world fixture")
@@ -421,24 +408,31 @@ func _initialize() -> void:
 		_fail("future world preserve: world.json contents were not preserved")
 		return
 
-	# PR #64 Codex P1: the outer world schema stayed at world-4 while the
-	# embedded home RunSnapshot schema advanced to gate2-current-run-4.
-	# load_world() must still migrate that inner home slice.
-	var stale_home_world = world_script.new()
-	stale_home_world.world_summary = {"world_seed": 100, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["stale-home"]}
-	stale_home_world.home_ship = {"slice_version": "gate2-current-run-3", "player_position": [1.0, 0.0, 2.0]}
-	stale_home_world.slice_version = world_script.WORLD_SLICE_VERSION
-	stale_home_world.godot_version = Engine.get_version_info()["string"]
-	stale_home_world.saved_at = "2026-07-07T00:01:00"
-	if not service.save_world(stale_home_world):
-		_fail("current world home migration: save_world fixture failed")
+	# Historical world-4 legitimately paired with run v3. Start from the
+	# checked-in complete world fixture, backstamp that exact historical pair,
+	# and remove current combat so the recognized legacy bootstrap owns it.
+	var stale_home_world_v: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(P10_WORLD_FIXTURE_PATH))
+	if not stale_home_world_v is Dictionary:
+		_fail("historical world fixture did not parse")
+		return
+	var stale_home_world: Dictionary = (stale_home_world_v as Dictionary).duplicate(true)
+	stale_home_world["slice_version"] = "world-4"
+	stale_home_world["godot_version"] = Engine.get_version_info()["string"]
+	stale_home_world.home_ship["slice_version"] = "gate2-current-run-3"
+	stale_home_world.home_ship["godot_version"] = Engine.get_version_info()["string"]
+	stale_home_world.home_ship.inventory_summary.erase("threat_summary")
+	if not _write_text(
+			SaveLoadServiceScript.WORLD_SLOT_FILE,
+			JSON.stringify(stale_home_world, "\t", false, true)):
+		_fail("historical world home migration fixture write failed")
 		return
 	var stale_loaded = service.load_world()
 	if stale_loaded == null:
-		_fail("current world home migration: load_world returned null")
+		_fail("historical world home migration: load_world returned null")
 		return
 	if str(stale_loaded.home_ship.get("slice_version", "")) != SaveLoadServiceScript.CURRENT_SLICE_VERSION:
-		_fail("current world home migration: home_ship slice_version='%s' expected '%s'" % [str(stale_loaded.home_ship.get("slice_version", "")), SaveLoadServiceScript.CURRENT_SLICE_VERSION])
+		_fail("historical world home migration: home_ship slice_version='%s' expected '%s'" % [str(stale_loaded.home_ship.get("slice_version", "")), SaveLoadServiceScript.CURRENT_SLICE_VERSION])
 		return
 	service.delete_current_run()
 
@@ -450,12 +444,19 @@ func _initialize() -> void:
 	resolver.clear_death("world")
 
 	service.set_active_run_id("A")
-	var stamp_snap := RunSnapshotScript.new()
-	stamp_snap.layout_path = original.layout_path
-	stamp_snap.kit_path = original.kit_path
-	stamp_snap.gameplay_slice_path = original.gameplay_slice_path
-	stamp_snap.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
-	stamp_snap.godot_version = Engine.get_version_info()["string"]
+	var stamp_snap: RunSnapshot = RunSnapshotScript.from_dict(
+		original.to_dict(), SaveLoadServiceScript.CURRENT_SLICE_VERSION,
+		Engine.get_version_info()["string"])
+	if stamp_snap == null:
+		_fail("run_id stamp: complete current fixture failed to decode")
+		return
+	# This second capture belongs to run A, so every embedded owner identity must
+	# agree before the service stamps and validates the world envelope.
+	stamp_snap.inventory_summary = InventoryStateScript.new("player:A").get_summary()
+	stamp_snap.inventory_summary["threat_summary"] = _empty_threat_summary()
+	stamp_snap.inventory_summary["combat_hotbar_text"] = "Weapon: Unarmed"
+	stamp_snap.recipe_knowledge_summary["owner_id"] = "player:A"
+	stamp_snap.run_id = "A"
 	if not service.save_to_slot("slot_01", stamp_snap, "manual", false, "Manual Save"):
 		_fail("run_id stamp: save_to_slot(slot_01) under run A should succeed")
 		return
@@ -549,8 +550,19 @@ func _initialize() -> void:
 	service.delete_slot("slot_01")
 	service.set_active_run_id("")
 
+	call_deferred("_finish_success")
+
+
+func _finish_success() -> void:
 	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true")
 	quit(0)
+
+
+func _empty_threat_summary() -> Dictionary:
+	var manager = ThreatManagerScript.new()
+	var summary: Dictionary = manager.get_summary()
+	manager.free()
+	return summary
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:
 	var ss = load("res://scripts/systems/spoilage_state.gd").new()
@@ -642,6 +654,16 @@ func _dicts_equal(a: Dictionary, b: Dictionary) -> bool:
 	# values match semantically; cast both sides through float() before
 	# comparing.
 	return JSON.stringify(_normalize(a)) == JSON.stringify(_normalize(b))
+
+
+func _write_text(path: String, text: String) -> bool:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(text)
+	file.close()
+	return true
 
 func _normalize(value: Variant) -> Variant:
 	if typeof(value) == TYPE_DICTIONARY:

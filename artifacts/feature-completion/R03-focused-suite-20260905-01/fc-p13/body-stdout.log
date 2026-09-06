@@ -1,0 +1,10 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP SAVED location= sequence=1
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP LOADED sequence=1 position=(24.00,4.12,0.00)
+FC P13 FAIL: recognized legacy access omission rejected: { "ok": false, "reason": "legacy_combat_has_schema", "source_path": "user://saves/world.json", "source_sha256": "9649608fb3b0275ffb1a9e9be03b420d4eff22ed06a974e63ff56a3fe883bd81" }

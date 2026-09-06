@@ -1,13 +1,12 @@
 extends Area3D
 class_name CraftingStation
 
-## A spatial, range-gated crafting/salvage station bound to a station_kind on the home
-## ship. Interaction hands work to the coordinator-owned models:
+## A spatial, range-gated crafting/salvage station bound to one exact ship/station
+## owner. Interaction hands work to the coordinator-owned models:
 ##  - a normal station (fabricator/medbay/kitchen/synthesizer/workbench) requests the
 ##    recipe picker (REQ-CS-016); the player chooses a recipe, then try_craft_recipe
-##    begins it via CraftingState (the coordinator ticks the global craft to completion
-##    and deposits the output — this node does NOT channel in _process, unlike RepairPoint,
-##    because CraftingState is single-active and ticked globally).
+##    begins it via CraftingState. CraftJobScheduler owns each physical station queue;
+##    this node does not channel in _process, unlike RepairPoint.
 ##  - a "salvage" station opens the same picker with deconstruct + junk targets
 ##    (REQ-CS-017); try_salvage_target runs DeconstructionResolver (instantaneous).
 ## Never advances crafting itself; it only starts work and reports it. Mirrors the
@@ -21,12 +20,18 @@ signal pending_output_collected(station_kind: String, result: Dictionary)
 signal station_destruction_requested(ship_id: String, station_instance_id: String, local_position: Vector3)
 ## REQ-CS-016: non-salvage interact opens the coordinator recipe picker for this kind.
 signal recipe_picker_requested(station_kind: String)
+## Physical stations retain their ship + authored placement identity through the
+## picker. The kind-only signal remains for older isolated consumers.
+signal recipe_picker_context_requested(station_kind: String, ship_id: String, station_instance_id: String, binding_generation: int)
 
 const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 
 var station_kind: String = ""
 var ship_id: String = ""
 var station_instance_id: String = ""
+## Captured from the live ShipInstance when this scene node was built. The
+## coordinator checks it again before it routes an owner-scoped picker request.
+var binding_generation: int = -1
 var crafting_state                       # CraftingState
 var material_state                       # MaterialState
 var inventory_state                      # InventoryState
@@ -55,7 +60,7 @@ func _ready() -> void:
 	if not body_exited.is_connected(_on_body_exited):
 		body_exited.connect(_on_body_exited)
 
-func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8, p_recipe_knowledge = null, p_ship_id: String = "", p_station_instance_id: String = "", p_pending_output_store = null) -> void:
+func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8, p_recipe_knowledge = null, p_ship_id: String = "", p_station_instance_id: String = "", p_pending_output_store = null, p_binding_generation: int = -1) -> void:
 	# Debug-build guards for the required dependencies (player_progression is intentionally
 	# optional — _player_skill() null-guards it, mirroring repair_point.gd).
 	assert(p_crafting_state != null, "p_crafting_state must not be null")
@@ -66,6 +71,7 @@ func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inv
 	station_kind = p_station_kind
 	ship_id = p_ship_id
 	station_instance_id = p_station_instance_id
+	binding_generation = p_binding_generation
 	crafting_state = p_crafting_state
 	material_state = p_material_state
 	inventory_state = p_inventory_state
@@ -118,16 +124,6 @@ func try_interact(player_body: Node) -> bool:
 		return false
 	if not _is_player_in_direct_range(player_body):
 		return false
-	if _has_pending_output():
-		var collected: Dictionary = collect_pending_output()
-		if int(collected.get("transferred", 0)) <= 0:
-			emit_signal("craft_blocked", station_kind, "output_full")
-		return true
-	# Single active craft (CraftingState holds one global _active_craft): if one is already
-	# running, this station blocks with feedback and consumes interact (no fall-through).
-	if _is_this_station_busy():
-		emit_signal("craft_blocked", station_kind, "busy")
-		return true
 	# Stream F: medbay field surgery when the patient is critical (before crafts).
 	if station_kind == "medbay" and surgery_provider != null \
 			and surgery_provider.has_method("try_medbay_surgery"):
@@ -135,6 +131,7 @@ func try_interact(player_body: Node) -> bool:
 			return true
 	# REQ-CS-016 / REQ-CS-017: open the recipe/salvage picker (no auto-select).
 	emit_signal("recipe_picker_requested", station_kind)
+	emit_signal("recipe_picker_context_requested", station_kind, ship_id, station_instance_id, binding_generation)
 	return true
 
 ## Explicit craft for a chosen recipe_id (picker confirm + validation seams).
@@ -142,9 +139,6 @@ func try_interact(player_body: Node) -> bool:
 func try_craft_recipe(recipe_id: String) -> bool:
 	if recipe_id.is_empty() or crafting_state == null or inventory_state == null:
 		emit_signal("craft_blocked", station_kind, "no_craftable_recipe")
-		return false
-	if _is_this_station_busy():
-		emit_signal("craft_blocked", station_kind, "busy")
 		return false
 	if crafting_state.get_station_kind(recipe_id) != station_kind:
 		emit_signal("craft_blocked", station_kind, "wrong_station")
@@ -162,12 +156,19 @@ func try_craft_recipe(recipe_id: String) -> bool:
 	if crafting_state.get_required_skill_level(recipe_id) > _player_skill():
 		emit_signal("craft_blocked", station_kind, "insufficient_skill")
 		return false
-	if crafting_state.begin_craft(
+	var accepted: bool = false
+	if _is_this_station_busy() and crafting_state.has_method("enqueue_craft"):
+		accepted = int(crafting_state.call(
+			"enqueue_craft", recipe_id, 1, recipe_knowledge, inventory_state,
+			material_state, _player_skill(), ship_id, station_instance_id)) == 1
+	else:
+		accepted = bool(crafting_state.begin_craft(
 			recipe_id, inventory_state, material_state, _player_skill(), recipe_knowledge,
-			ship_id, station_instance_id):
+			ship_id, station_instance_id))
+	if accepted:
 		emit_signal("craft_started", station_kind, recipe_id)
 		return true
-	emit_signal("craft_blocked", station_kind, "begin_failed")
+	emit_signal("craft_blocked", station_kind, "queue_full" if _is_this_station_busy() else "begin_failed")
 	return false
 
 
@@ -318,6 +319,11 @@ func _interaction_radius() -> float:
 	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:
 		return (collision_shape.shape as SphereShape3D).radius
 	return interaction_radius
+
+## Public predicate used by the coordinator's owner/generation preflight. Panel
+## actions re-run this predicate instead of trusting the range observed at open.
+func is_player_in_range(player_body: Node) -> bool:
+	return _is_player_in_direct_range(player_body)
 
 func _is_player_in_direct_range(player_body: Node) -> bool:
 	if not is_instance_valid(player_body) or not (player_body is Node3D):

@@ -1,0 +1,16 @@
+{
+	"saved_at": "2026-09-05T16:17:12",
+	"schema": "unlock-registry-1",
+	"unlocked": {
+		"class_unlock_salvage_captain": true,
+		"class_unlock_signal_specialist": true,
+		"codex_astrogation_intro": true,
+		"codex_leadership_intro": true,
+		"codex_negotiation_intro": true,
+		"codex_piloting_intro": true,
+		"codex_repair_intro": true,
+		"codex_scavenging_intro": true,
+		"codex_signal_intro": true,
+		"hub_scene_reactor": true
+	}
+}

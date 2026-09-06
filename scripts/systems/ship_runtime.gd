@@ -66,9 +66,11 @@ func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 		contact_boost_provider = provider as Callable
 	else:
 		contact_boost_provider = Callable()
-	var mi: Variant = opts.get("module_integrity", null)
+	var mi: Variant = opts.get("module_integrity",
+		ship.call("get_live_module_integrity") if ship != null and ship.has_method("get_live_module_integrity") else null)
 	module_integrity = mi as RefCounted if mi is RefCounted else null
-	var cp: Variant = opts.get("component_placement", null)
+	var cp: Variant = opts.get("component_placement",
+		ship.call("get_live_component_placement") if ship != null and ship.has_method("get_live_component_placement") else null)
 	component_placement = cp as RefCounted if cp is RefCounted else null
 	var scheduler_opt: Variant = opts.get("craft_job_scheduler", null)
 	craft_job_scheduler = scheduler_opt as RefCounted if scheduler_opt is RefCounted else null
@@ -228,9 +230,9 @@ func to_snapshot() -> Dictionary:
 func from_snapshot(data: Dictionary) -> bool:
 	if ship == null or data.is_empty():
 		return false
+	var restore_ship_id: String = str(ship.get("ship_id"))
 	if data.has("craft_jobs_v1"):
 		var strict_jobs: Variant = data.get("craft_jobs_v1", null)
-		var restore_ship_id: String = str(ship.get("ship_id"))
 		if not _valid_current_craft_snapshot(data, restore_ship_id) \
 				or craft_job_scheduler == null \
 				or not craft_job_scheduler.has_method("merge_summary_for_ship") \
@@ -257,7 +259,7 @@ func from_snapshot(data: Dictionary) -> bool:
 		if typeof(cp) == TYPE_DICTIONARY:
 			var cp_dict: Dictionary = cp as Dictionary
 			if component_placement != null and component_placement.has_method("apply_summary"):
-				component_placement.call("apply_summary", cp_dict)
+				component_placement.call("apply_summary", cp_dict, restore_ship_id)
 			ship.set("component_placement_summary", cp_dict.duplicate(true))
 	return true
 
@@ -291,13 +293,18 @@ func _valid_current_craft_snapshot(data: Dictionary, restore_ship_id: String) ->
 
 
 func _advance_craft_jobs(delta: float) -> void:
-	if craft_job_scheduler == null or not craft_job_scheduler.has_method("advance"):
+	if ship == null or craft_job_scheduler == null \
+			or not craft_job_scheduler.has_method("advance") \
+			or not craft_job_context_provider.is_valid():
 		return
-	var context: Dictionary = {}
-	if craft_job_context_provider.is_valid():
-		var resolved: Variant = craft_job_context_provider.call()
-		if resolved is Dictionary:
-			context = resolved as Dictionary
+	var resolved: Variant = craft_job_context_provider.call()
+	if not (resolved is Dictionary):
+		return
+	var context: Dictionary = resolved as Dictionary
+	var runtime_ship_id: String = str(ship.get("ship_id"))
+	if runtime_ship_id.is_empty() or typeof(context.get("ship_id", null)) != TYPE_STRING \
+			or str(context.get("ship_id", "")) != runtime_ship_id:
+		return
 	var emitted: Variant = craft_job_scheduler.call("advance", delta, context)
 	if emitted is Array:
 		var receipts: Array = []

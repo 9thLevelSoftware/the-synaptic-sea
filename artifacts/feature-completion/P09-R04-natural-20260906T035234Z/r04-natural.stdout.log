@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+FAIL: FC P09 NATURAL ROUTE timed out title=true searched=[] player=(3.149058, 0.125933, 1.598387) target=(24.0, 4.12, 4.0)

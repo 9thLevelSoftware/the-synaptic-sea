@@ -40,6 +40,10 @@ func _initialize() -> void:
 	}, cat, 42)
 	if place.placed.is_empty():
 		_fail("need at least one placed component"); return
+	var prepared_authority: Dictionary = place.prepare_condition_authority(
+		"ship_m:1", cat, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not place.commit_condition_authority(prepared_authority):
+		_fail("condition authority preparation"); return
 	var first_id: String = str(place.placed[0].get("component_instance_id", ""))
 	var dis: Dictionary = place.dismount(first_id)
 	if not bool(dis.get("ok", false)):

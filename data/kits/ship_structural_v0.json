@@ -11,21 +11,75 @@
     "abyssal_synaptic_sea": 0.9
   },
   "role_modules": {
-    "airlock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"],
-    "corridor": ["corridor_floor_1x1", "corridor_floor_1x1"],
-    "engineering": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
-    "life_support": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
-    "bridge": ["floor_2x1", "floor_2x1", "wall_straight_1x1"],
-    "cargo": ["floor_2x1", "floor_2x1"],
-    "crew_quarters": ["floor_1x1", "floor_1x1"],
-    "medical": ["floor_1x1", "floor_1x1"],
-    "maintenance": ["floor_1x1", "corridor_floor_1x1"],
-    "cockpit": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
-    "engine_bay": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
-    "compartment": ["floor_1x1", "floor_1x1", "floor_1x1"],
-    "bay": ["floor_2x1", "floor_2x1", "floor_1x1"],
-    "quarters": ["floor_1x1", "floor_1x1"],
-    "dock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"]
+    "airlock": [
+      "floor_1x1",
+      "floor_1x1",
+      "doorway_frame_open_1x1"
+    ],
+    "corridor": [
+      "corridor_floor_1x1",
+      "corridor_floor_1x1"
+    ],
+    "engineering": [
+      "floor_1x1",
+      "floor_2x1",
+      "wall_straight_1x1"
+    ],
+    "life_support": [
+      "floor_1x1",
+      "floor_1x1",
+      "wall_straight_1x1"
+    ],
+    "bridge": [
+      "floor_2x1",
+      "floor_2x1",
+      "wall_straight_1x1"
+    ],
+    "cargo": [
+      "floor_2x1",
+      "floor_2x1"
+    ],
+    "crew_quarters": [
+      "floor_1x1",
+      "floor_1x1"
+    ],
+    "medical": [
+      "floor_1x1",
+      "floor_1x1"
+    ],
+    "maintenance": [
+      "floor_1x1",
+      "corridor_floor_1x1"
+    ],
+    "cockpit": [
+      "floor_1x1",
+      "floor_1x1",
+      "wall_straight_1x1"
+    ],
+    "engine_bay": [
+      "floor_1x1",
+      "floor_2x1",
+      "wall_straight_1x1"
+    ],
+    "compartment": [
+      "floor_1x1",
+      "floor_1x1",
+      "floor_1x1"
+    ],
+    "bay": [
+      "floor_2x1",
+      "floor_2x1",
+      "floor_1x1"
+    ],
+    "quarters": [
+      "floor_1x1",
+      "floor_1x1"
+    ],
+    "dock": [
+      "floor_1x1",
+      "floor_1x1",
+      "doorway_frame_open_1x1"
+    ]
   },
   "modules": [
     {
@@ -1039,38 +1093,38 @@
       "processed_asset_source": "assets/_processed/ship_structural_v0/ceiling_cap_1x1/ceiling_cap_1x1.glb",
       "collision_proxy_records": [
         {
-          "proxy_name": "ceiling_cap_1x1",
-          "source_object_name": "Collision_ceiling_cap_1x1",
           "bounds": {
+            "dimensions_m": [
+              4.0,
+              0.2,
+              4.0
+            ],
             "local_min_m": [
               -2.0,
-              -1.7999999523162842,
-              0.0
+              3.8,
+              -2.0
             ],
             "local_max_m": [
               2.0,
-              1.7999999523162842,
-              0.25
-            ],
-            "dimensions_m": [
               4.0,
-              3.5999999046325684,
-              0.25
+              2.0
             ]
           },
           "collision_shape_m": {
-            "name": "ceiling_cap_1x1",
-            "kind": "box",
+            "base_y_m": 3.8,
             "footprint_m": [
               -2.0,
               2.0,
-              0.0,
-              0.25
+              -2.0,
+              2.0
             ],
-            "height_m": 3.5999999046325684,
-            "base_y_m": -1.7999999523162842,
-            "nav_blocker": true
-          }
+            "height_m": 0.2,
+            "kind": "box",
+            "name": "ceiling_cap_1x1",
+            "nav_blocker": false
+          },
+          "proxy_name": "ceiling_cap_1x1",
+          "source_object_name": "Collision_ceiling_cap_1x1"
         }
       ],
       "collision_proxy_count": 1,
@@ -1091,5 +1145,1107 @@
       "provenance_id": "ship_structural_v0:ceiling_cap_1x1",
       "collision_policy": "static-body-proxy"
     }
-  ]
+  ],
+  "dock_collision_projection_v1": {
+    "schema_version": "dock-collision-projection-v1",
+    "numeric_encoding": "ieee754-binary32-bits-v1",
+    "content_encoding": "dock-collision-content-v1",
+    "modules": {
+      "bulkhead_portal_2x1": {
+        "module_id": "bulkhead_portal_2x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+        "contract_sha256": "71b3fe6d8f0b43c38d70ee84427f747d088117f844a28be143ec1672784cfee6",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+        "wrapper_sha256": "298a11c3d9f2f7521275853466e59f49c052e813745c04862e37d53d2b0c4f3d",
+        "content_sha256": "8f15c17b15774593c9653cae28c8c9cc3871f5463b2da47f4b8665b8237ca5ef",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "dimensions_f32_bits": [
+              "3f800000",
+              "3f800000",
+              "3f800000"
+            ]
+          }
+        ]
+      },
+      "ceiling_cap_1x1": {
+        "module_id": "ceiling_cap_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+        "contract_sha256": "ad90d57f53ef066bdb57ef0f165e0bda33c05254e038bf117623ee3d0035bf13",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+        "wrapper_sha256": "f989a8c5efe904b7329a3051ace4de88fa985e4bffa2222c32ea816bfd6c0cf4",
+        "content_sha256": "0c78d60f81abb32431e140890ca9dffc8f6b39fdcdb2c638f3a8b91776ffb919",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              3.9000000953674316,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "4079999a",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              0.20000000298023224,
+              4.0
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "3e4ccccd",
+              "40800000"
+            ]
+          }
+        ]
+      },
+      "corridor_floor_1x1": {
+        "module_id": "corridor_floor_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
+        "contract_sha256": "e905001048ea7b8eb670b064e285b5c05ab45a3a45a35b5cf2bfc75fce0e5724",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+        "wrapper_sha256": "e750d2422dc60e2dba28f6a542d1bf9530e9a146df96028354623c95e3f7b487",
+        "content_sha256": "66e3702116506ed707b8108748441ad1b75c76c0f53119059327746c381e9a75",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              0.25,
+              4.0
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "3e800000",
+              "40800000"
+            ]
+          }
+        ]
+      },
+      "corridor_floor_1x2": {
+        "module_id": "corridor_floor_1x2",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
+        "contract_sha256": "2167fec8df31b89befba214992aee013c2740664c04a1966947ea67eb04f5458",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+        "wrapper_sha256": "20610e87253de62aa072cbc13e64f5a55993509de3cc0556e14dde923ddcd277",
+        "content_sha256": "ab6a6aed90fbb95a76fb46d3e07d3d8d5d4c177be334c6d136b470d5a24a9a5a",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              0.25,
+              8.0
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "3e800000",
+              "41000000"
+            ]
+          }
+        ]
+      },
+      "doorway_frame_blocked_1x1": {
+        "module_id": "doorway_frame_blocked_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
+        "contract_sha256": "5f55b93048c976b5b0f3bd53f5c3f9781c87813dd23eb5f58386e6c7cdc83161",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+        "wrapper_sha256": "272ab56e78d71480aa999bc5c2d1069da62cfc1eb0716ffa81adc4ea3f400232",
+        "content_sha256": "b1694241e81456112f1f6a51423a32cb78e6a6c7b7664e3427375cadcab2dbb6",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.600000023841858,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fcccccd",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.200000047683716,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "404ccccd",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "doorway_frame_open_1x1": {
+        "module_id": "doorway_frame_open_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.tres",
+        "contract_sha256": "a5f2eab6fea40aec2194c9d1ad42c9b2e6178435779283613d8a3eedd1bb36b0",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+        "wrapper_sha256": "43e0c432bad7e3cbd45550f9899721fa8a4ba5fddf4a833d18ef126df8ab0806",
+        "content_sha256": "18a3298e5b1bc68bef7bed346aefc2b30596f09e1b66ed0e20609d3114e337c1",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_Header",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              2.700000047683716,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "402ccccd",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              1.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "3f800000",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_PostEast",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              1.2999999523162842,
+              1.600000023841858,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "3fa66666",
+              "3fcccccd",
+              "00000000"
+            ],
+            "dimensions": [
+              1.399999976158142,
+              3.200000047683716,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "3fb33333",
+              "404ccccd",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_PostWest",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              -1.2999999523162842,
+              1.600000023841858,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "bfa66666",
+              "3fcccccd",
+              "00000000"
+            ],
+            "dimensions": [
+              1.399999976158142,
+              3.200000047683716,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "3fb33333",
+              "404ccccd",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "floor_1x1": {
+        "module_id": "floor_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.tres",
+        "contract_sha256": "45245962ff9d8f07f9e2b233f73fccabd0d6c34273583ddc8761212678389a67",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+        "wrapper_sha256": "517d909f25f25ed63a652d377dbe00530e68c485b8ecc12448894b3d89325279",
+        "content_sha256": "66e3702116506ed707b8108748441ad1b75c76c0f53119059327746c381e9a75",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              0.25,
+              4.0
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "3e800000",
+              "40800000"
+            ]
+          }
+        ]
+      },
+      "floor_2x1": {
+        "module_id": "floor_2x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
+        "contract_sha256": "dc491fec35dafb5f1de9622d7178904061de699360fc5d2db52fecc361481d4c",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+        "wrapper_sha256": "c8cb654127957375b3abfbf78ea74964fcf1e9dd68e530995726c59e38437c75",
+        "content_sha256": "d2621fd20c25bab475eeddd90bfd34d3a6d9177558448e186dfbde48e098d34c",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              8.0,
+              0.25,
+              4.0
+            ],
+            "dimensions_f32_bits": [
+              "41000000",
+              "3e800000",
+              "40800000"
+            ]
+          }
+        ]
+      },
+      "pillar_support_1x1": {
+        "module_id": "pillar_support_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
+        "contract_sha256": "2915378ac306d7d1f4a108039cbfc0f91779eeb447f244da3b40c2d68874ea14",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+        "wrapper_sha256": "c119d5c7685e793faf549ada4b0ea473321911c26737e9583db915143cc1fa4f",
+        "content_sha256": "8f15c17b15774593c9653cae28c8c9cc3871f5463b2da47f4b8665b8237ca5ef",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "dimensions_f32_bits": [
+              "3f800000",
+              "3f800000",
+              "3f800000"
+            ]
+          }
+        ]
+      },
+      "ramp_up_1x2": {
+        "module_id": "ramp_up_1x2",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
+        "contract_sha256": "53092546f9e006deff61efce63623d4dfaee586b09c86b6a4dd957faa381a568",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+        "wrapper_sha256": "029e00034d79ff231eb84784bac3fb5db130c801004ad9d89151b6c30c4325dc",
+        "content_sha256": "8f15c17b15774593c9653cae28c8c9cc3871f5463b2da47f4b8665b8237ca5ef",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "dimensions": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "dimensions_f32_bits": [
+              "3f800000",
+              "3f800000",
+              "3f800000"
+            ]
+          }
+        ]
+      },
+      "wall_end_cap": {
+        "module_id": "wall_end_cap",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
+        "contract_sha256": "dcbb4c497c81ecd413b1dbb666da103b6c698c8401c01d61b77925be57198e93",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+        "wrapper_sha256": "d9289dd68eb2822ea05d9dc5d80475410fbf469ef94710fc9dee2cf847abae2b",
+        "content_sha256": "a737a0a3f9cf20cf2e79982020b535b29a173fa29bc243ca85d1c4f20e7572e2",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "wall_inner_corner": {
+        "module_id": "wall_inner_corner",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+        "contract_sha256": "74e0ab345f36ab87358b493e3c06f1d7904fe24d79053b981e36078f9aa270f9",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+        "wrapper_sha256": "9266c8fb479c789315b3b037776de7f92eb06c2de81a81fe9a543829ca8c733d",
+        "content_sha256": "5fb53e5526f9545ab5b3a42f2743a65290a0cc5191e0e484637dba3c7281bf9a",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingEast",
+            "basis": [
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            "basis_f32_bits": [
+              "00000000",
+              "00000000",
+              "bf800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000"
+            ],
+            "origin": [
+              2.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "40000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingNorth",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.5,
+              -2.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fc00000",
+              "c0000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "wall_outer_corner": {
+        "module_id": "wall_outer_corner",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+        "contract_sha256": "77ee9629ff7bbe2a3095d9920e8cf903caba4d086d3b49886e16c1cd9e469c08",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+        "wrapper_sha256": "01433cfda588a74a3e2841f5771b6ece61c9fb329f9e11afde33aef5422b2426",
+        "content_sha256": "5fb53e5526f9545ab5b3a42f2743a65290a0cc5191e0e484637dba3c7281bf9a",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingEast",
+            "basis": [
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            "basis_f32_bits": [
+              "00000000",
+              "00000000",
+              "bf800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000"
+            ],
+            "origin": [
+              2.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "40000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingNorth",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.5,
+              -2.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fc00000",
+              "c0000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "wall_straight_1x1": {
+        "module_id": "wall_straight_1x1",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_straight_1x1_contract.tres",
+        "contract_sha256": "275e64f944acf19a9b6dcb277403a3928a613135b421540c3183e26dfab2fac5",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+        "wrapper_sha256": "977a8f1bb2655b57a07218ce71615c9213895e3f951946a19746f972420ccfb0",
+        "content_sha256": "a737a0a3f9cf20cf2e79982020b535b29a173fa29bc243ca85d1c4f20e7572e2",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      },
+      "wall_t_junction": {
+        "module_id": "wall_t_junction",
+        "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+        "contract_sha256": "f466503667981f5d626563c907ea4e7bff929a3f787057938409422a1f265500",
+        "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+        "wrapper_sha256": "a88ab1c073523dbd82dc8a54427bfd4b73db70508e8a4eb513bab9d3503160be",
+        "content_sha256": "c8703e0a01d12afd6161e2b898f9a7b2d3245eb66dd7a1a918a970e380295aaf",
+        "boxes": [
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingEast",
+            "basis": [
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            "basis_f32_bits": [
+              "00000000",
+              "00000000",
+              "bf800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000"
+            ],
+            "origin": [
+              2.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "40000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingNorth",
+            "basis": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "basis_f32_bits": [
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000",
+              "00000000",
+              "3f800000"
+            ],
+            "origin": [
+              0.0,
+              1.5,
+              -2.0
+            ],
+            "origin_f32_bits": [
+              "00000000",
+              "3fc00000",
+              "c0000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          },
+          {
+            "shape_path": "CollisionRoot/CollisionShape3D_WingWest",
+            "basis": [
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            "basis_f32_bits": [
+              "00000000",
+              "00000000",
+              "bf800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "3f800000",
+              "00000000",
+              "00000000"
+            ],
+            "origin": [
+              -2.0,
+              1.5,
+              0.0
+            ],
+            "origin_f32_bits": [
+              "c0000000",
+              "3fc00000",
+              "00000000"
+            ],
+            "dimensions": [
+              4.0,
+              3.0,
+              0.20000000298023224
+            ],
+            "dimensions_f32_bits": [
+              "40800000",
+              "40400000",
+              "3e4ccccd"
+            ]
+          }
+        ]
+      }
+    }
+  }
 }

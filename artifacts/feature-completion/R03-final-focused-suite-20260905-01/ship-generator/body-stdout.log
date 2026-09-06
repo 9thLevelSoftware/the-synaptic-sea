@@ -1,0 +1,8 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+GameplaySliceBuilder slot_fallback room=crew_quarters_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=armory_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=crew_quarters_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=armory_01 kind=salvage
+SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms=9 small_rooms=24

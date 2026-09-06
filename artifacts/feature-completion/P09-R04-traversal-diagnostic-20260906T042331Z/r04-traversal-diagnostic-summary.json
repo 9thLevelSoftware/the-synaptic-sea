@@ -1,0 +1,46 @@
+{
+  "case": {
+    "id": "R04-traversal-diagnostic",
+    "scope": "scene",
+    "script": ".superpowers/sdd/2026-09-05-remaining-feature-completion/r04_traversal_diagnostic.gd",
+    "marker": "R04 TRAVERSAL DIAGNOSTIC PASS baseline_lifeboat_floor=true resumed_without_lifeboat_collision=true"
+  },
+  "evidence": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-traversal-diagnostic-20260906T042331Z",
+  "raw_result": {
+    "id": "R04-traversal-diagnostic",
+    "scope": "scene",
+    "script": ".superpowers/sdd/2026-09-05-remaining-feature-completion/r04_traversal_diagnostic.gd",
+    "marker": "R04 TRAVERSAL DIAGNOSTIC PASS baseline_lifeboat_floor=true resumed_without_lifeboat_collision=true",
+    "player_accepted": false,
+    "passed": false,
+    "reason": "nonzero exit",
+    "exit_code": 1,
+    "duration_seconds": 8.484,
+    "diagnostics": [],
+    "cleanup_error": null,
+    "stdout_log": "r04-traversal-diagnostic.stdout.log",
+    "stderr_log": "r04-traversal-diagnostic.stderr.log",
+    "containment_probe": {
+      "passed": true,
+      "reason": "passed",
+      "exit_code": 0,
+      "timed_out": false,
+      "cleanup_error": null,
+      "duration_seconds": 2.125,
+      "marker_count": 1,
+      "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-traversal-diagnostic-20260906T042331Z/user-data/r04-traversal-diagnostic/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-traversal-diagnostic-20260906T042331Z/user-data/r04-traversal-diagnostic/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-traversal-diagnostic-20260906T042331Z/user-data/r04-traversal-diagnostic",
+      "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-traversal-diagnostic-20260906T042331Z\\user-data\\r04-traversal-diagnostic",
+      "diagnostics": [],
+      "unexpected_stdout": [],
+      "unexpected_stderr": [],
+      "stdout_log": "r04-traversal-diagnostic.probe.stdout.log",
+      "stderr_log": "r04-traversal-diagnostic.probe.stderr.log"
+    },
+    "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-traversal-diagnostic-20260906T042331Z\\user-data\\r04-traversal-diagnostic"
+  },
+  "marker_count": 0,
+  "accepted_voice_diagnostics": [],
+  "unexpected_diagnostics": [],
+  "task_local_accepted": false,
+  "classification": "controlled component diagnostic only; not natural-route acceptance"
+}

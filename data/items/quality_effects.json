@@ -19,10 +19,10 @@
       "consumer": "quantity_only"
     },
     "welder": {
-      "consumer": "quantity_only"
+      "consumer": "tool_work_speed"
     },
     "plasma_cutter": {
-      "consumer": "quantity_only"
+      "consumer": "tool_work_speed"
     },
     "oxygen_filter": {
       "consumer": "quantity_only"

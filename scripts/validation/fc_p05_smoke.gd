@@ -21,6 +21,7 @@ const WorkActionDriverScript := preload("res://scripts/systems/work_action_drive
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const ComponentPlacementScript := preload("res://scripts/systems/component_placement_state.gd")
 const ShipModificationScript := preload("res://scripts/systems/ship_modification_state.gd")
+const PendingOutputStoreScript := preload("res://scripts/systems/pending_output_store.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 
 const TIMEOUT_FRAMES: int = 300
@@ -66,7 +67,6 @@ func _verify_catalog_coverage_and_exact_crafting() -> bool:
 		return false
 	var explicit_effect_rows: Dictionary = (quality_root as Dictionary).get("items", {}) as Dictionary
 	var output_ids: Dictionary = {}
-	var counts: Dictionary = {}
 	for recipe_v in (recipe_root as Dictionary).get("recipes", []) as Array:
 		if not recipe_v is Dictionary:
 			_fail("malformed recipe row")
@@ -88,14 +88,21 @@ func _verify_catalog_coverage_and_exact_crafting() -> bool:
 		if consumer not in ItemQualityEffectsScript.VALID_CONSUMERS:
 			_fail("invalid output consumer %s=%s" % [str(item_id_v), consumer])
 			return false
-		counts[consumer] = int(counts.get(consumer, 0)) + 1
-	if output_ids.size() != 53 or int(counts.get("quantity_only", 0)) != 49 \
-			or int(counts.get("consumable_potency", 0)) != 2 \
-			or int(counts.get("repair_integrity", 0)) != 1 \
-			or int(counts.get("tool_work_speed", 0)) != 1 \
-			or int(counts.get("component_efficiency", 0)) != 0:
-		_fail("dishonest recipe output classifications outputs=%d counts=%s" % [output_ids.size(), str(counts)])
-		return false
+	# P09 adds real consumer bridges without coupling this regression to a
+	# catalog-wide count. Every output above must have an explicit valid row, and
+	# these bridge identities must name the consumer that production now reaches.
+	var required_consumers: Dictionary = {
+		"welder": "tool_work_speed",
+		"plasma_cutter": "tool_work_speed",
+		"plating": "quantity_only",
+		"plating_plate": "component_efficiency",
+	}
+	for item_id_v in required_consumers:
+		var item_id: String = str(item_id_v)
+		if not output_ids.has(item_id) \
+				or effects.consumer_for(item_id) != str(required_consumers[item_id]):
+			_fail("dishonest bridge consumer %s=%s" % [item_id, effects.consumer_for(item_id)])
+			return false
 	if not _verify_preview_selection_order():
 		return false
 
@@ -330,6 +337,11 @@ func _craft_recipe(
 		return {}
 	var ship_id: String = "p05-ship:%s" % fixture_id
 	var station_id: String = "p05-station:%s" % fixture_id
+	var pending_store = PendingOutputStoreScript.new()
+	if not pending_store.configure(ship_id) or not crafting.bind_station_runtime_context(
+			ship_id, station_id, station_kind, inventory, null, null, pending_store):
+		_fail("pending output authority %s" % recipe_id)
+		return {}
 	if not crafting.begin_craft(
 			recipe_id, inventory, null, skill_level, null, ship_id, station_id):
 		_fail("paid craft start %s" % recipe_id)
@@ -349,9 +361,16 @@ func _craft_recipe(
 		return {}
 	var result: Dictionary = crafting.finish_craft()
 	if result.is_empty() or not result.get("output_lot", null) is Dictionary \
+			or not bool(result.get("pending", false)) \
 			or absf(float(result.get("quality_score", -1.0)) - float(preview.get("score", -2.0))) > 0.0001 \
 			or str(result.get("quality_tier", "")) != str(preview.get("tier", "")):
 		_fail("preview/finished output mismatch %s preview=%s result=%s" % [recipe_id, str(preview), str(result)])
+		return {}
+	var pending_record: Dictionary = pending_store.get_record(str(result.get("receipt_id", "")))
+	if pending_record.is_empty() \
+			or str(pending_record.get("station_instance_id", "")) != station_id \
+			or (pending_record.get("remaining_lots", []) as Array).size() != 1:
+		_fail("output did not enter physical station store %s record=%s" % [recipe_id, str(pending_record)])
 		return {}
 	result["quality_preview"] = preview.duplicate(true)
 	return result

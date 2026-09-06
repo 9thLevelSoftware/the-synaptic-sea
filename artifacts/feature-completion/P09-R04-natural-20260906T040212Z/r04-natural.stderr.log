@@ -1,0 +1,9 @@
+WARNING: AudioManager: stream file missing, path='res://data/audio/voice/log_beacon_01.ogg'
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] _load_stream_cached (res://scripts/audio/audio_manager.gd:482)
+       [1] _play_via_bus (res://scripts/audio/audio_manager.gd:523)
+       [2] play_voice_log (res://scripts/audio/audio_manager.gd:438)
+       [3] tick (res://scripts/audio/audio_manager.gd:320)
+       [4] _tick_audio_runtime (res://scripts/procgen/playable_generated_ship.gd:11204)
+       [5] _process (res://scripts/procgen/playable_generated_ship.gd:11089)

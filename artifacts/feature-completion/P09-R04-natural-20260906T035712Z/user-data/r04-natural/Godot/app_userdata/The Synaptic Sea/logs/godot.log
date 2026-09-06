@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+R04 NATURAL ROUTE DOCK OPENED marker= position=(2.0, 0.0, 2.0)
+WARNING: AudioManager: stream file missing, path='res://data/audio/voice/log_beacon_01.ogg'
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] _load_stream_cached (res://scripts/audio/audio_manager.gd:482)
+       [1] _play_via_bus (res://scripts/audio/audio_manager.gd:523)
+       [2] play_voice_log (res://scripts/audio/audio_manager.gd:438)
+       [3] tick (res://scripts/audio/audio_manager.gd:320)
+       [4] _tick_audio_runtime (res://scripts/procgen/playable_generated_ship.gd:11199)
+       [5] _process (res://scripts/procgen/playable_generated_ship.gd:11084)
+FAIL: FC P09 NATURAL ROUTE timed out title=true dock_opening=false searched=[] player=(5.440354, 0.125653, 0.606004) target=(24.0, 4.12, 4.0)

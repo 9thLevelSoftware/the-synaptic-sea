@@ -1,0 +1,32 @@
+{
+  "id": "p12-component-mount-dismount",
+  "scope": "focused",
+  "script": "scripts/validation/component_mount_dismount_smoke.gd",
+  "marker": "COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true",
+  "player_accepted": false,
+  "passed": true,
+  "reason": "passed",
+  "exit_code": 0,
+  "duration_seconds": 0.359,
+  "diagnostics": [],
+  "cleanup_error": null,
+  "stdout_log": "p12-component-mount-dismount.stdout.log",
+  "stderr_log": "p12-component-mount-dismount.stderr.log",
+  "containment_probe": {
+    "passed": true,
+    "reason": "passed",
+    "exit_code": 0,
+    "timed_out": false,
+    "cleanup_error": null,
+    "duration_seconds": 2.016,
+    "marker_count": 1,
+    "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P12-focused-final-20260906-01/user-data/p12-component-mount-dismount/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P12-focused-final-20260906-01/user-data/p12-component-mount-dismount/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P12-focused-final-20260906-01/user-data/p12-component-mount-dismount",
+    "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P12-focused-final-20260906-01\\user-data\\p12-component-mount-dismount",
+    "diagnostics": [],
+    "unexpected_stdout": [],
+    "unexpected_stderr": [],
+    "stdout_log": "p12-component-mount-dismount.probe.stdout.log",
+    "stderr_log": "p12-component-mount-dismount.probe.stderr.log"
+  },
+  "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P12-focused-final-20260906-01\\user-data\\p12-component-mount-dismount"
+}

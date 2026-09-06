@@ -6,13 +6,15 @@ class_name ShipModificationPanel
 ## inventory for install/uninstall. Headless-queryable.
 
 signal panel_closed
-signal install_requested(slot_id: String, component_id: String, item_form: String)
-signal uninstall_requested(slot_id: String, component_id: String, item_form: String)
+signal install_requested(ship_id: String, binding_generation: int, slot_id: String, component_id: String, item_form: String)
+signal uninstall_requested(ship_id: String, binding_generation: int, slot_id: String, component_id: String, item_form: String)
 
 var _mod_state                    # ShipModificationState
 var _inventory: Dictionary = {}   # item_form -> qty (presentation bag for panel actions)
 var _catalog                       # ComponentCatalog for real-form selection
 var _install_preflight_query: Callable = Callable()
+var _bound_ship_id: String = ""
+var _bound_binding_generation: int = 0
 var _open: bool = false
 var _selected: int = 0
 var _status: String = ""
@@ -42,10 +44,12 @@ func _ready() -> void:
 	_render()
 
 
-func bind(mod_state, inventory: Dictionary = {}, catalog = null, physical_slots: Array = [], ship_id: String = "", placement_owner = null) -> void:
+func bind(mod_state, inventory: Dictionary = {}, catalog = null, physical_slots: Array = [], ship_id: String = "", placement_owner = null, binding_generation: int = 0) -> void:
 	_mod_state = mod_state
 	_inventory = inventory.duplicate(true)
 	_catalog = catalog
+	_bound_ship_id = ship_id
+	_bound_binding_generation = maxi(0, binding_generation)
 	if _mod_state != null and catalog != null and not physical_slots.is_empty() and _mod_state.has_method("bind_physical_slots"):
 		_mod_state.call("bind_physical_slots", ship_id, physical_slots, catalog, placement_owner)
 	_render()
@@ -132,7 +136,7 @@ func uninstall_selected() -> bool:
 	var component_id: String = str(row.get("component_id", ""))
 	var item_form: String = str(row.get("item_form", ""))
 	_status = "uninstall requested %s" % slot_id
-	uninstall_requested.emit(slot_id, component_id, item_form)
+	uninstall_requested.emit(_bound_ship_id, _bound_binding_generation, slot_id, component_id, item_form)
 	_render()
 	return true
 
@@ -163,7 +167,7 @@ func install_into_selected(
 		_render()
 		return false
 	_status = "install requested %s -> %s" % [component_id, slot_id]
-	install_requested.emit(slot_id, component_id, item_form)
+	install_requested.emit(_bound_ship_id, _bound_binding_generation, slot_id, component_id, item_form)
 	_render()
 	return true
 
@@ -250,6 +254,32 @@ func get_inventory_bag() -> Dictionary:
 	return _inventory.duplicate(true)
 
 
+func get_bound_ship_id() -> String:
+	return _bound_ship_id
+
+
+func get_bound_binding_generation() -> int:
+	return _bound_binding_generation
+
+
+func emit_install_request_for_validation(
+		slot_id: String, component_id: String, item_form: String,
+		ship_id_override: String = "", binding_generation_override: int = -1) -> void:
+	var request_ship_id: String = ship_id_override if not ship_id_override.is_empty() else _bound_ship_id
+	var request_generation: int = binding_generation_override \
+		if binding_generation_override >= 0 else _bound_binding_generation
+	install_requested.emit(request_ship_id, request_generation, slot_id, component_id, item_form)
+
+
+func emit_uninstall_request_for_validation(
+		slot_id: String, component_id: String, item_form: String,
+		ship_id_override: String = "", binding_generation_override: int = -1) -> void:
+	var request_ship_id: String = ship_id_override if not ship_id_override.is_empty() else _bound_ship_id
+	var request_generation: int = binding_generation_override \
+		if binding_generation_override >= 0 else _bound_binding_generation
+	uninstall_requested.emit(request_ship_id, request_generation, slot_id, component_id, item_form)
+
+
 func _slot_rows() -> Array:
 	var rows: Array = []
 	if _mod_state == null or not _mod_state.has_method("get_physical_slots"):
@@ -315,7 +345,8 @@ func _preflight_ok(slot_id: String, component_id: String, item_form: String) -> 
 
 func _preflight_result(slot_id: String, component_id: String, item_form: String) -> Dictionary:
 	if _install_preflight_query.is_valid():
-		var queried: Variant = _install_preflight_query.call(slot_id, component_id, item_form)
+		var queried: Variant = _install_preflight_query.call(
+			_bound_ship_id, _bound_binding_generation, slot_id, component_id, item_form)
 		return queried as Dictionary if queried is Dictionary else {"ok": false, "reason": "missing_preflight"}
 	if _mod_state == null or not _mod_state.has_method("preflight_install"):
 		return {"ok": false, "reason": "missing_preflight"}

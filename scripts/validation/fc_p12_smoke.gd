@@ -11,6 +11,7 @@ const ComponentCatalogScript := preload("res://scripts/systems/component_catalog
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 
 const TIMEOUT_FRAMES: int = 300
@@ -217,11 +218,15 @@ func _verify_transaction_model() -> bool:
 	# restore a falsely stable READY snapshot.
 	var reentrant_lot: Dictionary = exact_lot.duplicate(true)
 	reentrant_lot["lot_id"] = "model-reentrant-lot"
-	inventory.add_lot(reentrant_lot)
+	var reentrant_inventory = InventoryStateScript.new("p12-model-reentrant-holder")
+	if reentrant_inventory.add_lot(reentrant_lot) != 1:
+		_fail("reentrant lot setup")
+		return false
 	request["work_id"] = "model-reentrant"
+	request["source_holder_id"] = reentrant_inventory.get_holder_namespace()
 	request["selected_lot_ids"] = PackedStringArray(["model-reentrant-lot"])
-	if not bool(tx.prepare(request, inventory, {"console_unit": 1}).get("ok", false)) \
-			or not bool(tx.start("model-reentrant", driver, start_ctx, inventory).get("ok", false)):
+	if not bool(tx.prepare(request, reentrant_inventory, {"console_unit": 1}).get("ok", false)) \
+			or not bool(tx.start("model-reentrant", driver, start_ctx, reentrant_inventory).get("ok", false)):
 		_fail("reentrant setup")
 		return false
 	driver.tick(999.0, {})
@@ -241,7 +246,8 @@ func _verify_transaction_model() -> bool:
 		reentrant_noise_events[0] += 1
 		reentrant_xp_events[0] += 1
 		nested_results.append(tx.commit("model-reentrant", reentrant_context))
-		nested_cancels.append(tx.cancel("model-reentrant", inventory, driver, "recursive_cancel"))
+		nested_cancels.append(tx.cancel(
+			"model-reentrant", reentrant_inventory, driver, "recursive_cancel"))
 		unstable_summaries.append(tx.get_summary())
 		restore_attempts.append(tx.apply_summary(summary_before_reentrant))
 		configure_attempts.append(tx.configure("ship-model"))
@@ -269,11 +275,15 @@ func _verify_transaction_model() -> bool:
 	# safely retried and committed once after its recoverable denial.
 	var retry_lot: Dictionary = exact_lot.duplicate(true)
 	retry_lot["lot_id"] = "model-retry-lot"
-	inventory.add_lot(retry_lot)
+	var retry_inventory = InventoryStateScript.new("p12-model-retry-holder")
+	if retry_inventory.add_lot(retry_lot) != 1:
+		_fail("commit retry lot setup")
+		return false
 	request["work_id"] = "model-retry"
+	request["source_holder_id"] = retry_inventory.get_holder_namespace()
 	request["selected_lot_ids"] = PackedStringArray(["model-retry-lot"])
-	if not bool(tx.prepare(request, inventory, {"console_unit": 1}).get("ok", false)) \
-			or not bool(tx.start("model-retry", driver, start_ctx, inventory).get("ok", false)):
+	if not bool(tx.prepare(request, retry_inventory, {"console_unit": 1}).get("ok", false)) \
+			or not bool(tx.start("model-retry", driver, start_ctx, retry_inventory).get("ok", false)):
 		_fail("commit retry setup")
 		return false
 	driver.tick(999.0, {})
@@ -455,11 +465,14 @@ func _validate_live_panel_transaction() -> void:
 		return
 	var slot_id: String = str(fixture.get("slot_id", ""))
 	var item_form: String = str(fixture.get("item_form", ""))
+	var component_id: String = str(fixture.get("component_id", ""))
 	var instance_id: String = str(fixture.get("instance_id", slot_id))
 	var panel = _playable.get_ship_modification_panel_for_validation()
 	var placement = _playable.get_component_placement_state_for_validation()
 	if panel == null or placement == null or not placement.is_mounted(instance_id):
 		_fail("live mounted fixture")
+		return
+	if not _validate_pre_escrow_admission(slot_id):
 		return
 	if not panel.uninstall_selected():
 		_fail("uninstall request")
@@ -511,6 +524,25 @@ func _validate_live_panel_transaction() -> void:
 		return
 	_playable.vitals_state.stamina = _playable.vitals_state.max_stamina
 	panel.set_inventory(_playable.inventory_state.items)
+	if not _validate_production_denial_matrix(slot_id, component_id, item_form):
+		return
+	if not _validate_live_occupancy_refresh(slot_id, component_id, item_form):
+		return
+	if not _validate_reserved_target_removal_cancel(
+			panel, slot_id, item_form, returned_lot):
+		return
+	var selected_context = _playable._ship_work_context_for(
+		_playable.get_selected_ship_id_for_validation())
+	var authoritative_before: Dictionary = _authoritative_snapshot(selected_context)
+	var observable_before: Dictionary = _playable.get_ship_work_observable_counts_for_validation()
+	var receipts_before: int = _receipt_count(selected_context.work_transactions.get_summary())
+	var training_bus = _playable.get_training_event_bus()
+	var training_log_before: int = (training_bus.get_log() as Array).size()
+	var delivered_xp_before: int = training_bus.get_total_xp_delivered()
+	var progression_before: Dictionary = _playable.player_progression.get_summary()
+	var completion_event: StringName = AudioEventSeamScript.sfx_for_work_verb("mount")
+	var completion_sfx_before: int = _playable.audio_manager.sfx_router.get_routed_count(
+		completion_event)
 	if not panel.install_from_inventory(_playable.component_catalog, PackedStringArray([item_form])):
 		_fail("install request")
 		return
@@ -527,20 +559,78 @@ func _validate_live_panel_transaction() -> void:
 			str(_playable.vitals_state.stamina),
 		])
 		return
+	var previous_event_callback: Callable = training_bus.on_event_resolved
+	var reentrant_results: Array = []
+	training_bus.on_event_resolved = func(event: Dictionary) -> void:
+		if previous_event_callback.is_valid():
+			previous_event_callback.call(event)
+		reentrant_results.append(_playable.commit_last_ship_work_for_validation())
+	_playable.threat_manager.player_noise = 0.0
 	_playable.advance_active_ship_work_for_validation(999.0)
+	training_bus.on_event_resolved = previous_event_callback
 	if not placement.is_mounted(instance_id):
 		_fail("timed install did not commit: %s" % str(_playable.get_last_ship_work_result_for_validation()))
+		return
+	var first_receipt: Dictionary = _playable.get_last_ship_work_result_for_validation()
+	var observable_after: Dictionary = _playable.get_ship_work_observable_counts_for_validation()
+	var progression_after: Dictionary = _playable.player_progression.get_summary()
+	var training_log_after: int = (training_bus.get_log() as Array).size()
+	var delivered_xp_after: int = training_bus.get_total_xp_delivered()
+	var completion_sfx_after: int = _playable.audio_manager.sfx_router.get_routed_count(
+		completion_event)
+	var authoritative_after: Dictionary = _authoritative_snapshot(selected_context)
+	var committed_noise: float = float(first_receipt.get("noise", 0.0))
+	if str(first_receipt.get("commit_receipt_id", "")).is_empty() \
+			or _receipt_count(selected_context.work_transactions.get_summary()) != receipts_before + 1 \
+			or int(observable_after.get("commit", 0)) != int(observable_before.get("commit", 0)) + 1 \
+			or int(observable_after.get("effect", 0)) != int(observable_before.get("effect", 0)) + 1 \
+			or int(observable_after.get("noise_completion", 0)) != int(observable_before.get("noise_completion", 0)) + 1 \
+			or int(observable_after.get("xp_award", 0)) != int(observable_before.get("xp_award", 0)) + 1:
+		_fail("live commit did not produce one receipt/effect/noise/xp: receipt=%s before=%s after=%s" % [
+			str(first_receipt), str(observable_before), str(observable_after)])
+		return
+	if reentrant_results.size() != 1 \
+			or str((reentrant_results[0] as Dictionary).get("reason", "")) != "commit_in_flight" \
+			or not bool((reentrant_results[0] as Dictionary).get("escrow_retained", false)):
+		_fail("production consequence callback was not reentrancy-latched: %s" % str(reentrant_results))
+		return
+	if committed_noise <= 0.0 \
+			or float(_playable.threat_manager.player_noise) + 0.0001 < committed_noise \
+			or completion_sfx_after != completion_sfx_before + 1 \
+			or training_log_after != training_log_before + 1 \
+			or delivered_xp_after <= delivered_xp_before \
+			or progression_after == progression_before:
+		_fail("live consequence sinks missing: noise=%s routed=%d/%d log=%d/%d xp=%d/%d" % [
+			str(_playable.threat_manager.player_noise), completion_sfx_before,
+			completion_sfx_after, training_log_before, training_log_after,
+			delivered_xp_before, delivered_xp_after])
+		return
+	if authoritative_after.get("placement", {}) == authoritative_before.get("placement", {}) \
+			or authoritative_after.get("modification", {}) == authoritative_before.get("modification", {}) \
+			or int(authoritative_after.get("receipt_count", 0)) \
+			!= int(authoritative_before.get("receipt_count", 0)) + 1:
+		_fail("authoritative production placement/modification/receipt did not commit once")
 		return
 	var committed_before: int = _playable.get_ship_work_commit_count_for_validation()
 	var duplicate: Dictionary = _playable.commit_last_ship_work_for_validation()
 	if not bool(duplicate.get("already_committed", false)) \
-			or _playable.get_ship_work_commit_count_for_validation() != committed_before:
+			or str(duplicate.get("commit_receipt_id", "")) != str(first_receipt.get("commit_receipt_id", "")) \
+			or _playable.get_ship_work_commit_count_for_validation() != committed_before \
+			or _playable.get_ship_work_observable_counts_for_validation() != observable_after \
+			or _receipt_count(selected_context.work_transactions.get_summary()) != receipts_before + 1 \
+			or _playable.audio_manager.sfx_router.get_routed_count(completion_event) != completion_sfx_after \
+			or (training_bus.get_log() as Array).size() != training_log_after \
+			or training_bus.get_total_xp_delivered() != delivered_xp_after \
+			or _playable.player_progression.get_summary() != progression_after \
+			or _authoritative_snapshot(selected_context) != authoritative_after:
 		_fail("live duplicate commit")
 		return
 	var mounted: Dictionary = placement.get_entry(instance_id)
 	if str(mounted.get("source_lot_id", "")) != str(returned_lot.get("lot_id", "")) \
 			or absf(float(mounted.get("condition", 0.0)) - float(returned_lot.get("condition", 0.0))) > 0.0001:
 		_fail("mounted exact lot metadata")
+		return
+	if not _validate_moved_owner_position_rechecks(slot_id, selected_context):
 		return
 
 	# Lost tool, leaving range, and damage pause without removing the target or
@@ -565,9 +655,601 @@ func _validate_live_panel_transaction() -> void:
 				or _playable.has_active_ship_work_for_validation() or not placement.is_mounted(instance_id):
 			_fail("%s explicit cancel" % cause)
 			return
+	if not _validate_untransactioned_component_fails_closed(slot_id):
+		return
 
 	print("FC P12 PASS")
 	quit(0)
+
+
+func _validate_pre_escrow_admission(slot_id: String) -> bool:
+	var ship_id: String = _playable.get_selected_ship_id_for_validation()
+	var work_context = _playable._ship_work_context_for(ship_id)
+	var target_position: Variant = _playable._component_slot_world_position(slot_id, work_context)
+	if work_context == null or work_context.work_transactions == null \
+			or not (target_position is Vector3):
+		_fail("pre-escrow admission fixture")
+		return false
+	var entry: Dictionary = work_context.component_placement.get_entry(slot_id)
+	var payload: Dictionary = {
+		"slot_id": slot_id,
+		"component_id": str(entry.get("component_id", "")),
+		"item_form": str(entry.get("item_form", "")),
+	}
+	var start_context: Dictionary = {
+		"tool_class": "wrench",
+		"skill_id": "salvage",
+		"skill_level": 99,
+		"inventory": _playable._inventory_qty_dict_for_work(),
+	}
+	var target_revision: String = _playable._component_slot_revision(slot_id, work_context)
+	var protected_before: Dictionary = _authoritative_snapshot(work_context)
+	var missing_owner: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, target_position, PackedStringArray(), "")
+	if str(missing_owner.get("reason", "")) != "missing_ship_owner" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("missing owner admitted or spent: %s" % str(missing_owner))
+		return false
+	var non_finite: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, Vector3(INF, 0.0, 0.0), PackedStringArray(), ship_id)
+	if str(non_finite.get("reason", "")) != "invalid_target_position" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("non-finite target point admitted or spent: %s" % str(non_finite))
+		return false
+	var stale_point: Vector3 = (target_position as Vector3) + Vector3(0.25, 0.0, 0.0)
+	var stale_position: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, stale_point, PackedStringArray(), ship_id)
+	if str(stale_position.get("reason", "")) != "stale_target_position" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("stale target point admitted or spent: %s" % str(stale_position))
+		return false
+	var forged_nearby: Vector3 = (target_position as Vector3) \
+		+ Vector3(_playable.WORK_ACTION_INTERACT_RANGE + 1.0, 0.0, 0.0)
+	(_playable.player as Node3D).global_position = forged_nearby
+	var forged_position: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, forged_nearby, PackedStringArray(), ship_id)
+	if str(forged_position.get("reason", "")) != "stale_target_position" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("forged nearby point admitted distant target: %s" % str(forged_position))
+		return false
+
+	(_playable.player as Node3D).global_position = (target_position as Vector3) \
+		+ Vector3(_playable.WORK_ACTION_INTERACT_RANGE + 1.0, 0.0, 0.0)
+	var out_of_range: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, target_position, PackedStringArray(), ship_id)
+	if str(out_of_range.get("reason", "")) != "out_of_range" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("out-of-range admission spent or allocated: %s" % str(out_of_range))
+		return false
+
+	(_playable.player as Node3D).global_position = target_position as Vector3
+	var owner_root = work_context.ship.scene_root
+	if not (owner_root is Node3D):
+		_fail("moved-owner target-position fixture")
+		return false
+	var owner_transform_before: Transform3D = (owner_root as Node3D).global_transform
+	(owner_root as Node3D).global_position += Vector3(0.5, 0.0, 0.0)
+	var moved_owner: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", target_revision,
+		start_context, payload, target_position, PackedStringArray(), ship_id)
+	(owner_root as Node3D).global_transform = owner_transform_before
+	if str(moved_owner.get("reason", "")) != "stale_target_position" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("moved owner accepted stale start point: %s" % str(moved_owner))
+		return false
+	var stale_revision: Dictionary = _playable._start_transactional_work(
+		"dismount_component", slot_id, "component_uninstall", "%s|stale" % target_revision,
+		start_context, payload, target_position, PackedStringArray(), ship_id)
+	if str(stale_revision.get("reason", "")) != "stale_target" \
+			or _playable.has_active_ship_work_for_validation() \
+			or _authoritative_snapshot(work_context) != protected_before:
+		_fail("stale revision admitted or spent: %s" % str(stale_revision))
+		return false
+	return true
+
+
+func _authoritative_snapshot(work_context) -> Dictionary:
+	return _playable.get_ship_work_authoritative_snapshot_for_validation(
+		str(work_context.ship_id))
+
+
+func _validate_production_denial_matrix(
+		slot_id: String, component_id: String, item_form: String) -> bool:
+	var ship_id: String = _playable.get_selected_ship_id_for_validation()
+	var work_context = _playable._ship_work_context_for(ship_id)
+	var panel = _playable.get_ship_modification_panel_for_validation()
+	if work_context == null or work_context.component_placement == null or panel == null:
+		_fail("production denial context")
+		return false
+	var placement = work_context.component_placement
+	var slot: Dictionary = work_context.component_placement.get_physical_slot(slot_id)
+	var profile_id: String = str(slot.get("component_slot_profile_id", ""))
+	var original_profile: Dictionary = _playable.component_catalog.get_slot_profile(profile_id)
+	var target_position: Variant = _playable._component_slot_world_position(slot_id, work_context)
+	if slot.is_empty() or original_profile.is_empty() \
+			or not _playable._work_position_is_finite(target_position):
+		_fail("production denial fixture")
+		return false
+	(_playable.player as Node3D).global_position = target_position as Vector3
+
+	# Panel-side missing-item and missing/unknown-slot paths execute the real
+	# signal callback. Their failure SFX is allowed UI feedback; the shared
+	# authoritative snapshot deliberately tracks completion audio only.
+	if not _expect_panel_install_denied(
+			panel, work_context, slot_id, component_id, "review_missing_item_form",
+			"missing_item", "missing item"):
+		return false
+	if not _expect_panel_install_denied(
+			panel, work_context, "", component_id, item_form,
+			"unknown_slot", "missing slot"):
+		return false
+	if not _expect_panel_install_denied(
+			panel, work_context, "review_unknown_slot", component_id, item_form,
+			"unknown_slot", "unknown slot"):
+		return false
+
+	var water_lot_id: String = "p12-denial/purified-water"
+	var scrap_lot_id: String = "p12-denial/scrap-metal"
+	if _playable.inventory_state.add_lot({
+		"lot_id": water_lot_id, "item_id": "purified_water", "quantity": 1,
+		"quality_score": 0.5, "quality_tier": "standard", "condition": 1.0,
+		"origin": {"source": "p12-denial"},
+	}) != 1 or _playable.inventory_state.add_lot({
+		"lot_id": scrap_lot_id, "item_id": "scrap_metal", "quantity": 1,
+		"quality_score": 0.5, "quality_tier": "standard", "condition": 1.0,
+		"origin": {"source": "p12-denial"},
+	}) != 1:
+		_fail("production denial non-component lot fixture")
+		return false
+	if not _expect_start_install_denied(
+			work_context, slot_id, "purified_water", "purified_water",
+			"unknown_component", "water/non-component"):
+		return false
+	if not _expect_start_install_denied(
+			work_context, slot_id, "review_unknown_component", "scrap_metal",
+			"unknown_component", "unknown component"):
+		return false
+	if not _expect_start_install_denied(
+			work_context, slot_id, component_id, "scrap_metal",
+			"incompatible_item_form", "unknown/incompatible item form"):
+		return false
+
+	var physical_slots_before: Array = placement.physical_slots.duplicate(true)
+	var slot_index: int = -1
+	for index in range(placement.physical_slots.size()):
+		var candidate_v: Variant = placement.physical_slots[index]
+		if candidate_v is Dictionary \
+				and str((candidate_v as Dictionary).get("slot_id", "")) == slot_id:
+			slot_index = index
+			break
+	if slot_index < 0:
+		_fail("production denial physical slot index")
+		return false
+	for profile_case in [
+		{"profile_id": "", "label": "missing profile"},
+		{"profile_id": "review_unknown_profile", "label": "unknown profile"},
+	]:
+		var changed_slot: Dictionary = slot.duplicate(true)
+		changed_slot["component_slot_profile_id"] = str(profile_case.profile_id)
+		placement.physical_slots[slot_index] = changed_slot
+		if not _expect_start_install_denied(
+				work_context, slot_id, component_id, item_form,
+				"missing_fit_contract", str(profile_case.label)):
+			placement.physical_slots = physical_slots_before
+			return false
+	placement.physical_slots = physical_slots_before.duplicate(true)
+
+	var original_component: Dictionary = _playable.component_catalog.get_component(component_id)
+	var wrong_slot_component: Dictionary = original_component.duplicate(true)
+	wrong_slot_component["slot"] = "review_required_slot"
+	_playable.component_catalog._components[component_id] = wrong_slot_component
+	var incompatible_slot_passed: bool = _expect_start_install_denied(
+			work_context, slot_id, component_id, item_form,
+			"incompatible_slot", "incompatible slot")
+	_playable.component_catalog._components[component_id] = original_component.duplicate(true)
+	if not incompatible_slot_passed:
+		return false
+
+	var cases: Array[Dictionary] = [
+		{"field": "footprint_cells", "value": [99, 99], "reason": "incompatible_footprint"},
+		{"field": "socket_type", "value": "review_wrong_socket", "reason": "incompatible_socket"},
+		{"field": "allowed_component_types", "value": ["review_wrong_type"], "reason": "incompatible_type"},
+	]
+	for case in cases:
+		var changed_profile: Dictionary = original_profile.duplicate(true)
+		changed_profile[str(case.field)] = case.value
+		_playable.component_catalog._slot_profiles[profile_id] = changed_profile
+		var passed: bool = _expect_start_install_denied(
+			work_context, slot_id, component_id, item_form,
+			str(case.reason), str(case.reason))
+		_playable.component_catalog._slot_profiles[profile_id] = original_profile.duplicate(true)
+		if not passed:
+			return false
+
+	if not placement.restore_dismounted(slot_id):
+		_fail("production occupied-slot fixture")
+		return false
+	var occupied_passed: bool = _expect_start_install_denied(
+		work_context, slot_id, component_id, item_form, "slot_occupied", "occupied slot")
+	var occupied_restore: Dictionary = placement.dismount(slot_id)
+	if not occupied_passed or not bool(occupied_restore.get("ok", false)):
+		if occupied_passed:
+			_fail("production occupied-slot fixture restore")
+		return false
+
+	var lifeboat = _playable.get_lifeboat_ship_for_validation()
+	if lifeboat == null:
+		_fail("production wrong-ship fixture")
+		return false
+	var select_other: Dictionary = _playable.select_ship_for_modification_for_validation(
+		str(lifeboat.ship_id))
+	if not bool(select_other.get("ok", false)):
+		_fail("production wrong-ship selection: %s" % str(select_other))
+		return false
+	var wrong_ship_passed: bool = _expect_start_install_denied(
+		work_context, slot_id, component_id, item_form, "wrong_ship", "wrong ship")
+	var select_home: Dictionary = _playable.select_ship_for_modification_for_validation(ship_id)
+	if not bool(select_home.get("ok", false)):
+		_fail("production denial home reselection")
+		return false
+	if not wrong_ship_passed:
+		return false
+	panel = _playable.get_ship_modification_panel_for_validation()
+	panel.select_slot_id(slot_id)
+	panel.set_inventory(_playable.inventory_state.items)
+
+	var removed_water: Array = _playable.inventory_state.take_lots(
+		"purified_water", 1, PackedStringArray([water_lot_id]))
+	var removed_scrap: Array = _playable.inventory_state.take_lots(
+		"scrap_metal", 1, PackedStringArray([scrap_lot_id]))
+	if removed_water.size() != 1 or removed_scrap.size() != 1:
+		_fail("production denial lot cleanup")
+		return false
+	return true
+
+
+func _expect_panel_install_denied(
+		panel, work_context, slot_id: String, component_id: String, item_form: String,
+		expected_reason: String, label: String) -> bool:
+	var before: Dictionary = _authoritative_snapshot(work_context)
+	panel.emit_install_request_for_validation(
+		slot_id, component_id, item_form,
+		str(work_context.ship_id), int(work_context.binding_generation))
+	var after: Dictionary = _authoritative_snapshot(work_context)
+	var status: String = str(panel.get("_status"))
+	if not status.ends_with(expected_reason) \
+			or _playable.has_active_ship_work_for_validation() or after != before:
+		_fail("production %s panel denial mutated authority: %s" % [label, status])
+		return false
+	return true
+
+
+func _expect_start_install_denied(
+		work_context, slot_id: String, component_id: String, item_form: String,
+		expected_reason: String, label: String) -> bool:
+	var slot: Dictionary = work_context.component_placement.get_physical_slot(slot_id)
+	var target_position: Variant = _playable._component_slot_world_position(slot_id, work_context)
+	if slot.is_empty() or not _playable._work_position_is_finite(target_position):
+		_fail("production %s target fixture" % label)
+		return false
+	(_playable.player as Node3D).global_position = target_position as Vector3
+	var selected_ids: PackedStringArray = _playable._selected_lot_ids_for_requirements(
+		{item_form: 1})
+	if selected_ids.size() != 1:
+		_fail("production %s selected-lot fixture" % label)
+		return false
+	var before: Dictionary = _authoritative_snapshot(work_context)
+	var denied: Dictionary = _playable._start_transactional_work(
+		"mount_component", slot_id, "component_install",
+		_playable._component_slot_revision(slot_id, work_context), {
+			"tool_class": "wrench", "skill_id": "salvage", "skill_level": 99,
+			"inventory": _playable._inventory_qty_dict_for_work(),
+		}, {
+			"slot_id": slot_id, "component_id": component_id, "item_form": item_form,
+			"room_id": str(slot.get("room_id", "")),
+			"slot_kind": str(slot.get("slot_kind", "")),
+			"slot_index": int(slot.get("slot_index", -1)),
+		}, target_position, selected_ids, str(work_context.ship_id))
+	var after: Dictionary = _authoritative_snapshot(work_context)
+	if str(denied.get("reason", "")) != expected_reason \
+			or _playable.has_active_ship_work_for_validation() or after != before:
+		_fail("production %s denial mutated authority: %s" % [label, str(denied)])
+		return false
+	return true
+
+
+func _validate_live_occupancy_refresh(
+		slot_id: String, component_id: String, item_form: String) -> bool:
+	var ship_id: String = _playable.get_selected_ship_id_for_validation()
+	var work_context = _playable._ship_work_context_for(ship_id)
+	var lifeboat = _playable.get_lifeboat_ship_for_validation()
+	var target_position: Variant = _playable._component_slot_world_position(
+		slot_id, work_context)
+	if work_context == null or lifeboat == null or lifeboat == work_context.ship \
+			or not (lifeboat.scene_root is Node3D) \
+			or not _playable._work_position_is_finite(target_position):
+		_fail("live occupancy-refresh fixture")
+		return false
+	var selected_ids: PackedStringArray = _playable._selected_lot_ids_for_requirements(
+		{item_form: 1})
+	if selected_ids.size() != 1:
+		_fail("live occupancy-refresh selected lot")
+		return false
+	var slot: Dictionary = work_context.component_placement.get_physical_slot(slot_id)
+	var payload: Dictionary = {
+		"slot_id": slot_id, "component_id": component_id, "item_form": item_form,
+		"room_id": str(slot.get("room_id", "")),
+		"slot_kind": str(slot.get("slot_kind", "")),
+		"slot_index": int(slot.get("slot_index", -1)),
+	}
+	var start_context: Dictionary = {
+		"tool_class": "wrench", "skill_id": "salvage", "skill_level": 99,
+		"inventory": _playable._inventory_qty_dict_for_work(),
+	}
+	var lifeboat_root: Node3D = lifeboat.scene_root as Node3D
+	var lifeboat_transform: Transform3D = lifeboat_root.global_transform
+	var target: Vector3 = target_position as Vector3
+	var overlap_delta: Vector3 = target - lifeboat.interior_aabb().get_center()
+	var overlap_transform: Transform3D = lifeboat_transform
+	overlap_transform.origin += overlap_delta
+	var far_transform: Transform3D = overlap_transform
+	far_transform.origin += Vector3(10000.0, 0.0, 0.0)
+
+	# Stale context says lifeboat while the actual player has just boarded the
+	# selected home ship. Start must refresh attendance before constructing its
+	# context and admit the paid work. The test deliberately does not recompute
+	# between moving the lifeboat away and invoking production start.
+	lifeboat_root.global_transform = overlap_transform
+	(_playable.player as Node3D).global_position = target
+	_playable.recompute_occupancy()
+	if _playable.get_current_occupancy_for_validation() != lifeboat:
+		_fail("live occupancy-refresh stale-away setup")
+		return false
+	lifeboat_root.global_transform = far_transform
+	var board_before: Dictionary = _authoritative_snapshot(work_context)
+	var board_started: Dictionary = _playable._start_transactional_work(
+		"mount_component", slot_id, "component_install",
+		_playable._component_slot_revision(slot_id, work_context), start_context,
+		payload, target, selected_ids, ship_id)
+	if not bool(board_started.get("ok", false)) \
+			or _playable.get_current_occupancy_for_validation() != work_context.ship \
+			or not _playable.has_active_ship_work_for_validation():
+		_fail("live occupancy-refresh boarded admission: %s" % str(board_started))
+		return false
+	var board_record: Dictionary = _playable.get_active_ship_work_record_for_validation()
+	var board_escrow: Array = (board_record.get("escrow", []) as Array).duplicate(true)
+	var cancelled: Dictionary = _playable._cancel_active_ship_work("explicit_cancel")
+	var board_after: Dictionary = _authoritative_snapshot(work_context)
+	var cancelled_record: Dictionary = work_context.work_transactions.get_record(
+		str(board_record.get("work_id", "")))
+	if board_escrow.size() != 1 or cancelled.get("returned_lots", []) != board_escrow \
+			or board_after.get("lots", {}) != board_before.get("lots", {}) \
+			or not _same_authoritative_consequences(board_before, board_after) \
+			or int(board_after.get("receipt_count", -1)) \
+			!= int(board_before.get("receipt_count", -2)) \
+			or str(cancelled_record.get("state", "")) != "cancelled" \
+			or not (cancelled_record.get("escrow", []) as Array).is_empty():
+		_fail("live occupancy-refresh boarded cancel recovery")
+		return false
+
+	# Stale context now says home while the actual player has just entered the
+	# lifeboat at the same range point. The refreshed context must deny before a
+	# work ID or escrow exists, with the entire authoritative snapshot unchanged.
+	lifeboat_root.global_transform = far_transform
+	(_playable.player as Node3D).global_position = target
+	_playable.recompute_occupancy()
+	if _playable.get_current_occupancy_for_validation() != work_context.ship:
+		_fail("live occupancy-refresh stale-home setup")
+		return false
+	lifeboat_root.global_transform = overlap_transform
+	var leave_before: Dictionary = _authoritative_snapshot(work_context)
+	var leave_denied: Dictionary = _playable._start_transactional_work(
+		"mount_component", slot_id, "component_install",
+		_playable._component_slot_revision(slot_id, work_context), start_context,
+		payload, target, selected_ids, ship_id)
+	var leave_after: Dictionary = _authoritative_snapshot(work_context)
+	if str(leave_denied.get("reason", "")) != "not_attending_target" \
+			or _playable.get_current_occupancy_for_validation() != lifeboat \
+			or _playable.has_active_ship_work_for_validation() \
+			or leave_after != leave_before:
+		_fail("live occupancy-refresh leave denial: %s" % str(leave_denied))
+		return false
+
+	lifeboat_root.global_transform = lifeboat_transform
+	(_playable.player as Node3D).global_position = target
+	_playable.recompute_occupancy()
+	return true
+
+
+func _validate_reserved_target_removal_cancel(
+		panel, slot_id: String, item_form: String, exact_lot: Dictionary) -> bool:
+	var ship_id: String = _playable.get_selected_ship_id_for_validation()
+	var work_context = _playable._ship_work_context_for(ship_id)
+	var placement = work_context.component_placement if work_context != null else null
+	if work_context == null or placement == null:
+		_fail("reserved target-removal context")
+		return false
+	var before: Dictionary = _authoritative_snapshot(work_context)
+	panel.set_inventory(_playable.inventory_state.items)
+	if not panel.install_from_inventory(
+			_playable.component_catalog, PackedStringArray([item_form])):
+		_fail("reserved target-removal start")
+		return false
+	var paid: Dictionary = _playable.get_active_ship_work_record_for_validation()
+	var escrow: Array = (paid.get("escrow", []) as Array).duplicate(true)
+	if escrow.size() != 1 or not (escrow[0] is Dictionary) \
+			or str((escrow[0] as Dictionary).get("lot_id", "")) \
+			!= str(exact_lot.get("lot_id", "")):
+		_fail("reserved target-removal exact escrow: %s" % str(paid))
+		return false
+	var physical_slots_before: Array = placement.physical_slots.duplicate(true)
+	var without_target: Array = []
+	for slot_v in physical_slots_before:
+		if slot_v is Dictionary and str((slot_v as Dictionary).get("slot_id", "")) == slot_id:
+			continue
+		without_target.append((slot_v as Dictionary).duplicate(true) if slot_v is Dictionary else slot_v)
+	placement.physical_slots = without_target
+	_playable.advance_active_ship_work_for_validation(0.5)
+	placement.physical_slots = physical_slots_before
+	var paused: Dictionary = _playable.get_active_ship_work_record_for_validation()
+	var paused_snapshot: Dictionary = _authoritative_snapshot(work_context)
+	if str(_playable.get_last_ship_work_result_for_validation().get("reason", "")) != "target_removed" \
+			or str(paused.get("state", "")) != "paused" \
+			or paused.get("escrow", []) != escrow \
+			or not _same_authoritative_consequences(before, paused_snapshot):
+		_fail("reserved removed target mutated consequence state: %s" % str(paused))
+		return false
+	var cancelled: Dictionary = _playable._cancel_active_ship_work("explicit_cancel")
+	var after: Dictionary = _authoritative_snapshot(work_context)
+	var cancelled_record: Dictionary = work_context.work_transactions.get_record(
+		str(paid.get("work_id", "")))
+	if not bool(cancelled.get("ok", false)) \
+			or cancelled.get("returned_lots", []) != escrow \
+			or after.get("lots", {}) != before.get("lots", {}) \
+			or not _same_authoritative_consequences(before, after) \
+			or int(after.get("receipt_count", -1)) != int(before.get("receipt_count", -2)) \
+			or str(cancelled_record.get("state", "")) != "cancelled" \
+			or not (cancelled_record.get("escrow", []) as Array).is_empty():
+		_fail("reserved removed target did not recover exact escrow: %s" % str(cancelled))
+		return false
+	panel.set_inventory(_playable.inventory_state.items)
+	return true
+
+
+func _same_authoritative_consequences(before: Dictionary, after: Dictionary) -> bool:
+	for key in [
+		"placement", "integrity", "modification", "systems", "receipt_count", "effects",
+		"threat_noise", "completion_audio", "training_log", "delivered_xp", "progression",
+	]:
+		if before.get(key) != after.get(key):
+			return false
+	return true
+
+
+func _validate_moved_owner_position_rechecks(slot_id: String, work_context) -> bool:
+	var owner_root = work_context.ship.scene_root if work_context != null else null
+	if not (owner_root is Node3D):
+		_fail("moved-owner active fixture")
+		return false
+	# Pause/resume gate: the cached point must be replaced by the live owner-space
+	# point before range is evaluated.
+	if not _playable.begin_p12_uninstall_for_validation(slot_id):
+		_fail("moved-owner pause start")
+		return false
+	var active_before: Dictionary = _authoritative_snapshot(work_context)
+	var target_before: Vector3 = _playable._active_ship_work_target_position
+	var transform_before: Transform3D = (owner_root as Node3D).global_transform
+	var movement: Vector3 = Vector3(_playable.WORK_ACTION_INTERACT_RANGE + 1.0, 0.0, 0.0)
+	(owner_root as Node3D).global_position += movement
+	_playable.advance_active_ship_work_for_validation(0.001)
+	var moved_cached: Vector3 = _playable._active_ship_work_target_position
+	(owner_root as Node3D).global_transform = transform_before
+	var paused_after: Dictionary = _authoritative_snapshot(work_context)
+	if str(_playable.get_last_ship_work_result_for_validation().get("reason", "")) != "out_of_range" \
+			or moved_cached.distance_to(target_before + movement) > 0.01 \
+			or not _same_authoritative_consequences(active_before, paused_after):
+		_fail("moved-owner pause used stale target position")
+		return false
+	if not bool(_playable._cancel_active_ship_work("explicit_cancel").get("ok", false)):
+		_fail("moved-owner pause cancel")
+		return false
+
+	# Commit gate: complete only the driver/ledger, then move the owner before the
+	# production coordinator is asked to commit. No resolver or consequence may run.
+	if not _playable.begin_p12_uninstall_for_validation(slot_id):
+		_fail("moved-owner commit start")
+		return false
+	var ready_before: Dictionary = _authoritative_snapshot(work_context)
+	var ready_id: String = str(_playable.get_active_ship_work_record_for_validation().get("work_id", ""))
+	_playable.work_action_driver.tick(999.0, {})
+	work_context.work_transactions.sync_progress(ready_id, _playable.work_action_driver)
+	if not work_context.work_transactions.mark_completed(ready_id, _playable.work_action_driver):
+		_fail("moved-owner ready fixture")
+		return false
+	transform_before = (owner_root as Node3D).global_transform
+	(owner_root as Node3D).global_position += movement
+	var denied_commit: Dictionary = _playable._commit_active_ship_work()
+	moved_cached = _playable._active_ship_work_target_position
+	(owner_root as Node3D).global_transform = transform_before
+	var denied_after: Dictionary = _authoritative_snapshot(work_context)
+	if str(denied_commit.get("reason", "")) != "out_of_range" \
+			or moved_cached.distance_to(target_before + movement) > 0.01 \
+			or not _same_authoritative_consequences(ready_before, denied_after):
+		_fail("moved-owner commit used stale target position: %s" % str(denied_commit))
+		return false
+	if not bool(_playable._cancel_active_ship_work("explicit_cancel").get("ok", false)) \
+			or not work_context.component_placement.is_mounted(slot_id):
+		_fail("moved-owner commit cancel")
+		return false
+	return true
+
+
+func _receipt_count(summary: Dictionary) -> int:
+	var count: int = 0
+	for record_v in summary.get("transactions", []) as Array:
+		if record_v is Dictionary \
+				and not str((record_v as Dictionary).get("commit_receipt_id", "")).is_empty():
+			count += 1
+	return count
+
+
+func _validate_untransactioned_component_fails_closed(slot_id: String) -> bool:
+	var ship_id: String = _playable.get_selected_ship_id_for_validation()
+	var work_context = _playable._ship_work_context_for(ship_id)
+	if work_context == null or _playable.has_active_ship_work_for_validation():
+		_fail("untransactioned component fixture")
+		return false
+	var protected_before: Dictionary = {
+		"inventory": _playable.inventory_state.get_summary(),
+		"placement": work_context.component_placement.get_summary(),
+		"ledger": work_context.work_transactions.get_summary(),
+		"observables": _playable.get_ship_work_observable_counts_for_validation(),
+		"training_log": _playable.get_training_event_bus().get_log(),
+		"training_xp": _playable.get_training_event_bus().get_total_xp_delivered(),
+		"progression": _playable.player_progression.get_summary(),
+		"threat_noise": float(_playable.threat_manager.player_noise),
+		"audio": _playable.audio_manager.sfx_router.get_summary(),
+	}
+	var started: bool = _playable.work_action_driver.start_action(
+		"dismount_component", slot_id, {
+			"tool_class": "wrench",
+			"skill_id": "salvage",
+			"skill_level": 99,
+			"inventory": _playable._inventory_qty_dict_for_work(),
+		})
+	if not started:
+		_fail("untransactioned component driver setup")
+		return false
+	_playable._tick_work_action(999.0)
+	var denied: Dictionary = _playable.work_action_driver.last_resolve
+	var protected_after: Dictionary = {
+		"inventory": _playable.inventory_state.get_summary(),
+		"placement": work_context.component_placement.get_summary(),
+		"ledger": work_context.work_transactions.get_summary(),
+		"observables": _playable.get_ship_work_observable_counts_for_validation(),
+		"training_log": _playable.get_training_event_bus().get_log(),
+		"training_xp": _playable.get_training_event_bus().get_total_xp_delivered(),
+		"progression": _playable.player_progression.get_summary(),
+		"threat_noise": float(_playable.threat_manager.player_noise),
+		"audio": _playable.audio_manager.sfx_router.get_summary(),
+	}
+	if str(denied.get("reason", "")) != "missing_work_transaction" \
+			or protected_after != protected_before \
+			or _playable.has_active_ship_work_for_validation():
+		_fail("untransactioned component path did not fail closed: %s" % str(denied))
+		return false
+	return true
 
 
 func _find_playable(node: Node):

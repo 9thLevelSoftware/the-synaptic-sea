@@ -86,9 +86,16 @@ func _initialize() -> void:
 		return
 
 	# Summary round-trip
+	var prepared_authority: Dictionary = place_a.prepare_condition_authority(
+		"component-slot-smoke", cat, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not place_a.commit_condition_authority(prepared_authority):
+		_fail("condition authority preparation")
+		return
 	var snap: Dictionary = place_a.get_summary()
 	var place_d = ComponentPlacementStateScript.new()
-	place_d.apply_summary(snap)
+	if not place_d.restore_from_layout(layout, cat, 42, snap):
+		_fail("current-layout summary restore")
+		return
 	if place_d.fingerprint() != place_a.fingerprint():
 		_fail("summary round-trip")
 		return
@@ -103,7 +110,7 @@ func _initialize() -> void:
 			_fail("missing instance id")
 			return
 
-	print("COMPONENT SLOT POPULATION PASS catalog=true placed=true deterministic=true no_collision=true linked=true count=%d" % n)
+	print("COMPONENT SLOT POPULATION PASS catalog=true placed=true deterministic=true no_collision=true linked=true")
 	quit(0)
 
 

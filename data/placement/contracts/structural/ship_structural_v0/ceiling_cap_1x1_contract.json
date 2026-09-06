@@ -10,12 +10,12 @@
   "bounds": {
     "local_min_m": [
       -2.0,
-      0.0,
+      3.8,
       -2.0
     ],
     "local_max_m": [
       2.0,
-      0.2,
+      4.0,
       2.0
     ],
     "placement_origin": "cell-center-floor",
@@ -131,12 +131,12 @@
     "bounds": {
       "local_min_m": [
         -2.0,
-        0.0,
+        3.8,
         -2.0
       ],
       "local_max_m": [
         2.0,
-        0.2,
+        4.0,
         2.0
       ],
       "placement_origin": "cell-center-floor",
@@ -237,6 +237,54 @@
     },
     "source_asset_path": "assets/_processed/ship_structural_v0/ceiling_cap_1x1/ceiling_cap_1x1.glb",
     "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
-    "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres"
+    "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+    "physical_bounds": {
+      "min": [
+        -2.0,
+        3.8,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    },
+    "visual_bounds": {
+      "min": [
+        -2.0,
+        3.6875,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    }
+  },
+  "physical_bounds": {
+    "min": [
+      -2.0,
+      3.8,
+      -2.0
+    ],
+    "max": [
+      2.0,
+      4.0,
+      2.0
+    ]
+  },
+  "visual_bounds": {
+    "min": [
+      -2.0,
+      3.6875,
+      -2.0
+    ],
+    "max": [
+      2.0,
+      4.0,
+      2.0
+    ]
   }
 }

@@ -1,0 +1,20 @@
+{
+  "scope": "partial P10 expanded scene matrix",
+  "full_p10_accepted": false,
+  "pass_count": 1,
+  "diagnostics": [],
+  "log_sha256": "df128c7bc840119a7df610b251921fc253d1bfd9a3b3a83551e957860ef4f3f3",
+  "covered_additionally": [
+    "same-ship component move and two reloads",
+    "cross-ship component move and two reloads/revisit",
+    "single mounted authority and immutable origin",
+    "rollback disk inventory checks"
+  ],
+  "pending": [
+    "full terminal migration/forgery expansion",
+    "malformed nondefault subsystem cases",
+    "precision rejection proof",
+    "P13 pointer integration",
+    "fresh-process trial and full regressions"
+  ]
+}

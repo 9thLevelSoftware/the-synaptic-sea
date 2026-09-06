@@ -1,0 +1,650 @@
+{
+	"world_summary": {},
+	"home_ship": {
+		"layout_path": "res://data/procgen/smoke/seed_000017/layout.json",
+		"kit_path": "res://data/kits/ship_structural_v0.json",
+		"gameplay_slice_path": "res://data/procgen/smoke/seed_000017/gameplay_slice.json",
+		"player_position": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"current_objective_sequence": 1,
+		"ship_systems_summary": {},
+		"route_control_summary": {},
+		"oxygen_summary": {},
+		"inventory_summary": {
+			"items": {},
+			"item_lots_v1": {
+				"schema": "item-lots-1",
+				"holder_namespace": "player:fixture-world",
+				"sequence": 0,
+				"lots": []
+			},
+			"tool_ids": [],
+			"active_effects": [],
+			"drain_multiplier": 1.0,
+			"total_weight": 0.0,
+			"max_weight": 50.0,
+			"threat_summary": {
+				"schema": "threat-manager-2",
+				"encounter_markers": [
+					{
+						"id": "fallback_0",
+						"room_id": "dock_01",
+						"cell": [
+							0,
+							0
+						],
+						"encounter_kind": "biomatter_swarm",
+						"count": 1
+					},
+					{
+						"id": "fallback_1",
+						"room_id": "corridor_02",
+						"cell": [
+							1,
+							0
+						],
+						"encounter_kind": "puppet_corpse",
+						"count": 1
+					},
+					{
+						"id": "fallback_2",
+						"room_id": "crew_quarters_03",
+						"cell": [
+							2,
+							0
+						],
+						"encounter_kind": "stalker",
+						"count": 1
+					},
+					{
+						"id": "fallback_3",
+						"room_id": "corridor_04",
+						"cell": [
+							3,
+							0
+						],
+						"encounter_kind": "mimic",
+						"count": 1
+					},
+					{
+						"id": "fallback_4",
+						"room_id": "cargo_05",
+						"cell": [
+							4,
+							0
+						],
+						"encounter_kind": "hull_tendril",
+						"count": 1
+					}
+				],
+				"threats": [
+					{
+						"instance_id": "fallback_0_0",
+						"archetype_id": "biomatter_swarm",
+						"display_name": "Biomatter Swarm",
+						"room_id": "dock_01",
+						"cell": [
+							0,
+							0
+						],
+						"world_position": [
+							4.0,
+							0.0,
+							0.0
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 24.0,
+						"health": 24.0,
+						"attack_damage": 6.0,
+						"structure_damage": 0.0,
+						"attack_type": "biomatter",
+						"attack_noise": 0.45,
+						"attack_interval": 1.1,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 1.1,
+						"light_sensitivity": 0.7,
+						"sight_sensitivity": 0.8,
+						"memory_seconds": 6.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.1,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "infected",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 1.0
+							},
+							"resistance": {
+								"biomatter": 0.1,
+								"fire": 0.0
+							},
+							"durability": 18.0
+						},
+						"tags": [
+							"swarm",
+							"biomatter"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": true,
+						"anchored": false,
+						"telegraph_seconds": 0.25,
+						"telegraph_remaining": 0.0,
+						"player_verb": "burn_or_scatter"
+					},
+					{
+						"instance_id": "fallback_1_0",
+						"archetype_id": "puppet_corpse",
+						"display_name": "Puppet Corpse",
+						"room_id": "corridor_02",
+						"cell": [
+							1,
+							0
+						],
+						"world_position": [
+							2.161209223472559,
+							0.0,
+							3.365883939231586
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 42.0,
+						"health": 42.0,
+						"attack_damage": 10.0,
+						"structure_damage": 0.0,
+						"attack_type": "physical",
+						"attack_noise": 0.55,
+						"attack_interval": 1.5,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.9,
+						"light_sensitivity": 0.8,
+						"sight_sensitivity": 0.9,
+						"memory_seconds": 7.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.18,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "bleed",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 2.0
+							},
+							"resistance": {
+								"physical": 0.15,
+								"fire": -0.15
+							},
+							"durability": 28.0
+						},
+						"tags": [
+							"melee",
+							"corpse"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.6,
+						"telegraph_remaining": 0.0,
+						"player_verb": "keep_distance"
+					},
+					{
+						"instance_id": "fallback_2_0",
+						"archetype_id": "stalker",
+						"display_name": "Stalker",
+						"room_id": "crew_quarters_03",
+						"cell": [
+							2,
+							0
+						],
+						"world_position": [
+							-1.6645873461885696,
+							0.0,
+							3.637189707302727
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 30.0,
+						"health": 30.0,
+						"attack_damage": 12.0,
+						"structure_damage": 0.0,
+						"attack_type": "physical",
+						"attack_noise": 0.25,
+						"attack_interval": 1.2,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 1.3,
+						"light_sensitivity": 1.0,
+						"sight_sensitivity": 1.2,
+						"memory_seconds": 10.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.12,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "bleed",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 1.0
+							},
+							"resistance": {
+								"electric": -0.2,
+								"fire": -0.1
+							},
+							"durability": 16.0
+						},
+						"tags": [
+							"stealth",
+							"hunter"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.15,
+						"flee_speed_mult": 1.5,
+						"investigate_speed_mult": 0.85,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 3.5,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.35,
+						"telegraph_remaining": 0.0,
+						"player_verb": "break_los"
+					},
+					{
+						"instance_id": "fallback_3_0",
+						"archetype_id": "mimic",
+						"display_name": "Mimic",
+						"room_id": "corridor_04",
+						"cell": [
+							3,
+							0
+						],
+						"world_position": [
+							-3.9599699864017817,
+							0.0,
+							0.5644800322394689
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 36.0,
+						"health": 36.0,
+						"attack_damage": 11.0,
+						"structure_damage": 0.0,
+						"attack_type": "acid",
+						"attack_noise": 0.35,
+						"attack_interval": 1.4,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.8,
+						"light_sensitivity": 1.2,
+						"sight_sensitivity": 1.0,
+						"memory_seconds": 8.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.15,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "exposed",
+						"armor_profile": {
+							"flat_reduction": {
+								"acid": 2.0
+							},
+							"resistance": {
+								"acid": 0.3,
+								"fire": -0.25
+							},
+							"durability": 20.0
+						},
+						"tags": [
+							"ambush",
+							"acid"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": true,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.5,
+						"telegraph_remaining": 0.0,
+						"player_verb": "probe_before_loot"
+					},
+					{
+						"instance_id": "fallback_4_0",
+						"archetype_id": "hull_tendril",
+						"display_name": "Hull Tendril",
+						"room_id": "cargo_05",
+						"cell": [
+							4,
+							0
+						],
+						"world_position": [
+							-2.6145744834544478,
+							0.0,
+							-3.027209981231713
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 48.0,
+						"health": 48.0,
+						"attack_damage": 8.0,
+						"structure_damage": 0.4,
+						"attack_type": "electric",
+						"attack_noise": 0.4,
+						"attack_interval": 1.8,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.7,
+						"light_sensitivity": 1.1,
+						"sight_sensitivity": 0.9,
+						"memory_seconds": 9.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.08,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "stun",
+						"armor_profile": {
+							"flat_reduction": {
+								"electric": 3.0
+							},
+							"resistance": {
+								"electric": 0.45,
+								"fire": -0.1
+							},
+							"durability": 32.0
+						},
+						"tags": [
+							"anchored",
+							"electric"
+						],
+						"move_speed": 0.1,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.0,
+						"investigate_speed_mult": 0.1,
+						"attack_range": 2.2,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": true,
+						"telegraph_seconds": 0.9,
+						"telegraph_remaining": 0.0,
+						"player_verb": "cut_structure"
+					}
+				],
+				"detection": {
+					"noise_level": 0.0,
+					"light_level": 0.0,
+					"sight_level": 0.0,
+					"crouching": false,
+					"room_id": "",
+					"detect_threshold": 0.75,
+					"memory_seconds": 5.0,
+					"memory_remaining": 0.0,
+					"awareness_score": 0.0,
+					"detected": false,
+					"heard": false,
+					"seen": false,
+					"last_reason": "idle"
+				},
+				"awareness_indicator": 0.0,
+				"combat_engaged": false,
+				"last_attack_result": {},
+				"damage_pipeline": {
+					"processed_hits": 0,
+					"total_damage_applied": 0.0,
+					"total_noise_generated": 0.0,
+					"last_result": {},
+					"armor_resolver": {
+						"armor_profile": {
+							"flat_reduction": {},
+							"resistance": {},
+							"durability": 0.0,
+							"max_durability": 0.0,
+							"wear_factor": 0.35
+						},
+						"last_resolution": {}
+					}
+				}
+			}
+		},
+		"fire_summary": {},
+		"electrical_arc_summary": {},
+		"objective_progress_summary": {},
+		"player_progression_summary": {},
+		"skill_tree_summary": {},
+		"settings_summary": {},
+		"audio_summary": {},
+		"spoilage_summary": {},
+		"hydroponics_summary": {},
+		"water_recycler_summary": {},
+		"crafting_summary": {
+			"recipe_count": 61,
+			"active_craft": {},
+			"station_summaries": {},
+			"physical_station_summaries": {},
+			"craft_jobs_v1": {
+				"schema": "craft-jobs-2",
+				"jobs": [],
+				"owners": []
+			},
+			"physical_station_positions_v1": {
+				"schema": "physical-station-positions-1",
+				"owners": []
+			},
+			"field_crafting": {
+				"recipe_count": 61,
+				"active_craft": {},
+				"station_summaries": {},
+				"physical_station_summaries": {},
+				"craft_jobs_v1": {
+					"schema": "craft-jobs-2",
+					"jobs": [],
+					"owners": []
+				},
+				"field_pending_v1": {
+					"schema": "field-pending-2",
+					"ship_id": "ship_start",
+					"receipt_sequence": 4,
+					"active_receipt_id": "",
+					"pinned_destination_ship_id": "",
+					"pinned_local_position": [],
+					"receipt_history_v1": [
+						{
+							"destination_ship_id": "ship_start",
+							"original_lots": [
+								{
+									"condition": 1.0,
+									"item_id": "field_bandage",
+									"lot_id": "field_crafting/job-000004/output/output-1",
+									"origin": {
+										"field_receipt_id": "field_crafting/job-000004/output"
+									},
+									"quality_score": 0.7,
+									"quality_tier": "good",
+									"quantity": 1.0
+								}
+							],
+							"receipt_id": "field_crafting/job-000004/output",
+							"recipe_id": "field_bandage"
+						}
+					]
+				}
+			}
+		},
+		"recipe_knowledge_summary": {
+			"schema": "recipe-knowledge-1",
+			"owner_id": "player:fixture-world",
+			"known_recipe_ids": [
+				"weld_plating"
+			],
+			"event_receipt_ids": [
+				"codex:fixture"
+			],
+			"event_sequence": 4,
+			"dismantle_counts": {
+				"power_cell": 2
+			},
+			"migration_origin": "native"
+		},
+		"material_summary": {},
+		"consumable_summary": {},
+		"medicine_summary": {},
+		"stimulant_summary": {},
+		"addiction_summary": {},
+		"ammo_summary": {},
+		"utility_summary": {},
+		"vitals_summary": {},
+		"sanity_summary": {},
+		"radiation_summary": {},
+		"temperature_summary": {},
+		"status_effects_summary": {},
+		"hallucination_summary": {},
+		"module_integrity_summary": {},
+		"component_placement_summary": {
+			"schema": "component_placement_v2",
+			"condition_authority_version": 1,
+			"condition_lot_sequence": 0,
+			"seed": 0,
+			"count": 0,
+			"placed": [],
+			"rejected_saved_components": []
+		},
+		"work_action_summary": {},
+		"ship_modification_summary": {},
+		"play_time_seconds": 0.0,
+		"current_location": "",
+		"world_seed": 0,
+		"slot_id": "p10-modern-world",
+		"slot_kind": "manual",
+		"is_autosave": false,
+		"is_quicksave": false,
+		"parent_world_slot": "",
+		"run_id": "fixture-world",
+		"slice_version": "gate2-current-run-6",
+		"godot_version": "4.7.2-stable (official)",
+		"saved_at": "2026-09-06T02:52:48",
+		"saved_at_epoch": 1788663168
+	},
+	"meta_progression_summary": {},
+	"unique_item_summary": {},
+	"home_looted_containers": [],
+	"home_ship_carts": [],
+	"home_breach_environment": {},
+	"visited_ships": {
+		"marker-away": {
+			"inventory": {
+				"item_lots_v1": {
+					"holder_namespace": "ship:ship-away:cargo",
+					"lots": [
+						{
+							"condition": 1.0,
+							"item_id": "scrap_metal",
+							"lot_id": "ship:ship-away:cargo/lot-000001",
+							"origin": {
+								"kind": "salvage"
+							},
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"quantity": 2.0
+						}
+					],
+					"schema": "item-lots-1",
+					"sequence": 1.0
+				},
+				"max_weight": 120.0
+			},
+			"marker_id": "marker-away",
+			"pending_outputs_v1": {
+				"records": [],
+				"schema": "pending-outputs-1",
+				"ship_id": "ship-away"
+			},
+			"ship_id": "ship-away"
+		}
+	},
+	"current_location": "",
+	"world_time": 20.0,
+	"player_position_in_ship": [
+		0.0,
+		0.0,
+		0.0
+	],
+	"dock_edges": [],
+	"piloted_ship_id": "",
+	"aboard_ship_id": "ship_start",
+	"opened_ports": [],
+	"run_id": "fixture-world",
+	"slice_version": "world-6",
+	"godot_version": "4.7.2-stable (official)",
+	"saved_at": "2026-09-06T02:52:48",
+	"home_pending_outputs_v1": {
+		"records": [
+			{
+				"collected_quantities": {},
+				"original_lots": [
+					{
+						"condition": 1.0,
+						"item_id": "field_bandage",
+						"lot_id": "field_crafting/job-000004/output/output-1",
+						"origin": {
+							"field_receipt_id": "field_crafting/job-000004/output"
+						},
+						"quality_score": 0.7,
+						"quality_tier": "good",
+						"quantity": 1.0
+					}
+				],
+				"producer_id": "field_crafting/job-000004",
+				"producer_kind": "field_craft",
+				"purpose": "output",
+				"receipt_id": "field_crafting/job-000004/output",
+				"remaining_lots": [
+					{
+						"condition": 1.0,
+						"item_id": "field_bandage",
+						"lot_id": "field_crafting/job-000004/output/output-1",
+						"origin": {
+							"field_receipt_id": "field_crafting/job-000004/output"
+						},
+						"quality_score": 0.7,
+						"quality_tier": "good",
+						"quantity": 1.0
+					}
+				],
+				"ship_id": "ship_start",
+				"source_holder_id": "",
+				"state": "pending",
+				"station_instance_id": "field_crafting"
+			}
+		],
+		"schema": "pending-outputs-1",
+		"ship_id": "ship_start"
+	},
+	"home_access_v1": {
+		"access_ids": [
+			"player:foreign"
+		],
+		"owner_id": "player:foreign"
+	}
+}

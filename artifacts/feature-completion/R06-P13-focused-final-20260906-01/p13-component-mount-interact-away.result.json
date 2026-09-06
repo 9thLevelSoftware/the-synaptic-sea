@@ -1,0 +1,32 @@
+{
+  "id": "p13-component-mount-interact-away",
+  "scope": "focused",
+  "script": "scripts/validation/component_mount_interact_away_smoke.gd",
+  "marker": "COMPONENT MOUNT INTERACT AWAY PASS away=true dismount=true remount=true mounted=true",
+  "player_accepted": false,
+  "passed": false,
+  "reason": "nonzero exit",
+  "exit_code": 1,
+  "duration_seconds": 2.578,
+  "diagnostics": [],
+  "cleanup_error": null,
+  "stdout_log": "p13-component-mount-interact-away.stdout.log",
+  "stderr_log": "p13-component-mount-interact-away.stderr.log",
+  "containment_probe": {
+    "passed": true,
+    "reason": "passed",
+    "exit_code": 0,
+    "timed_out": false,
+    "cleanup_error": null,
+    "duration_seconds": 2.031,
+    "marker_count": 1,
+    "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-01/user-data/p13-component-mount-interact-away/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-01/user-data/p13-component-mount-interact-away/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-01/user-data/p13-component-mount-interact-away",
+    "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P13-focused-final-20260906-01\\user-data\\p13-component-mount-interact-away",
+    "diagnostics": [],
+    "unexpected_stdout": [],
+    "unexpected_stderr": [],
+    "stdout_log": "p13-component-mount-interact-away.probe.stdout.log",
+    "stderr_log": "p13-component-mount-interact-away.probe.stderr.log"
+  },
+  "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P13-focused-final-20260906-01\\user-data\\p13-component-mount-interact-away"
+}

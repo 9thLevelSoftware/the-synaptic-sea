@@ -1,0 +1,4 @@
+exit=0
+markers=1
+diagnostics=0
+stderr_bytes=0

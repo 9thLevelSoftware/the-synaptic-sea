@@ -7,6 +7,8 @@ const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd"
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const SpatialPerceptionStateScript := preload("res://scripts/systems/spatial_perception_state.gd")
+const ThreatSaveContractScript := preload("res://scripts/systems/threat_save_contract.gd")
+const ThreatInitialStateBuilderScript := preload("res://scripts/systems/threat_initial_state_builder.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
@@ -55,12 +57,15 @@ func _ready() -> void:
 
 func configure_for_layout(layout: Dictionary, markers: Array = [], anchor: Vector3 = Vector3.ZERO) -> void:
 	fallback_anchor = anchor
-	encounter_markers = markers.duplicate(true)
-	if encounter_markers.is_empty():
-		encounter_markers = _fallback_markers_from_layout(layout)
 	configure_nav_graph(layout)
 	configure_spatial_perception(layout)
-	_spawn_from_markers(encounter_markers, fallback_anchor)
+	var initial: Dictionary = ThreatInitialStateBuilderScript.build_initial_v2(
+		layout, markers, anchor, threat_archetypes)
+	if not bool(initial.get("ok", false)):
+		_clear_runtime_nodes()
+		encounter_markers = markers.duplicate(true)
+		return
+	_apply_validated_summary(initial.summary as Dictionary)
 
 
 ## PKG-C4.1b: build SpatialPerceptionState from layout room_links / blocked_links.
@@ -238,6 +243,7 @@ func get_summary() -> Dictionary:
 	for threat in threats:
 		threat_summaries.append(threat.get_summary())
 	return {
+		"schema": ThreatSaveContractScript.SCHEMA,
 		"encounter_markers": encounter_markers.duplicate(true),
 		"threats": threat_summaries,
 		"detection": detection_state.get_summary(),
@@ -248,8 +254,19 @@ func get_summary() -> Dictionary:
 	}
 
 func apply_summary(summary: Dictionary) -> bool:
-	if summary == null or summary.is_empty():
+	var validated: Dictionary = ThreatSaveContractScript.validate_current(summary)
+	if not bool(validated.get("ok", false)):
 		return false
+	_apply_validated_summary(validated.summary as Dictionary)
+	return true
+
+
+func _apply_validated_summary(summary: Dictionary) -> void:
+	# Tear down the prior scene adapters and transient path/reward caches before
+	# hydrating authority. _clear_runtime_nodes() also resets manager projections,
+	# so calling it after the assignments below silently erased every saved
+	# non-zero awareness/combat value on load.
+	_clear_runtime_nodes()
 	encounter_markers = (summary.get("encounter_markers", []) as Array).duplicate(true) if summary.get("encounter_markers", []) is Array else []
 	if summary.get("detection", null) is Dictionary:
 		detection_state.apply_summary(summary.get("detection", {}))
@@ -257,8 +274,13 @@ func apply_summary(summary: Dictionary) -> bool:
 		damage_pipeline.apply_summary(summary.get("damage_pipeline", {}))
 	awareness_indicator = float(summary.get("awareness_indicator", 0.0))
 	combat_engaged = bool(summary.get("combat_engaged", false))
-	last_attack_result = summary.get("last_attack_result", {}) if summary.get("last_attack_result", {}) is Dictionary else {}
-	_clear_runtime_nodes()
+	last_attack_result = (summary.get("last_attack_result", {}) as Dictionary).duplicate(true) \
+		if summary.get("last_attack_result", {}) is Dictionary else {}
+	# This cache is the exact persisted attack attribution consumed by the next
+	# dead-threat sweep. Rebuild it from the authoritative result instead of
+	# letting a load turn a ranged kill into an unarmed intimidation event.
+	_last_attack_weapon_id = last_attack_result.weapon_id as String \
+		if last_attack_result.has("weapon_id") else ""
 	var idx: int = 0
 	var raw_threats: Variant = summary.get("threats", [])
 	if raw_threats is Array:
@@ -270,7 +292,6 @@ func apply_summary(summary: Dictionary) -> bool:
 			threats.append(threat)
 			_spawn_placeholder(threat, idx, fallback_anchor)
 			idx += 1
-	return true
 
 func get_status_lines() -> PackedStringArray:
 	var alive: int = 0
@@ -512,6 +533,7 @@ func _clear_runtime_nodes() -> void:
 	_rewarded_kills.clear()
 	threats.clear()
 	_path_runtime.clear()
+	engaged_los.clear()
 	combat_engaged = false
 	awareness_indicator = 0.0
 

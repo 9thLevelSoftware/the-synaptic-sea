@@ -1,0 +1,72 @@
+{
+  "name": "title-failure",
+  "script": "title_load_failure_smoke.gd",
+  "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+  "environment": {
+    "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+    "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+    "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+    "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user"
+  },
+  "probe": {
+    "command": [
+      "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+      "--headless",
+      "--path",
+      "D:\\the-synaptic-sea-feature-completion",
+      "--log-file",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\probe-godot.log",
+      "--user-data-dir",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+      "--script",
+      "res://scripts/validation/fc_p10_process_smoke.gd",
+      "--",
+      "--mode=probe",
+      "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "markers": [
+      "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user"
+    ],
+    "diagnostics": [],
+    "passed": true
+  },
+  "body": {
+    "command": [
+      "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+      "--headless",
+      "--path",
+      "D:\\the-synaptic-sea-feature-completion",
+      "--log-file",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\body-godot.log",
+      "--user-data-dir",
+      "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+      "--script",
+      "res://scripts/validation/title_load_failure_smoke.gd"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_prefix": "TITLE LOAD FAILURE PASS ",
+    "marker_lines": [
+      "TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true"
+    ],
+    "marker_count": 1,
+    "diagnostics": [
+      "ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure",
+      "WARNING: TitleMain: gameplay boot failed (smoke_forced_failure) — returning to title"
+    ],
+    "intentional_injected_diagnostics": true,
+    "expected_diagnostics": [
+      "ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure",
+      "WARNING: TitleMain: gameplay boot failed (smoke_forced_failure) — returning to title"
+    ],
+    "diagnostics_classification": "expected loader-failure injection only",
+    "stdout_bytes": 419,
+    "stderr_bytes": 750,
+    "passed": true
+  },
+  "duration_seconds": 4.797,
+  "passed": true
+}

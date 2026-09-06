@@ -2,6 +2,14 @@
 
 **Last updated:** 2026-09-06
 
+**Execution paused at the user's request.** Resume from the
+[2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md).
+The checkpoint preserves integrated WIP and portable task evidence; it is not
+feature-complete or independently approved as a whole. R10-A's latest focused
+home/away production traversal checks pass, but its final combined qualification,
+paired run7/world7 migration and independent review remain pending. Continue
+only after the user explicitly resumes.
+
 ## Current feature-completion program
 
 The approved feature-completion program is active. Its scope is the

@@ -5,18 +5,13 @@ extends SceneTree
 ## user://saves/ dir (no test-scoped save root exists in this codebase --
 ## mirrors every other save-touching smoke's cleanup discipline).
 ##
-## Corrupt-world case (PR #57 Codex P2): writes literal garbage over
+## Invalid-world case (PR #57 Codex P2): writes a valid JSON non-object over
 ## world.json (has_slot("world") still reports true -- the file exists,
-## it just is not valid JSON) and asserts is_continue_available() now
+## but it is not a world object) and asserts is_continue_available() now
 ## reads false, proving the strengthened gate actually calls
 ## load_world() rather than stopping at the has_slot/has_died_in checks.
-## This deliberately prints two expected, allowlisted lines: Godot's own
-## native "ERROR: Parse JSON failed..." (core/io/json.cpp, not a Synaptic
-## Sea push_error) followed by load_world()'s
-## "WARNING: SaveLoadService: world save file is not valid JSON object"
-## push_warning. Both are allowlisted in 06_validation_plan.md's regression
-## bundle (CORRUPT_WORLD_JSON_ERROR / CORRUPT_WORLD_WARNING) -- see that
-## file's "Baseline Godot teardown noise" section for the full rationale.
+## Using a syntactically valid array preserves the rejection predicate without
+## manufacturing parser diagnostics in a successful smoke.
 ##
 ## Pass marker:
 ##   TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true
@@ -25,6 +20,8 @@ const TitleSaveQueryScript := preload("res://scripts/systems/title_save_query.gd
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
+const CURRENT_WORLD_FIXTURE: String = \
+	"res://tests/fixtures/feature_completion/p10_world_v5_transactional.json"
 
 func _initialize() -> void:
 	var service := SaveLoadServiceScript.new()
@@ -43,10 +40,11 @@ func _initialize() -> void:
 	# load_from_slot()) rejects a dict whose version markers do not match
 	# the running engine. An unstamped fixture would make this case fail
 	# for the wrong reason (version mismatch, not "no save").
-	var ws := WorldSnapshotScript.new()
-	ws.home_ship = {"current_objective_sequence": 1}
-	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
-	ws.godot_version = Engine.get_version_info()["string"]
+	var ws = _current_world_fixture(service)
+	if ws == null:
+		_fail("current fixture could not be prepared")
+		return
+	service.set_active_run_id(str(ws.run_id))
 	if not service.save_world(ws):
 		_fail("save_world failed while seeding has-save case")
 		return
@@ -64,8 +62,8 @@ func _initialize() -> void:
 		return
 	resolver.clear_death("world")
 
-	# Case 4 (PR #57 Codex P2): a corrupt world.json (literal garbage, not
-	# valid JSON) must also block Continue. has_slot("world") reports true
+	# Case 4 (PR #57 Codex P2): a non-object world.json must also block
+	# Continue. has_slot("world") reports true
 	# (the file exists) and has_died_in is false, so only the strengthened
 	# load_world()!=null check catches this -- proving the fix actually
 	# calls it rather than stopping at the first two gates. Writes directly
@@ -77,7 +75,7 @@ func _initialize() -> void:
 	if corrupt_file == null:
 		_fail("could not open world.json path for corrupt-write fixture")
 		return
-	corrupt_file.store_string("not valid json {{{")
+	corrupt_file.store_string("[]")
 	corrupt_file.close()
 	var corrupt_blocks: bool = not TitleSaveQueryScript.is_continue_available(service, resolver)
 	if not corrupt_blocks:
@@ -87,6 +85,45 @@ func _initialize() -> void:
 	_wipe(service, resolver)
 	print("TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true")
 	quit(0)
+
+
+func _current_world_fixture(service: RefCounted):
+	var parsed: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string(CURRENT_WORLD_FIXTURE))
+	if not parsed is Dictionary:
+		return null
+	_replace_fixture_version(parsed)
+	var saves_dir: String = SaveLoadServiceScript.SAVES_DIR
+	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(saves_dir)) != OK:
+		return null
+	var file := FileAccess.open(SaveLoadServiceScript.WORLD_SLOT_FILE, FileAccess.WRITE)
+	if file == null:
+		return null
+	file.store_string(JSON.stringify(parsed, "", true, true))
+	file.close()
+	var prepared: Dictionary = service.prepare_world_load()
+	if not bool(prepared.get("ok", false)):
+		return null
+	var token: String = str(prepared.get("token", ""))
+	var current_dict: Dictionary = service.inspect_prepared_world_for_validation(
+		token, str(prepared.get("seal", "")))
+	service.discard_prepared_load(token)
+	return WorldSnapshotScript.from_dict(
+		current_dict, WorldSnapshotScript.WORLD_SLICE_VERSION,
+		Engine.get_version_info()["string"])
+
+
+func _replace_fixture_version(value: Variant) -> void:
+	if value is Dictionary:
+		var dict: Dictionary = value
+		for key in dict.keys():
+			if str(key) == "godot_version" and str(dict[key]) == "fixture-current":
+				dict[key] = Engine.get_version_info()["string"]
+			else:
+				_replace_fixture_version(dict[key])
+	elif value is Array:
+		for item in value as Array:
+			_replace_fixture_version(item)
 
 func _wipe(service, resolver) -> void:
 	service.delete_current_run()

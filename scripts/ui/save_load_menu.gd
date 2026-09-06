@@ -18,17 +18,17 @@ func refresh() -> Array:
 		return []
 	return _service.list_slots()
 
-func select_slot_for_load(slot_id: String) -> Object:
+func select_slot_for_load(slot_id: String) -> Dictionary:
 	if _service == null:
-		return null
-	return _service.load_from_slot(slot_id)
+		return {"ok": false, "reason": "missing_service"}
+	return _service.prepare_slot_load(slot_id)
 
-func confirm_save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, display_name: String) -> bool:
+func confirm_save_to_slot(slot_id: String, snapshot: Variant, slot_kind: String, display_name: String) -> bool:
 	if _service == null:
 		return false
 	return _service.save_to_slot(slot_id, snapshot, slot_kind, false, display_name)
 
-func confirm_quicksave(snapshot: RunSnapshot) -> bool:
+func confirm_quicksave(snapshot: Variant) -> bool:
 	if _service == null:
 		return false
 	return _service.save_to_slot("quicksave", snapshot, "quick", true, "Quicksave")

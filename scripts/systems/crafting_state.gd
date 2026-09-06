@@ -22,6 +22,8 @@ var _craft_job_scheduler: RefCounted = CraftJobSchedulerScript.new()
 var _physical_station_states: Dictionary = {} # [ship_id, station_instance_id] -> StationState
 var _job_contexts: Dictionary = {} # owner key -> paid reservation/run dependencies
 var _completion_receipts: Array = []
+var _legacy_restore_ship_id: String = ""
+var _legacy_restore_source_holder_id: String = ""
 
 func _init() -> void:
 	_load_recipes()
@@ -400,7 +402,10 @@ func get_or_create_station_instance(ship_id: String, station_instance_id: String
 		"station_instance_id": station_instance_id,
 		"station_kind": station_kind,
 		"level": int(inherited.get("level")),
-		"tier": int(inherited.get("tier")),
+		# The generic station is a picker compatibility projection. Its derived
+		# component tier belongs to no physical owner and must not seed a station
+		# created later on another ship.
+		"tier": int(inherited.get("level")),
 		"powered": bool(inherited.get("powered")),
 	})
 	_physical_station_states[key] = station
@@ -441,12 +446,24 @@ func get_craft_job_scheduler() -> RefCounted:
 	return _craft_job_scheduler
 
 
+func configure_legacy_restore_owner(ship_id: String, source_holder_id: String) -> bool:
+	if ship_id.is_empty() or source_holder_id.is_empty():
+		return false
+	_legacy_restore_ship_id = ship_id
+	_legacy_restore_source_holder_id = source_holder_id
+	return true
+
+
 func receive_completion_receipts(receipts: Array) -> int:
 	return _collect_completion_receipts(receipts)
 
 
 func has_completion_receipts() -> bool:
 	return not _completion_receipts.is_empty()
+
+
+func completion_receipt_count() -> int:
+	return _completion_receipts.size()
 
 
 ## Reattaches non-serializable live dependencies after a station scene is built
@@ -475,6 +492,35 @@ func bind_station_runtime_context(
 		inventory.call("bind_craft_reservation_authority", _craft_job_scheduler)
 	return true
 
+
+## Reattaches the live holder services required by migration-only station jobs.
+## These stations have no scene node and therefore are not covered by the normal
+## station rebuild. They remain isolated from generic enqueue APIs below.
+func bind_legacy_migration_jobs(
+		inventory: RefCounted, knowledge = null, player_progression = null,
+		pending_output_store = null) -> bool:
+	if inventory == null:
+		return false
+	var bound_any: bool = false
+	var summary: Dictionary = _craft_job_scheduler.call("get_summary")
+	for owner_variant in summary.get("owners", []) as Array:
+		if not owner_variant is Dictionary:
+			return false
+		var owner: Dictionary = owner_variant
+		var ship_id: String = str(owner.get("ship_id", ""))
+		var station_id: String = str(owner.get("station_instance_id", ""))
+		if not _is_migration_station(ship_id, station_id):
+			continue
+		var station = get_station_instance(ship_id, station_id)
+		if station == null:
+			return false
+		if not bind_station_runtime_context(
+				ship_id, station_id, str(station.get("station_kind")), inventory,
+				knowledge, player_progression, pending_output_store):
+			return false
+		bound_any = true
+	return bound_any
+
 func remove_station(station_kind: String) -> void:
 	_station_states.erase(station_kind)
 
@@ -500,6 +546,8 @@ func begin_craft(
 	var stable_station_id: String = station_instance_id
 	if stable_station_id.is_empty():
 		stable_station_id = "legacy:%s" % station_kind
+	if _is_migration_station(ship_id, stable_station_id):
+		return false
 	if is_station_busy(ship_id, stable_station_id):
 		return false
 	var station = get_or_create_station_instance(ship_id, stable_station_id, station_kind)
@@ -558,6 +606,8 @@ func enqueue_craft(
 		return 0
 	var stable_station_id: String = station_instance_id if not station_instance_id.is_empty() \
 		else "legacy:%s" % station_kind
+	if _is_migration_station(ship_id, stable_station_id):
+		return 0
 	var station = get_or_create_station_instance(ship_id, stable_station_id, station_kind)
 	var owner_key: String = _owner_key(ship_id, stable_station_id)
 	var local_context: Dictionary = (_job_contexts.get(owner_key, {}) as Dictionary).duplicate(false)
@@ -652,6 +702,8 @@ func finish_craft() -> Dictionary:
 				str(lot.get("quality_tier", "standard"))),
 			"quality_score": float(lot.get("quality_score", 0.5)),
 			"station_kind": str(claimed.get("station_kind", "")),
+			"ship_id": str(claimed.get("ship_id", "")),
+			"station_instance_id": str(claimed.get("station_instance_id", "")),
 			"recipe_id": str(claimed.get("recipe_id", "")),
 			"job_id": job_id,
 			"receipt_id": str(claimed.get("receipt_id", "")),
@@ -753,6 +805,28 @@ func cancel_job(job_id: String, ship_id: String = "", station_instance_id: Strin
 		_active_craft.clear()
 	return result
 
+
+func admit_legacy_unreserved(
+		job_id: String, inventory: RefCounted, knowledge = null,
+		player_skill_level: int = 0, selected_lot_ids: Dictionary = {}) -> Dictionary:
+	var job: Dictionary = _craft_job_scheduler.call("get_job", job_id)
+	if job.is_empty() or str(job.get("state", "")) != "blocked_unreserved" \
+			or not str(job.get("station_instance_id", "")).begins_with(
+				"legacy:%s:" % str(job.get("ship_id", ""))):
+		return {"ok": false, "reason": "not_blocked_unreserved"}
+	var ship_id: String = str(job.ship_id)
+	var station_id: String = str(job.station_instance_id)
+	var station_kind: String = str(job.station_kind)
+	bind_station_runtime_context(
+		ship_id, station_id, station_kind, inventory, knowledge,
+		null, _pending_store_for_job(job))
+	var owner_key: String = _owner_key(ship_id, station_id)
+	var context: Dictionary = (_job_contexts.get(owner_key, {}) as Dictionary).duplicate(false)
+	context["player_skill_level"] = player_skill_level
+	_job_contexts[owner_key] = context
+	return _craft_job_scheduler.call(
+		"admit_blocked_unreserved", job_id, selected_lot_ids, _scheduler_context())
+
 # --- save/load ---
 
 func get_summary() -> Dictionary:
@@ -773,9 +847,28 @@ func get_summary() -> Dictionary:
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():
 		return false
+	if summary.has("legacy_craft_migration_v1"):
+		return _apply_legacy_bridge_summary(summary)
 	if summary.has("craft_jobs_v1"):
 		return _apply_current_summary(summary)
 	return _apply_legacy_summary(summary)
+
+
+func _apply_legacy_bridge_summary(summary: Dictionary) -> bool:
+	if _legacy_restore_ship_id.is_empty() or _legacy_restore_source_holder_id.is_empty() \
+			or not summary.get("legacy_craft_migration_v1", null) is Dictionary:
+		return false
+	var bridge_result: Dictionary = _craft_job_scheduler.call(
+		"build_legacy_migration_summary", summary.legacy_craft_migration_v1,
+		_legacy_restore_ship_id, _legacy_restore_source_holder_id)
+	if bridge_result.is_empty():
+		return false
+	var current: Dictionary = summary.duplicate(true)
+	current.erase("legacy_craft_migration_v1")
+	current["craft_jobs_v1"] = bridge_result.craft_jobs_v1
+	current["physical_station_summaries"] = bridge_result.physical_station_summaries
+	current["active_craft"] = {}
+	return _apply_current_summary(current)
 
 
 ## Parses the complete current envelope into detached models and commits only
@@ -922,6 +1015,11 @@ func _pending_store_for_job(job_or_receipt: Dictionary) -> RefCounted:
 static func _is_explicit_legacy_job(job_or_receipt: Dictionary) -> bool:
 	return str(job_or_receipt.get("ship_id", "")) == "legacy-crafting" \
 		and str(job_or_receipt.get("station_instance_id", "")).begins_with("legacy:")
+
+
+static func _is_migration_station(ship_id: String, station_instance_id: String) -> bool:
+	return not ship_id.is_empty() \
+		and station_instance_id.begins_with("legacy:%s:" % ship_id)
 
 
 func settle_station_pending(ship_id: String, station_instance_id: String) -> Dictionary:

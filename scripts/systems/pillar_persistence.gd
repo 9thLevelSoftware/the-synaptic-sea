@@ -34,20 +34,34 @@ static func unpack_module_integrity(summary: Dictionary) -> RefCounted:
 
 static func pack_component_placement(placement: RefCounted) -> Dictionary:
 	if placement == null:
-		return {"schema": "component_placement_v1", "seed": 0, "count": 0, "placed": []}
+		return {
+			"schema": "component_placement_v2", "seed": 0, "count": 0,
+			"placed": [], "rejected_saved_components": [],
+		}
 	if placement.has_method("get_summary"):
-		var s: Dictionary = placement.call("get_summary")
-		s["schema"] = "component_placement_v1"
-		return s
-	return {"schema": "component_placement_v1", "seed": 0, "count": 0, "placed": []}
+		return (placement.call("get_summary") as Dictionary).duplicate(true)
+	return {
+		"schema": "component_placement_v2", "seed": 0, "count": 0,
+		"placed": [], "rejected_saved_components": [],
+	}
 
 
 static func unpack_component_placement(summary: Dictionary) -> RefCounted:
 	var place = ComponentPlacementStateScript.new()
 	if summary.is_empty():
 		return place
-	if place.has_method("apply_summary"):
-		place.call("apply_summary", summary)
+	var candidate: Dictionary = summary.duplicate(true)
+	if str(candidate.get("schema", "")) == "component_placement_v1":
+		# Recognized historical pillar packs used the current placement body but
+		# overwrote its schema label. Migrate only the missing v2 additive field.
+		candidate["schema"] = "component_placement_v2"
+		if not candidate.has("rejected_saved_components"):
+			candidate["rejected_saved_components"] = []
+	elif str(candidate.get("schema", "")) != "component_placement_v2":
+		return null
+	if not place.has_method("apply_summary") \
+			or not bool(place.call("apply_summary", candidate)):
+		return null
 	return place
 
 

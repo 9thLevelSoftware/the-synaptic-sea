@@ -102,6 +102,55 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
         self.assertEqual("FC P03 PASS\nstdout", (self.evidence / result["stdout_log"]).read_text())
         self.assertEqual("stderr", (self.evidence / result["stderr_log"]).read_text())
 
+    def test_reused_evidence_root_is_rejected_before_new_evidence_is_written(self):
+        sentinel = self.evidence / "previous-summary.json"
+        sentinel.write_text("immutable prior evidence", encoding="utf-8")
+        with self.assertRaisesRegex(runner.RunnerError, "new empty unique"):
+            runner._prepare_evidence_root(self.evidence)
+        self.assertEqual("immutable prior evidence", sentinel.read_text(encoding="utf-8"))
+
+    def test_containment_probe_failure_prevents_feature_smoke_body(self):
+        calls = []
+        isolated_root = self.evidence / "isolated-failure"
+
+        def fake(command, **kwargs):
+            calls.append((command, kwargs["env"]))
+            return subprocess.CompletedProcess(command, 0, "probe did not emit authority\n", "")
+
+        result = runner.execute_isolated_case(
+            self.case, Path("godot"), self.evidence, isolated_root, run=fake)
+
+        self.assertFalse(result["passed"])
+        self.assertEqual("containment probe failed", result["reason"])
+        self.assertEqual(1, len(calls), "smoke body ran after a failed containment probe")
+
+    def test_feature_smoke_runs_after_probe_in_the_same_exact_owned_environment(self):
+        calls = []
+        isolated_root = self.evidence / "isolated-success"
+
+        def fake(command, **kwargs):
+            calls.append((command, kwargs["env"]))
+            if "--mode=probe" in command:
+                marker = ("FC P10 USER DATA PROBE PASS resolved_user=%s/Godot/app_userdata/The Synaptic Sea "
+                          "os_user=%s/Godot/app_userdata/The Synaptic Sea root=%s\n") % (
+                              isolated_root, isolated_root, isolated_root)
+                return subprocess.CompletedProcess(command, 0, marker, "")
+            return subprocess.CompletedProcess(command, 0, "FC P03 PASS\n", "")
+
+        result = runner.execute_isolated_case(
+            self.case, Path("godot"), self.evidence, isolated_root, run=fake)
+
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(2, len(calls))
+        for command, environment in calls:
+            self.assertNotIn("--user-data-dir", command)
+            self.assertEqual(
+                {str(isolated_root)},
+                {environment[key] for key in
+                 ("APPDATA", "LOCALAPPDATA", "GODOT_USER_PATH", "XDG_DATA_HOME")})
+        self.assertEqual(1, result["containment_probe"]["marker_count"])
+        self.assertTrue((self.evidence / result["containment_probe"]["stdout_log"]).is_file())
+
     def test_duplicate_case_ids_are_rejected(self):
         manifest = self.root / "cases.json"
         manifest.write_text('{"cases":[{"id":"P03","script":"a","marker":"x"},{"id":"P03","script":"b","marker":"y"}]}')
@@ -220,6 +269,59 @@ class FeatureCompletionRunnerTests(unittest.TestCase):
         prepared = runner._prepared_bundle(source)
         self.assertIn("RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))", prepared)
         self.assertIn("commands=${RUN_CLEAN_COUNT}", prepared)
+
+    def test_prepared_bundle_probes_each_godot_body_in_a_distinct_fresh_home(self):
+        bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+        if not bash.is_file():
+            self.skipTest("Git Bash is required for this containment regression")
+        fake_godot = self.root / "fake-godot.sh"
+        trace = self.root / "godot-trace.txt"
+        fake_godot.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "printf '%s|%s|%s|%s|%s\\n' \"$APPDATA\" \"$LOCALAPPDATA\" \"$GODOT_USER_PATH\" \"$XDG_DATA_HOME\" \"$*\" >> \"$TRACE\"\n"
+            "if [[ \" $* \" == *\" --mode=probe \"* ]]; then\n"
+            "  for arg in \"$@\"; do case \"$arg\" in --user_data=*) owned=${arg#--user_data=};; esac; done\n"
+            "  printf 'FC P10 USER DATA PROBE PASS resolved_user=%s/Godot/app_userdata/The Synaptic Sea os_user=%s/Godot/app_userdata/The Synaptic Sea root=%s\\n' \"$owned\" \"$owned\" \"$owned\"\n"
+            "elif [[ \" $* \" == *\" body-one \"* ]]; then echo 'ONE PASS';\n"
+            "else echo 'TWO PASS'; fi\n",
+            encoding="utf-8", newline="\n")
+        body = (
+            "set -euo pipefail\nRUN_CLEAN_COUNT=0\n"
+            "run_clean() {\n  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))\n"
+            "  label=\"$1\"\n  marker=\"$2\"\n  shift 2\n  echo \"=== $label ===\"\n"
+            "  set +e\n  OUT=$(\"$@\" 2>&1)\n  COMMAND_STATUS=$?\n  set -e\n"
+            "  printf '%s\\n' \"$OUT\"\n  printf '%s\\n' \"$OUT\" | grep -q \"$marker\"\n"
+            "  [ \"$COMMAND_STATUS\" -eq 0 ]\n}\n"
+            "run_clean 'one' 'ONE PASS' \"$GODOT\" body-one\n"
+            "run_clean 'two' 'TWO PASS' \"$GODOT\" body-two\n"
+            "echo 'SYNAPTIC_SEA REGRESSION PASS commands=2 clean_output=true'\n")
+        script = self.root / "prepared-containment.sh"
+        script.write_text(runner._prepared_bundle(body), encoding="utf-8", newline="\n")
+        user_root = self.root / "bundle-user-data"
+        evidence_root = self.root / "bundle-evidence"
+        environment = {
+            **os.environ,
+            "GODOT": fake_godot.as_posix(),
+            "ROOT": self.root.as_posix(),
+            "TRACE": trace.as_posix(),
+            "FEATURE_COMPLETION_USER_ROOT": user_root.as_posix(),
+            "FEATURE_COMPLETION_EVIDENCE": evidence_root.as_posix(),
+        }
+        completed = subprocess.run(
+            [str(bash), str(script)], env=environment, text=True,
+            capture_output=True, check=False, timeout=20)
+
+        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+        rows = [line.split("|", 4) for line in trace.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(4, len(rows), rows)
+        roots = []
+        for environment_row in rows:
+            self.assertEqual(1, len(set(environment_row[:4])))
+            roots.append(environment_row[0])
+        self.assertEqual(roots[0], roots[1])
+        self.assertEqual(roots[2], roots[3])
+        self.assertNotEqual(roots[0], roots[2])
 
     def test_post_kill_drain_timeout_is_reported(self):
         process = Mock(pid=17)

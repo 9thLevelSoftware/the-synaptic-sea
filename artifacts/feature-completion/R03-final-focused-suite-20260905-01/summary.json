@@ -1,0 +1,1073 @@
+{
+  "schema": "r03-final-focused-suite-1",
+  "root": "D:\\the-synaptic-sea-feature-completion",
+  "godot": "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+  "timeout_seconds": 180,
+  "fresh_distinct_homes": true,
+  "all_four_environment_exact": true,
+  "results": [
+    {
+      "name": "arc-state",
+      "script": "electrical_arc_state_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/arc-state/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/arc-state/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/arc-state/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\arc-state\\owned-user",
+          "--script",
+          "res://scripts/validation/electrical_arc_state_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "ARC STATE PASS ",
+        "marker_lines": [
+          "ARC STATE PASS cycles=2 phases=4 passability_switches=4"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 241,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 2.391,
+      "passed": true
+    },
+    {
+      "name": "fc-p10",
+      "script": "fc_p10_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p10/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p10/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p10/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p10\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "FC P10 PASS",
+        "marker_lines": [
+          "FC P10 PASS"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 6307,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 37.875,
+      "passed": true
+    },
+    {
+      "name": "fc-p13",
+      "script": "fc_p13_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p13/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p13/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/fc-p13/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\fc-p13\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p13_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "FC P13 PASS",
+        "marker_lines": [
+          "FC P13 PASS"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 881,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 9.063,
+      "passed": true
+    },
+    {
+      "name": "migration-service",
+      "script": "save_migration_service_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-service/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-service/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-service/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-service\\owned-user",
+          "--script",
+          "res://scripts/validation/save_migration_service_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "SAVE MIGRATION SERVICE PASS",
+        "marker_lines": [
+          "SAVE MIGRATION SERVICE PASS"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 213,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 3.125,
+      "passed": true
+    },
+    {
+      "name": "migration-world",
+      "script": "save_migration_world_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-world/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-world/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/migration-world/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\migration-world\\owned-user",
+          "--script",
+          "res://scripts/validation/save_migration_world_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "SAVE MIGRATION WORLD PASS ",
+        "marker_lines": [
+          "SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 313,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 2.296,
+      "passed": true
+    },
+    {
+      "name": "save-load-service",
+      "script": "save_load_service_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/save-load-service/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/save-load-service/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/save-load-service/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+          "--script",
+          "res://scripts/validation/save_load_service_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "SAVE LOAD SERVICE PASS ",
+        "marker_lines": [
+          "SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 280,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 3.407,
+      "passed": true
+    },
+    {
+      "name": "world-snapshot",
+      "script": "world_snapshot_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-snapshot/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-snapshot/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-snapshot/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-snapshot\\owned-user",
+          "--script",
+          "res://scripts/validation/world_snapshot_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "WORLD SNAPSHOT PASS ",
+        "marker_lines": [
+          "WORLD SNAPSHOT PASS round_trip=true version_gated=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 240,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 2.937,
+      "passed": true
+    },
+    {
+      "name": "world-save",
+      "script": "world_save_service_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/world-save/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\world-save\\owned-user",
+          "--script",
+          "res://scripts/validation/world_save_service_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "WORLD SAVE SERVICE PASS ",
+        "marker_lines": [
+          "WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 248,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 3.125,
+      "passed": true
+    },
+    {
+      "name": "ship-mod-run",
+      "script": "ship_mod_run_snapshot_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-mod-run/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-mod-run/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-mod-run/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-mod-run\\owned-user",
+          "--script",
+          "res://scripts/validation/ship_mod_run_snapshot_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "SHIP MOD RUN SNAPSHOT PASS ",
+        "marker_lines": [
+          "SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 248,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 2.563,
+      "passed": true
+    },
+    {
+      "name": "combat",
+      "script": "combat_persistence_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/combat/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/combat/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/combat/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\combat\\owned-user",
+          "--script",
+          "res://scripts/validation/combat_persistence_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "COMBAT PERSISTENCE PASS ",
+        "marker_lines": [
+          "COMBAT PERSISTENCE PASS schema=threat-manager-2 hull=0.4 callback=true owners=home+away"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 273,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 3.312,
+      "passed": true
+    },
+    {
+      "name": "ship-generator",
+      "script": "ship_generator_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-generator/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-generator/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/ship-generator/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\ship-generator\\owned-user",
+          "--script",
+          "res://scripts/validation/ship_generator_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "SHIP GENERATOR PASS ",
+        "marker_lines": [
+          "SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms=9 small_rooms=24"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 559,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 5.938,
+      "passed": true
+    },
+    {
+      "name": "manual-load",
+      "script": "main_playable_slice_save_load_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/manual-load/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/manual-load/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/manual-load/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\manual-load\\owned-user",
+          "--script",
+          "res://scripts/validation/main_playable_slice_save_load_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "MAIN PLAYABLE SAVE LOAD PASS ",
+        "marker_lines": [
+          "MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 2609,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 6.031,
+      "passed": true
+    },
+    {
+      "name": "quick-load",
+      "script": "main_playable_quicksave_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/quick-load/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/quick-load/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/quick-load/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\quick-load\\owned-user",
+          "--script",
+          "res://scripts/validation/main_playable_quicksave_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "MAIN PLAYABLE QUICKSAVE PASS ",
+        "marker_lines": [
+          "MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 403,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 4.703,
+      "passed": true
+    },
+    {
+      "name": "auto-load",
+      "script": "main_playable_meta_autosave_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/auto-load/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/auto-load/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/auto-load/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\auto-load\\owned-user",
+          "--script",
+          "res://scripts/validation/main_playable_meta_autosave_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "MAIN PLAYABLE META AUTOSAVE PASS ",
+        "marker_lines": [
+          "MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 400,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 4.703,
+      "passed": true
+    },
+    {
+      "name": "title-query",
+      "script": "title_save_query_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-query/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-query/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-query/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-query\\owned-user",
+          "--script",
+          "res://scripts/validation/title_save_query_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "TITLE SAVE QUERY PASS ",
+        "marker_lines": [
+          "TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [],
+        "intentional_injected_diagnostics": false,
+        "expected_diagnostics": [],
+        "diagnostics_classification": "clean",
+        "stdout_bytes": 253,
+        "stderr_bytes": 0,
+        "passed": true
+      },
+      "duration_seconds": 3.125,
+      "passed": true
+    },
+    {
+      "name": "title-failure",
+      "script": "title_load_failure_smoke.gd",
+      "home": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+      "environment": {
+        "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+        "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+        "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+        "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user"
+      },
+      "probe": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\probe-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+          "--script",
+          "res://scripts/validation/fc_p10_process_smoke.gd",
+          "--",
+          "--mode=probe",
+          "--user_data=D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_count": 1,
+        "markers": [
+          "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-final-focused-suite-20260905-01/title-failure/owned-user"
+        ],
+        "diagnostics": [],
+        "passed": true
+      },
+      "body": {
+        "command": [
+          "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+          "--headless",
+          "--path",
+          "D:\\the-synaptic-sea-feature-completion",
+          "--log-file",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\body-godot.log",
+          "--user-data-dir",
+          "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\title-failure\\owned-user",
+          "--script",
+          "res://scripts/validation/title_load_failure_smoke.gd"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "marker_prefix": "TITLE LOAD FAILURE PASS ",
+        "marker_lines": [
+          "TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true"
+        ],
+        "marker_count": 1,
+        "diagnostics": [
+          "ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure",
+          "WARNING: TitleMain: gameplay boot failed (smoke_forced_failure) — returning to title"
+        ],
+        "intentional_injected_diagnostics": true,
+        "expected_diagnostics": [
+          "ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure",
+          "WARNING: TitleMain: gameplay boot failed (smoke_forced_failure) — returning to title"
+        ],
+        "diagnostics_classification": "expected loader-failure injection only",
+        "stdout_bytes": 419,
+        "stderr_bytes": 750,
+        "passed": true
+      },
+      "duration_seconds": 4.797,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

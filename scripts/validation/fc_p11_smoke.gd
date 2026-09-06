@@ -19,6 +19,8 @@ func _initialize() -> void:
 		return
 	if not _verify_generated_contracts(catalog):
 		return
+	if not _verify_distinct_fit_denials(catalog):
+		return
 	var layout: Dictionary = _authored_layout()
 	var placement = ComponentPlacementStateScript.new()
 	placement.populate(layout, catalog, 42)
@@ -48,6 +50,8 @@ func _initialize() -> void:
 	_expect_unchanged(state, placement, inventory, baseline, power_before, "water")
 	_expect_denied(state.install("eng_wall_0", "unknown_part", "unknown_part", inventory), "unknown_component", "unknown")
 	_expect_unchanged(state, placement, inventory, baseline, power_before, "unknown")
+	_expect_denied(state.install("missing_slot", "reactor_console", "reactor_console", inventory), "unknown_slot", "unknown slot")
+	_expect_unchanged(state, placement, inventory, baseline, power_before, "unknown slot")
 	_expect_denied(state.install("eng_wall_0", "pump_assembly", "pump_assembly", inventory), "incompatible_slot", "wrong slot")
 	_expect_unchanged(state, placement, inventory, baseline, power_before, "wrong slot")
 	_expect_denied(state.install("eng_wall_0", "reactor_console", "reactor_console", inventory, 0.0, 0.0, "", false, "other-ship"), "wrong_ship", "wrong ship")
@@ -56,6 +60,23 @@ func _initialize() -> void:
 	var wall_install: Dictionary = state.install("eng_wall_0", "reactor_console", "reactor_console", inventory)
 	if not bool(wall_install.get("ok", false)) or not placement.is_mounted("eng_wall_0"):
 		_fail("singular wall socket install did not mount physical placement: %s" % str(wall_install))
+		return
+	var occupied_before: Dictionary = {
+		"inventory": inventory.duplicate(true),
+		"placement": placement.get_summary(),
+		"modification": state.get_summary(),
+		"power": state.total_power_draw(),
+	}
+	_expect_denied(state.install(
+		"eng_wall_0", "locker_wall", "wall_locker", inventory),
+		"slot_occupied", "occupied slot")
+	if occupied_before != {
+		"inventory": inventory.duplicate(true),
+		"placement": placement.get_summary(),
+		"modification": state.get_summary(),
+		"power": state.total_power_draw(),
+	}:
+		_fail("occupied slot denial mutated protected state")
 		return
 	var wall_remove: Dictionary = state.uninstall("eng_wall_0", inventory)
 	if not bool(wall_remove.get("ok", false)) or placement.is_mounted("eng_wall_0"):
@@ -72,6 +93,38 @@ func _initialize() -> void:
 		return
 	print("FC P11 PASS")
 	quit(0)
+
+
+func _verify_distinct_fit_denials(catalog) -> bool:
+	var slot: Dictionary = {
+		"slot_kind": "wall",
+		"component_slot_profile_id": "wall_console_mount_v1",
+	}
+	var original_profile: Dictionary = catalog._slot_profiles["wall_console_mount_v1"].duplicate(true)
+	var cases: Array = [
+		{"label": "footprint", "patch": {"footprint_cells": [2, 1]}, "reason": "incompatible_footprint"},
+		{"label": "socket", "patch": {"socket_type": "deck_mount"}, "reason": "incompatible_socket"},
+		{"label": "type", "patch": {"allowed_component_types": ["storage"]}, "reason": "incompatible_type"},
+	]
+	for case_v in cases:
+		var case: Dictionary = case_v as Dictionary
+		var changed: Dictionary = original_profile.duplicate(true)
+		changed.merge(case.get("patch", {}) as Dictionary, true)
+		catalog._slot_profiles["wall_console_mount_v1"] = changed
+		var fit: Dictionary = catalog.validate_component_fit("reactor_console", slot)
+		if bool(fit.get("ok", false)) or str(fit.get("reason", "")) != str(case.get("reason", "")):
+			catalog._slot_profiles["wall_console_mount_v1"] = original_profile
+			_fail("distinct %s denial: %s" % [str(case.get("label", "fit")), str(fit)])
+			return false
+	catalog._slot_profiles["wall_console_mount_v1"] = original_profile
+	var wrong_slot: Dictionary = catalog.validate_component_fit("pump_assembly", slot)
+	var missing_profile: Dictionary = catalog.validate_component_fit("reactor_console", {
+		"slot_kind": "wall", "component_slot_profile_id": "missing_profile"})
+	if str(wrong_slot.get("reason", "")) != "incompatible_slot" \
+			or str(missing_profile.get("reason", "")) != "missing_fit_contract":
+		_fail("distinct slot/profile denial")
+		return false
+	return true
 
 
 func _verify_generated_contracts(catalog) -> bool:
@@ -181,15 +234,24 @@ func _verify_panel_catalog_search(catalog) -> bool:
 	var panel = ShipModificationPanelScript.new()
 	get_root().add_child(panel)
 	await process_frame
+	var requests: Array = []
+	panel.install_requested.connect(func(
+			ship_id: String, binding_generation: int,
+			slot_id: String, component_id: String, item_form: String) -> void:
+		requests.append([ship_id, binding_generation, slot_id, component_id, item_form]))
 	panel.bind(state, {"reactor_console": 1}, catalog, state.get_physical_slots(), "panel-ship", placement)
 	panel.move_selection(1)
-	if not panel.install_from_inventory(catalog) or not placement.is_mounted("eng_wall_0"):
+	if not panel.install_from_inventory(catalog) \
+			or requests != [["panel-ship", 0, "eng_wall_0", "reactor_console", "reactor_console"]] \
+			or placement.is_mounted("eng_wall_0"):
 		_fail("panel stopped on incompatible same-kind utility slot")
 		return false
-	var returned_inventory: Dictionary = panel.get_inventory_bag()
-	state.uninstall("eng_wall_0", returned_inventory)
 	panel.bind(state, {"wall_locker": 1}, catalog, placement.get_physical_slot_descriptors("panel-ship"), "panel-ship", placement)
-	if not panel.install_from_inventory(catalog) or not placement.is_mounted("eng_wall_1"):
+	if not panel.install_from_inventory(catalog) \
+			or requests != [
+				["panel-ship", 0, "eng_wall_0", "reactor_console", "reactor_console"],
+				["panel-ship", 0, "eng_wall_1", "locker_wall", "wall_locker"],
+			] or placement.is_mounted("eng_wall_1"):
 		_fail("panel omitted valid wall_locker catalog form")
 		return false
 	panel.queue_free()
@@ -199,6 +261,11 @@ func _verify_panel_catalog_search(catalog) -> bool:
 func _verify_current_policy_overrides_saved(catalog, layout: Dictionary) -> bool:
 	var original = ComponentPlacementStateScript.new()
 	original.populate(layout, catalog, 42)
+	var prepared_authority: Dictionary = original.prepare_condition_authority(
+		"policy-ship", catalog, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not original.commit_condition_authority(prepared_authority):
+		_fail("current-policy condition authority fixture: %s" % str(prepared_authority))
+		return false
 	var stale: Dictionary = original.get_summary()
 	var saved_placed: Array = stale.get("placed", []) as Array
 	for index in range(saved_placed.size()):
@@ -206,6 +273,11 @@ func _verify_current_policy_overrides_saved(catalog, layout: Dictionary) -> bool
 		if str(row.get("component_instance_id", "")) == "eng_wall_0":
 			row["component_id"] = "pump_assembly"
 			row["item_form"] = "pump_assembly"
+			var source_lot: Dictionary = row.get("source_lot", {}) as Dictionary
+			source_lot = source_lot.duplicate(true)
+			source_lot["item_id"] = "pump_assembly"
+			row["source_lot"] = source_lot
+			row["source_lot_id"] = str(source_lot.get("lot_id", ""))
 			row["mounted"] = true
 			row["socket_type"] = "deck_mount"
 			row["allowed_component_types"] = ["machinery"]
@@ -239,15 +311,19 @@ func _verify_current_policy_overrides_saved(catalog, layout: Dictionary) -> bool
 	if str(rejected_entry.get("component_id", "")) != "pump_assembly":
 		_fail("quarantined stale content was not preserved")
 		return false
-	var removed_slot_summary: Dictionary = {
-		"placed": [{
-			"component_instance_id": "removed_wall_0",
-			"component_id": "reactor_console",
-			"mounted": true,
-		}],
-	}
+	var removed_slot_summary: Dictionary = original.get_summary().duplicate(true)
+	var removed_entries: Array = removed_slot_summary.get("placed", []) as Array
+	if removed_entries.is_empty():
+		_fail("removed-slot source fixture")
+		return false
+	var removed_entry: Dictionary = (removed_entries[0] as Dictionary).duplicate(true)
+	removed_entry["component_instance_id"] = "removed_wall_0"
+	removed_entries[0] = removed_entry
+	removed_slot_summary["placed"] = removed_entries
 	var removed_slot_restore = ComponentPlacementStateScript.new()
-	removed_slot_restore.restore_from_layout(layout, catalog, 42, removed_slot_summary)
+	if not removed_slot_restore.restore_from_layout(layout, catalog, 42, removed_slot_summary):
+		_fail("removed authored slot restore")
+		return false
 	if removed_slot_restore.rejected_saved_components.size() != 1 \
 			or str((removed_slot_restore.rejected_saved_components[0] as Dictionary).get("reason", "")) != "slot_removed":
 		_fail("removed authored slot content was not preserved for recovery")

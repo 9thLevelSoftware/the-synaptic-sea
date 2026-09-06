@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP LOADED sequence=1 position=(4.00,0.00,2.00)
+ERROR: FC P10 PROCESS FAIL: consumer one field holder did not transfer exact receipt lot once
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p10_process_smoke.gd:581)
+       [1] _fail_bool (res://scripts/validation/fc_p10_process_smoke.gd:576)
+       [2] _collect_restored_field_drop_once (res://scripts/validation/fc_p10_process_smoke.gd:217)
+       [3] _run_consumer_one (res://scripts/validation/fc_p10_process_smoke.gd:128)
+       [4] _on_frame (res://scripts/validation/fc_p10_process_smoke.gd:44)

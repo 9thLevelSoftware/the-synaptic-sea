@@ -378,6 +378,7 @@ func _test_ship_runtime_catch_up(crafting: RefCounted) -> bool:
 	var station = _station("ship-runtime", "fabricator-runtime", 0, false)
 	var context: Dictionary = _context(
 		crafting, inventory, {"fabricator-runtime": station}, 2)
+	context["ship_id"] = "ship-runtime"
 	var enqueue_result: Dictionary = scheduler.enqueue(
 		_request("ship-runtime", "fabricator-runtime", inventory), context)
 	var job_id: String = str(enqueue_result.get("job_id", ""))
@@ -419,7 +420,7 @@ func _test_ship_runtime_catch_up(crafting: RefCounted) -> bool:
 	var before_bad: Dictionary = restored_scheduler.get_summary()
 	var before_time: float = float(restored_ship.last_sim_time)
 	var malformed: Dictionary = snapshot.duplicate(true)
-	malformed["craft_jobs_v1"] = {"schema": "craft-jobs-1", "jobs": "bad", "owners": []}
+	malformed["craft_jobs_v1"] = {"schema": "craft-jobs-2", "jobs": "bad", "owners": []}
 	malformed["last_sim_time"] = 999.0
 	if restored_runtime.from_snapshot(malformed) \
 			or restored_scheduler.get_summary() != before_bad \

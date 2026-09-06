@@ -1,0 +1,2960 @@
+{
+	"world_summary": {
+		"generated_marker_ids": [
+			"0:0:0"
+		],
+		"player_position": [
+			23.369525909423828,
+			0.0,
+			18.641542434692383
+		],
+		"world_seed": 17.0
+	},
+	"home_ship": {
+		"layout_path": "res://data/procgen/golden/coherent_ship_001/layout.json",
+		"kit_path": "res://data/kits/ship_structural_v0.json",
+		"gameplay_slice_path": "res://data/procgen/golden/coherent_ship_001/gameplay_slice.json",
+		"player_position": [
+			24.0,
+			4.119999885559082,
+			0.0
+		],
+		"current_objective_sequence": 1,
+		"ship_systems_summary": {
+			"completed_objective_types": [],
+			"extinguisher_summary": {
+				"charge": 100.0,
+				"charge_cost_per_use": 34.0,
+				"max_charge": 100.0,
+				"recharge_per_second": 5.0
+			},
+			"fire_suppression_summary": {
+				"active_fires": {
+					"bridge": 1.0,
+					"engineering": 1.0
+				},
+				"adjacency": {
+					"bridge": [
+						"engineering"
+					],
+					"cargo": [
+						"engineering"
+					],
+					"engineering": [
+						"bridge",
+						"hydroponics",
+						"cargo"
+					],
+					"hydroponics": [
+						"engineering"
+					]
+				},
+				"arc_compartment": "engineering",
+				"cascade_progress": 0.0,
+				"cascade_rate_per_second": 0.5,
+				"closed_links": [],
+				"compartments": [
+					"bridge",
+					"engineering",
+					"hydroponics",
+					"cargo"
+				],
+				"ignition_progress": {},
+				"ignition_rate_per_second": 0.2,
+				"power_threshold": 0.5,
+				"spread_progress": {},
+				"spread_rate_per_second": 0.15,
+				"suppressant_units": 100.0,
+				"suppression_rate_per_second": 25.0,
+				"vented_compartments": []
+			},
+			"hull_integrity_summary": {
+				"compartments": {
+					"bridge": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.9
+					},
+					"cargo": {
+						"breach_open": true,
+						"health": 0.3,
+						"isolation_rating": 0.6
+					},
+					"engineering": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.8
+					},
+					"hydroponics": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.7
+					}
+				}
+			},
+			"life_support_state_summary": {
+				"atmosphere_safe_co2": 15.0,
+				"atmosphere_safe_oxygen": 50.0,
+				"atmosphere_temp_comfort_band": 8.0,
+				"breach_oxygen_leak_per_second": 1.5,
+				"co2_percent": 2.0,
+				"life_support_power_threshold": 0.5,
+				"max_atmosphere_health_drain": 5.0,
+				"max_atmosphere_thirst_mult": 1.5,
+				"nominal_temperature_c": 21.0,
+				"offline_co2_gain_per_second": 3.5,
+				"offline_oxygen_drain_per_second": 4.0,
+				"offline_temp_drift_per_second": 0.3,
+				"online_co2_scrub_per_second": 2.0,
+				"online_oxygen_recovery_per_second": 2.0,
+				"oxygen_percent": 100.0,
+				"temperature_c": 21.0,
+				"water_liters": 40.0,
+				"water_use_per_second": 0.2
+			},
+			"power_grid_summary": {
+				"available_supply_units": 100.0,
+				"baseline_demand_units": {
+					"life_support": 22.0,
+					"lights": 8.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"sustenance": 10.0
+				},
+				"blackout_subsystems": [],
+				"effective_routes_units": {
+					"life_support": 22.0,
+					"lights": 8.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"sustenance": 10.0
+				},
+				"manager_broken_systems": [],
+				"manual_routes_units": {
+					"life_support": 22.0,
+					"lights": 8.0,
+					"propulsion": 30.0,
+					"stations": 12.0,
+					"sustenance": 10.0
+				},
+				"min_operational_ratio": 0.5,
+				"overloaded": false,
+				"subsystem_order": [
+					"life_support",
+					"propulsion",
+					"stations",
+					"lights",
+					"sustenance"
+				],
+				"total_supply_units": 100.0
+			},
+			"propulsion_state_summary": {
+				"engine_temperature_c": 28.0,
+				"fuel_efficiency": 1.0,
+				"operational": true,
+				"power_threshold": 0.5,
+				"thrust_percent": 100.0
+			},
+			"sustenance_state_summary": {
+				"facilities": {
+					"hydroponics": {
+						"power_band": "sustenance",
+						"upgrade_slots": 2.0
+					},
+					"synthesizer": {
+						"power_band": "sustenance",
+						"upgrade_slots": 2.0
+					},
+					"water_recycler": {
+						"power_band": "sustenance",
+						"upgrade_slots": 1.0
+					}
+				},
+				"harvest_ready": 0.0,
+				"meals_ready": 0.0,
+				"purified_water_ready": 0.0,
+				"total_materials_consumed": 0.0,
+				"total_power_consumed": 0.0
+			},
+			"system_order": [
+				"power",
+				"life_support",
+				"gravity",
+				"navigation",
+				"propulsion",
+				"scanners"
+			],
+			"systems": {
+				"gravity": {
+					"dependency_ids": [
+						"power"
+					],
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 14.0,
+							"required_parts": [
+								"plating"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "gravity_plating"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 12.0,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "field_emitter"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 9.0,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [],
+							"subcomponent_id": "inertial_dampeners"
+						}
+					],
+					"system_id": "gravity"
+				},
+				"life_support": {
+					"dependency_ids": [
+						"power"
+					],
+					"oxygen": {
+						"breach_open": true,
+						"breach_sealed": false,
+						"breach_zone_ids": [
+							"life_support"
+						],
+						"drain_multiplier": 1.0,
+						"drain_rate": 6.0,
+						"effective_drain_rate": 6.0,
+						"equipment_drain_multiplier": 1.0,
+						"hazard_kind": "oxygen",
+						"max_oxygen": 100.0,
+						"oxygen": 100.0,
+						"passability_blocked": false,
+						"player_in_breach_zone": false,
+						"recovery_threshold": 30.0,
+						"regen_rate": 3.5,
+						"safe_threshold": 35.0
+					},
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 12.0,
+							"required_parts": [
+								"oxygen_filter"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "air_recycler"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 1.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 8.0,
+							"required_parts": [
+								"oxygen_filter"
+							],
+							"required_tools": [],
+							"subcomponent_id": "co2_scrubber"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 10.0,
+							"required_parts": [
+								"sealant"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "oxygen_tanks"
+						}
+					],
+					"system_id": "life_support"
+				},
+				"navigation": {
+					"dependency_ids": [
+						"power"
+					],
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 1.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 6.0,
+							"required_parts": [
+								"data_core"
+							],
+							"required_tools": [],
+							"subcomponent_id": "star_charts"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 12.0,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "nav_computer"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 10.0,
+							"required_parts": [
+								"sensor_module"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "sensor_array"
+						}
+					],
+					"system_id": "navigation"
+				},
+				"power": {
+					"dependency_ids": [],
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 4.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 20.0,
+							"required_parts": [
+								"reactor_core"
+							],
+							"required_tools": [
+								"plasma_cutter"
+							],
+							"subcomponent_id": "reactor_core"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 10.0,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "power_distribution"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 1.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 6.0,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [],
+							"subcomponent_id": "battery_cells"
+						}
+					],
+					"system_id": "power"
+				},
+				"propulsion": {
+					"dependency_ids": [
+						"power",
+						"navigation"
+					],
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 4.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 18.0,
+							"required_parts": [
+								"thruster_nozzle"
+							],
+							"required_tools": [
+								"plasma_cutter"
+							],
+							"subcomponent_id": "thruster_array"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 12.0,
+							"required_parts": [
+								"fuel_line"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "fuel_injection"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 8.0,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [],
+							"subcomponent_id": "nav_linkage"
+						}
+					],
+					"system_id": "propulsion"
+				},
+				"scanners": {
+					"dependency_ids": [
+						"power",
+						"navigation"
+					],
+					"subcomponents": [
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 12.0,
+							"required_parts": [
+								"sensor_module"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "scanner_dish"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 3.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 11.0,
+							"required_parts": [
+								"circuit_board"
+							],
+							"required_tools": [
+								"welder"
+							],
+							"subcomponent_id": "signal_processor"
+						},
+						{
+							"health": 1.0,
+							"min_skill": 2.0,
+							"operational_threshold": 0.5,
+							"repair_seconds": 7.0,
+							"required_parts": [
+								"power_cell"
+							],
+							"required_tools": [],
+							"subcomponent_id": "power_coupling"
+						}
+					],
+					"system_id": "scanners"
+				}
+			},
+			"web_infestation_summary": {
+				"attached_to_web": true,
+				"coverage": 0.0,
+				"hazard_kind": "web_infestation"
+			}
+		},
+		"route_control_summary": {
+			"active_blocker_count": 1.0,
+			"extraction_unlocked": false,
+			"gate_ids": [
+				"powered_route_gate_01"
+			],
+			"gate_records": {
+				"powered_route_gate_01": {
+					"id": "powered_route_gate_01",
+					"open": false,
+					"required_system": "main_power_restored"
+				}
+			},
+			"opened_gate_count": 0.0,
+			"powered_gates_open": false,
+			"route_gate_collision_enabled_count": 1.0,
+			"route_gate_count": 1.0
+		},
+		"oxygen_summary": {
+			"breach_open": true,
+			"breach_sealed": false,
+			"breach_zone_ids": [
+				"corridor_to_reactor"
+			],
+			"drain_multiplier": 1.0,
+			"drain_rate": 6.0,
+			"effective_drain_rate": 6.0,
+			"equipment_drain_multiplier": 1.0,
+			"hazard_kind": "oxygen",
+			"max_oxygen": 100.0,
+			"oxygen": 100.0,
+			"passability_blocked": false,
+			"player_in_breach_zone": false,
+			"recovery_threshold": 30.0,
+			"regen_rate": 3.5,
+			"safe_threshold": 35.0
+		},
+		"inventory_summary": {
+			"items": {
+				"welding_lance": 1,
+				"hull_plate": 1,
+				"prybar": 1,
+				"wrench": 1
+			},
+			"item_lots_v1": {
+				"schema": "item-lots-1",
+				"holder_namespace": "player:2059933-ded2",
+				"sequence": 6,
+				"lots": [
+					{
+						"lot_id": "player:2059933-ded2/lot-000001",
+						"item_id": "welding_lance",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {}
+					},
+					{
+						"lot_id": "player:2059933-ded2/lot-000003",
+						"item_id": "hull_plate",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {}
+					},
+					{
+						"lot_id": "player:2059933-ded2/lot-000005",
+						"item_id": "prybar",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {}
+					},
+					{
+						"lot_id": "player:2059933-ded2/lot-000006",
+						"item_id": "wrench",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {}
+					}
+				]
+			},
+			"tool_ids": [
+				"welding_lance"
+			],
+			"active_effects": [
+				{
+					"tool_id": "welding_lance",
+					"type": "",
+					"value": 1.0
+				}
+			],
+			"drain_multiplier": 1.0,
+			"total_weight": 3.6,
+			"max_weight": 50.0,
+			"threat_summary": {
+				"schema": "threat-manager-2",
+				"encounter_markers": [
+					{
+						"id": "fallback_0",
+						"room_id": "airlock_01",
+						"cell": [
+							0,
+							0
+						],
+						"encounter_kind": "biomatter_swarm",
+						"count": 1
+					},
+					{
+						"id": "fallback_1",
+						"room_id": "corridor_01",
+						"cell": [
+							1,
+							0
+						],
+						"encounter_kind": "puppet_corpse",
+						"count": 1
+					},
+					{
+						"id": "fallback_2",
+						"room_id": "ramp_01",
+						"cell": [
+							2,
+							0
+						],
+						"encounter_kind": "stalker",
+						"count": 1
+					},
+					{
+						"id": "fallback_3",
+						"room_id": "spine_01",
+						"cell": [
+							3,
+							0
+						],
+						"encounter_kind": "mimic",
+						"count": 1
+					},
+					{
+						"id": "fallback_4",
+						"room_id": "cargo_01",
+						"cell": [
+							4,
+							0
+						],
+						"encounter_kind": "hull_tendril",
+						"count": 1
+					}
+				],
+				"threats": [
+					{
+						"instance_id": "fallback_0_0",
+						"archetype_id": "biomatter_swarm",
+						"display_name": "Biomatter Swarm",
+						"room_id": "airlock_01",
+						"cell": [
+							0,
+							0
+						],
+						"world_position": [
+							4.0,
+							0.0,
+							0.0
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 24.0,
+						"health": 24.0,
+						"attack_damage": 6.0,
+						"structure_damage": 0.0,
+						"attack_type": "biomatter",
+						"attack_noise": 0.45,
+						"attack_interval": 1.1,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 1.1,
+						"light_sensitivity": 0.7,
+						"sight_sensitivity": 0.8,
+						"memory_seconds": 6.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.1,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "infected",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 1.0
+							},
+							"resistance": {
+								"biomatter": 0.1,
+								"fire": 0.0
+							},
+							"durability": 18.0
+						},
+						"tags": [
+							"swarm",
+							"biomatter"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": true,
+						"anchored": false,
+						"telegraph_seconds": 0.25,
+						"telegraph_remaining": 0.0,
+						"player_verb": "burn_or_scatter"
+					},
+					{
+						"instance_id": "fallback_1_0",
+						"archetype_id": "puppet_corpse",
+						"display_name": "Puppet Corpse",
+						"room_id": "corridor_01",
+						"cell": [
+							1,
+							0
+						],
+						"world_position": [
+							2.161209223472559,
+							0.0,
+							3.365883939231586
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 42.0,
+						"health": 42.0,
+						"attack_damage": 10.0,
+						"structure_damage": 0.0,
+						"attack_type": "physical",
+						"attack_noise": 0.55,
+						"attack_interval": 1.5,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.9,
+						"light_sensitivity": 0.8,
+						"sight_sensitivity": 0.9,
+						"memory_seconds": 7.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.18,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "bleed",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 2.0
+							},
+							"resistance": {
+								"physical": 0.15,
+								"fire": -0.15
+							},
+							"durability": 28.0
+						},
+						"tags": [
+							"melee",
+							"corpse"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.6,
+						"telegraph_remaining": 0.0,
+						"player_verb": "keep_distance"
+					},
+					{
+						"instance_id": "fallback_2_0",
+						"archetype_id": "stalker",
+						"display_name": "Stalker",
+						"room_id": "ramp_01",
+						"cell": [
+							2,
+							0
+						],
+						"world_position": [
+							-1.6645873461885696,
+							0.0,
+							3.637189707302727
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 30.0,
+						"health": 30.0,
+						"attack_damage": 12.0,
+						"structure_damage": 0.0,
+						"attack_type": "physical",
+						"attack_noise": 0.25,
+						"attack_interval": 1.2,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 1.3,
+						"light_sensitivity": 1.0,
+						"sight_sensitivity": 1.2,
+						"memory_seconds": 10.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.12,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "bleed",
+						"armor_profile": {
+							"flat_reduction": {
+								"physical": 1.0
+							},
+							"resistance": {
+								"electric": -0.2,
+								"fire": -0.1
+							},
+							"durability": 16.0
+						},
+						"tags": [
+							"stealth",
+							"hunter"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.15,
+						"flee_speed_mult": 1.5,
+						"investigate_speed_mult": 0.85,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 3.5,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.35,
+						"telegraph_remaining": 0.0,
+						"player_verb": "break_los"
+					},
+					{
+						"instance_id": "fallback_3_0",
+						"archetype_id": "mimic",
+						"display_name": "Mimic",
+						"room_id": "spine_01",
+						"cell": [
+							3,
+							0
+						],
+						"world_position": [
+							-3.9599699864017817,
+							0.0,
+							0.5644800322394689
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 36.0,
+						"health": 36.0,
+						"attack_damage": 11.0,
+						"structure_damage": 0.0,
+						"attack_type": "acid",
+						"attack_noise": 0.35,
+						"attack_interval": 1.4,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.8,
+						"light_sensitivity": 1.2,
+						"sight_sensitivity": 1.0,
+						"memory_seconds": 8.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.15,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "exposed",
+						"armor_profile": {
+							"flat_reduction": {
+								"acid": 2.0
+							},
+							"resistance": {
+								"acid": 0.3,
+								"fire": -0.25
+							},
+							"durability": 20.0
+						},
+						"tags": [
+							"ambush",
+							"acid"
+						],
+						"move_speed": 2.5,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.35,
+						"investigate_speed_mult": 0.7,
+						"attack_range": 1.4,
+						"last_known_position": [],
+						"ambush_hold": true,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": false,
+						"telegraph_seconds": 0.5,
+						"telegraph_remaining": 0.0,
+						"player_verb": "probe_before_loot"
+					},
+					{
+						"instance_id": "fallback_4_0",
+						"archetype_id": "hull_tendril",
+						"display_name": "Hull Tendril",
+						"room_id": "cargo_01",
+						"cell": [
+							4,
+							0
+						],
+						"world_position": [
+							-2.6145744834544478,
+							0.0,
+							-3.027209981231713
+						],
+						"state": "idle",
+						"previous_state": "idle",
+						"max_health": 48.0,
+						"health": 48.0,
+						"attack_damage": 8.0,
+						"structure_damage": 0.4,
+						"attack_type": "electric",
+						"attack_noise": 0.4,
+						"attack_interval": 1.8,
+						"attack_cooldown": 0.0,
+						"noise_sensitivity": 0.7,
+						"light_sensitivity": 1.1,
+						"sight_sensitivity": 0.9,
+						"memory_seconds": 9.0,
+						"memory_remaining": 0.0,
+						"flee_threshold": 0.08,
+						"stunned_remaining": 0.0,
+						"awareness_score": 0.0,
+						"last_known_room": "",
+						"status_on_hit": "stun",
+						"armor_profile": {
+							"flat_reduction": {
+								"electric": 3.0
+							},
+							"resistance": {
+								"electric": 0.45,
+								"fire": -0.1
+							},
+							"durability": 32.0
+						},
+						"tags": [
+							"anchored",
+							"electric"
+						],
+						"move_speed": 0.1,
+						"hunt_speed_mult": 1.0,
+						"flee_speed_mult": 1.0,
+						"investigate_speed_mult": 0.1,
+						"attack_range": 2.2,
+						"last_known_position": [],
+						"ambush_hold": false,
+						"stalk_range": 0.0,
+						"swarm_split": false,
+						"anchored": true,
+						"telegraph_seconds": 0.9,
+						"telegraph_remaining": 0.0,
+						"player_verb": "cut_structure"
+					}
+				],
+				"detection": {
+					"noise_level": 0.0,
+					"light_level": 0.0,
+					"sight_level": 0.0,
+					"crouching": false,
+					"room_id": "",
+					"detect_threshold": 0.75,
+					"memory_seconds": 5.0,
+					"memory_remaining": 0.0,
+					"awareness_score": 0.0,
+					"detected": false,
+					"heard": false,
+					"seen": false,
+					"last_reason": "idle"
+				},
+				"awareness_indicator": 0.0,
+				"combat_engaged": false,
+				"last_attack_result": {},
+				"damage_pipeline": {
+					"processed_hits": 0,
+					"total_damage_applied": 0.0,
+					"total_noise_generated": 0.0,
+					"last_result": {},
+					"armor_resolver": {
+						"armor_profile": {
+							"flat_reduction": {},
+							"resistance": {},
+							"durability": 0.0,
+							"max_durability": 0.0,
+							"wear_factor": 0.35
+						},
+						"last_resolution": {}
+					}
+				}
+			},
+			"combat_hotbar_text": ""
+		},
+		"fire_summary": {},
+		"electrical_arc_summary": {
+			"arcing": false,
+			"arcing_duration": 2.5,
+			"cycle_duration": 4.0,
+			"discharged_duration": 1.5,
+			"hazard_kind": "electrical_arc",
+			"passability_blocked": false,
+			"phase": 0.0,
+			"remaining_in_state": 1.5,
+			"state": "DISCHARGED",
+			"time_in_state": 0.0,
+			"zone_ids": []
+		},
+		"objective_progress_summary": {
+			"2": {
+				"calibrator_applied": false,
+				"complete": false,
+				"completed_step_ids": [],
+				"completed_steps": 0.0,
+				"objective_type": "restore_systems",
+				"required_steps": 2.0
+			}
+		},
+		"player_progression_summary": {
+			"books_read": {},
+			"class_id": "engineer",
+			"cross_training": {
+				"astrogation": 0.0,
+				"biomatter_diagnostics": 0.0,
+				"comms": 0.0,
+				"construction": 0.0,
+				"cooking": 0.0,
+				"diagnostics": 0.0,
+				"fabrication": 0.0,
+				"first_aid": 0.0,
+				"intimidation": 0.0,
+				"leadership": 0.0,
+				"negotiation": 0.0,
+				"pharmacology": 0.0,
+				"piloting": 60.0,
+				"quarantine": 0.0,
+				"repair": 0.0,
+				"resource_management": 0.0,
+				"scanner_operation": 0.0,
+				"scavenging": 70.0,
+				"signal_analysis": 0.0,
+				"surgery": 0.0,
+				"welding": 0.0,
+				"welding_mastery": 0.0
+			},
+			"schema": "progression-2",
+			"skill_xp": {
+				"astrogation": 0.0,
+				"biomatter_diagnostics": 0.0,
+				"comms": 0.0,
+				"construction": 0.0,
+				"cooking": 0.0,
+				"diagnostics": 0.0,
+				"fabrication": 0.0,
+				"first_aid": 0.0,
+				"intimidation": 0.0,
+				"leadership": 0.0,
+				"negotiation": 0.0,
+				"pharmacology": 0.0,
+				"piloting": 30.0,
+				"quarantine": 0.0,
+				"repair": 0.0,
+				"resource_management": 0.0,
+				"scanner_operation": 0.0,
+				"scavenging": 36.0,
+				"signal_analysis": 0.0,
+				"surgery": 0.0,
+				"welding": 97.0,
+				"welding_mastery": 0.0
+			},
+			"skill_xp_fractional": {
+				"astrogation": 0.0,
+				"biomatter_diagnostics": 0.0,
+				"comms": 0.0,
+				"construction": 0.0,
+				"cooking": 0.0,
+				"diagnostics": 0.0,
+				"fabrication": 0.0,
+				"first_aid": 0.0,
+				"intimidation": 0.0,
+				"leadership": 0.0,
+				"negotiation": 0.0,
+				"pharmacology": 0.0,
+				"piloting": 0.0,
+				"quarantine": 0.0,
+				"repair": 0.0,
+				"resource_management": 0.0,
+				"scanner_operation": 0.0,
+				"scavenging": 0.0,
+				"signal_analysis": 0.0,
+				"surgery": 0.0,
+				"welding": 0.5,
+				"welding_mastery": 0.0
+			},
+			"skills": {
+				"astrogation": 0.0,
+				"biomatter_diagnostics": 0.0,
+				"comms": 0.0,
+				"construction": 0.0,
+				"cooking": 0.0,
+				"diagnostics": 2.0,
+				"fabrication": 1.0,
+				"first_aid": 0.0,
+				"intimidation": 0.0,
+				"leadership": 0.0,
+				"negotiation": 0.0,
+				"pharmacology": 0.0,
+				"piloting": 0.0,
+				"quarantine": 0.0,
+				"repair": 3.0,
+				"resource_management": 0.0,
+				"scanner_operation": 0.0,
+				"scavenging": 0.0,
+				"signal_analysis": 0.0,
+				"surgery": 0.0,
+				"welding": 2.0,
+				"welding_mastery": 0.0
+			}
+		},
+		"skill_tree_summary": {
+			"unlocked": {}
+		},
+		"settings_summary": {
+			"captions": true,
+			"colorblind_mode": "none",
+			"difficulty": "standard",
+			"glyph_scheme": "auto",
+			"hold_to_tap": false,
+			"motion_reduce": false,
+			"preset_id": "default",
+			"schema": "settings-state-1",
+			"text_scale": 1.0
+		},
+		"audio_summary": {
+			"ambient": {
+				"crossfade_active": false,
+				"crossfade_seconds": 1.5,
+				"crossfade_time": 0.0,
+				"current_intensity": 0.6,
+				"current_role": "docking",
+				"current_track_id": "amb.docking",
+				"kind": "ambient_zone_state",
+				"previous_intensity": 0.0,
+				"previous_role": "",
+				"previous_track_id": "",
+				"threat_boost": 0.25,
+				"threat_level": 0.0,
+				"threat_threshold": 0.5
+			},
+			"bus_config": {
+				"kind": "audio_bus_config",
+				"mutes": {
+					"ambient": false,
+					"master": false,
+					"meta": false,
+					"music": false,
+					"sfx": false,
+					"ui": false,
+					"voice": false
+				},
+				"volumes": {
+					"ambient": -9.0,
+					"master": 0.0,
+					"meta": -6.0,
+					"music": -6.0,
+					"sfx": -3.0,
+					"ui": -6.0,
+					"voice": -3.0
+				}
+			},
+			"current_voice_log_id": "",
+			"meta_event": {
+				"elapsed": 0.0,
+				"fired": [],
+				"kind": "meta_event_state",
+				"pending": [
+					{
+						"id": "beacon_distress",
+						"trigger_time": 12.0,
+						"voice_log_id": "log.beacon_01",
+						"volume_db": -3.0
+					},
+					{
+						"id": "biomatter_pulse",
+						"trigger_time": 30.0,
+						"voice_log_id": "log.pulse_01",
+						"volume_db": -6.0
+					},
+					{
+						"id": "hull_groan",
+						"trigger_time": 55.0,
+						"voice_log_id": "",
+						"volume_db": -6.0
+					}
+				],
+				"run_seed": 0.0
+			},
+			"music": {
+				"crossfade_seconds": 2.0,
+				"engagement_flag": false,
+				"hazard_active": false,
+				"kind": "dynamic_music_state",
+				"layer_gains": {
+					"layer.base": 1.0,
+					"layer.combat_percussion": 0.0,
+					"layer.critical_pad": 0.0,
+					"layer.tension_drone": 0.0
+				},
+				"state": "EXPLORATION",
+				"target_gains": {
+					"layer.base": 1.0,
+					"layer.combat_percussion": 0.0,
+					"layer.critical_pad": 0.0,
+					"layer.tension_drone": 0.0
+				},
+				"vitals_critical": false
+			},
+			"sfx_router": {
+				"caption_duration": 2.5,
+				"captions_enabled": true,
+				"cooldown_clock": {
+					"meta.hull.groan": 0.0,
+					"sfx.dock.land": 0.0,
+					"sfx.door.open": 0.0,
+					"sfx.tool.use": 0.0,
+					"sfx.work.unbolt": 0.0,
+					"sfx.work.weld": 0.0,
+					"ui.objective.advance": 0.0,
+					"ui.panel.close": 0.0,
+					"ui.ship_mod.open": 0.0,
+					"ui.work.progress": 0.0
+				},
+				"dropped_count": 23.0,
+				"kind": "sfx_event_router",
+				"routed_count": {
+					"meta.hull.groan": 1.0,
+					"sfx.dock.land": 1.0,
+					"sfx.door.open": 1.0,
+					"sfx.tool.use": 1.0,
+					"sfx.work.unbolt": 1.0,
+					"sfx.work.weld": 1.0,
+					"ui.objective.advance": 1.0,
+					"ui.panel.close": 1.0,
+					"ui.ship_mod.open": 1.0,
+					"ui.work.progress": 1.0
+				}
+			},
+			"spatial": {
+				"kind": "spatial_audio_resolver",
+				"max_attenuation_db": -36.0,
+				"max_distance": 25.0,
+				"occlusion_penalty_db": -6.0,
+				"ref_distance": 2.0
+			}
+		},
+		"spoilage_summary": {
+			"foods": {},
+			"rotten_present": false,
+			"transition_count": 0.0
+		},
+		"hydroponics_summary": {
+			"crop_id": "",
+			"crop_name": "",
+			"growth_seconds": 120.0,
+			"power_cost": 3.0,
+			"produce_item_id": "",
+			"produce_quantity": 0.0,
+			"progress_ratio": 0.0,
+			"progress_seconds": 0.0,
+			"required_skill_level": 0.0,
+			"state": 0.0,
+			"water_cost": 2.0
+		},
+		"water_recycler_summary": {
+			"conversion_ratio": 1.0,
+			"input_item_id": "",
+			"input_quantity": 0.0,
+			"output_item_id": "purified_water",
+			"output_ready": 0.0,
+			"power_cost": 5.0,
+			"progress_ratio": 0.0,
+			"progress_seconds": 0.0,
+			"recycle_time_seconds": 30.0,
+			"state": 0.0
+		},
+		"crafting_summary": {
+			"recipe_count": 61,
+			"active_craft": {},
+			"station_summaries": {
+				"fabricator": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "fabricator",
+					"level": 0,
+					"tier": 2,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"kitchen": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "kitchen",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"medbay": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "medbay",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"salvage": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "salvage",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"synthesizer": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "synthesizer",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"workbench": {
+					"ship_id": "",
+					"station_instance_id": "",
+					"active_job_id": "",
+					"station_kind": "workbench",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				}
+			},
+			"physical_station_summaries": {
+				"[\"ship_0:0:0\",\"station:fabricator@12000,550,24000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:fabricator@12000,550,24000",
+					"active_job_id": "",
+					"station_kind": "fabricator",
+					"level": 0,
+					"tier": 2,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_0:0:0\",\"station:kitchen@24000,550,12000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:kitchen@24000,550,12000",
+					"active_job_id": "",
+					"station_kind": "kitchen",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_0:0:0\",\"station:medbay@44000,550,16000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:medbay@44000,550,16000",
+					"active_job_id": "",
+					"station_kind": "medbay",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_0:0:0\",\"station:salvage@20000,550,20000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:salvage@20000,550,20000",
+					"active_job_id": "",
+					"station_kind": "salvage",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_0:0:0\",\"station:synthesizer@24000,550,28000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:synthesizer@24000,550,28000",
+					"active_job_id": "",
+					"station_kind": "synthesizer",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_0:0:0\",\"station:workbench@32000,550,20000\"]": {
+					"ship_id": "ship_0:0:0",
+					"station_instance_id": "station:workbench@32000,550,20000",
+					"active_job_id": "",
+					"station_kind": "workbench",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:fabricator@16000,4550,0\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:fabricator@16000,4550,0",
+					"active_job_id": "",
+					"station_kind": "fabricator",
+					"level": 0,
+					"tier": 2,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:kitchen@28000,4550,-4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:kitchen@28000,4550,-4000",
+					"active_job_id": "",
+					"station_kind": "kitchen",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:medbay@40000,4550,4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:medbay@40000,4550,4000",
+					"active_job_id": "",
+					"station_kind": "medbay",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:salvage@20000,4550,4000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:salvage@20000,4550,4000",
+					"active_job_id": "",
+					"station_kind": "salvage",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:synthesizer@24000,4550,8000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:synthesizer@24000,4550,8000",
+					"active_job_id": "",
+					"station_kind": "synthesizer",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				},
+				"[\"ship_start\",\"station:workbench@20000,4550,-8000\"]": {
+					"ship_id": "ship_start",
+					"station_instance_id": "station:workbench@20000,4550,-8000",
+					"active_job_id": "",
+					"station_kind": "workbench",
+					"level": 0,
+					"tier": 0,
+					"max_queue": 8,
+					"powered": true,
+					"active_recipe_id": "",
+					"progress_seconds": 0.0,
+					"required_seconds": 0.0,
+					"status": 0,
+					"queue": []
+				}
+			},
+			"craft_jobs_v1": {
+				"schema": "craft-jobs-2",
+				"jobs": [],
+				"owners": []
+			},
+			"physical_station_positions_v1": {
+				"schema": "physical-station-positions-1",
+				"owners": [
+					{
+						"ship_id": "ship_0:0:0",
+						"stations": [
+							{
+								"station_kind": "fabricator",
+								"station_instance_id": "station:fabricator@12000,550,24000",
+								"floor_slot_id": "floor@12000,550,24000",
+								"local_position": [
+									12.0,
+									0.550000011920929,
+									24.0
+								]
+							},
+							{
+								"station_kind": "kitchen",
+								"station_instance_id": "station:kitchen@24000,550,12000",
+								"floor_slot_id": "floor@24000,550,12000",
+								"local_position": [
+									24.0,
+									0.550000011920929,
+									12.0
+								]
+							},
+							{
+								"station_kind": "medbay",
+								"station_instance_id": "station:medbay@44000,550,16000",
+								"floor_slot_id": "floor@44000,550,16000",
+								"local_position": [
+									44.0,
+									0.550000011920929,
+									16.0
+								]
+							},
+							{
+								"station_kind": "salvage",
+								"station_instance_id": "station:salvage@20000,550,20000",
+								"floor_slot_id": "floor@20000,550,20000",
+								"local_position": [
+									20.0,
+									0.550000011920929,
+									20.0
+								]
+							},
+							{
+								"station_kind": "synthesizer",
+								"station_instance_id": "station:synthesizer@24000,550,28000",
+								"floor_slot_id": "floor@24000,550,28000",
+								"local_position": [
+									24.0,
+									0.550000011920929,
+									28.0
+								]
+							},
+							{
+								"station_kind": "workbench",
+								"station_instance_id": "station:workbench@32000,550,20000",
+								"floor_slot_id": "floor@32000,550,20000",
+								"local_position": [
+									32.0,
+									0.550000011920929,
+									20.0
+								]
+							}
+						]
+					},
+					{
+						"ship_id": "ship_start",
+						"stations": [
+							{
+								"station_kind": "fabricator",
+								"station_instance_id": "station:fabricator@16000,4550,0",
+								"floor_slot_id": "floor@16000,4550,0",
+								"local_position": [
+									16.0,
+									4.550000190734863,
+									0.0
+								]
+							},
+							{
+								"station_kind": "kitchen",
+								"station_instance_id": "station:kitchen@28000,4550,-4000",
+								"floor_slot_id": "floor@28000,4550,-4000",
+								"local_position": [
+									28.0,
+									4.550000190734863,
+									-4.0
+								]
+							},
+							{
+								"station_kind": "medbay",
+								"station_instance_id": "station:medbay@40000,4550,4000",
+								"floor_slot_id": "floor@40000,4550,4000",
+								"local_position": [
+									40.0,
+									4.550000190734863,
+									4.0
+								]
+							},
+							{
+								"station_kind": "salvage",
+								"station_instance_id": "station:salvage@20000,4550,4000",
+								"floor_slot_id": "floor@20000,4550,4000",
+								"local_position": [
+									20.0,
+									4.550000190734863,
+									4.0
+								]
+							},
+							{
+								"station_kind": "synthesizer",
+								"station_instance_id": "station:synthesizer@24000,4550,8000",
+								"floor_slot_id": "floor@24000,4550,8000",
+								"local_position": [
+									24.0,
+									4.550000190734863,
+									8.0
+								]
+							},
+							{
+								"station_kind": "workbench",
+								"station_instance_id": "station:workbench@20000,4550,-8000",
+								"floor_slot_id": "floor@20000,4550,-8000",
+								"local_position": [
+									20.0,
+									4.550000190734863,
+									-8.0
+								]
+							}
+						]
+					}
+				]
+			},
+			"field_crafting": {
+				"recipe_count": 61,
+				"active_craft": {},
+				"station_summaries": {},
+				"physical_station_summaries": {},
+				"craft_jobs_v1": {
+					"schema": "craft-jobs-2",
+					"jobs": [],
+					"owners": []
+				},
+				"field_pending_v1": {
+					"schema": "field-pending-2",
+					"ship_id": "ship_start",
+					"receipt_sequence": 0,
+					"active_receipt_id": "",
+					"pinned_destination_ship_id": "",
+					"pinned_local_position": [],
+					"receipt_history_v1": []
+				}
+			}
+		},
+		"recipe_knowledge_summary": {
+			"schema": "recipe-knowledge-1",
+			"owner_id": "player:2059933-ded2",
+			"known_recipe_ids": [
+				"cook_alien_flora",
+				"cook_basic_meal",
+				"cook_nutrient_broth",
+				"cook_protein_fry",
+				"cook_synth_stew",
+				"craft_biomatter_filter",
+				"craft_breather_mask",
+				"craft_cryo_unit",
+				"craft_data_core",
+				"craft_docking_brace",
+				"craft_emergency_beacon",
+				"craft_filter_cartridge",
+				"craft_fire_extinguisher",
+				"craft_fuel_line",
+				"craft_graphene_weave",
+				"craft_hull_sealant",
+				"craft_hydraulic_clamp",
+				"craft_junction_calibrator_upgrade",
+				"craft_medkit",
+				"craft_memory_drive",
+				"craft_nanite_patch",
+				"craft_nav_chip",
+				"craft_oxygen_filter",
+				"craft_plasma_cutter",
+				"craft_pneumatic_actuator",
+				"craft_portable_pump_upgrade",
+				"craft_power_cell",
+				"craft_propulsion_coupling",
+				"craft_radiation_badge",
+				"craft_radiation_suit",
+				"craft_reactor_core",
+				"craft_sealant",
+				"craft_sensor_module",
+				"craft_solenoid_rig",
+				"craft_stimulant",
+				"craft_survival_tent",
+				"craft_thermal_pad",
+				"craft_welder",
+				"deconstruct_plasma_cutter",
+				"deconstruct_plating",
+				"deconstruct_power_cell",
+				"deconstruct_scrap",
+				"deconstruct_sensor",
+				"deconstruct_thruster",
+				"deconstruct_welder",
+				"field_bandage",
+				"field_craft_fishing_line",
+				"field_craft_torch",
+				"field_filter_mask",
+				"field_patch",
+				"field_splint",
+				"form_plating_plate",
+				"splice_circuit",
+				"synthesize_adhesive",
+				"synthesize_coolant",
+				"synthesize_fiber_strand",
+				"synthesize_graphene_ink",
+				"synthesize_nanite_slurry",
+				"synthesize_nutrient_paste",
+				"weld_plating"
+			],
+			"event_receipt_ids": [],
+			"event_sequence": 0,
+			"dismantle_counts": {},
+			"migration_origin": "native"
+		},
+		"material_summary": {},
+		"consumable_summary": {
+			"hotbar_slots": [
+				"",
+				"",
+				""
+			],
+			"last_result": {}
+		},
+		"medicine_summary": {
+			"last_cured_statuses": [],
+			"last_item_id": "",
+			"last_results": []
+		},
+		"stimulant_summary": {
+			"active_stims": [],
+			"last_used_item": ""
+		},
+		"addiction_summary": {
+			"profiles": {}
+		},
+		"ammo_summary": {
+			"magazines": {},
+			"reload_active": false,
+			"reload_remaining": 0.0,
+			"reload_target": 0.0,
+			"reload_weapon_id": "",
+			"total_fired": 0.0
+		},
+		"utility_summary": {
+			"active_flags": {},
+			"last_item_id": "",
+			"last_note": ""
+		},
+		"vitals_summary": {
+			"health": 100.0,
+			"health_drain_rate": 0.0,
+			"health_recovery_rate": 0.0,
+			"hunger": 100.0,
+			"hunger_drain_rate": 0.5,
+			"hunger_stamina_cascade_active": false,
+			"hunger_stamina_recovery_mult": 1.0,
+			"max_health": 100.0,
+			"max_hunger": 100.0,
+			"max_stamina": 100.0,
+			"max_thirst": 100.0,
+			"move_mult": 1.0,
+			"stamina": 40.0,
+			"stamina_drain_rate": 2.0,
+			"stamina_recovery_rate": 5.0,
+			"starvation_health_drain": 0.0,
+			"thirst": 100.0,
+			"thirst_drain_rate": 0.8,
+			"thirst_stamina_drain_mult": 1.0,
+			"thirst_vision_warning_active": false,
+			"vision_mult": 1.0
+		},
+		"sanity_summary": {
+			"drain_rate": 1.5,
+			"in_safe_zone": false,
+			"max_sanity": 100.0,
+			"perception_pressure_active": false,
+			"recovery_rate": 3.0,
+			"sanity": 100.0
+		},
+		"radiation_summary": {
+			"accumulation_rate": 2.0,
+			"decay_rate": 0.5,
+			"health_drain_active": false,
+			"health_drain_per_second": 0.0,
+			"health_drain_rate": 1.0,
+			"in_radiation_zone": false,
+			"max_radiation": 100.0,
+			"radiation": 0.0
+		},
+		"temperature_summary": {
+			"drain_rate": 0.5,
+			"hunger_multiplier": 1.0,
+			"in_extreme_zone": false,
+			"is_safe": true,
+			"recovery_rate": 1.0,
+			"safe_max": 32.0,
+			"safe_min": 18.0,
+			"temperature": 22.0,
+			"thirst_multiplier": 1.0
+		},
+		"status_effects_summary": {
+			"count": 0.0,
+			"effects": []
+		},
+		"hallucination_summary": {
+			"active_events": [],
+			"current_tier": 0.0,
+			"health_drain_per_second": 0.5,
+			"pool_loaded": true,
+			"seed": 17.0,
+			"spawn_timers": {},
+			"stamina_recovery_mult": 0.5,
+			"step": 0.0
+		},
+		"module_integrity_summary": {
+			"deltas": [],
+			"registered": 100.0,
+			"schema": "module_integrity_map_v1"
+		},
+		"component_placement_summary": {
+			"schema": "component_placement_v2",
+			"condition_authority_version": 1,
+			"condition_lot_sequence": 3,
+			"seed": 17,
+			"count": 3,
+			"placed": [
+				{
+					"against_wall": true,
+					"cell": [
+						6.0,
+						0.0
+					],
+					"component_id": "console_generic",
+					"component_instance_id": "spine_01_wall_0",
+					"component_slot_profile_id": "wall_console_mount_v1",
+					"condition": 1.0,
+					"item_form": "console_unit",
+					"linked_subcomponent": "",
+					"linked_system": "",
+					"mass": 12.0,
+					"room_id": "spine_01",
+					"ship_mod_managed": false,
+					"slot_index": 0.0,
+					"slot_kind": "wall",
+					"mounted": true,
+					"source_lot_id": "ship:ship_start:components/lot-000003",
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000003",
+						"item_id": "console_unit",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {
+							"kind": "legacy_unrecorded_component",
+							"ship_id": "ship_start",
+							"slot_id": "spine_01_wall_0"
+						}
+					}
+				},
+				{
+					"against_wall": true,
+					"cell": [
+						5.0,
+						-2.0
+					],
+					"component_id": "locker_wall",
+					"component_instance_id": "cargo_01_wall_0",
+					"component_slot_profile_id": "wall_utility_mount_v1",
+					"condition": 1.0,
+					"item_form": "wall_locker",
+					"linked_subcomponent": "",
+					"linked_system": "",
+					"mass": 8.0,
+					"room_id": "cargo_01",
+					"ship_mod_managed": false,
+					"slot_index": 0.0,
+					"slot_kind": "wall",
+					"mounted": true,
+					"source_lot_id": "ship:ship_start:components/lot-000001",
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000001",
+						"item_id": "wall_locker",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 1.0,
+						"origin": {
+							"kind": "legacy_unrecorded_component",
+							"ship_id": "ship_start",
+							"slot_id": "cargo_01_wall_0"
+						}
+					}
+				},
+				{
+					"against_wall": true,
+					"cell": [
+						10.0,
+						0.0
+					],
+					"component_id": "reactor_console",
+					"component_instance_id": "reactor_01_wall_0",
+					"component_slot_profile_id": "wall_console_mount_v1",
+					"condition": 0.6,
+					"item_form": "reactor_console",
+					"linked_subcomponent": "power_distribution",
+					"linked_system": "power",
+					"mass": 15.0,
+					"room_id": "reactor_01",
+					"ship_mod_managed": false,
+					"slot_index": 0.0,
+					"slot_kind": "wall",
+					"mounted": true,
+					"source_lot_id": "ship:ship_start:components/lot-000002",
+					"source_lot": {
+						"lot_id": "ship:ship_start:components/lot-000002",
+						"item_id": "reactor_console",
+						"quantity": 1,
+						"quality_score": 0.5,
+						"quality_tier": "standard",
+						"condition": 0.6,
+						"origin": {
+							"kind": "legacy_unrecorded_component",
+							"ship_id": "ship_start",
+							"slot_id": "reactor_01_wall_0"
+						}
+					}
+				}
+			],
+			"rejected_saved_components": []
+		},
+		"work_action_summary": {},
+		"ship_modification_summary": {
+			"hull_plating_bonus": 0.0,
+			"installed": [],
+			"min_operational_ratio": 0.5,
+			"power_demand_baseline": 82.0,
+			"power_draw": 82.0,
+			"power_ok": true,
+			"power_supply": 100.0,
+			"schema": "ship_modification_v2",
+			"ship_id": "ship_start"
+		},
+		"play_time_seconds": 0.0,
+		"current_location": "home",
+		"world_seed": 17,
+		"slot_id": "world",
+		"slot_kind": "world",
+		"is_autosave": false,
+		"is_quicksave": false,
+		"parent_world_slot": "",
+		"run_id": "2059933-ded2",
+		"slice_version": "gate2-current-run-6",
+		"godot_version": "4.7.2-stable (official)",
+		"saved_at": "2026-09-06T05:38:12",
+		"saved_at_epoch": 1788673092
+	},
+	"meta_progression_summary": {
+		"highest_skill_level_seen": 0.0,
+		"last_payout_currency": 0.0,
+		"last_payout_reason": "",
+		"meta_currency": 0.0,
+		"saved_at": "2026-09-06T05:38:12",
+		"schema": "meta-progression-1",
+		"selected_class_id": "",
+		"total_runs_completed": 0.0,
+		"total_runs_deaths": 0.0,
+		"unlocked_class_ids": {},
+		"unlocked_codex_entry_ids": {},
+		"unlocked_hub_upgrade_ids": {}
+	},
+	"unique_item_summary": {
+		"claimed_seed_keys": {},
+		"claimed_unique_ids": {},
+		"unlocked_codex_entry_ids": {}
+	},
+	"home_looted_containers": [],
+	"home_ship_carts": [
+		{
+			"cart_id": "organic_cart_ship_start",
+			"hold": {
+				"item_lots_v1": {
+					"holder_namespace": "cart:organic_cart_ship_start",
+					"lots": [],
+					"schema": "item-lots-1",
+					"sequence": 0.0
+				},
+				"items": {},
+				"max_weight": 200.0
+			},
+			"parked_position": [
+				23.5,
+				4.0,
+				-6.0
+			],
+			"parked_ship_id": "ship_start",
+			"push_speed_multiplier": 0.7
+		}
+	],
+	"home_breach_environment": {
+		"breach_open": true,
+		"breach_sealed": false,
+		"breach_zone_ids": [
+			"corridor_to_reactor"
+		],
+		"hazard_kind": "oxygen",
+		"passability_blocked": false
+	},
+	"visited_ships": {
+		"0:0:0": {
+			"access": {
+				"access_ids": [
+					"player_local"
+				],
+				"owner_id": "player_local"
+			},
+			"arc": {
+				"arcing": false,
+				"arcing_duration": 2.5,
+				"cycle_duration": 4.0,
+				"discharged_duration": 1.5,
+				"hazard_kind": "electrical_arc",
+				"passability_blocked": false,
+				"phase": 0.0,
+				"remaining_in_state": 1.5,
+				"state": "DISCHARGED",
+				"time_in_state": 0.0,
+				"zone_ids": []
+			},
+			"blueprint": {
+				"condition": 2.0,
+				"generation_context_v1": {
+					"biome": "breach_field",
+					"difficulty": "standard"
+				},
+				"room_count_range": {
+					"max": 4.0,
+					"min": 2.0
+				},
+				"seed_value": 42.0,
+				"size": 0.0
+			},
+			"breach_environment": {
+				"breach_open": true,
+				"breach_sealed": false,
+				"breach_zone_ids": [
+					"corridor_to_reactor"
+				],
+				"hazard_kind": "oxygen",
+				"passability_blocked": false
+			},
+			"breach_seeded": true,
+			"carts": [
+				{
+					"cart_id": "organic_cart_ship_0:0:0",
+					"hold": {
+						"item_lots_v1": {
+							"holder_namespace": "cart:organic_cart_ship_0:0:0",
+							"lots": [],
+							"schema": "item-lots-1",
+							"sequence": 0.0
+						},
+						"items": {},
+						"max_weight": 200.0
+					},
+					"parked_position": [
+						21.5,
+						0.0,
+						16.0
+					],
+					"parked_ship_id": "ship_0:0:0",
+					"push_speed_multiplier": 0.7
+				}
+			],
+			"component_placement": {
+				"condition_authority_version": 1,
+				"condition_lot_sequence": 9,
+				"count": 9,
+				"placed": [
+					{
+						"against_wall": true,
+						"cell": [
+							4.0,
+							3.0
+						],
+						"component_id": "locker_wall",
+						"component_instance_id": "cargo_04_wall_0",
+						"component_slot_profile_id": "wall_utility_mount_v1",
+						"condition": 1.0,
+						"item_form": "wall_locker",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 8.0,
+						"room_id": "cargo_04",
+						"ship_mod_managed": false,
+						"slot_index": 0.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000001",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000001",
+							"item_id": "wall_locker",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "cargo_04_wall_0"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							6.0,
+							3.0
+						],
+						"component_id": "locker_wall",
+						"component_instance_id": "cargo_04_wall_2",
+						"component_slot_profile_id": "wall_utility_mount_v1",
+						"condition": 1.0,
+						"item_form": "wall_locker",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 8.0,
+						"room_id": "cargo_04",
+						"ship_mod_managed": false,
+						"slot_index": 2.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000002",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000002",
+							"item_id": "wall_locker",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "cargo_04_wall_2"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							5.0,
+							5.0
+						],
+						"component_id": "locker_wall",
+						"component_instance_id": "cargo_04_wall_3",
+						"component_slot_profile_id": "wall_utility_mount_v1",
+						"condition": 1.0,
+						"item_form": "wall_locker",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 8.0,
+						"room_id": "cargo_04",
+						"ship_mod_managed": false,
+						"slot_index": 3.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000003",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000003",
+							"item_id": "wall_locker",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "cargo_04_wall_3"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							5.0,
+							6.0
+						],
+						"component_id": "conduit_run",
+						"component_instance_id": "crew_quarters_05_wall_0",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 1.0,
+						"item_form": "conduit_segment",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 6.0,
+						"room_id": "crew_quarters_05",
+						"ship_mod_managed": false,
+						"slot_index": 0.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000005",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000005",
+							"item_id": "conduit_segment",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "crew_quarters_05_wall_0"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							6.0,
+							7.0
+						],
+						"component_id": "conduit_run",
+						"component_instance_id": "crew_quarters_05_wall_2",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 1.0,
+						"item_form": "conduit_segment",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 6.0,
+						"room_id": "crew_quarters_05",
+						"ship_mod_managed": false,
+						"slot_index": 2.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000006",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000006",
+							"item_id": "conduit_segment",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "crew_quarters_05_wall_2"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							10.0,
+							4.0
+						],
+						"component_id": "reactor_console",
+						"component_instance_id": "reactor_06_wall_0",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 0.6,
+						"item_form": "reactor_console",
+						"linked_subcomponent": "power_distribution",
+						"linked_system": "power",
+						"mass": 15.0,
+						"room_id": "reactor_06",
+						"ship_mod_managed": false,
+						"slot_index": 0.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000007",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000007",
+							"item_id": "reactor_console",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 0.6,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "reactor_06_wall_0"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							11.0,
+							4.0
+						],
+						"component_id": "reactor_console",
+						"component_instance_id": "reactor_06_wall_1",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 0.6,
+						"item_form": "reactor_console",
+						"linked_subcomponent": "power_distribution",
+						"linked_system": "power",
+						"mass": 15.0,
+						"room_id": "reactor_06",
+						"ship_mod_managed": false,
+						"slot_index": 1.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000008",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000008",
+							"item_id": "reactor_console",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 0.6,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "reactor_06_wall_1"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							11.0,
+							5.0
+						],
+						"component_id": "reactor_console",
+						"component_instance_id": "reactor_06_wall_2",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 0.6,
+						"item_form": "reactor_console",
+						"linked_subcomponent": "power_distribution",
+						"linked_system": "power",
+						"mass": 15.0,
+						"room_id": "reactor_06",
+						"ship_mod_managed": false,
+						"slot_index": 2.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000009",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000009",
+							"item_id": "reactor_console",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 0.6,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "reactor_06_wall_2"
+							}
+						}
+					},
+					{
+						"against_wall": true,
+						"cell": [
+							7.0,
+							3.0
+						],
+						"component_id": "console_generic",
+						"component_instance_id": "compartment_08_wall_0",
+						"component_slot_profile_id": "wall_console_mount_v1",
+						"condition": 1.0,
+						"item_form": "console_unit",
+						"linked_subcomponent": "",
+						"linked_system": "",
+						"mass": 12.0,
+						"room_id": "compartment_08",
+						"ship_mod_managed": false,
+						"slot_index": 0.0,
+						"slot_kind": "wall",
+						"mounted": true,
+						"source_lot_id": "ship:ship_0:0:0:components/lot-000004",
+						"source_lot": {
+							"lot_id": "ship:ship_0:0:0:components/lot-000004",
+							"item_id": "console_unit",
+							"quantity": 1,
+							"quality_score": 0.5,
+							"quality_tier": "standard",
+							"condition": 1.0,
+							"origin": {
+								"kind": "legacy_unrecorded_component",
+								"ship_id": "ship_0:0:0",
+								"slot_id": "compartment_08_wall_0"
+							}
+						}
+					}
+				],
+				"rejected_saved_components": [],
+				"schema": "component_placement_v2",
+				"seed": 42.0
+			},
+			"fire": {
+				"active_fires": {},
+				"adjacency": {
+					"bridge": [
+						"engineering"
+					],
+					"cargo": [
+						"engineering"
+					],
+					"engineering": [
+						"bridge",
+						"hydroponics",
+						"cargo"
+					],
+					"hydroponics": [
+						"engineering"
+					]
+				},
+				"arc_compartment": "engineering",
+				"cascade_progress": 0.0,
+				"cascade_rate_per_second": 0.5,
+				"closed_links": [],
+				"compartments": [
+					"bridge",
+					"engineering",
+					"hydroponics",
+					"cargo"
+				],
+				"ignition_progress": {},
+				"ignition_rate_per_second": 0.2,
+				"power_threshold": 0.5,
+				"spread_progress": {},
+				"spread_rate_per_second": 0.15,
+				"suppressant_units": 100.0,
+				"suppression_rate_per_second": 25.0,
+				"vented_compartments": []
+			},
+			"fire_seeded": true,
+			"hangar": {
+				"slot_count": 4.0,
+				"slot_size_class": 2.0,
+				"slots": [
+					"",
+					"",
+					"",
+					""
+				]
+			},
+			"hull": {
+				"compartments": {
+					"bridge": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.9
+					},
+					"cargo": {
+						"breach_open": true,
+						"health": 0.0,
+						"isolation_rating": 0.6
+					},
+					"engineering": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.8
+					},
+					"hydroponics": {
+						"breach_open": false,
+						"health": 1.0,
+						"isolation_rating": 0.7
+					}
+				}
+			},
+			"marker_id": "0:0:0",
+			"module_integrity": {
+				"deltas": [
+					{
+						"base_integrity": 1.0,
+						"integrity": 0.5,
+						"kind": "wall_outer_corner",
+						"material_composition": {},
+						"module_id": "edge/0|v|3|3",
+						"mounted_components": [],
+						"room_id": "edge",
+						"state": "damaged",
+						"tool_class": ""
+					}
+				],
+				"registered": 117.0,
+				"schema": "module_integrity_map_v1"
+			},
+			"objective": {
+				"cleared": false,
+				"progress": {
+					"1": {
+						"calibrator_applied": false,
+						"complete": false,
+						"completed_step_ids": [],
+						"completed_steps": 0.0,
+						"objective_type": "salvage",
+						"required_steps": 1.0
+					},
+					"2": {
+						"calibrator_applied": false,
+						"complete": false,
+						"completed_step_ids": [],
+						"completed_steps": 0.0,
+						"objective_type": "salvage",
+						"required_steps": 1.0
+					},
+					"3": {
+						"calibrator_applied": false,
+						"complete": false,
+						"completed_step_ids": [],
+						"completed_steps": 0.0,
+						"objective_type": "salvage",
+						"required_steps": 1.0
+					},
+					"4": {
+						"calibrator_applied": false,
+						"complete": false,
+						"completed_step_ids": [],
+						"completed_steps": 0.0,
+						"objective_type": "salvage",
+						"required_steps": 1.0
+					},
+					"5": {
+						"calibrator_applied": false,
+						"complete": false,
+						"completed_step_ids": [],
+						"completed_steps": 0.0,
+						"objective_type": "interact",
+						"required_steps": 1.0
+					}
+				},
+				"reach_goal_sequence": 5.0
+			},
+			"pending_outputs_v1": {
+				"records": [],
+				"schema": "pending-outputs-1",
+				"ship_id": "ship_0:0:0"
+			},
+			"ship_id": "ship_0:0:0",
+			"systems": {
+				"system_order": [
+					"power",
+					"life_support",
+					"gravity",
+					"navigation",
+					"propulsion",
+					"scanners"
+				],
+				"systems": {
+					"gravity": {
+						"dependency_ids": [
+							"power"
+						],
+						"subcomponents": [
+							{
+								"health": 1.0,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 14.0,
+								"required_parts": [
+									"plating"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "gravity_plating"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 12.0,
+								"required_parts": [
+									"circuit_board"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "field_emitter"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 9.0,
+								"required_parts": [
+									"circuit_board"
+								],
+								"required_tools": [],
+								"subcomponent_id": "inertial_dampeners"
+							}
+						],
+						"system_id": "gravity"
+					},
+					"life_support": {
+						"dependency_ids": [
+							"power"
+						],
+						"oxygen": {
+							"breach_open": true,
+							"breach_sealed": false,
+							"breach_zone_ids": [
+								"life_support"
+							],
+							"drain_multiplier": 1.0,
+							"drain_rate": 6.0,
+							"effective_drain_rate": 6.0,
+							"equipment_drain_multiplier": 1.0,
+							"hazard_kind": "oxygen",
+							"max_oxygen": 100.0,
+							"oxygen": 100.0,
+							"passability_blocked": false,
+							"player_in_breach_zone": false,
+							"recovery_threshold": 30.0,
+							"regen_rate": 3.5,
+							"safe_threshold": 35.0
+						},
+						"subcomponents": [
+							{
+								"health": 0.2,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 12.0,
+								"required_parts": [
+									"oxygen_filter"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "air_recycler"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 1.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 8.0,
+								"required_parts": [
+									"oxygen_filter"
+								],
+								"required_tools": [],
+								"subcomponent_id": "co2_scrubber"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 10.0,
+								"required_parts": [
+									"sealant"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "oxygen_tanks"
+							}
+						],
+						"system_id": "life_support"
+					},
+					"navigation": {
+						"dependency_ids": [
+							"power"
+						],
+						"subcomponents": [
+							{
+								"health": 1.0,
+								"min_skill": 1.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 6.0,
+								"required_parts": [
+									"data_core"
+								],
+								"required_tools": [],
+								"subcomponent_id": "star_charts"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 12.0,
+								"required_parts": [
+									"circuit_board"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "nav_computer"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 10.0,
+								"required_parts": [
+									"sensor_module"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "sensor_array"
+							}
+						],
+						"system_id": "navigation"
+					},
+					"power": {
+						"dependency_ids": [],
+						"subcomponents": [
+							{
+								"health": 0.2,
+								"min_skill": 4.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 20.0,
+								"required_parts": [
+									"reactor_core"
+								],
+								"required_tools": [
+									"plasma_cutter"
+								],
+								"subcomponent_id": "reactor_core"
+							},
+							{
+								"health": 0.0,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 10.0,
+								"required_parts": [
+									"power_cell"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "power_distribution"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 1.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 6.0,
+								"required_parts": [
+									"power_cell"
+								],
+								"required_tools": [],
+								"subcomponent_id": "battery_cells"
+							}
+						],
+						"system_id": "power"
+					},
+					"propulsion": {
+						"dependency_ids": [
+							"power",
+							"navigation"
+						],
+						"subcomponents": [
+							{
+								"health": 0.2,
+								"min_skill": 4.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 18.0,
+								"required_parts": [
+									"thruster_nozzle"
+								],
+								"required_tools": [
+									"plasma_cutter"
+								],
+								"subcomponent_id": "thruster_array"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 12.0,
+								"required_parts": [
+									"fuel_line"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "fuel_injection"
+							},
+							{
+								"health": 1.0,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 8.0,
+								"required_parts": [
+									"circuit_board"
+								],
+								"required_tools": [],
+								"subcomponent_id": "nav_linkage"
+							}
+						],
+						"system_id": "propulsion"
+					},
+					"scanners": {
+						"dependency_ids": [
+							"power",
+							"navigation"
+						],
+						"subcomponents": [
+							{
+								"health": 0.2,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 12.0,
+								"required_parts": [
+									"sensor_module"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "scanner_dish"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 3.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 11.0,
+								"required_parts": [
+									"circuit_board"
+								],
+								"required_tools": [
+									"welder"
+								],
+								"subcomponent_id": "signal_processor"
+							},
+							{
+								"health": 0.2,
+								"min_skill": 2.0,
+								"operational_threshold": 0.5,
+								"repair_seconds": 7.0,
+								"required_parts": [
+									"power_cell"
+								],
+								"required_tools": [],
+								"subcomponent_id": "power_coupling"
+							}
+						],
+						"system_id": "scanners"
+					}
+				}
+			}
+		}
+	},
+	"current_location": "",
+	"world_time": 0.0,
+	"player_position_in_ship": [
+		24.0,
+		4.119999885559082,
+		0.0
+	],
+	"dock_edges": [
+		{
+			"host": "",
+			"mobile": "lifeboat",
+			"port_type": "airlock",
+			"slot_index": -1.0
+		}
+	],
+	"piloted_ship_id": "lifeboat",
+	"aboard_ship_id": "ship_start",
+	"opened_ports": [],
+	"run_id": "2059933-ded2",
+	"slice_version": "world-6",
+	"godot_version": "4.7.2-stable (official)",
+	"saved_at": "2026-09-06T05:38:12",
+	"home_ship_inventory": {
+		"item_lots_v1": {
+			"holder_namespace": "ship:ship_start:cargo",
+			"lots": [],
+			"schema": "item-lots-1",
+			"sequence": 0.0
+		},
+		"items": {},
+		"max_weight": 500.0
+	},
+	"home_floor_drops_v1": {
+		"drops": [],
+		"schema": "ship-floor-drops-1",
+		"sequence": 0.0,
+		"ship_id": "ship_start"
+	},
+	"home_pending_outputs_v1": {
+		"records": [],
+		"schema": "pending-outputs-1",
+		"ship_id": "ship_start"
+	},
+	"home_access_v1": {
+		"owner_id": "player_local",
+		"access_ids": [
+			"player_local"
+		]
+	},
+	"player_equipment": {
+		"slot_lots_v1": {},
+		"slots": {}
+	}
+}

@@ -9,6 +9,7 @@ const PHASE_QUEUED: String = "queued"
 const PHASE_RUNNING: String = "running"
 const PHASE_PAUSED_POWER: String = "paused_power"
 const PHASE_BLOCKED: String = "blocked"
+const PHASE_BLOCKED_UNRESERVED: String = "blocked_unreserved"
 const PHASE_OUTPUT_READY: String = "output_ready"
 const PHASE_COLLECTED: String = "collected"
 const PHASE_CANCELLED: String = "cancelled"
@@ -17,6 +18,7 @@ const VALID_PHASES: Array[String] = [
 	PHASE_RUNNING,
 	PHASE_PAUSED_POWER,
 	PHASE_BLOCKED,
+	PHASE_BLOCKED_UNRESERVED,
 	PHASE_OUTPUT_READY,
 	PHASE_COLLECTED,
 	PHASE_CANCELLED,
@@ -43,10 +45,20 @@ var input_skill_level: int = -1
 var station_effective_tier: int = -1
 var station_powered_at_start: bool = false
 var receipt_emitted: bool = false
+var legacy_consumed_history_v1: Dictionary = {}
+## Immutable provenance for an unstarted cancellation. These lots no longer
+## own value after cancellation; they bind any recoverable refund receipt to
+## the exact reservation that was returned or published.
+var refunded_lots_v1: Array = []
+var legacy_unreserved_cancelled_v1: bool = false
+## A migrated craft-jobs-1 terminal with no surviving lot evidence. This is a
+## history-only tombstone: it preserves the cancellation but can never
+## authorize a pending refund or create recoverable value.
+var legacy_unrecorded_cancelled_v1: bool = false
 
 
 func get_summary() -> Dictionary:
-	return {
+	var result: Dictionary = {
 		"job_id": job_id,
 		"ship_id": ship_id,
 		"station_instance_id": station_instance_id,
@@ -70,7 +82,13 @@ func get_summary() -> Dictionary:
 		"station_effective_tier": station_effective_tier,
 		"station_powered_at_start": station_powered_at_start,
 		"receipt_emitted": receipt_emitted,
+		"refunded_lots_v1": refunded_lots_v1.duplicate(true),
+		"legacy_unreserved_cancelled_v1": legacy_unreserved_cancelled_v1,
+		"legacy_unrecorded_cancelled_v1": legacy_unrecorded_cancelled_v1,
 	}
+	if not legacy_consumed_history_v1.is_empty():
+		result["legacy_consumed_history_v1"] = legacy_consumed_history_v1.duplicate(true)
+	return result
 
 
 ## Strict and atomic: malformed current records never partially replace a job.
@@ -99,6 +117,10 @@ func apply_summary(summary: Dictionary) -> bool:
 	station_effective_tier = normalized.station_effective_tier
 	station_powered_at_start = normalized.station_powered_at_start
 	receipt_emitted = normalized.receipt_emitted
+	legacy_consumed_history_v1 = normalized.legacy_consumed_history_v1
+	refunded_lots_v1 = normalized.refunded_lots_v1
+	legacy_unreserved_cancelled_v1 = normalized.legacy_unreserved_cancelled_v1
+	legacy_unrecorded_cancelled_v1 = normalized.legacy_unrecorded_cancelled_v1
 	return true
 
 
@@ -122,7 +144,9 @@ func _normalize(raw: Dictionary) -> Dictionary:
 		if typeof(raw.get(string_key, null)) != TYPE_STRING:
 			return {}
 	if typeof(raw.get("receipt_emitted", null)) != TYPE_BOOL \
-			or typeof(raw.get("station_powered_at_start", null)) != TYPE_BOOL:
+			or typeof(raw.get("station_powered_at_start", null)) != TYPE_BOOL \
+			or typeof(raw.get("legacy_unreserved_cancelled_v1", null)) != TYPE_BOOL \
+			or typeof(raw.get("legacy_unrecorded_cancelled_v1", null)) != TYPE_BOOL:
 		return {}
 	for key in [
 		"job_id", "ship_id", "station_instance_id", "station_kind", "recipe_id",
@@ -131,6 +155,8 @@ func _normalize(raw: Dictionary) -> Dictionary:
 		"blocked_reason", "input_quality_score", "input_skill_level",
 		"station_effective_tier", "receipt_emitted",
 		"station_powered_at_start",
+		"refunded_lots_v1", "legacy_unreserved_cancelled_v1",
+		"legacy_unrecorded_cancelled_v1",
 	]:
 		if not raw.has(key):
 			return {}
@@ -158,9 +184,14 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	var escrow: Array = _normalize_lots(raw.ingredient_escrow)
 	var consumed: Array = _normalize_lots(raw.consumed_lots)
 	var outputs: Array = _normalize_lots(raw.output_lots)
+	var refunded_raw: Variant = raw.get("refunded_lots_v1", [])
+	if not refunded_raw is Array:
+		return {}
+	var refunded: Array = _normalize_lots(refunded_raw)
 	if escrow.size() != (raw.ingredient_escrow as Array).size() \
 			or consumed.size() != (raw.consumed_lots as Array).size() \
-			or outputs.size() != (raw.output_lots as Array).size():
+			or outputs.size() != (raw.output_lots as Array).size() \
+			or refunded.size() != (refunded_raw as Array).size():
 		return {}
 	for id_key in ["job_id", "ship_id", "station_instance_id", "station_kind", "recipe_id", "source_holder_id", "escrow_holder_id"]:
 		if str(raw[id_key]).is_empty():
@@ -169,6 +200,10 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	if str(raw.job_id) != expected_id:
 		return {}
 	var receipt: String = str(raw.output_receipt_id)
+	var legacy_history: Dictionary = _normalize_legacy_history(
+		raw.get("legacy_consumed_history_v1", null), str(raw.recipe_id), consumed)
+	if raw.has("legacy_consumed_history_v1") and legacy_history.is_empty():
+		return {}
 	match next_phase:
 		PHASE_QUEUED, PHASE_BLOCKED:
 			if escrow.is_empty() or not consumed.is_empty() or not outputs.is_empty() \
@@ -182,6 +217,13 @@ func _normalize(raw: Dictionary) -> Dictionary:
 					or not receipt.is_empty() or next_quality < 0.0 \
 					or next_skill < 0 or next_tier < 0:
 				return {}
+		PHASE_BLOCKED_UNRESERVED:
+			if not escrow.is_empty() or not consumed.is_empty() or not outputs.is_empty() \
+					or not receipt.is_empty() or next_progress != 0.0 \
+					or next_quality != -1.0 or next_skill != -1 or next_tier != -1 \
+					or str(raw.blocked_reason) != "legacy_unreserved" \
+					or bool(raw.receipt_emitted) or not legacy_history.is_empty():
+				return {}
 		PHASE_OUTPUT_READY, PHASE_COLLECTED:
 			if not escrow.is_empty() or consumed.is_empty() or outputs.is_empty() \
 					or receipt != "%s/output" % str(raw.job_id) \
@@ -190,9 +232,24 @@ func _normalize(raw: Dictionary) -> Dictionary:
 					or not bool(raw.receipt_emitted):
 				return {}
 		PHASE_CANCELLED:
-			if not escrow.is_empty() or not receipt.is_empty():
+			var legacy_terminal: bool = bool(raw.legacy_unreserved_cancelled_v1) \
+					or bool(raw.legacy_unrecorded_cancelled_v1)
+			if not escrow.is_empty() or not receipt.is_empty() \
+					or (not refunded.is_empty() and not consumed.is_empty()) \
+					or (consumed.is_empty() and refunded.is_empty() \
+						and not legacy_terminal):
 				return {}
-	if next_phase != PHASE_BLOCKED and not str(raw.blocked_reason).is_empty():
+	if next_phase != PHASE_CANCELLED and not refunded.is_empty():
+		return {}
+	if bool(raw.legacy_unreserved_cancelled_v1) \
+			and (next_phase != PHASE_CANCELLED or not consumed.is_empty() or not refunded.is_empty()):
+		return {}
+	if bool(raw.legacy_unrecorded_cancelled_v1) \
+			and (next_phase != PHASE_CANCELLED or not consumed.is_empty() or not refunded.is_empty() \
+				or bool(raw.legacy_unreserved_cancelled_v1)):
+		return {}
+	if next_phase != PHASE_BLOCKED and next_phase != PHASE_BLOCKED_UNRESERVED \
+			and not str(raw.blocked_reason).is_empty():
 		return {}
 	if bool(raw.receipt_emitted) and next_phase != PHASE_OUTPUT_READY and next_phase != PHASE_COLLECTED:
 		return {}
@@ -222,6 +279,10 @@ func _normalize(raw: Dictionary) -> Dictionary:
 		"station_effective_tier": next_tier,
 		"station_powered_at_start": bool(raw.station_powered_at_start),
 		"receipt_emitted": bool(raw.receipt_emitted),
+		"legacy_consumed_history_v1": legacy_history,
+		"refunded_lots_v1": refunded,
+		"legacy_unreserved_cancelled_v1": bool(raw.legacy_unreserved_cancelled_v1),
+		"legacy_unrecorded_cancelled_v1": bool(raw.legacy_unrecorded_cancelled_v1),
 	}
 
 
@@ -237,7 +298,7 @@ func _normalize_lots(value: Variant) -> Array:
 		for string_key in ["lot_id", "item_id", "quality_tier"]:
 			if typeof(lot.get(string_key, null)) != TYPE_STRING:
 				return []
-		if typeof(lot.get("quantity", null)) != TYPE_INT:
+		if not _is_positive_json_integer(lot.get("quantity", null)):
 			return []
 		var lot_id: String = str(lot.get("lot_id", ""))
 		var item_id: String = str(lot.get("item_id", ""))
@@ -274,10 +335,8 @@ func _output_metadata_matches(
 		if typeof(origin.get(key, null)) != TYPE_STRING:
 			return false
 	if str(origin.job_id) != expected_job_id or str(origin.recipe_id) != expected_recipe_id \
-			or typeof(origin.get("input_skill_level", null)) != TYPE_INT \
-			or int(origin.input_skill_level) != expected_skill \
-			or typeof(origin.get("station_effective_tier", null)) != TYPE_INT \
-			or int(origin.station_effective_tier) != expected_tier:
+			or _strict_int(origin.get("input_skill_level", null)) != expected_skill \
+			or _strict_int(origin.get("station_effective_tier", null)) != expected_tier:
 		return false
 	var origin_quality: float = _finite_number(origin.get("input_quality_score", null))
 	if origin_quality < 0.0 or absf(origin_quality - expected_quality) > 0.0001 \
@@ -303,9 +362,65 @@ func _strict_nonnegative_int(value: Variant) -> int:
 
 
 func _strict_int(value: Variant) -> int:
-	if typeof(value) == TYPE_INT:
+	if (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) \
+			and is_finite(float(value)) and float(value) == floor(float(value)) \
+			and absf(float(value)) <= 9007199254740991.0:
 		return int(value)
 	return -2147483648
+
+
+func _normalize_legacy_history(value: Variant, recipe_id: String, consumed: Array) -> Dictionary:
+	if value == null:
+		return {}
+	if not value is Dictionary:
+		return {}
+	var history: Dictionary = value
+	var historical_score: float = _finite_number(history.get("historical_quality_score", null))
+	var historical_multiplier: float = _finite_number(history.get("historical_quality_multiplier", null))
+	for key in [
+		"schema", "source_version", "paid_before_snapshot",
+		"lot_metadata_reconstructable", "historical_quality_score",
+		"historical_quality_tier", "historical_quality_multiplier", "ingredients",
+	]:
+		if not history.has(key):
+			return {}
+	if str(history.schema) != "legacy-consumed-history-1" \
+			or str(history.source_version) != "gate2-current-run-4" \
+			or history.paid_before_snapshot != true \
+			or history.lot_metadata_reconstructable != false \
+			or not history.ingredients is Array \
+			or historical_score < 0.0 or historical_score > 1.0 \
+			or historical_multiplier <= 0.0 \
+			or typeof(history.historical_quality_tier) != TYPE_STRING:
+		return {}
+	var expected: Dictionary = {}
+	for ingredient_variant in history.ingredients as Array:
+		if not ingredient_variant is Dictionary:
+			return {}
+		var ingredient: Dictionary = ingredient_variant
+		var item_id: String = str(ingredient.get("item_id", ""))
+		if item_id.is_empty() or expected.has(item_id) \
+				or not _is_positive_json_integer(ingredient.get("quantity", null)):
+			return {}
+		expected[item_id] = int(ingredient.quantity)
+	var actual: Dictionary = {}
+	for lot_variant in consumed:
+		var lot: Dictionary = lot_variant
+		var origin: Dictionary = lot.origin
+		if str(origin.get("kind", "")) != "legacy_consumed_history" \
+				or str(origin.get("source_version", "")) != "gate2-current-run-4" \
+				or origin.get("paid_before_snapshot", false) != true \
+				or origin.get("metadata_reconstructable", true) != false:
+			return {}
+		var consumed_item_id: String = str(lot.item_id)
+		actual[consumed_item_id] = int(actual.get(consumed_item_id, 0)) + int(lot.quantity)
+	return history.duplicate(true) if expected == actual and not recipe_id.is_empty() else {}
+
+
+static func _is_positive_json_integer(value: Variant) -> bool:
+	return (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) \
+		and is_finite(float(value)) and float(value) > 0.0 \
+		and float(value) <= 9007199254740991.0 and float(value) == floor(float(value))
 
 
 func _finite_number(value: Variant) -> float:

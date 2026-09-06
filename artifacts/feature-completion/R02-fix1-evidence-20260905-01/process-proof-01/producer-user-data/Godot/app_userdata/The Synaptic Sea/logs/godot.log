@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT COMPLETED item=plating qty=1 quality=poor
+FIELD CRAFT STARTED recipe=field_bandage
+FIELD CRAFT COMPLETED item=field_bandage qty=1 quality=poor
+PLAYABLE SHIP SAVED location=0:0:0 sequence=1
+FC P10 PROCESS PRODUCER PASS

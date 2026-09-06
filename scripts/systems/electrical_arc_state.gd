@@ -145,11 +145,11 @@ func apply_summary(summary: Dictionary) -> bool:
 		phase = new_phase
 		changed = true
 	var new_arcing: float = float(summary.get("arcing_duration", arcing_duration))
-	if absf(new_arcing - arcing_duration) > 0.001:
+	if new_arcing != arcing_duration:
 		arcing_duration = maxf(_phase_timer.MINIMUM_PHASE_DURATION, new_arcing)
 		changed = true
 	var new_discharged: float = float(summary.get("discharged_duration", discharged_duration))
-	if absf(new_discharged - discharged_duration) > 0.001:
+	if new_discharged != discharged_duration:
 		discharged_duration = maxf(_phase_timer.MINIMUM_PHASE_DURATION, new_discharged)
 		changed = true
 	# Re-sync the helper so subsequent ticks advance against the restored
@@ -162,7 +162,7 @@ func apply_summary(summary: Dictionary) -> bool:
 	else:
 		_phase_timer.phase = _phase_timer.Phase.A
 	var new_time: float = float(summary.get("time_in_state", time_in_phase))
-	if absf(new_time - time_in_phase) > 0.001:
+	if new_time != time_in_phase:
 		time_in_phase = new_time
 		changed = true
 	_phase_timer.time_in_phase = time_in_phase

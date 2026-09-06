@@ -26,6 +26,21 @@
       "batch_size": 1
     },
     {
+      "recipe_id": "form_plating_plate",
+      "display_name": "Form Mountable Hull Plate",
+      "category": "fabrication",
+      "ingredients": { "plating": 1 },
+      "produces": { "item_id": "plating_plate", "quantity": 1 },
+      "craft_time_seconds": 10.0,
+      "required_skill_level": 0,
+      "station_kind": "workbench",
+      "station_tier_min": 0,
+      "knowledge_source": "starter",
+      "work_verb": "craft",
+      "power_cost": 2.0,
+      "batch_size": 1
+    },
+    {
       "recipe_id": "splice_circuit",
       "display_name": "Splice Circuit",
       "category": "repair",

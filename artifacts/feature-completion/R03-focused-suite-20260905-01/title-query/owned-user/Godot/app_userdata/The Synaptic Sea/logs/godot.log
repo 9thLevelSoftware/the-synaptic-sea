@@ -1,0 +1,12 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+WARNING: SaveLoadService: rejected incoherent world save reason=invalid_world_snapshot
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] save_world (res://scripts/systems/save_load_service.gd:681)
+       [1] _initialize (res://scripts/validation/title_save_query_smoke.gd:50)
+ERROR: TITLE SAVE QUERY FAIL reason=save_world failed while seeding has-save case
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/title_save_query_smoke.gd:96)
+       [1] _initialize (res://scripts/validation/title_save_query_smoke.gd:51)

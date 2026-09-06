@@ -1,0 +1,24 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+ACHIEVEMENT UNLOCKED trigger=loot_searched target=start_supply_a id=first_loot
+LOOT CONTAINER SEARCHED marker= container=start_supply_a granted=1
+LOOT CONTAINER SEARCHED marker= container=start_supply_b granted=2
+ACHIEVEMENT UNLOCKED trigger=repair_consumed target=propulsion.nav_linkage id=first_repair
+REPAIR COMPLETED system=propulsion sub=nav_linkage operational=true
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT COMPLETED item=plating qty=1 quality=good
+CRAFT STARTED station=workbench recipe=craft_welder
+CRAFT COMPLETED item=welder qty=1 quality=good
+CRAFT STARTED station=fabricator recipe=craft_plasma_cutter
+CRAFT COMPLETED item=plasma_cutter qty=1 quality=good
+ERROR: FC P09 FAIL reason=cut_wall did not commit through the production transaction result={ "ok": true, "reason": "active", "work_id": "ship_start/cut_wall:3" } record={ "work_id": "ship_start/cut_wall:3", "ship_id": "ship_start", "target_id": "edge/1|v|0|3", "target_kind": "module", "target_revision": "ship_start|binding:1|edge/1|v|0|3|intact|1.00000", "action_id": "cut_wall", "source_holder_id": "player:2735845-f16f", "selected_lot_ids": [], "replacement_catalog_id": "", "payload": {  }, "state": "active", "escrow": [], "requirements": {  }, "progress": 0.975946875, "commit_receipt_id": "", "receipt": {  }, "last_reason": "" }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p09_smoke.gd:725)
+       [1] _validate_timed_tool_work (res://scripts/validation/fc_p09_smoke.gd:433)
+       [2] _validate_crafted_tool_consumers (res://scripts/validation/fc_p09_smoke.gd:347)
+       [3] _validate (res://scripts/validation/fc_p09_smoke.gd:147)
+       [4] _on_process_frame (res://scripts/validation/fc_p09_smoke.gd:39)

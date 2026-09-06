@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+FC P12 FAIL: moved-owner commit used stale target position: { "ok": false, "reason": "pause_failed", "work_id": "ship_start/dismount_component:6" }

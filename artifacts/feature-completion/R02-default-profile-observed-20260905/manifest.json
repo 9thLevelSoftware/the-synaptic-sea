@@ -1,0 +1,182 @@
+{
+  "schema": "observed-default-profile-preservation-v1",
+  "captured_at": "2026-09-05T21:18:10.779326-04:00",
+  "source": "C:\\Users\\dasbl\\AppData\\Roaming\\Godot\\app_userdata\\The Synaptic Sea",
+  "note": "Observed state AFTER incorrectly isolated focused smokes; NOT a pre-test backup and NOT a restoration. Source directory only read, never modified by this capture. Older .corrupt files retained as found; no assumption they are valid recovery points.",
+  "files": [
+    {
+      "path": "saves/autosave_b.json",
+      "size": 45257,
+      "sha256": "222bef7037c589d3e2c7d2448ad20f01fe77b94837ad5811ba53e2ba340f3bdc",
+      "modified": "2026-09-05T20:59:16.433333-04:00"
+    },
+    {
+      "path": "saves/index.json",
+      "size": 2496,
+      "sha256": "9f735a5a48cd13177e32e51e92e7c6ca0fbde352f24ad87ac2fe447db0670b40",
+      "modified": "2026-09-05T20:59:38.220364-04:00"
+    },
+    {
+      "path": "saves/p10-bad-component.json",
+      "size": 2166,
+      "sha256": "6f02c2cb5eb576208f7343e1051fa221c08c800ff4b75ceee27923b281fa435d",
+      "modified": "2026-09-05T20:59:15.061604-04:00"
+    },
+    {
+      "path": "saves/p10-bad-field.json",
+      "size": 1786,
+      "sha256": "daa34187a642e56c3207994064da8e48a2fbd52af8d7fa2146b99fd55684f180",
+      "modified": "2026-09-05T20:59:15.066605-04:00"
+    },
+    {
+      "path": "saves/p10-current.json",
+      "size": 3756,
+      "sha256": "73f6367d5724025813e36288406ff26f80db17f62f0731a72db7d29555546525",
+      "modified": "2026-09-05T20:59:15.031605-04:00"
+    },
+    {
+      "path": "saves/p10-future.json",
+      "size": 214,
+      "sha256": "5faf5a8fd2d1428a63747145b0b7408fc64bf2e0698d672cf416a56e9e631a1b",
+      "modified": "2026-09-05T20:59:15.059603-04:00"
+    },
+    {
+      "path": "saves/p10-invalid-json.json",
+      "size": 13,
+      "sha256": "9b60fca5ee82ffb9afc0d382b727815b0b0e70a096b08a1ccb82cc2ec8909066",
+      "modified": "2026-09-05T20:59:14.931677-04:00"
+    },
+    {
+      "path": "saves/p10-legacy.json",
+      "size": 1608,
+      "sha256": "4c3654cab3ba17aeb8e7593aa841db0bf20f418e8e4fa3f9d1451f7541c89956",
+      "modified": "2026-09-05T20:59:15.026604-04:00"
+    },
+    {
+      "path": "saves/p10-legacy.migrated.json",
+      "size": 21746,
+      "sha256": "920f8d7acab62a80e4e07568999a063238ba5ea92fffb3ea9c64e1258a5dc3ff",
+      "modified": "2026-09-05T20:59:15.008049-04:00"
+    },
+    {
+      "path": "saves/p10-live-manual.json",
+      "size": 45265,
+      "sha256": "eaf8936c75c41e459fa2a541feb61e177549364711ed0b27761fc1609d8275a8",
+      "modified": "2026-09-05T20:59:16.331836-04:00"
+    },
+    {
+      "path": "saves/p10-modern-world.json",
+      "size": 15644,
+      "sha256": "a5a9853b0533207628d192c03e6946a1582121ca573ed28df847f7626c3bac71",
+      "modified": "2026-09-05T20:59:15.171690-04:00"
+    },
+    {
+      "path": "saves/quicksave.json",
+      "size": 45257,
+      "sha256": "2dc88e4bfb68b656bf40f0368b8fc5a04251b5c9bb41ba2b9a2920f7d187d4c3",
+      "modified": "2026-09-05T20:59:16.380824-04:00"
+    },
+    {
+      "path": "saves/world.json",
+      "size": 7103,
+      "sha256": "381796f9ca94307d55b871713a33b990f24c1a3db99271ef7e6284acb4abdfe7",
+      "modified": "2026-09-05T21:02:09.750543-04:00"
+    },
+    {
+      "path": "saves/.cloud/autosave_b.manifest.json",
+      "size": 356,
+      "sha256": "b850411620f6e6dc509a6e88fdf9f8dda66604acc093621e181fd8ea385def49",
+      "modified": "2026-09-05T20:59:16.439334-04:00"
+    },
+    {
+      "path": "saves/.cloud/p10-live-manual.manifest.json",
+      "size": 361,
+      "sha256": "682aa97ab17e11f60984ab931dcd5db8035f23c3ebb8fdc3748adb6109277bc9",
+      "modified": "2026-09-05T20:59:16.351824-04:00"
+    },
+    {
+      "path": "saves/.cloud/p10-modern-world.manifest.json",
+      "size": 362,
+      "sha256": "f973eefab34670fa29451e0d4eb2b9b0384dafb56132feb3bb9708f68c9bc541",
+      "modified": "2026-09-05T20:59:15.179692-04:00"
+    },
+    {
+      "path": "saves/.cloud/quicksave.manifest.json",
+      "size": 355,
+      "sha256": "0d28e9c2f1cef8a7b83ab871b9d3611c65f31ffe3d5bcdd5bd50f3cb01b0fef6",
+      "modified": "2026-09-05T20:59:16.387827-04:00"
+    },
+    {
+      "path": "saves/.corrupt/autosave_active.1787745542.current_run.json.bak",
+      "size": 14270,
+      "sha256": "48b22905d99977a51f58a65d4bb238ece8aee54af1bd2744837ea5836acc7b6f",
+      "modified": "2026-08-26T07:59:02.789154-04:00"
+    },
+    {
+      "path": "saves/.corrupt/autosave_active.1787774923.current_run.json.bak",
+      "size": 14324,
+      "sha256": "8e1b981e8a17d00a584b91e21446b2d8f846ff26e34a098918c4788ee7fd1fec",
+      "modified": "2026-08-26T16:08:43.102659-04:00"
+    },
+    {
+      "path": "saves/.corrupt/autosave_active.1787779554.current_run.json.bak",
+      "size": 14324,
+      "sha256": "cc47501af404ce2cb9a400386b2e8e134485a559fff4a885eb2a2d016143e3f2",
+      "modified": "2026-08-26T17:25:54.382408-04:00"
+    },
+    {
+      "path": "saves/.corrupt/autosave_active.1787780076.current_run.json.bak",
+      "size": 14324,
+      "sha256": "07c9aabc89a635900271f16e8d29e5bf1a6665d4d18266c2e471c689da8c2d62",
+      "modified": "2026-08-26T17:34:36.712515-04:00"
+    },
+    {
+      "path": "saves/.corrupt/autosave_active.1788625033.current_run.json.bak",
+      "size": 23553,
+      "sha256": "3e29f27cf7d87035109446c6dde1d03a086be9489fced4e197e98124f91d724a",
+      "modified": "2026-09-05T12:17:13.238316-04:00"
+    },
+    {
+      "path": "logs/godot.log",
+      "size": 166,
+      "sha256": "3e41040e5ad3db21d2f8bb67a36aee773b7d64fe1d3a8296517d33f1da0ec2f7",
+      "modified": "2026-09-05T21:02:09.753544-04:00"
+    },
+    {
+      "path": "logs/godot2026-09-05T20.58.55.log",
+      "size": 452,
+      "sha256": "6ac8b9455473d118e2d759eccefc54e1554a238aedd98670b06246bbf41f63ce",
+      "modified": "2026-09-05T20:58:55.439925-04:00"
+    },
+    {
+      "path": "logs/godot2026-09-05T20.59.03.log",
+      "size": 133,
+      "sha256": "0c361e3e4ebab1b9daddfddf17d83cf5e9f9b65ca3e32d78d9175ffbc3454dde",
+      "modified": "2026-09-05T20:59:03.150343-04:00"
+    },
+    {
+      "path": "logs/godot2026-09-05T20.59.12.log",
+      "size": 166,
+      "sha256": "3e41040e5ad3db21d2f8bb67a36aee773b7d64fe1d3a8296517d33f1da0ec2f7",
+      "modified": "2026-09-05T20:59:12.940364-04:00"
+    },
+    {
+      "path": "logs/godot2026-09-05T21.02.08.log",
+      "size": 5265,
+      "sha256": "8543f88ef873630a6fc1c2b7c9a1574c35b14025958da5972a85658ef7b61635",
+      "modified": "2026-09-05T21:02:08.715985-04:00"
+    },
+    {
+      "path": "meta_progression.json",
+      "size": 448,
+      "sha256": "d977b2b725e4b70458b93acd4e2332464d073119ae311e13a5fb0cfedf9b9a4f",
+      "modified": "2026-09-05T12:17:12.597464-04:00"
+    },
+    {
+      "path": "unlock_registry.json",
+      "size": 429,
+      "sha256": "78790be5cb6500e6912ee1c8b4fb7e2ffb2ddfb2e066cb3c01b55167328bc990",
+      "modified": "2026-09-05T12:17:12.597464-04:00"
+    }
+  ]
+}

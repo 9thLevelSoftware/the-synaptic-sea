@@ -5,6 +5,7 @@ const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const StationStateScript := preload("res://scripts/systems/station_state.gd")
 const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
+const PENDING_SCHEMA: String = "field-pending-2"
 
 ## Pure model for portable/field crafting. A subset of recipes with
 ## station_kind == "field_crafting" can be executed without a powered station.
@@ -20,6 +21,12 @@ var _active_receipt_id: String = ""
 var _bound_local_position: Vector3 = Vector3.ZERO
 var _pinned_destination_ship_id: String = ""
 var _pinned_local_position: Vector3 = Vector3.ZERO
+var _legacy_restore_ship_id: String = ""
+var _legacy_restore_source_holder_id: String = ""
+## Terminal producer history binds every durable field receipt to the exact
+## recipe/output that created it. It carries provenance only; the pending
+## store or collected destination remains the value authority.
+var _receipt_history_v1: Array = []
 
 func _init() -> void:
 	pass
@@ -45,6 +52,21 @@ func bind_pending_output_store(
 
 func has_pending_output_store() -> bool:
 	return _pending_store() != null
+
+
+func configure_legacy_restore_owner(ship_id: String, source_holder_id: String) -> bool:
+	if ship_id.is_empty() or source_holder_id.is_empty():
+		return false
+	_legacy_restore_ship_id = ship_id
+	_legacy_restore_source_holder_id = source_holder_id
+	return true
+
+
+func bind_legacy_migration_jobs(
+		inventory: RefCounted, knowledge = null, player_progression = null,
+		pending_output_store = null) -> bool:
+	return _crafting_state.bind_legacy_migration_jobs(
+		inventory, knowledge, player_progression, pending_output_store)
 
 
 func get_pinned_destination_ship_id() -> String:
@@ -194,6 +216,12 @@ func finish_craft() -> Dictionary:
 	result["pending"] = true
 	result["destination_ship_id"] = _pinned_destination_ship_id
 	result["destination_local_position"] = _pinned_local_position
+	_receipt_history_v1.append({
+		"receipt_id": _active_receipt_id,
+		"destination_ship_id": _pinned_destination_ship_id,
+		"recipe_id": str(preview.get("recipe_id", "")),
+		"original_lots": [lot.duplicate(true)],
+	})
 	_active_receipt_id = ""
 	_pinned_destination_ship_id = ""
 	_pinned_local_position = Vector3.ZERO
@@ -217,6 +245,7 @@ func _peek_completed_field_output() -> Dictionary:
 	if item_id.is_empty() or quantity <= 0:
 		return {}
 	return {
+		"recipe_id": recipe_id,
 		"item_id": item_id,
 		"quantity": quantity,
 		"quality_score": float(active.get("quality_score", 0.5)),
@@ -238,12 +267,14 @@ func cancel_craft() -> void:
 func get_summary() -> Dictionary:
 	var inner: Dictionary = _crafting_state.get_summary()
 	inner["field_pending_v1"] = {
+		"schema": PENDING_SCHEMA,
 		"ship_id": _ship_id,
 		"receipt_sequence": _receipt_sequence,
 		"active_receipt_id": _active_receipt_id,
 		"pinned_destination_ship_id": _pinned_destination_ship_id,
 		"pinned_local_position": _vector_summary(_pinned_local_position) \
 			if not _pinned_destination_ship_id.is_empty() else [],
+		"receipt_history_v1": _receipt_history_v1.duplicate(true),
 	}
 	return {
 		"field_crafting": inner,
@@ -263,8 +294,18 @@ func apply_summary(summary: Dictionary) -> bool:
 		var next_active_receipt_id: String = ""
 		var next_pinned_ship_id: String = ""
 		var next_pinned_position: Vector3 = Vector3.ZERO
+		var next_history: Array = []
+		var pending_keys: Array = pending.keys()
+		pending_keys.sort()
+		if pending_keys != [
+				"active_receipt_id", "pinned_destination_ship_id",
+				"pinned_local_position", "receipt_history_v1", "receipt_sequence",
+				"schema", "ship_id"]:
+			return false
 		if not pending.is_empty():
-			if typeof(pending.get("ship_id", null)) != TYPE_STRING \
+			if typeof(pending.get("schema", null)) != TYPE_STRING \
+					or str(pending.get("schema", "")) != PENDING_SCHEMA \
+					or typeof(pending.get("ship_id", null)) != TYPE_STRING \
 					or not _is_nonnegative_json_integer(
 						pending.get("receipt_sequence", null)) \
 					or typeof(pending.get("active_receipt_id", null)) != TYPE_STRING \
@@ -288,16 +329,113 @@ func apply_summary(summary: Dictionary) -> bool:
 					float(pinned_position_values[0]), float(pinned_position_values[1]),
 					float(pinned_position_values[2]))
 		var candidate = CraftingStateScript.new()
+		if (fc as Dictionary).has("legacy_craft_migration_v1") \
+				and not candidate.configure_legacy_restore_owner(
+					_legacy_restore_ship_id, _legacy_restore_source_holder_id):
+			return false
 		if not candidate.apply_summary(fc as Dictionary):
 			return false
+		var history_v: Variant = pending.get("receipt_history_v1", null)
+		if not history_v is Array:
+			return false
+		var history_ids: Dictionary = {}
+		for history_entry_v in history_v as Array:
+			if not history_entry_v is Dictionary:
+				return false
+			var history_entry: Dictionary = history_entry_v
+			if not _valid_receipt_history_entry(
+					history_entry, next_receipt_sequence, candidate, history_ids):
+				return false
+			next_history.append(history_entry.duplicate(true))
+		if not next_active_receipt_id.is_empty():
+			var active_sequence: int = _receipt_id_sequence(next_active_receipt_id)
+			if active_sequence <= 0 or active_sequence > next_receipt_sequence \
+					or history_ids.has(next_active_receipt_id):
+				return false
 		_crafting_state = candidate
 		_ship_id = next_ship_id
 		_receipt_sequence = next_receipt_sequence
 		_active_receipt_id = next_active_receipt_id
 		_pinned_destination_ship_id = next_pinned_ship_id
 		_pinned_local_position = next_pinned_position
+		_receipt_history_v1 = next_history
 		return true
 	return false
+
+
+func get_receipt_history_v1() -> Array:
+	return _receipt_history_v1.duplicate(true)
+
+
+static func _valid_receipt_history_entry(
+		entry: Dictionary,
+		receipt_sequence: int,
+		crafting: RefCounted,
+		seen_ids: Dictionary) -> bool:
+	var keys: Array = entry.keys()
+	keys.sort()
+	if keys != ["destination_ship_id", "original_lots", "receipt_id", "recipe_id"]:
+		return false
+	for key in ["receipt_id", "destination_ship_id", "recipe_id"]:
+		if typeof(entry.get(key, null)) != TYPE_STRING or str(entry.get(key, "")).is_empty():
+			return false
+	var receipt_id: String = str(entry.receipt_id)
+	var sequence: int = _receipt_id_sequence(receipt_id)
+	if sequence <= 0 or sequence > receipt_sequence or seen_ids.has(receipt_id):
+		return false
+	var lots_v: Variant = entry.get("original_lots", null)
+	if not lots_v is Array or (lots_v as Array).size() != 1:
+		return false
+	var lot_v: Variant = (lots_v as Array)[0]
+	if not lot_v is Dictionary:
+		return false
+	var lot: Dictionary = lot_v
+	var lot_keys: Array = lot.keys()
+	lot_keys.sort()
+	if lot_keys != [
+			"condition", "item_id", "lot_id", "origin", "quality_score",
+			"quality_tier", "quantity"]:
+		return false
+	for string_key in ["lot_id", "item_id", "quality_tier"]:
+		if typeof(lot.get(string_key, null)) != TYPE_STRING \
+				or str(lot.get(string_key, "")).is_empty():
+			return false
+	var recipe_id: String = str(entry.recipe_id)
+	var produces: Dictionary = crafting.call("get_produces", recipe_id)
+	var origin_v: Variant = lot.get("origin", null)
+	if produces.is_empty() or not origin_v is Dictionary \
+			or (origin_v as Dictionary) != {"field_receipt_id": receipt_id} \
+			or str(lot.get("lot_id", "")) != "%s/output-1" % receipt_id \
+			or str(lot.get("item_id", "")) != str(produces.get("item_id", "")) \
+			or not _is_positive_json_integer(lot.get("quantity", null)) \
+			or int(lot.quantity) != int(produces.get("quantity", 0)):
+		return false
+	var score_v: Variant = lot.get("quality_score", null)
+	var condition_v: Variant = lot.get("condition", null)
+	if typeof(score_v) not in [TYPE_INT, TYPE_FLOAT] \
+			or typeof(condition_v) not in [TYPE_INT, TYPE_FLOAT]:
+		return false
+	var score: float = float(score_v)
+	var condition: float = float(condition_v)
+	if not is_finite(score) or score < 0.0 or score > 1.0 \
+			or not is_finite(condition) or condition < 0.0 or condition > 1.0 \
+			or not is_equal_approx(condition, 1.0) \
+			or str(lot.get("quality_tier", "")) != QualityTierResolverScript.tier_for_score(score):
+		return false
+	seen_ids[receipt_id] = true
+	return true
+
+
+static func _receipt_id_sequence(receipt_id: String) -> int:
+	var prefix: String = "field_crafting/job-"
+	var suffix: String = "/output"
+	if not receipt_id.begins_with(prefix) or not receipt_id.ends_with(suffix):
+		return -1
+	var digits: String = receipt_id.substr(
+		prefix.length(), receipt_id.length() - prefix.length() - suffix.length())
+	if digits.length() != 6 or not digits.is_valid_int():
+		return -1
+	return int(digits)
 
 
 func _pending_store() -> RefCounted:
@@ -325,6 +463,10 @@ static func _is_nonnegative_json_integer(value: Variant) -> bool:
 	var number: float = float(value)
 	return is_finite(number) and number >= 0.0 \
 		and number <= MAX_SAFE_JSON_INTEGER and number == floor(number)
+
+
+static func _is_positive_json_integer(value: Variant) -> bool:
+	return _is_nonnegative_json_integer(value) and int(value) > 0
 
 
 static func _is_finite_vector(value: Vector3) -> bool:

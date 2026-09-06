@@ -1,0 +1,19 @@
+{
+  "kind": "preparatory_native_acquisition_discovery",
+  "qualified_for_fc09": false,
+  "qualification": "Discovery fixture only: force_repair_systems_for_travel_only enabled marker travel. It establishes generated-world donor and ingredient candidates, not starter-journey acceptance.",
+  "world_seed": 17,
+  "reachable_marker_count": 60,
+  "visited_marker_count": 12,
+  "travel_failures": [],
+  "schematic_candidates": [],
+  "advanced_ingredient_candidate_count": 55,
+  "donor_candidate_count": 14,
+  "donor_component_ids": [
+    "reactor_console"
+  ],
+  "probe_script": ".tmp/p09_native_acquisition_probe.gd",
+  "probe_script_sha256": "A7161C9E9ECF0CD3EAF4812BDD2A9436CD31299D0D8E02E6A955E6BD19067067",
+  "source_log": "p09_native_acquisition_probe.godot.log",
+  "marker": "PREPARATORY P09 ACQUISITION PROBE PASS"
+}

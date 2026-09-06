@@ -1,0 +1,120 @@
+{
+  "slice_version": "world-5",
+  "godot_version": "fixture-current",
+  "run_id": "malformed-world",
+  "home_ship": {
+    "slice_version": "gate2-current-run-5",
+    "godot_version": "fixture-current",
+    "run_id": "malformed-world",
+    "inventory_summary": {
+      "item_lots_v1": {
+        "schema": "item-lots-1",
+        "holder_namespace": "player:malformed-world",
+        "sequence": 0,
+        "lots": []
+      }
+    },
+    "crafting_summary": {
+      "recipe_count": 0,
+      "active_craft": {},
+      "station_summaries": {},
+      "physical_station_summaries": {},
+      "craft_jobs_v1": {
+        "schema": "craft-jobs-2",
+        "jobs": [],
+        "owners": []
+      },
+      "field_crafting": {
+        "recipe_count": 0,
+        "active_craft": {},
+        "station_summaries": {},
+        "physical_station_summaries": {},
+        "craft_jobs_v1": {
+          "schema": "craft-jobs-2",
+          "jobs": [],
+          "owners": []
+        },
+        "field_pending_v1": {
+          "ship_id": "",
+          "receipt_sequence": 0,
+          "active_receipt_id": "",
+          "pinned_destination_ship_id": "",
+          "pinned_local_position": [],
+          "receipt_history_v1": [],
+          "schema": "field-pending-2"
+        }
+      },
+      "physical_station_positions_v1": {
+        "schema": "physical-station-positions-1",
+        "owners": []
+      }
+    },
+    "recipe_knowledge_summary": {
+      "schema": "recipe-knowledge-1",
+      "owner_id": "player:malformed-world",
+      "known_recipe_ids": [],
+      "event_receipt_ids": [],
+      "event_sequence": 0,
+      "dismantle_counts": {},
+      "migration_origin": "native"
+    },
+    "component_placement_summary": {
+      "schema": "component_placement_v2",
+      "condition_authority_version": 1,
+      "condition_lot_sequence": 0,
+      "seed": 0,
+      "count": 0,
+      "placed": [],
+      "rejected_saved_components": []
+    }
+  },
+  "home_ship_carts": [],
+  "home_pending_outputs_v1": {
+    "schema": "pending-outputs-1",
+    "ship_id": "ship_start",
+    "records": []
+  },
+  "visited_ships": {
+    "marker-bad": {
+      "ship_id": "ship-bad",
+      "marker_id": "marker-bad",
+      "inventory": {
+        "item_lots_v1": {
+          "schema": "item-lots-1",
+          "holder_namespace": "ship:ship-bad:cargo",
+          "sequence": 1,
+          "lots": [
+            {
+              "lot_id": "ship:ship-bad:cargo/lot-000001",
+              "item_id": "scrap_metal",
+              "quantity": 1.5,
+              "quality_score": 0.5,
+              "quality_tier": "standard",
+              "condition": 1.0,
+              "origin": {
+                "kind": "salvage"
+              }
+            }
+          ]
+        },
+        "max_weight": 120.0
+      },
+      "pending_outputs_v1": {
+        "schema": "pending-outputs-1",
+        "ship_id": "ship-bad",
+        "records": []
+      }
+    }
+  },
+  "current_location": "",
+  "world_time": 0.0,
+  "player_position_in_ship": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "dock_edges": [],
+  "piloted_ship_id": "",
+  "aboard_ship_id": "ship_start",
+  "opened_ports": []
+}

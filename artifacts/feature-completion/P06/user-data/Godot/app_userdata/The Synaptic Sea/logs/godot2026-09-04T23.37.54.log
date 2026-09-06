@@ -1,0 +1,8 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+CRAFT STARTED station=fabricator recipe=craft_thruster_nozzle
+SALVAGE COMPLETED item=titanium_ingot qty=1
+FC P06 PASS
+FC P06 PASS locked=true direct_gate=true book=true codex=true reverse=true receipts=true live_book=true live_codex=true live_salvage=true

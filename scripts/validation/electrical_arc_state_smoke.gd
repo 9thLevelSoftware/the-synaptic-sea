@@ -119,6 +119,34 @@ func _initialize() -> void:
 		_fail("apply_summary accepted a wrong-kind summary (must reject)")
 		return
 
+	# Persistence authority is exact even below one millisecond. This value is
+	# the production drift that previously rebuilt an inactive owner's
+	# remaining time as 1.5 instead of 1.49954052188553.
+	var precise_source := ElectricalArcState.new()
+	precise_source.configure({
+		"zone_ids": ["inactive_owner_arc"],
+		"arcing_duration": ElectricalArcState.DEFAULT_ARCING_DURATION,
+		"discharged_duration": ElectricalArcState.DEFAULT_DISCHARGED_DURATION,
+	})
+	precise_source.tick(0.00045947811447)
+	var precise_saved_v: Variant = JSON.parse_string(JSON.stringify(
+		precise_source.get_summary(), "", true, true))
+	if not precise_saved_v is Dictionary:
+		_fail("precise summary did not survive JSON serialization")
+		return
+	var precise_saved: Dictionary = precise_saved_v as Dictionary
+	var precise_restored := ElectricalArcState.new()
+	if not precise_restored.apply_summary(precise_saved):
+		_fail("precise persisted summary was not applied")
+		return
+	var precise_after: Dictionary = precise_restored.get_summary()
+	var precise_after_json: Variant = JSON.parse_string(JSON.stringify(
+		precise_after, "", true, true))
+	if precise_after_json != precise_saved:
+		_fail("sub-millisecond phase authority drifted expected=%s actual=%s" % [
+			str(precise_saved), str(precise_after_json)])
+		return
+
 	# Final summary must include the keys called out in the spec.
 	for key in ["hazard_kind", "state", "phase", "time_in_state", "cycle_duration", "arcing", "passability_blocked", "arcing_duration", "discharged_duration", "zone_ids"]:
 		if not final.has(key):

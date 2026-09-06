@@ -1,0 +1,12 @@
+[
+  "C:\\Users\\dasbl\\Downloads\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64_console.exe",
+  "--headless",
+  "--path",
+  "D:\\the-synaptic-sea-feature-completion",
+  "--log-file",
+  "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\body-godot.log",
+  "--user-data-dir",
+  "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-final-focused-suite-20260905-01\\save-load-service\\owned-user",
+  "--script",
+  "res://scripts/validation/save_load_service_smoke.gd"
+]

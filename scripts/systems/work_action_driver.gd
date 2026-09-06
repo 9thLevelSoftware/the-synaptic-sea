@@ -28,6 +28,9 @@ var overloaded: bool = false
 var _progress_noise_acc: float = 0.0
 var last_progress_noise: float = 0.0
 var _active_start_speed_mult: float = 1.0
+## Frozen concrete tool accepted by the current/last successful start. This is
+## evidence of the accepted start context, never a query of current inventory.
+var _active_selected_tool_context: Dictionary = {}
 const PROGRESS_NOISE_INTERVAL: float = 1.0
 const PROGRESS_NOISE_FRACTION: float = 0.35  # fraction of verb noise per pulse
 
@@ -48,6 +51,7 @@ func configure(config: Dictionary = {}) -> void:
 	_progress_noise_acc = 0.0
 	last_progress_noise = 0.0
 	_active_start_speed_mult = 1.0
+	_active_selected_tool_context = {}
 
 
 func is_working() -> bool:
@@ -117,6 +121,7 @@ func start_action(action_id: String, target_id: String, context: Dictionary = {}
 	pending_yields = {}
 	_progress_noise_acc = 0.0
 	last_progress_noise = 0.0
+	_active_selected_tool_context = {}
 	if catalog == null or not catalog.has_action(action_id):
 		return false
 	var def: Dictionary = catalog.get_action(action_id)
@@ -149,6 +154,8 @@ func start_action(action_id: String, target_id: String, context: Dictionary = {}
 	# the selected tool's frozen quality so callers that pass build_context back
 	# into tick cannot apply their base speed twice.
 	_active_start_speed_mult = maxf(0.05, selected_tool_quality_mult) if started else 1.0
+	if started and start_ctx.get("selected_tool_lot", null) is Dictionary:
+		_active_selected_tool_context = (start_ctx["selected_tool_lot"] as Dictionary).duplicate(true)
 	return started
 
 
@@ -269,10 +276,27 @@ func reset() -> void:
 	last_noise_pulse = 0.0
 	last_xp_event = ""
 	_active_start_speed_mult = 1.0
+	_active_selected_tool_context = {}
 
 
 func get_active_start_speed_multiplier() -> float:
 	return _active_start_speed_mult
+
+
+## Read-only start receipt for scene/UI validation. It intentionally returns the
+## lot accepted at start rather than resolving whatever is selectable after
+## inventory changes. Tools are not spent by work actions, but this pins the
+## exact tool identity that supplied the frozen quality multiplier.
+func get_active_selected_tool_projection() -> Dictionary:
+	if _active_selected_tool_context.is_empty():
+		return {}
+	return {
+		"item_id": str(_active_selected_tool_context.get("item_id", "")),
+		"lot_id": str(_active_selected_tool_context.get("lot_id", "")),
+		"quality_score": float(_active_selected_tool_context.get("quality_score", 0.0)),
+		"quality_tier": str(_active_selected_tool_context.get("quality_tier", "")),
+		"quality_multiplier": _active_start_speed_mult,
+	}
 
 
 ## Apply noise pulse into DetectionState / ThreatManager-like object.

@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP LOADED sequence=1 position=(4.00,0.00,2.00)
+P10 RESTORE AUTHORITY DIFF world.home_ship.inventory_summary.combat_hotbar_text expected=Weapon: Flare Pistol | R02 process authority actual=Weapon: unarmed | Threat: 0.84 | Hostiles: 1
+ERROR: FC P10 PROCESS FAIL: consumer one production load rejected baseline
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p10_process_smoke.gd:685)
+       [1] _fail_bool (res://scripts/validation/fc_p10_process_smoke.gd:680)
+       [2] _run_consumer_one (res://scripts/validation/fc_p10_process_smoke.gd:122)
+       [3] _on_frame (res://scripts/validation/fc_p10_process_smoke.gd:44)

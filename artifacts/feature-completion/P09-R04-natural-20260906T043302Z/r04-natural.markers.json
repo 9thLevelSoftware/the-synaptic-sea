@@ -1,0 +1,5 @@
+{
+  "expected": "FC P09 NATURAL ROUTE PASS",
+  "lines": [],
+  "expected_red_failure_prefix": "FAIL: FC P09 NATURAL ROUTE timed out"
+}

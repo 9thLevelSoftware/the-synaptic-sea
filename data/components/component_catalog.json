@@ -292,6 +292,34 @@
       ],
       "center": []
     },
+    "hydroponics": {
+      "wall": [
+        {
+          "component_id": "conduit_run",
+          "weight": 1
+        }
+      ],
+      "center": [
+        {
+          "component_id": "air_recycler_unit",
+          "weight": 1
+        }
+      ]
+    },
+    "life_support": {
+      "wall": [
+        {
+          "component_id": "conduit_run",
+          "weight": 1
+        }
+      ],
+      "center": [
+        {
+          "component_id": "air_recycler_unit",
+          "weight": 1
+        }
+      ]
+    },
     "default": {
       "wall": [
         {
@@ -328,6 +356,9 @@
       "propulsion"
     ],
     "hydroponics": [
+      "life_support"
+    ],
+    "life_support": [
       "life_support"
     ]
   }
