@@ -746,6 +746,9 @@ file. Before any focused smoke, the probe must print and validate the resolved
 
 R03 closes the remaining FC-12 matrix in the same ownership window. Its added
 scope is `scripts/systems/ship_work_context.gd`,
+`scripts/systems/electrical_arc_state.gd` only to hydrate a persisted
+sub-millisecond `time_in_state` exactly, and its existing direct
+`scripts/validation/electrical_arc_state_smoke.gd`,
 `scripts/ui/{recipe_picker_panel,ship_modification_panel}.gd`,
 `scripts/tools/crafting_station.gd`, `scripts/validation/fc_p13_smoke.gd`,
 `scripts/validation/ship_mod_run_snapshot_smoke.gd`, and the existing
