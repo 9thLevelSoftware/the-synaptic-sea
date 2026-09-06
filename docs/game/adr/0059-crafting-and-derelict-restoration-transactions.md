@@ -1,6 +1,6 @@
 # ADR-0059: Persistent crafting lots and transactional derelict restoration
 
-- Status: **Accepted for the Crafting and Derelict Feature Completion program; scoped implementation underway; full acceptance pending.**
+- Status: **Accepted for the Crafting and Derelict Feature Completion program; scoped implementation underway; the 2026-09-06 R10-A strict-persistence governance allocates `gate2-current-run-7`/`world-7`, with runtime pending; full acceptance pending.**
 - Date: 2026-09-04
 - Related: ADR-0038, ADR-0051, [ADR-0062](0062-ship-owned-pending-output-receipts.md),
   existing RunSnapshot versioning and ShipRuntime contracts.
@@ -492,6 +492,105 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     preserved byte-for-byte. This supersedes decision 38's word `optional` only;
     combat display remains an inventory-envelope extension owned by the
     coordinator rather than InventoryState.
+
+### R10-A strict docking/save addendum accepted with paired version allocation
+
+44. Save migration, snapshot validation, scene capture and restore remain one
+    central strict authority. Docking, occupancy, player and hallucination
+    owners expose typed state to that authority; they do not independently
+    normalize, reinterpret or publish save dictionaries. The next transition is
+    the paired `gate2-current-run-7`/`world-7` version so no intermediate current schema can contain
+    new docking identity with old global-pose meaning, or remove hallucination
+    state on only one side. Runtime constants, fixtures and migration branches
+    change together only after the R06 accepted handoff.
+45. Historical `gate2-current-run-6`/`world-6` remains a permanent admitted
+    source pair. The existing v5-to-v6 helper targets the literal run-6 schema,
+    not `CURRENT_VERSION`, before a separate v6-to-v7 step runs. Run 7 rejects
+    both `hallucination_summary` and the obsolete global
+    `player_position`; it never persists ephemeral
+    hallucination events, per ADR-0042. Recognized historical absence remains
+    valid. Migration validates any present v6 summary strictly before removing
+    it, and resets dependent projections only after the detached candidate has
+    passed every nested validation. Staged recapture is exact except for the
+    already accepted boolean oxygen projection.
+46. World 7 replaces logical `dock_edges` with
+    `dock_connections_v1`. Each strict row contains only
+    `connection_id`, `port_type`, `slot_index`, and exact `host`/`mobile`
+    endpoint references. Each reference contains `ship_id`, `endpoint_id`, and
+    `port_id`. IDs must resolve exactly to the versioned generated layout,
+    endpoint type/slot and opposing normals; duplicate or unresolvable identities
+    reject. Restore generates owner roots first, resolves all registered
+    descriptors, proves the derived complete-hull connection transform and
+    barrier state, and only then publishes parent/docked views. Saved arbitrary
+    transforms, room centers and nearest-port recovery are not admitted.
+    Marker-only `opened_ports` is replaced by strict
+    `boarding_port_states_v1` rows containing `ship_id`, `endpoint_id`, and an
+    exact Boolean `barrier_open`. Every active endpoint has one row; the state
+    drives its real physical/occupancy barrier. A historical open marker must map
+    uniquely through version-pinned old barrier identity or migration rejects.
+47. Run 7 removes `RunSnapshot.player_position` without adding another run-pose
+    field. World 7 is the sole current player-pose authority and replaces the
+    misleading global `player_position_in_ship` with strict
+    `player_owner_pose_v1` containing
+    `owner_ship_id`, `location_kind`, `local_position`, `connection_id`, and
+    `endpoint_id`. `owner_ship_id` must equal explicit `aboard_ship_id`.
+    `location_kind=interior` requires empty connection/endpoint IDs.
+    `location_kind=dock_threshold` requires an existing connection and its
+    mobile endpoint; the mobile side owns the shared threshold. Capture derives
+    local position only from the explicitly occupied owner root. Restore applies
+    owner roots and registered connections first, transforms the exact local
+    pose through that owner, and requires the real player capsule to be clear.
+    Failure rejects the detached candidate; it never clamps, teleports, selects
+    the nearest ship, snaps to a room center or invents a spawn.
+    The accepted local numeric array remains the authoritative value. Central
+    restore staging retains an ephemeral receipt containing that array, the
+    exact owner/root revision, and the exact projected global body position. An
+    unchanged recapture reuses it only when all receipt values and body position
+    are bit-exact; movement or a root/owner revision computes one new full-
+    precision local value. This is transaction provenance, not a second gameplay
+    owner, epsilon, rounding rule or staged-comparison exception.
+48. A raw standalone current run-6 payload retains the existing recoverable
+    `unclosed_owner_graph` rejection. Recognized older direct-run adapters retain
+    only their existing strict historical preconditions; this transition does
+    not broaden them. The current loader compares a source version to
+    `CURRENT_SLICE_VERSION`, so advancing that constant must be accompanied by
+    an explicit raw run-6 rejection before the older-run adapter; a constant-only
+    change would silently admit the formerly-current unclosed payload. World-6 admission uses its nonempty `aboard_ship_id` as the
+    explicit owner of the top-level global pose and a version-pinned legacy
+    geometry resolver that reconstructs exactly the transforms used by world-6.
+    When `current_location` is empty, the embedded
+    `home_ship.player_position` must exactly equal top-level
+    `player_position_in_ship`; migration converts that one value through the
+    explicit aboard owner, then discards the embedded duplicate. When
+    `current_location` is nonempty, migration strictly validates the embedded
+    home-departure coordinates as finite obsolete data and discards them without
+    inferring `ship_start` or rejecting solely for their lack of owner. Every old edge must map uniquely to
+    registered endpoints. Global-to-owner-local conversion is performed once
+    with full-precision engine numerics and that exact local result becomes the
+    new authority; the restore receipt in decision 47 prevents an additional
+    inverse-transform round trip during unchanged staged recapture. Missing
+    top-level owner, unequal at-home duplicates, multiple mappings, non-finite
+    values, or a non-invertible legacy
+    root transform reject recoverably
+    before bytes, save indexes or live scene state change. Current endpoint
+    geometry cannot be substituted for that historical resolver. The later live
+    capsule-clearance check may reject an otherwise structurally valid migration;
+    it cannot silently adjust the pose.
+49. Before moving any historical mobile root, migration inventories existing
+    spatial payloads for that owner. Current carts, floor drops, corpse drops and
+    physical station positions are already ship-local and remain byte-identical.
+    Visited-ship combat rows contain world-space `world_position` and optional
+    `last_known_position`; every finite nonempty point is transformed from the
+    version-pinned old root into the corrected root. The obsolete home-departure
+    duplicate is handled only by decision 48; home combat positions remain in
+    the unchanged home frame. An unknown present
+    world-space field, absent owner, or unprovable frame rejects recoverably; the
+    migration does not invent another spatial-state owner.
+
+Decisions 44-49 allocate `gate2-current-run-7` and `world-7` together for R10-A.
+They remain governance-only until the coordinated runtime change moves R06/P10's
+future-rejection sentinels and fixtures to `gate2-current-run-8`/`world-8` and
+makes the allocated pair current.
 
 ## Locked transaction payloads
 

@@ -194,6 +194,47 @@ save/load or repeated callbacks.
   each connected ship's local side must be evaluated against that ship's graph.
   Exterior-edge replacement and floor/ceiling support topology remain outside
   that preparatory helper and must stay visibly unsupported until integrated.
+- Before that live safety integration, R10-A restores a truthful docking and
+  traversal baseline. Every production home, fallback, native and fixed-lifeboat
+  layout precompiles stable boarding endpoint/port/portal identity from actual
+  occupied cells. The port must be an explicit one-sided exterior portal on a
+  supporting hull plane, with every non-join shape behind that plane and separate
+  threshold/interior capsule-clear points. Only authenticated portions of the
+  endpoint's named join boxes may protrude into its exact bounded seam clips. The fixed lifeboat's west airlock edge
+  is an internal engine-room seam, so the authorizer chooses a valid unoccupied
+  north/south edge rather than preserving a diagnostic coordinate.
+- Docking derives its pose from opposing registered descriptors and checks both
+  complete transformed hulls before mutation. Only exact endpoint-owned open-
+  frame/directly-incident-floor join boxes may intersect, and only inside the
+  finite seam envelope derived by clipping their contract-selected canonical
+  wrapper boxes to both outward half-spaces. Non-join, opaque or dynamic overlap
+  rejects without an epsilon/global margin. A closed connection has one separate
+  mobile-owned barrier; an open one
+  proves ordinary capsule travel in both directions. The mobile endpoint owns
+  the shared threshold identity. Missing authoring, ambiguous identity, concave
+  non-supporting edges, hull overlap or blocked clearance fail closed without a
+  nearest-room, center-snap, silent alternate layout or collision-disable path.
+- The canonical opening owns one fixed-lifeboat
+  `initial_player_spawn_v1` interior point. New Game constructs the corrected
+  pair and closed barrier first, then places the player once and publishes only
+  when the live capsule is clear, occupancy resolves to the lifeboat and the
+  barrier excludes home. This authored opening point is unavailable to save/load
+  or migration recovery.
+- The same baseline correction retains floor-origin ceiling wrappers while
+  moving `ceiling_cap_1x1` structural collision to Y 3.8..4.0: a 4x0.2x4 proxy
+  centered at `(0, 3.9, 0)`. Physical collision bounds and transformed visual
+  bounds are independently validated so decorative underside down to about
+  Y 3.6875 neither blocks traversal nor disappears from visual metadata.
+- The allocated `gate2-current-run-7`/`world-7` migration persists registered
+  connection identities and one exact WorldSnapshot-owned player pose while
+  removing RunSnapshot's global pose and ephemeral hallucination summaries.
+  World-6/run-6 remain a historical pair. At-home world-6 migration requires
+  exact embedded/top-level equality and explicit `aboard_ship_id`; away migration
+  validates then discards its obsolete finite home-departure coordinate. Raw
+  current run-6 retains `unclosed_owner_graph`, and older direct-run adapters keep
+  their strict historical preconditions. Ambiguity or an uncleared restored
+  player capsule rejects without inventing a pose. This prerequisite cannot
+  itself satisfy FC-19.
 - A successful replacement restores geometry, collision, navigable edge state,
   atmosphere enclosure, component-slot availability, and structural health as one
   committed operation. Intact restoration must close the hole it replaces.

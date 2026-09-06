@@ -1150,7 +1150,12 @@ the preparatory smokes' standalone membership and exact PASS-marker rows;
 contract and registered-endpoint seams in `generated_ship_loader.gd`,
 `modular_socket_catalog.gd`, `dock_ports.gd`,
 `docking_manager.gd`, `ship_instance.gd`, `ship_nav_graph.gd`, and the playable
-coordinator; new rebuild and physical-volume catalogs, catalog checker/tests,
+coordinator; an additive pure precompile boarding-endpoint authorizer and its
+layout/compiler validation seams; production home/fallback/native/lifeboat layout
+sources and the coherent-home golden; a physical dock-barrier owner; the
+canonical `ceiling_cap_1x1` contract, wrapper sidecars and source-pipeline
+validators; coordinated run/world save owners under the explicitly allocated
+run7/world7 pair after accepted R06 re-review handoff; new rebuild and physical-volume catalogs, catalog checker/tests,
 work-action definitions,
 and compatible-action metadata in `data/tools/tool_definitions.json` plus only
 the `welder.compatible_work_action_ids` `rebuild_structure` entry in
@@ -1160,10 +1165,81 @@ assertions in `fc_p16_smoke.gd`; `structural_rebuild_policy_smoke.gd`, a
 preparatory P17 policy/loader proof that does
 not emit an `FC P17 PASS` marker; preparatory
 `structural_rebuild_candidate_nav_smoke.gd` for the bounded pure edge/path helper.
-**Non-goals:** geometry/nav/air mutation, component displacement, replacement
+The tracked R10-A runner and focused endpoint, full-hull docking, barrier,
+ordinary traversal, ceiling-proxy, persistence and migration smokes are also in
+scope once their exact paths are frozen in the generated card.
+**Non-goals:** claiming full candidate-result FC-19 safety from the R10-A
+baseline prerequisite, arbitrary reinterpretation of an old dock transform or
+global player pose, geometry/nav/air mutation, component displacement, replacement
 outside the original transform/footprint, arbitrary rotation/substitution,
-auto-undocking, persistence, or adding cart push/motion behavior in the
+auto-undocking, persistence outside the reviewed R10-A paired transition, or
+adding cart push/motion behavior in the
 physical-volume foundation slice.
+
+**R10-A baseline prerequisite:** before live replacement safety consumes docking
+or egress, author every production boarding port from real occupied cells and an
+explicit one-sided exterior portal. A valid port lies on a supporting exterior
+plane: every non-join owner shape is in the inward half-space, while the authored
+threshold and clearance envelope are outside it. Only separately authenticated
+join-box portions may cross into the exact bounded seam clips. Fixed lifeboat north/south
+selection must therefore respect the real airlock/engine occupancy; the old
+room-center `+X` result and diagnostic `(-2, 0, 0)` mobile example are not
+authority. Pair opposing descriptors deterministically, derive the transform
+from their registered poses/normals, and reject before moving either ship when
+any cross-ship intersection lies outside a finite contract-selected-wrapper seam
+envelope. Only exact open-frame/directly-incident-floor join placement IDs may
+intersect inside it; walls, ceilings, opaque/blocked portals, room interiors,
+unrelated floors and dynamic bodies never qualify. The envelope is constructed
+by clipping canonical collision boxes to both outward half-spaces, with exact
+containment and no epsilon/global margin. The mobile threshold owner instantiates
+the separate barrier once, and an independent full-capsule sweep must clear the
+open seam. The same atomic root delta rebases established
+live/stored combat world/last-known points while existing ship-local spatial
+state inherits the move. No
+nearest room, role prefix, alternate layout, center snap, collision disable or
+post-mutation rollback is an authorization path.
+
+This prerequisite slice may execute after R01/R03 governance and the R06 shared-
+owner release while P09 remains RED. The parent P17 acceptance dependency on P09
+is unchanged; R10-A cannot consume or replace P09's economy result.
+
+R10-A also gives a closed dock a real physical/occupancy barrier, proves two-way
+capsule traversal when open, and corrects `ceiling_cap_1x1` at its source: the
+physical contract/proxy is `[-2, 3.8, -2]..[2, 4.0, 2]`, while transformed visual
+bounds separately retain decorative underside reaching approximately Y 3.6875.
+The compiler, generated loader and lifeboat remain floor-origin. Source
+regeneration must produce the 4x0.2x4 box centered at `(0, 3.9, 0)` and validate
+both structural collision bounds and transformed visual bounds.
+
+ADR-0017's canonical opening uses one strict fixed-lifeboat
+`initial_player_spawn_v1` interior point. New Game builds and validates the
+corrected pair and closed barrier before applying that point once, then publishes
+only when the capsule is clear, occupancy is the lifeboat and home is denied.
+The row is not admitted as save/load, migration, clamp or later-teleport recovery.
+
+The persistence transition is the allocated
+`gate2-current-run-7`/`world-7` pair. It stores registered endpoint connection
+IDs, endpoint-keyed physical-barrier state and the sole WorldSnapshot owner-local
+player pose, removes RunSnapshot's global pose without adding another pose field, and removes
+ephemeral hallucination summaries under
+ADR-0042, preserves the historical run-6/world-6 pair, and pins the v5-to-v6
+helper to literal run-6 before v6-to-v7 migration. The coordinated runtime change
+moves R06's active future-rejection sentinel and fixtures to run8/world8 while
+retaining the old artifacts as history. At-home world-6 admission
+requires exact embedded/top-level position equality plus explicit aboard owner;
+away world-6 validates and discards finite obsolete home-departure data. Raw
+current run-6 retains `unclosed_owner_graph` through an explicit literal check
+before older-run adaptation after the current constant advances; older direct-run
+adapters retain their strict historical preconditions, and ambiguity rejects recoverably without
+nearest-ship or invented spawn recovery. Restore must rebuild
+registered docking and prove the exact local pose capsule-clear before publishing.
+An exact central restore receipt preserves the full-precision authoritative local
+value across unchanged recapture without epsilon or another inverse transform.
+For every moved owner, established ship-local cart/drop/corpse/station fields stay
+byte-identical, visited combat world/last-known positions transform through the
+proven old/new roots, and an unknown or unprovable world-space field rejects.
+The shared threshold is explicitly owned by the mobile endpoint. This slice
+cannot emit or satisfy `FC P17 PASS`.
 
 **P17 foundation slice A:** land the explicit reviewed physical-volume catalog,
 strict immutable loader, primitive builder, and private candidate-only query
@@ -1312,6 +1388,10 @@ connection; a restored doorway retains authored open/closed semantics, not a sol
 coordinator capture/restore/revisit; new `fc_p19_smoke.gd` and historical fixtures.
 **Non-goals:** silently discarding unmatched deltas.
 
+R10-A may make the reviewed paired save transition before this task so baseline
+docking can be represented without corrupting world-6 meaning. P19 consumes that
+strict current schema; it does not allocate another version for the same change.
+
 - [ ] Persist replacement descriptors independently from integrity deltas, plus
   work escrow/receipts and condition-bearing component placement.
 - [ ] Never serialize an APPLYING state or P18 token/Node/RID. Save waits or returns
@@ -1322,6 +1402,12 @@ coordinator capture/restore/revisit; new `fc_p19_smoke.gd` and historical fixtur
   any mismatch rejects restore without guessing or overwriting the save.
 - [ ] Restore in order: generated originals -> replacements -> integrity -> components
   -> systems/ship effects -> derived navigation/atmosphere -> active simulation.
+- [ ] Preserve registered docking connection IDs and the explicit aboard owner's
+  ship-local player pose. Restore owner roots and registered connections before
+  converting that exact local pose to world space, then require real traversal-
+  capsule clearance before publishing. Threshold poses name their connection and
+  mobile-owned endpoint. Reject ambiguous legacy transforms/owners without a
+  nearest-ship, center-snap or newly invented spawn fallback.
 - [ ] Handle stale IDs/version mismatch as an explicit load/recovery failure that
   preserves the original save; no geometry guess or automatic corrupt-save overwrite.
 - [ ] Test pristine replacement (no damage delta), mid-work save, commit-boundary

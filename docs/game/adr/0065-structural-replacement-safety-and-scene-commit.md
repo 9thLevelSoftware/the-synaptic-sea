@@ -1,6 +1,6 @@
 # ADR-0065: Structural replacement safety and scene commit boundary
 
-- Status: **Accepted for implementation; runtime validation and all-15 BOM acquisition proof remain pending.**
+- Status: **Accepted for implementation; the 2026-09-06 R10-A baseline docking/traversal governance amendment and paired `gate2-current-run-7`/`world-7` allocation are accepted, while runtime validation and all-15 BOM acquisition proof remain pending.**
 - Date: 2026-09-05
 - Requirements: FC-18, FC-19, FC-20, FC-22.
 - Related: ADR-0051, ADR-0053, ADR-0056, ADR-0059, ADR-0061, ADR-0062.
@@ -272,6 +272,10 @@ sweep. No candidate-only result may be described as full path clearance.
 
 ### 4. Docking and registered exits
 
+The R10-A baseline correction in this section is accepted governance. Runtime
+evidence remains pending. The existing candidate-result safety obligations
+remain accepted and cannot be weakened by its implementation.
+
 Every boarding/docking port used by production receives stable authored identity:
 
 - `port_id`;
@@ -281,19 +285,103 @@ Every boarding/docking port used by production receives stable authored identity
 - endpoint ID and local/world transform;
 - distinct `threshold_nav_node_id` and `interior_nav_node_id`, each resolving a
   real clearance-sized point rather than near-identical samples of one location;
+- exact endpoint-owned `join_piece_placement_ids` and a build-time
+  `join_collision_fingerprint` over their canonical wrapper collision boxes;
 - type, size and current condition/usable state.
 
-The loader registers the existing production `DockPorts` position/facing once
-against its exact structural plan. Registration must resolve one stable floor or
-edge target and, where applicable, one authored portal; missing or ambiguous
-mapping fails. This preserves current docking geometry while preventing P17 from
-repeating `DockPorts` room-role/name-prefix guesses as authorization. The loader
-then exposes registered boarding/airlock endpoint descriptors.
+The prior `DockPorts` room-center geometry is not preserved. Natural traversal
+evidence demonstrated that it can mate occupied hull faces and overlap the home
+and lifeboat. Before structural-replacement safety consumes a port, a pure
+precompile authorizer registers it from occupied cells and an explicit one-sided
+exterior portal. The row names its stable port/endpoint/portal IDs, room, deck,
+edge cell/direction, structural edge/module, exact local pose and outward normal,
+and distinct threshold/interior navigation nodes plus clearance points. The
+compiler accepts this deliberately exterior portal form while continuing to
+reject accidental one-room internal portals.
+
+A valid endpoint lies on a supporting exterior plane: every non-join collision
+shape of its complete owning hull is in the inward half-space, and its
+threshold/clearance envelope lies outside. Only the separately authenticated
+portions of that endpoint's named join boxes may cross the plane, and only into
+the bounded half-space clips used to construct the seam envelope below. This
+excludes concave boundary edges that would still dock through another room
+without making an outward-protruding wall, ceiling, interior or unrelated floor
+eligible. The fixed lifeboat authoring derives
+an unoccupied north/south airlock edge from its real occupancy; its west edge is
+the internal airlock-to-engine seam and cannot be registered as exterior.
+Fallback, native and authored home layouts obey the same rule. Generation fails
+closed when it cannot author a usable endpoint; it never silently selects another
+layout or reconstructs a port from a room center, role prefix, nearest cell or
+fixed half-cell offset.
+
+`DockingManager` selects a deterministic compatible endpoint pair and derives the
+mobile root transform solely from the two registered poses and opposing normals.
+Before changing either root or connection state it tests the complete transformed
+host and mobile hulls against a finite constructed seam envelope. Join IDs may
+name only each endpoint's exact open doorway-frame placement and directly
+incident floor/corridor-floor placements. Walls, ceilings, blocked/solid portals,
+room-interior shapes, unrelated floors and dynamic bodies are never join pieces.
+The live loader resolves those IDs to contract-selected canonical wrapper boxes
+and requires exact agreement with the precompiled collision fingerprint.
+
+In threshold coordinates, the constructor clips each authenticated join box to
+its outward half-space and unions the exact clipped AABBs from both mated sides.
+Endpoint transforms are cardinal; non-box/non-cardinal join geometry is
+unsupported. With the current canonical wrapper, the two doorway posts and header
+are 0.2 m deep and produce a 0.1 m slab on each side; the 4x0.25x4 floor reaches
+the plane. These actual extents explain why zero-volume logical-cell contact is
+not a valid universal rule. Existing Blender collision-proxy sidecars disagree
+with the runtime wrapper shapes and cannot authorize the seam.
+
+Every cross-ship shape pair is checked. An intersection involving any non-join
+shape rejects. Two authenticated join boxes may intersect only when their exact
+box-intersection AABB lies wholly inside the constructed envelope. There is no
+epsilon or global overlap allowance. The mobile threshold owner instantiates the
+separate closed-state barrier exactly once, and an independent full-capsule sweep
+between both interior clearance points must pass with that barrier open.
+Supporting planes constrain the full hull, while this narrow rule admits only
+the canonical connector/floor contact needed by real wrappers. The diagnostic
+`(-2, 0, 0)` mobile port and `(-4, 0, 0)` root pose remain evidence examples,
+never authored constants.
+
+That pre-mutation transaction inventories mobile-owned spatial state. Ship-local
+carts, floor drops, corpse drops and station positions inherit the root move.
+Active and stored combat currently uses world-space threat and last-known
+positions, so every such point receives the exact old-root to new-root delta in
+the same transaction. The explicit owner-local carry path covers the player.
+Missing ownership or an unhandled world-space payload rejects before any root or
+connection state changes.
 
 `DockingManager` retains the exact host and mobile port identities in one
 connection record, and both `parent_ship` and `docked_ships` views resolve that
 same connection. Replacing a module/edge that owns an active connection is
 denied. Replacement never auto-undocks a ship.
+
+A closed production connection owns a real physical/occupancy barrier at the
+shared threshold; an open connection removes that obstruction and must permit
+full capsule travel in both directions between the two distinct interior
+clearance points. The mobile endpoint owns the shared threshold node, so graph,
+barrier and persisted threshold-pose identity cannot disagree about ownership.
+
+The fixed lifeboat layout separately owns the canonical opening's strict
+`initial_player_spawn_v1` row (`spawn_id`, `owner_ship_id`, `room_id`,
+`nav_node_id`, `local_position`). It names the lifeboat as owner and lies at a
+capsule-clear interior point distinct from the threshold and both clearance
+anchors. New Game first constructs and validates the corrected pair and closed
+home barrier, then resolves and applies that owner-local spawn once before
+publishing occupancy. Occupancy must identify the lifeboat and the closed
+barrier must deny home ownership. Failure aborts publication; the row is never a
+save migration, load-recovery, nearest-room, clamp or later-teleport mechanism.
+
+The same prerequisite corrects the demonstrated ceiling collision at its source.
+Compiler, generated loader and fixed lifeboat keep the wrapper root at the floor
+cell origin. The canonical `ceiling_cap_1x1` structural collision bounds become
+`[-2, 3.8, -2]..[2, 4.0, 2]`, producing a 4x0.2x4 box centered at
+`(0, 3.9, 0)`. Transformed GLB visual bounds are separate metadata and retain
+decorative underside down to approximately Y 3.6875. Pipeline validation must
+check both domains; it may not enlarge the physical proxy over decoration,
+truncate the visual bounds, disable collision, or reinterpret `nav_blocker=false`
+as non-collision.
 
 ### 5. Candidate-result egress policy
 

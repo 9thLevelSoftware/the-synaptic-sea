@@ -60,16 +60,20 @@ Key retained evidence:
 flowchart TD
   R01[Reconcile evidence and WIP] --> R02[Combat save contract]
   R02 --> R03[Persistence closure]
-  R01 --> R04[Natural crafting routes]
+  R01 --> R10A[Baseline dock and traversal]
+  R03 --> R10A
+  R10A --> R04[Natural crafting routes]
   R03 --> R05[Crafting G1]
   R04 --> R05
   R03 --> R06[Physical work ownership closure]
+  R06 --> R10A
   R06 --> R07[Machinery condition]
   R07 --> R08[Selected paid repair G2]
   R06 --> R09[Live rebuild blockers]
-  R09 --> R10[Dock routes and support]
+  R10A --> R09
+  R09 --> R10B[Candidate dock routes and support]
   R04 --> R11[Timed rebuild admission]
-  R10 --> R11
+  R10B --> R11
   R08 --> R12[Atomic scene replacement]
   R11 --> R12
   R12 --> R13[Rebuilt ship persistence]
@@ -146,7 +150,7 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 ### Task 4: R04 — Finish natural crafting acquisition and economy closure
 
-**Parent:** P09/FC-10, with FC-04–06 and FC-11. **Owner:** Terra; root owns balance decisions. **Dependencies:** R01; final source pinning waits R03/R11.
+**Parent:** P09/FC-10, with FC-04–06 and FC-11. **Owner:** Terra; root owns balance decisions. **Dependencies:** R01; natural-route runtime waits R10-A; final source pinning waits R03/R11.
 
 **Files:** `tools/check_crafting_economy.py`, `tests/test_crafting_economy.py`; existing material/recipe/item/loot/component catalogs; `scripts/tools/crafting_station.gd`; `scripts/ui/recipe_picker_panel.gd`; `scripts/validation/fc_p09_smoke.gd`; narrow coordinator crafting/interaction seams.
 
@@ -219,7 +223,7 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 ### Task 9: R09 — Bind rebuild collision checks to actual scene occupants
 
-**Parent:** P16–P17 / FC-18–19. **Owner:** Sol. **Dependencies:** R06; accepted P16/P17 foundation.
+**Parent:** P16–P17 / FC-18–19. **Owner:** Sol. **Dependencies:** R06 and R10-A; accepted P16/P17 foundation. Read-only source preparation may precede R10-A, but live-scene acceptance consumes its registered endpoints and corrected baseline traversal.
 
 **Files:** `scripts/systems/structural_rebuild_state.gd`, `module_integrity_map.gd`, `runtime_physical_volume.gd`, `runtime_physical_volume_catalog.gd`; new `scripts/systems/structural_rebuild_preflight.gd`; `scripts/procgen/generated_ship_loader.gd`; coordinator scene binding; actual cart/drop/component owner scripts after exact paths are added to the card.
 
@@ -232,11 +236,24 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 **Exit:** real scene blockers are enforced with trusted bindings. Passing synthetic geometry tests alone does not close this package.
 
-### Task 10: R10 — Complete docking, egress, and structural-support preflight
+### Task 10: R10-A/R10-B — Restore baseline docking, then complete candidate egress and support
 
-**Parent:** P17 / FC-19. **Owner:** Sol. **Dependencies:** R09.
+**Parent:** P17 / FC-19. **Owner:** Sol. **Dependencies:** R10-A follows R01/R03 governance and the accepted R06 fix re-review handoff; R10-B follows R09 and R10-A. R10-A is also a runtime prerequisite for R04 and R09.
 
-**Files:** `scripts/systems/ship_nav_graph.gd`, `dock_ports.gd`, `docking_manager.gd`, `ship_instance.gd`, `structural_rebuild_preflight.gd`; loader/socket/coordinator endpoint seams; candidate-nav and live-safety smokes.
+**Files:** R10-A adds a pure precompile endpoint authorizer; structural compiler/validator, fallback/native generator, fixed lifeboat, generated loader, authoritative coherent-home golden, `dock_ports.gd`, `docking_manager.gd`, `ship_instance.gd`, physical dock barrier, narrow coordinator seams, canonical ceiling contract/wrapper generation and validation, and the coordinated strict save owners under the allocated run7/world7 pair. R10-B retains `scripts/systems/ship_nav_graph.gd`, `structural_rebuild_preflight.gd`, loader/socket/coordinator endpoint seams, and candidate-nav/live-safety smokes. Exact paths and conditional asset-pipeline scope are recorded in the generated P17 card and `task-10a-brief.md`.
+
+**R10-A baseline prerequisite:** the final R04 RED evidence proves current room-center docking overlaps the home and lifeboat hulls, while a stale floor-origin `ceiling_cap_1x1` cube blocks horizontal travel. Correct these demonstrated baseline defects before treating ordinary traversal as an R04 or live-preflight input. This slice cannot emit `FC P17 PASS` or claim R10-B safety completion.
+
+- [ ] Author one deterministic registered exterior aperture for every production home, fixed-lifeboat, fallback and native generated layout before structural compilation. Use solved occupancy, require an unoccupied exterior neighbor on a supporting plane with every non-join owner shape inward and threshold clearance outward; only separately authenticated join-box portions may cross into the exact bounded seam clips. Preserve exact portal/edge/module identity, and fail when no complete-hull-clear pairing exists. Never derive a live port from a room center, role/name prefix, nearest edge, or fixed half-cell offset.
+- [ ] Bind stable `port_id`, `endpoint_id`, portal, structural edge/module, outward normal, local transform, distinct threshold/interior capsule-clearance anchors, exact endpoint-owned join placement IDs and a build-time canonical-wrapper collision fingerprint through the compiler and loader. The coherent-home fixture uses west exterior edge `0|v|0|-1`; the fixed lifeboat endpoint must come from its actual occupancy because its old local `(-2,0,0)` point lies on the airlock/engine seam.
+- [ ] Dock only authenticated host/mobile descriptors. Require coincident positions, opposing normals and compatible types/sizes before moving the mobile root. Reject every cross-ship intersection except one between authenticated open-frame/directly-incident-floor join boxes whose exact intersection is wholly contained in the finite seam envelope constructed by clipping canonical wrapper boxes to each outward half-space. No wall, ceiling, opaque/blocked portal, interior/unrelated floor or dynamic body qualifies; no epsilon/global margin applies. The mobile owner instantiates one separate barrier, and full-capsule passage is independently clear. Rebase established live/stored combat world/last-known points through the same root delta while ship-local carts/drops/corpses/stations inherit it. Store both sides in one stable connection record consumed by parent/child views.
+- [ ] Make the closed dock barrier physically occupy the aperture and keep occupancy denial as a second gate. Prove ordinary `move_and_slide` traversal in both directions after open/breach, closed denial, threshold-boundary behavior, and mobile-side threshold ownership without teleporting, lowering floors, or disabling hull collision.
+- [ ] Preserve ADR-0017's canonical opening with one strict fixed-lifeboat `initial_player_spawn_v1` interior point. Build and validate the corrected pair and closed barrier before applying it once; publish only when the capsule is clear, occupancy is the lifeboat, and home is denied. It is not a save/load, migration or later-teleport fallback.
+- [ ] Correct the ceiling asset authority without changing compiler/loader placement: canonical physical bounds `[-2,3.8,-2]..[2,4.0,2]`, a `4 x 0.2 x 4` box centered at local `(0,3.9,0)`, regenerated JSON/TRES/input/manifest/kit projections, transform-aware visual bounds retaining decorative underside detail, and wrapper validation of proxy size/center. Do not widen the physical proxy to the full visual bounds or disable collision.
+- [ ] Implement the allocated `gate2-current-run-7`/`world-7` pair for registered connections, exact endpoint-keyed barrier state, sole WorldSnapshot owner-local player pose, and ADR-0042 ephemeral hallucinations. RunSnapshot removes/forbids its global pose without a replacement pose field. Current data forbids old dock/global-pose/marker-open fields and any hallucination key. Move R06's active future-rejection sentinel/fixtures to run8/world8 as part of the coordinated runtime change, preserving old artifacts as history. Pin the world-5-to-world-6 helper to literal run 6 before the explicit v6-to-v7 step. At-home world-6 requires exact embedded/top-level position equality and explicit aboard owner; away world-6 validates and discards finite obsolete home-departure coordinates. Preserve raw current run-6 `unclosed_owner_graph` rejection through an explicit literal check before the older-run adapter after `CURRENT_SLICE_VERSION` advances; retain older direct-run adapters' strict historical preconditions. Preserve the full-precision authoritative world-local value through unchanged staged recapture with an exact central restore receipt, never epsilon or repeated inverse conversion. Audit every moved owner's existing spatial payload: retain established ship-local carts/drops/corpses/stations byte-for-byte, transform visited combat world/last-known positions through the proven old/new roots, and reject unknown or unprovable world-space fields. Restore docking and barrier state before placing the capsule, then reject rather than snap when current clearance fails.
+- [ ] Validate exact port transforms, complete-hull non-overlap, compiler/loader/native/fallback parity, ceiling clearance, closed/open barrier and occupancy both ways, fresh boot/away/return, save/load on both sides and at the threshold, recognized legacy and ambiguous rejection, existing docking/carry/persistence suites, and finally the unchanged R04 natural route through the tracked hardened runner.
+
+**R10-B candidate-result preflight:** consume R10-A's registered authority; do not recreate or reinterpret it in the rebuild helper.
 
 - [ ] Register real endpoint IDs with distinct threshold and meaningful interior anchors from authored geometry. A structural exterior boundary alone is not an exit.
 - [ ] Authenticate the pure helper's layout, portal, base-clearance, local endpoint, and connection-side projections against current scene owners. Preserve closed/unsafe portal semantics and exact authored portal IDs.
@@ -245,7 +262,7 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 - [ ] Extend the currently bounded helper/preflight with explicit exterior-target, floor/ramp, and ceiling/support topology rules for every required active module. Record the extension in ADR-0065 before implementation; unsupported cases remain visible until proved.
 - [ ] Test active docks, both connection sides, transformed/nested hosts, thin blockers, alternate routes, shared edges, open/closed doorway state, and trapped actors. Run candidate-nav plus existing `ship_nav_graph_smoke.gd` and docking/socket regressions.
 
-**Exit:** each required replacement topology has real safety evidence. Full P17 cannot pass with exterior/floor/ceiling targets silently unsupported.
+**Exit:** R10-A first restores safe ordinary physical docking/traversal and strict persistence without claiming rebuild acceptance. R10-B then gives each required replacement topology real safety evidence. Full P17 cannot pass with exterior/floor/ceiling targets silently unsupported.
 
 ### Task 11: R11 — Connect paid rebuild admission to timed work
 
@@ -297,6 +314,7 @@ These are planned new interfaces, not claims about current code. The applier own
 **Files:** `scripts/systems/pillar_persistence.gd`, `ship_instance.gd`, `ship_runtime.gd`, `run_snapshot.gd`, `world_snapshot.gd`, `save_migration_service.gd`, `structural_rebuild_state.gd`; coordinator capture/restore/revisit; `scripts/validation/fc_p19_smoke.gd` and migration fixtures.
 
 - [ ] Persist replacement descriptors separately from integrity damage deltas so pristine rebuilt modules survive regeneration. Preserve condition, placement, exact lots, work escrow, and terminal receipts together.
+- [ ] Consume the already-allocated registered dock-connection and owner-local player-pose schema from R10-A. R13 may extend replacement persistence but may not reinterpret old global poses, weaken endpoint identity, or allocate a second transition for the same boundary.
 - [ ] Save must wait or return busy during APPLYING. Never serialize a Node, RID, stage capability, or half-applied scene; restart recovers the last committed ownership graph.
 - [ ] Restore in explicit order: original generation, replacements, integrity, components, systems/effects, derived nav/air, active simulation.
 - [ ] Reject unsupported identity/version/layout mismatch with source bytes intact; legacy descriptor reconstruction requires exact verified original identity, never a guessed replacement.
@@ -438,7 +456,7 @@ Every evidence packet contains the exact source revision/hashes, command, engine
 
 ## 5. Scheduling and completion reporting
 
-The immediate sequence is **R01 → R02 → R03**, with read-only R04 route analysis and R17 domain tracing alongside it. Then complete **R06–R08** and **R09–R14**, followed by UI/player acceptance and final qualification. R04/R05 must close before accepting the full crafting/restoration loop.
+The immediate persistence sequence remains **R01 → R02 → R03**. After its governance and shared-owner release, execute **R10-A baseline docking/traversal** before R04 natural-route runtime and R09 live-scene acceptance; read-only R04 economy/route analysis, R09 source preparation and R17 domain tracing may proceed alongside it. R10-B follows R09, then R11–R14. R04/R05 must close before accepting the full crafting/restoration loop.
 
 Do not provide a calendar estimate based on package count: atomic restoration and the unassessed P23 gap backlog dominate uncertainty. After R01/R17 tracing, estimate each scoped implementation card using its actual affected code and failing cases, and report the critical path separately from parallel work.
 
