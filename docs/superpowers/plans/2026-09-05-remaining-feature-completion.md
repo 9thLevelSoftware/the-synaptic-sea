@@ -131,16 +131,18 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 **Files:** existing P10 allowed files and `scripts/validation/fc_p10_smoke.gd`, `fc_p10_process_smoke.gd`, `fc_p13_smoke.gd`; `tools/run_p10_process_smoke.py`; `tests/test_p10_process_runner.py`; historical fixtures under `tests/fixtures/feature_completion/`.
 
-- [ ] Review and rerun the latest terminal/refund/field forgery, legacy downgrade, started/unstarted cancellation, partial collection, station destruction, inactive catch-up, and source-buffer mutation matrix against the final combat fix.
-- [ ] Confirm failure snapshots compare inventory/escrow/receipts, owner graph, mounted lots, audio buses/playback state, current camera, source file bytes, index, and absence of precommit migrated sidecars.
-- [ ] Verify present malformed audio/settings/system data rejects atomically; valid nondefault values survive two loads. Preserve exact quality beyond default JSON precision.
-- [ ] Test the one documented derived oxygen projection: boolean validation, exact exception path only, unrelated oxygen drift rejection, and correct context after activation/revisit/tick.
-- [ ] Verify old world-4 absent home access becomes explicit local ownership in the detached candidate, present foreign access remains unchanged, and present empty/malformed access rejects. A migrated sidecar is published only after successful commit.
-- [ ] Cover manual/auto/quick/title load, same-ship and cross-ship component moves, stale coordinator pointers, and station interactions after partial/full output collection.
-- [ ] Run focused P10/P13, all save-migration/load/world smokes named in the original plan, sixteen process-runner tests, and the complete three-process proof with unique initially empty homes.
-- [ ] Obtain final independent review on one stable diff and source manifest, replacing obsolete moving-source review conclusions with an evidence-linked disposition.
+- [x] Review and rerun the latest terminal/refund/field forgery, legacy downgrade, started/unstarted cancellation, partial collection, station destruction, inactive catch-up, and source-buffer mutation matrix against the final combat fix.
+- [x] Confirm failure snapshots compare inventory/escrow/receipts, owner graph, mounted lots, audio buses/playback state, current camera, source file bytes, index, and absence of precommit migrated sidecars.
+- [x] Verify present malformed audio/settings/system data rejects atomically; valid nondefault values survive two loads. Preserve exact quality beyond default JSON precision.
+- [x] Test the one documented derived oxygen projection: boolean validation, exact exception path only, unrelated oxygen drift rejection, and correct context after activation/revisit/tick.
+- [x] Verify old world-4 absent home access becomes explicit local ownership in the detached candidate, present foreign access remains unchanged, and present empty/malformed access rejects. A migrated sidecar is published only after successful commit.
+- [x] Cover manual/auto/quick/title load, same-ship and cross-ship component moves, stale coordinator pointers, and station interactions after partial/full output collection.
+- [x] Run focused P10/P13, all save-migration/load/world smokes named in the original plan, sixteen process-runner tests, and the complete three-process proof with unique initially empty homes.
+- [x] Obtain final independent review on one stable diff and source manifest, replacing obsolete moving-source review conclusions with an evidence-linked disposition.
 
 **Exit:** no known P10 production blocker or required untested matrix row remains. This closes P10 evidence, not G1 by itself.
+
+**Reviewed outcome:** R03 local persistence closure is complete: [report](../../../.superpowers/sdd/2026-09-05-remaining-feature-completion/task-3-report.md), [independent review](../../../.superpowers/sdd/2026-09-05-remaining-feature-completion/task-3-review.md), and [root raw-evidence check](../../../.superpowers/sdd/2026-09-05-remaining-feature-completion/r03-root-raw-evidence-check.md) record 16 focused cases, a three-process proof, and 47 Python tests. This does not accept G1 or player evidence; external board synchronization remains pending. The runtime commit boundary remains root-owned and no commit is claimed here.
 
 ### Task 4: R04 — Finish natural crafting acquisition and economy closure
 
