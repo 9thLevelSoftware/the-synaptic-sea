@@ -1558,3 +1558,44 @@ Final acceptance requires:
 
 This document is the planning deliverable. No gameplay implementation, board
 mutation, engine install, release or completion claim has been performed by writing it.
+
+## Appendix A: R06 integration checkpoint for P11-P13
+
+R06 closes FC-13 through FC-15 on the accepted R03 owner graph. Preserve the
+existing P10 production journey in `fc_p10_smoke.gd`: it dismounts and remounts
+one exact component lot on the away ship, reloads twice, moves that lot to the
+home ship, reloads twice again, revisits the away owner, and proves exact origin,
+quantity, mounted-count and owner projections. R06 must rerun and review those
+predicates; it must not duplicate them in a second transfer implementation or
+describe them as missing.
+
+The remaining closure matrix is explicit. Before escrow, validate a nonempty
+target ship rather than deriving one from the current/home owner, current binding,
+selection, attachment, occupancy, action-specific access, authored slot identity,
+profile, footprint/size, socket/type, occupancy, component identity and spatial
+range. Revalidate owner/access/occupancy, range, tool, target existence and exact
+revision at commit. Admission denials spend nothing. Interruptions after payment
+pause with unchanged progress and escrow; explicit cancellation refunds the exact
+lots. Duplicate or reentrant completion emits one receipt, physical effect, noise
+completion and XP award.
+
+R06 may modify only the P11-P13 files already listed above plus the local
+`task-6-brief.md`, `task-6-report.md`, tracked
+`tools/run_physical_work_smokes.py` runner and
+`tests/test_physical_work_runner.py`, requirements, feature spec, this plan,
+generated-card source, and its two generated manifests.
+The first expected runtime delta is the coordinator's physical-work admission and
+owner targeting plus focused FC P11-P13 assertions. Any additional runtime or
+fixture file requires an additive beforeimage and card allowlist update before
+editing. Non-goals are P09 economy/presentation, ADR-0066/P14 condition policy,
+P15 selected repair, P17-P20 structural replacement/claim behavior, multiplayer
+authority, new slot synthesis, or a second mutation/economy owner.
+
+Run the canonical P11, P12 and P13 cases through
+`tools/run_feature_completion.py`; run every named focused smoke through tracked
+`tools/run_physical_work_smokes.py`, a thin hardened `execute_isolated_case`
+adapter, so each Godot process receives a fresh four-variable user home and a
+separate P10 containment probe. Its focused tests may not weaken those guards.
+Rerun canonical P10 for its existing
+two-ship/two-reload predicate. Require exit zero, every exact marker once, no
+unexpected diagnostic, no timeout or cleanup failure, and retained raw output.

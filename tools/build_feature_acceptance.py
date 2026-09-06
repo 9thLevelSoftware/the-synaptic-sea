@@ -131,9 +131,9 @@ CARD_NON_GOALS = {
     "P08": "Infinite hidden player storage.",
     "P09": "Recipe count as a completion metric; arbitrary loot or balance additions from a sampled absence; injected inventory, force repair, teleport, direct skill mutation, or snapshot seeding as natural-path evidence; retired donor healing; unproven low-repair-class softlock claims; editor/import/plugin launch; or early full-source pinning.",
     "P10": "Save filename changes, historical-data deletion, default-profile cleanup, comparison epsilon, new ignored fields, generalized oxygen normalization, combat-schema weakening, editor/import/plugin launch, or unrelated P09/P17/catalog/navigation behavior.",
-    "P11": "Timing changes before P12 or synthetic replacement slots.",
-    "P12": "Replacing the interaction system.",
-    "P13": "Multiplayer authority or unrelated extraction.",
+    "P11": "Synthetic replacement slots, freeform construction, or P14 condition policy.",
+    "P12": "Replacing the interaction system, adding a second mutation authority, or absorbing P15/P17 work.",
+    "P13": "Multiplayer authority, unrelated extraction, or implicit current/home-ship owner fallback.",
     "P14": "Free repair on install or balance inflation.",
     "P15": "Ordinary repair resurrecting destroyed modules.",
     "P16": "Reconstruction or altered room generation.",
@@ -153,6 +153,20 @@ CARD_SCOPE_DECISIONS = {
         "Full production-source closure is deferred until reviewed R03/R11 integration; R04 records exact source hashes and reachable-route limits.",
         "R07 machinery-condition review retires old donor-healing assumptions; R04 must observe only current intended station/system benefit.",
         "Every P09 Godot body uses the hardened feature-completion runner, which first runs the accepted FC P10 USER DATA PROBE PASS containment check with all four owned-home variables."
+    ],
+    "P11": [
+        "R06 adds distinct no-spend cases for authored slot identity/profile, footprint or size, socket or type, occupancy, water, unknown component, and wrong selected ship without changing FC-13 text.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe.",
+    ],
+    "P12": [
+        "R06 distinguishes pre-escrow admission denial from paid interruption: admission spends nothing; pause retains exact escrow and progress; explicit cancel refunds exact lots.",
+        "Commit revalidates target existence and revision, range, owner, access, occupancy, and tool; duplicate or reentrant completion may produce one receipt, effect, noise completion, and XP award.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe.",
+    ],
+    "P13": [
+        "Physical work requires an explicit target ship and current binding generation; missing owners fail closed and may not resolve through current_ship or home_ship.",
+        "R03 already accepted the production same-ship and cross-ship exact-lot move through two reloads; R06 reruns canonical P10 and reviews those predicates instead of duplicating them.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe.",
     ],
 }
 
@@ -200,6 +214,31 @@ COORDINATOR = "scripts/procgen/playable_generated_ship.gd"
 COMPONENT_CATALOG = "data/components/component_catalog.json"
 WORK_ACTION_CATALOG = "data/work_actions/work_action_catalog.json"
 VALIDATION = "scripts/validation/"
+R06_GOVERNANCE_SCOPE = [
+    ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+    ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+    "tools/run_physical_work_smokes.py",
+    "tests/test_physical_work_runner.py",
+    "docs/game/05_requirements.md",
+    "docs/game/features/crafting_derelict_feature_completion.md",
+    "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+    "tools/build_feature_acceptance.py",
+    "data/validation/feature_completion_cards.json",
+    "docs/game/inventory/feature_acceptance.json",
+]
+R06_CARD_METADATA = {
+    card_id: {
+        "closure_package": "R06",
+        "owner": {
+            "integration": "sol_engineer",
+            "bounded_tests": "terra_worker",
+            "coordinator_and_acceptance": "root",
+        },
+        "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+        "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+    }
+    for card_id in ("P11", "P12", "P13")
+}
 
 CARD_ALLOWLISTS: dict[str, list[str]] = {
     "P00": [
@@ -369,6 +408,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "docs/game/06_validation_plan.md", "tools/classify_orphan_smokes.sh",
     ],
     "P11": [
+        *R06_GOVERNANCE_SCOPE,
         *[f"scripts/systems/{name}.gd" for name in ("component_catalog", "component_placement_state", "component_mount_resolver", "ship_modification_state")],
         "scripts/ui/ship_modification_panel.gd", COMPONENT_CATALOG, COORDINATOR,
         "scripts/procgen/wall_door_resolver.gd", "scripts/procgen/layout_serializer.gd",
@@ -387,6 +427,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         )],
     ],
     "P12": [
+        *R06_GOVERNANCE_SCOPE,
         *[f"scripts/systems/{name}.gd" for name in ("ship_work_transaction", "work_action_state", "work_action_driver", "work_action_channel", "work_action_resolver", "component_mount_resolver", "component_placement_state")],
         "scripts/tools/repair_point.gd", "scripts/ui/ship_modification_panel.gd",
         "scripts/ui/work_action_hud_panel.gd", WORK_ACTION_CATALOG, COORDINATOR,
@@ -402,6 +443,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         )],
     ],
     "P13": [
+        *R06_GOVERNANCE_SCOPE,
         *[f"scripts/systems/{name}.gd" for name in (
             "ship_work_context", "ship_runtime", "ship_instance", "ship_access_state", "crafting_state")],
         "scripts/systems/world_snapshot.gd", "scripts/ui/ship_modification_panel.gd",
@@ -1574,11 +1616,28 @@ def _verification(card_id: str, root: Path) -> list[dict[str, Any]]:
             f"& $Python tools/run_feature_completion.py --godot $Godot --case {card_id} --evidence-dir artifacts/feature-completion/{card_id}",
             f"FC {card_id} PASS",
         ))
-    for filename in CARD_SMOKES.get(card_id, []):
+    if card_id in {"P11", "P12", "P13"}:
         checks.append(_check(
-            f"& $Godot --headless --path . --script res://scripts/validation/{filename}",
-            _smoke_marker(root, filename),
+            "& $Python -m pytest -q tests/test_physical_work_runner.py",
+            "passed",
+            forbid_diagnostics=False,
         ))
+        checks.append(_check(
+            "& $Python tools/run_physical_work_smokes.py "
+            f"--godot $Godot --group {card_id} --evidence-dir artifacts/feature-completion/R06-{card_id}-focused",
+            f"R06 {card_id} FOCUSED PASS cases={len(CARD_SMOKES[card_id])}",
+        ))
+        if card_id == "P13":
+            checks.append(_check(
+                "& $Python tools/run_feature_completion.py --godot $Godot --case P10 --evidence-dir artifacts/feature-completion/R06-P10-relocation-reload",
+                "FC P10 PASS",
+            ))
+    else:
+        for filename in CARD_SMOKES.get(card_id, []):
+            checks.append(_check(
+                f"& $Godot --headless --path . --script res://scripts/validation/{filename}",
+                _smoke_marker(root, filename),
+            ))
     if card_id == "P09":
         checks.append(_check("& $Python -m unittest tests.test_crafting_economy", "OK", forbid_diagnostics=False))
     if card_id == "P10":
@@ -1643,6 +1702,7 @@ def build_card_manifest(root: Path = ROOT) -> dict[str, Any]:
             ],
             "scope_decisions_pending": CARD_SCOPE_DECISIONS.get(card_id, []),
             "non_goals": CARD_NON_GOALS[card_id],
+            **R06_CARD_METADATA.get(card_id, {}),
             **({"contract": CARD_CONTRACTS[card_id]} if card_id in CARD_CONTRACTS else {}),
             "verification": _verification(card_id, root),
             "plan_anchor": {"path": PLAN_REL.as_posix(), "heading": card_id, "line": anchors[card_id]},

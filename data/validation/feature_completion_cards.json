@@ -1694,8 +1694,8 @@
         },
         {
           "path": "scripts/validation/fc_p09_natural_route_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/validation/recipe_resource_smoke.gd",
@@ -2464,6 +2464,56 @@
       ],
       "allowlist": [
         {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/systems/component_catalog.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -2609,8 +2659,19 @@
           "scope_state": "present"
         }
       ],
-      "scope_decisions_pending": [],
-      "non_goals": "Timing changes before P12 or synthetic replacement slots.",
+      "scope_decisions_pending": [
+        "R06 adds distinct no-spend cases for authored slot identity/profile, footprint or size, socket or type, occupancy, water, unknown component, and wrong selected ship without changing FC-13 text.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Synthetic replacement slots, freeform construction, or P14 condition policy.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P11 --evidence-dir artifacts/feature-completion/P11",
@@ -2627,53 +2688,21 @@
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/component_slot_population_smoke.gd",
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "COMPONENT SLOT POPULATION PASS catalog=true placed=true deterministic=true no_collision=true linked=true count="
+              "passed"
             ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
+            "forbidden_output": []
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/component_system_link_smoke.gd",
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P11 --evidence-dir artifacts/feature-completion/R06-P11-focused",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_modification_panel_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "SHIP MOD PANEL PASS bind=true install=true uninstall=true power=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_modification_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "SHIP MODIFICATION PASS install=true power=true uninstall=true plating=true"
+              "R06 P11 FOCUSED PASS cases=4"
             ],
             "forbidden_output": [
               "ERROR:",
@@ -2699,6 +2728,56 @@
         "P11"
       ],
       "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
         {
           "path": "scripts/systems/ship_work_transaction.gd",
           "source_exists": true,
@@ -2845,8 +2924,20 @@
           "scope_state": "present"
         }
       ],
-      "scope_decisions_pending": [],
-      "non_goals": "Replacing the interaction system.",
+      "scope_decisions_pending": [
+        "R06 distinguishes pre-escrow admission denial from paid interruption: admission spends nothing; pause retains exact escrow and progress; explicit cancel refunds exact lots.",
+        "Commit revalidates target existence and revision, range, owner, access, occupancy, and tool; duplicate or reentrant completion may produce one receipt, effect, noise completion, and XP award.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Replacing the interaction system, adding a second mutation authority, or absorbing P15/P17 work.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P12 --evidence-dir artifacts/feature-completion/P12",
@@ -2863,53 +2954,21 @@
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/repair_unification_smoke.gd",
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "REPAIR UNIFICATION PASS repair=true seal=true suppress=true interrupt=true catalog=true"
+              "passed"
             ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
+            "forbidden_output": []
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/repair_blocked_consume_smoke.gd",
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P12 --evidence-dir artifacts/feature-completion/R06-P12-focused",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "REPAIR BLOCKED CONSUME PASS blocked=true consume=true sfx=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/work_action_driver_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "WORK ACTION DRIVER PASS cut=true noise=true yield=true interrupt=true overload=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/component_mount_dismount_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true"
+              "R06 P12 FOCUSED PASS cases=4"
             ],
             "forbidden_output": [
               "ERROR:",
@@ -2935,6 +2994,56 @@
         "P12"
       ],
       "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
         {
           "path": "scripts/systems/ship_work_context.gd",
           "source_exists": true,
@@ -3011,8 +3120,20 @@
           "scope_state": "present"
         }
       ],
-      "scope_decisions_pending": [],
-      "non_goals": "Multiplayer authority or unrelated extraction.",
+      "scope_decisions_pending": [
+        "Physical work requires an explicit target ship and current binding generation; missing owners fail closed and may not resolve through current_ship or home_ship.",
+        "R03 already accepted the production same-ship and cross-ship exact-lot move through two reloads; R06 reruns canonical P10 and reviews those predicates instead of duplicating them.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Multiplayer authority, unrelated extraction, or implicit current/home-ship owner fallback.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P13 --evidence-dir artifacts/feature-completion/P13",
@@ -3029,11 +3150,21 @@
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/component_mount_interact_away_smoke.gd",
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "COMPONENT MOUNT INTERACT AWAY PASS away=true dismount=true remount=true mounted=true"
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P13 --evidence-dir artifacts/feature-completion/R06-P13-focused",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "R06 P13 FOCUSED PASS cases=4"
             ],
             "forbidden_output": [
               "ERROR:",
@@ -3043,39 +3174,11 @@
           }
         },
         {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_inventory_sync_away_smoke.gd",
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P10 --evidence-dir artifacts/feature-completion/R06-P10-relocation-reload",
           "success": {
             "exit_code": 0,
             "required_output": [
-              "SHIP MOD INVENTORY SYNC AWAY PASS away=true install=true uninstall=true inv=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/component_remount_sfx_live_away_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true"
-            ],
-            "forbidden_output": [
-              "ERROR:",
-              "WARNING:",
-              "SCRIPT ERROR:"
-            ]
-          }
-        },
-        {
-          "command": "& $Godot --headless --path . --script res://scripts/validation/pillar_revisit_persistence_smoke.gd",
-          "success": {
-            "exit_code": 0,
-            "required_output": [
-              "PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true"
+              "FC P10 PASS"
             ],
             "forbidden_output": [
               "ERROR:",

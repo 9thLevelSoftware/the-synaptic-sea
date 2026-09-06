@@ -246,6 +246,22 @@ reject missing IDs, mandatory prerequisite cycles, and sinkless profitable
 cycles; and capture Title-authored starter, donor, and advanced routes through
 normal controls, inventory Use, paid work, collection, and an output consumer.
 
+R06 records the existing FC-13 through FC-15 obligations without changing any
+frozen criterion. Component work must name one attached, occupied selected ship
+and its current binding generation; permanent install/remove also requires the
+action-specific access policy. Admission validates the authored slot profile,
+footprint/size, socket/type, occupancy, exact component lot, spatial range, and
+initial target revision before escrow. Commit revalidates owner, access,
+occupancy, range, tool, target existence and revision before applying one model
+delta, scene consequence, receipt, noise completion, and XP award. Every denial
+preserves the protected owners and either spends nothing before admission or
+retains/refunds exact escrow according to the explicit pause/cancel contract.
+R03's accepted P10 production case already moves one immutable component lot
+within a ship and then across ships, reloads twice after each move, revisits the
+source owner, and proves one mounted copy. R06 reuses that case as its relocation
+and reload predicate while separately closing the P11-P13 admission, timing, and
+owner-boundary matrix.
+
 ## Final player scenarios
 
 Run both seeds 42 and 777 in `breach_field`/`standard`, with home and away branches:

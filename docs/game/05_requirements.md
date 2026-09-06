@@ -2003,3 +2003,14 @@ runtime source, and promotion is always a separate reviewed task.
 - Verification:
   - Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`.
 
+## R06 FC-13..15 closure rationale (2026-09-06)
+
+R06 closes the integration evidence for FC-13 through FC-15 without changing
+their frozen text or status. Its required matrix distinguishes admission from
+commit: slot identity/profile/footprint/socket/type, selected owner, access,
+occupancy, range, and binding/target revision are checked before spend and again
+before mutation. Existing P10 evidence already supplies the production same-ship
+and cross-ship component-lot journey through two reloads; R06 must rerun and
+review that predicate on the stable candidate instead of creating a duplicate
+transfer authority or weaker substitute.
+
