@@ -385,6 +385,15 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     uses its original saved layout and markers. Active-away uses the visited
     blueprint and validated generation context. Failure to reconstruct these
     inputs rejects while preserving source bytes, the slot index, and live state.
+    `scripts/procgen/ship_generator.gd` exposes the shared pure document seam
+    `generate_documents_from_seed(seed_value: int, size: int = 0, condition: int = 1) -> Dictionary`,
+    returning `ok`, `reason`, and success-only `layout`, `kit`, and `gameplay`.
+    Both scene generation and legacy active-away bootstrap consume these same
+    documents, including the existing native-versus-fallback selection and exact
+    seed/size/condition semantics. The pure result contains no Node or RID. Native
+    and fallback tests compare the document seam with the corresponding production
+    scene loader documents; a generation failure remains explicit and never falls
+    through to a different layout implementation.
 38. Embedded home combat and visited combat are separate owner authorities.
     At home, capture the manager into home inventory. While away, capture home
     combat only from retained `home_ship.combat_summary`; synchronize the active

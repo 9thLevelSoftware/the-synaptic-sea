@@ -1912,13 +1912,13 @@
         },
         {
           "path": "scripts/systems/threat_save_contract.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/systems/threat_initial_state_builder.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/procgen/playable_generated_ship.gd",
@@ -1964,6 +1964,16 @@
           "path": "tests/fixtures/feature_completion/p10_world_v7_future.json",
           "source_exists": false,
           "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/procgen/ship_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_generator_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/validation/threat_ai_state_smoke.gd",
@@ -2034,6 +2044,11 @@
           "path": "scripts/systems/threat_initial_state_builder.gd",
           "api": "build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary",
           "production_consumer": "ThreatManager.configure_for_layout"
+        },
+        "generation_documents": {
+          "path": "scripts/procgen/ship_generator.gd",
+          "api": "generate_documents_from_seed(seed_value: int, size: int = 0, condition: int = 1) -> Dictionary",
+          "contract": "Pure native-or-fallback layout/kit/gameplay documents shared by scene generation and legacy bootstrap; no Node/RID and no fallback after a selected pipeline fails."
         },
         "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
         "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
@@ -2387,7 +2402,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 827
+        "line": 832
       }
     },
     {
@@ -2623,7 +2638,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 874
+        "line": 879
       }
     },
     {
@@ -2789,7 +2804,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 918
+        "line": 923
       }
     },
     {
@@ -3056,7 +3071,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 966
+        "line": 971
       }
     },
     {
@@ -3175,7 +3190,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 1007
+        "line": 1012
       }
     },
     {
@@ -3268,7 +3283,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 1029
+        "line": 1034
       }
     },
     {
@@ -3548,7 +3563,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 1054
+        "line": 1059
       }
     },
     {
@@ -3683,7 +3698,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 1190
+        "line": 1195
       }
     },
     {
@@ -3821,7 +3836,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1222
+        "line": 1227
       }
     },
     {
@@ -3968,7 +3983,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1250
+        "line": 1255
       }
     },
     {
@@ -4054,7 +4069,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1272
+        "line": 1277
       }
     },
     {
@@ -4147,7 +4162,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1296
+        "line": 1301
       }
     },
     {
@@ -4273,7 +4288,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1318
+        "line": 1323
       }
     },
     {
@@ -4396,7 +4411,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1343
+        "line": 1348
       }
     }
   ]

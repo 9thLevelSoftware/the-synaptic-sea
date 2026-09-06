@@ -167,6 +167,11 @@ CARD_CONTRACTS = {
             "api": "build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary",
             "production_consumer": "ThreatManager.configure_for_layout",
         },
+        "generation_documents": {
+            "path": "scripts/procgen/ship_generator.gd",
+            "api": "generate_documents_from_seed(seed_value: int, size: int = 0, condition: int = 1) -> Dictionary",
+            "contract": "Pure native-or-fallback layout/kit/gameplay documents shared by scene generation and legacy bootstrap; no Node/RID and no fallback after a selected pipeline fails.",
+        },
         "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
         "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
         "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and strictly String combat_hotbar_text through inventory canonicalization.",
@@ -329,6 +334,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "tests/test_p10_process_runner.py",
         "tests/fixtures/feature_completion/p10_run_v7_future.json",
         "tests/fixtures/feature_completion/p10_world_v7_future.json",
+        "scripts/procgen/ship_generator.gd", f"{VALIDATION}ship_generator_smoke.gd",
         *[f"{VALIDATION}{name}.gd" for name in (
             "threat_ai_state_smoke", "tendril_structure_damage_smoke",
             "save_migration_service_smoke", "save_migration_world_smoke",
@@ -1380,6 +1386,11 @@ def build(
             "reserved_run_version": "gate2-current-run-5",
             "reserved_world_version": "world-5",
             "implemented": False,
+            "reservation_status": "historical ADR-0059 pre-P10 reservation metadata",
+            "current_run_version": "gate2-current-run-6",
+            "current_world_version": "world-6",
+            "current_combat_version": "threat-manager-2",
+            "r02_implemented": False,
             "payloads": [
                 "item_lots_v1", "craft_jobs_v1", "pending_outputs_v1",
                 "recipe_knowledge_v1", "work_transactions_v1", "structural_rebuild_v1",

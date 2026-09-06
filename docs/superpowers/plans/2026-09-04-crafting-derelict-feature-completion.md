@@ -733,6 +733,11 @@ save_migration_service_smoke,save_migration_world_smoke,save_load_service_smoke,
 world_snapshot_smoke,world_save_service_smoke}.gd`. R02 may update
 `docs/game/06_validation_plan.md` and `tools/classify_orphan_smokes.sh` only to
 register and classify `combat_persistence_smoke.gd` as a standalone smoke.
+R02 also scopes `scripts/procgen/ship_generator.gd` to the pure
+`generate_documents_from_seed(seed_value: int, size: int = 0, condition: int = 1) -> Dictionary`
+extraction and `scripts/validation/ship_generator_smoke.gd` to prove its native
+and fallback documents match those consumed by production scene generation, with
+explicit failure and no Node/RID in the pure result.
 **Non-goals:** changing save filenames or wiping historical data.
 
 **R02 combat amendment:** allocate current `gate2-current-run-6`, `world-6`,
