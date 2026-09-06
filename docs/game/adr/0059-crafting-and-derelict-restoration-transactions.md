@@ -325,6 +325,89 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     remains loadable and survives resave. Normal started-work cancellation retains
     exact consumed history as forfeiture and must remain loadable without a refund.
 
+### R02 combat persistence amendment accepted for implementation
+
+33. Allocate `gate2-current-run-6`, `world-6`, and nested
+    `threat-manager-2`. The v5-to-v6 outer steps operate on detached deep copies.
+    This decision supersedes decision 29's earlier statement that combat receives
+    no schema change; every other decision 29 validation, recapture, rollback, and
+    sole oxygen-projection-exception rule remains binding.
+    The run step first performs the existing v5 crafting normalization under the
+    literal `gate2-current-run-5` source contract, then migrates combat, and only
+    then decodes the complete v6 structure. An input already declaring run v6
+    receives no v5 defaults or nested downgrade migration. The world v5-to-v6
+    step is the only step permitted to migrate its embedded home run; a declared
+    world v6 requires an embedded run v6 exactly. Preserve historical v6 future
+    fixtures and add v7 future-rejection fixtures for the new current versions.
+    Missing current crafting, knowledge, field, component, or combat data and any
+    mixed outer/inner downgrade shape reject before live mutation or sidecar
+    publication.
+34. `threat-manager-2` is a complete strict combat summary. Every threat row
+    requires `structure_damage` as an integer or float, excluding booleans and
+    strings, and its value must be finite and nonnegative. Manager, threat,
+    detection, damage, and armor containers and scalar fields are validated in
+    full before application. `scripts/systems/threat_save_contract.gd` is the one
+    pure codec with `static func validate_current(summary: Variant) -> Dictionary`
+    and `static func migrate_legacy(summary: Variant) -> Dictionary`. Results
+    contain `ok: bool`, `reason: String`, and `summary: Dictionary` only on
+    success. RunSnapshot, WorldSnapshot, SaveRestoreCandidate, ShipInstance, and
+    ThreatManager use this codec at their respective boundaries. Successful
+    manager application clears derived nodes and caches only after validation,
+    hydrates authoritative state, and derives the weapon cache solely from the
+    persisted `last_attack_result.weapon_id`.
+35. A recognized legacy manager is unversioned, nonempty, and has no
+    `structure_damage` field on any threat row. Legacy input containing any
+    v2-only field or any manager schema is an ambiguous mixed shape and rejects.
+    Migration reconstructs only the six shipped defaults from this immutable map:
+    `hull_tendril` is `0.4`; `biomatter_swarm`, `puppet_corpse`, `stalker`,
+    `mimic`, and `drone_swarm` are `0.0`. Each persisted `archetype_id` must be a
+    strict nonempty string matching the map directly; aliases, missing IDs, and
+    unknown IDs reject the complete preparation. The map does not consult mutable
+    balance data. Historical custom per-instance overrides were never serialized
+    and cannot be reconstructed.
+36. Combat absence is distinct from initialized-empty authority. A current run v6
+    requires a complete home `inventory_summary.threat_summary`. A current world
+    v6 requires complete `combat` for the ship named by nonempty
+    `current_location`; inactive never-initialized visited owners may omit combat.
+    Present `{}` always rejects in current data. A complete v2 summary with
+    `threats: []` is authoritative and must not respawn. For recognized pre-v6
+    input only, missing or `{}` home combat and missing or `{}` active-away combat
+    are deterministically expanded before current decoding, candidate build,
+    sealing, hashing, or sidecar publication. Inactive omitted owners remain
+    omitted until first activation.
+37. `scripts/systems/threat_initial_state_builder.gd` owns the pure initializer
+    `static func build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary`,
+    returning the same `ok`/`reason`/success-only `summary` shape. ThreatManager's
+    `configure_for_layout` uses this initializer, preserving encounter
+    normalization and spawn semantics. Legacy bootstrap injects layouts, markers,
+    owner anchors, generation context, and canonical definitions from validated
+    production owners; save fields cannot nominate substitute definitions. Home
+    uses its original saved layout and markers. Active-away uses the visited
+    blueprint and validated generation context. Failure to reconstruct these
+    inputs rejects while preserving source bytes, the slot index, and live state.
+38. Embedded home combat and visited combat are separate owner authorities.
+    At home, capture the manager into home inventory. While away, capture home
+    combat only from retained `home_ship.combat_summary`; synchronize the active
+    visited owner from the live manager immediately before capturing that visited
+    ship. Inactive owners retain their stored summaries. Home and away health,
+    threat IDs, awareness, last-hit weapon, and structural damage may differ and
+    must round-trip independently. SaveRestoreCandidate validates, retains, and
+    reattaches home `threat_summary` after inventory canonicalization, and also
+    preserves optional `combat_hotbar_text` after requiring it to be a string.
+    InventoryState does not acquire ownership of these extensions. Rejected
+    ShipInstance combat is validated before changing existing owner data.
+39. R02 proof covers exact nonzero current roundtrip, legacy migration and two
+    resaves, absence/bootstrap versus initialized-empty/no-respawn, inactive
+    owner traversal, malformed/nonfinite/negative/missing values, unknown schema
+    and archetype, v5 crafting preservation, v6 downgrade mutants, mixed
+    home/away rollback, and future run/world v7 rejection. It also observes the
+    next real structural-damage callback after restoring a hull tendril, retains
+    lethal ranged-hit attribution without unintended intimidation reward, and
+    extends the three-process proof with deliberately different home and away
+    combat. Editable legacy saves are unauthenticated; rewriting every version
+    discriminator and payload into a genuinely legacy-shaped document cannot be
+    detected cryptographically and no such claim is made.
+
 ## Locked transaction payloads
 
 The following additive payload names are the inter-card contract. They are

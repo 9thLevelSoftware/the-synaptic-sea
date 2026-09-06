@@ -147,6 +147,41 @@ CARD_NON_GOALS = {
     "P24": "Publishing, purchasing services, or enabling cloud integrations.",
 }
 
+CARD_CONTRACTS = {
+    "P10": {
+        "r02_versions": {
+            "run": "gate2-current-run-6",
+            "world": "world-6",
+            "combat": "threat-manager-2",
+            "future_rejection": ["gate2-current-run-7", "world-7"],
+        },
+        "combat_codec": {
+            "path": "scripts/systems/threat_save_contract.gd",
+            "api": [
+                "validate_current(summary: Variant) -> Dictionary",
+                "migrate_legacy(summary: Variant) -> Dictionary",
+            ],
+        },
+        "combat_initializer": {
+            "path": "scripts/systems/threat_initial_state_builder.gd",
+            "api": "build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary",
+            "production_consumer": "ThreatManager.configure_for_layout",
+        },
+        "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
+        "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
+        "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and strictly String combat_hotbar_text through inventory canonicalization.",
+        "legacy_structure_damage": {
+            "hull_tendril": 0.4,
+            "biomatter_swarm": 0.0,
+            "puppet_corpse": 0.0,
+            "stalker": 0.0,
+            "mimic": 0.0,
+            "drone_swarm": 0.0,
+        },
+        "authority": "ADR-0059 decisions 33-39",
+    },
+}
+
 COORDINATOR = "scripts/procgen/playable_generated_ship.gd"
 COMPONENT_CATALOG = "data/components/component_catalog.json"
 WORK_ACTION_CATALOG = "data/work_actions/work_action_catalog.json"
@@ -285,11 +320,21 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "run_snapshot", "world_snapshot", "save_migration_service", "save_load_service",
             "crafting_state", "craft_job_state", "craft_job_scheduler", "station_state",
             "field_crafting_state", "recipe_knowledge_state", "component_placement_state",
-            "ship_instance", "ship_runtime", "pillar_persistence", "threat_manager",
+            "ship_instance", "ship_runtime", "pillar_persistence", "threat_ai_state",
+            "threat_manager", "threat_save_contract", "threat_initial_state_builder",
         )],
         COORDINATOR, "tests/fixtures/feature_completion/**", f"{VALIDATION}fc_p10_smoke.gd",
-        f"{VALIDATION}fc_p10_process_smoke.gd", "tools/run_p10_process_smoke.py",
+        f"{VALIDATION}fc_p10_process_smoke.gd", f"{VALIDATION}combat_persistence_smoke.gd",
+        "tools/run_p10_process_smoke.py",
         "tests/test_p10_process_runner.py",
+        "tests/fixtures/feature_completion/p10_run_v7_future.json",
+        "tests/fixtures/feature_completion/p10_world_v7_future.json",
+        *[f"{VALIDATION}{name}.gd" for name in (
+            "threat_ai_state_smoke", "tendril_structure_damage_smoke",
+            "save_migration_service_smoke", "save_migration_world_smoke",
+            "save_load_service_smoke", "world_snapshot_smoke", "world_save_service_smoke",
+        )],
+        "docs/game/06_validation_plan.md", "tools/classify_orphan_smokes.sh",
     ],
     "P11": [
         *[f"scripts/systems/{name}.gd" for name in ("component_catalog", "component_placement_state", "component_mount_resolver", "ship_modification_state")],
@@ -459,7 +504,10 @@ CARD_SMOKES = {
     "P07": ["crafting_state_smoke.gd", "station_state_smoke.gd", "fc_p06_smoke.gd"],
     "P08": ["main_playable_slice_station_craft_smoke.gd", "main_playable_slice_salvage_picker_smoke.gd"],
     "P09": ["recipe_resource_smoke.gd", "recipe_picker_panel_smoke.gd"],
-    "P10": ["save_migration_service_smoke.gd", "save_migration_world_smoke.gd", "save_load_service_smoke.gd"],
+    "P10": [
+        "save_migration_service_smoke.gd", "save_migration_world_smoke.gd",
+        "save_load_service_smoke.gd", "combat_persistence_smoke.gd",
+    ],
     "P11": ["component_slot_population_smoke.gd", "component_system_link_smoke.gd", "ship_modification_panel_smoke.gd", "ship_modification_smoke.gd"],
     "P12": ["repair_unification_smoke.gd", "repair_blocked_consume_smoke.gd", "work_action_driver_smoke.gd", "component_mount_dismount_smoke.gd"],
     "P13": ["component_mount_interact_away_smoke.gd", "ship_mod_inventory_sync_away_smoke.gd", "component_remount_sfx_live_away_smoke.gd", "pillar_revisit_persistence_smoke.gd"],
@@ -1517,6 +1565,7 @@ def build_card_manifest(root: Path = ROOT) -> dict[str, Any]:
             ],
             "scope_decisions_pending": [],
             "non_goals": CARD_NON_GOALS[card_id],
+            **({"contract": CARD_CONTRACTS[card_id]} if card_id in CARD_CONTRACTS else {}),
             "verification": _verification(card_id, root),
             "plan_anchor": {"path": PLAN_REL.as_posix(), "heading": card_id, "line": anchors[card_id]},
         })

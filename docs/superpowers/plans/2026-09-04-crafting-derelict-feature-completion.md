@@ -702,7 +702,8 @@ review, G1 profile, canonical regression and player gates remain pending.
 `scripts/systems/{run_snapshot,world_snapshot,save_migration_service,
 save_load_service,crafting_state,craft_job_state,craft_job_scheduler,station_state,
 field_crafting_state,recipe_knowledge_state,component_placement_state,
-ship_instance,ship_runtime,pillar_persistence,threat_manager}.gd`; coordinator capture, detached prepare/commit,
+ship_instance,ship_runtime,pillar_persistence,threat_ai_state,threat_manager,
+threat_save_contract,threat_initial_state_builder}.gd`; coordinator capture, detached prepare/commit,
 new `scripts/systems/save_restore_candidate.gd` for the detached owner graph;
 `scripts/main.gd` and `scripts/title_main.gd` only staged playable-instance
 replacement, owner pointer and signal reconnection seams;
@@ -720,10 +721,39 @@ world-envelope slot dispatch; existing manual/auto/quick save and migration smok
 only for the reviewed coherent-world policy and strict legacy compatibility;
 owner binding and tick/collection enablement seams only; new `fc_p10_smoke.gd`,
 `fc_p10_process_smoke.gd` (producer/consumer modes), optional strict
+`combat_persistence_smoke.gd`,
 `tools/run_p10_process_smoke.py` and its focused
 `tests/test_p10_process_runner.py`, and the nine approved `p10_*.json` migration
-fixtures under `tests/fixtures/feature_completion/`.
+fixtures under `tests/fixtures/feature_completion/`. R02 explicitly adds
+`tests/fixtures/feature_completion/p10_run_v7_future.json` and
+`tests/fixtures/feature_completion/p10_world_v7_future.json` while preserving the
+historical v6 future fixtures. Existing test-file scope for the version update is
+`scripts/validation/{threat_ai_state_smoke,tendril_structure_damage_smoke,
+save_migration_service_smoke,save_migration_world_smoke,save_load_service_smoke,
+world_snapshot_smoke,world_save_service_smoke}.gd`. R02 may update
+`docs/game/06_validation_plan.md` and `tools/classify_orphan_smokes.sh` only to
+register and classify `combat_persistence_smoke.gd` as a standalone smoke.
 **Non-goals:** changing save filenames or wiping historical data.
+
+**R02 combat amendment:** allocate current `gate2-current-run-6`, `world-6`,
+and nested `threat-manager-2`. The pure codec is
+`scripts/systems/threat_save_contract.gd` with
+`validate_current(summary: Variant) -> Dictionary` and
+`migrate_legacy(summary: Variant) -> Dictionary`. The shared pure initializer is
+`scripts/systems/threat_initial_state_builder.gd` with
+`build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary`;
+`ThreatManager.configure_for_layout` uses the same initializer. Current run v6
+requires initialized home combat and current world v6 requires initialized combat
+for active `current_location`; inactive never-initialized owners may omit combat.
+Recognized pre-v6 absent/empty required combat is bootstrapped from validated
+original layout/markers/owner anchor or visited blueprint/generation context and
+canonical definitions before decoding and sealing. Present current `{}` rejects;
+complete v2 `threats: []` remains authoritative. Outer source version pins every
+migration: current v6 receives no v5 crafting adaptation and world v6 embeds run
+v6 exactly. Home inventory combat and visited ship combat remain separate owner
+state; candidate inventory normalization retains validated `threat_summary` and
+strictly String `combat_hotbar_text`. The frozen legacy archetype map and complete
+validation/rollback/proof obligations are specified by ADR-0059 decisions 33-39.
 
 - [ ] Implement ADR-0059 decisions 23-26: coherent world envelopes for modern
   slots, legacy closed-graph adaptation, single pending authority, target-run

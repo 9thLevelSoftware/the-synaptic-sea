@@ -1901,9 +1901,24 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/systems/threat_ai_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/systems/threat_manager.gd",
           "source_exists": true,
           "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_save_contract.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/systems/threat_initial_state_builder.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
         },
         {
           "path": "scripts/procgen/playable_generated_ship.gd",
@@ -1926,6 +1941,11 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/combat_persistence_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
           "path": "tools/run_p10_process_smoke.py",
           "source_exists": true,
           "scope_state": "present"
@@ -1934,10 +1954,100 @@
           "path": "tests/test_p10_process_runner.py",
           "source_exists": true,
           "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_run_v7_future.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_world_v7_future.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/threat_ai_state_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/tendril_structure_damage_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_world_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_load_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/world_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/world_save_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/classify_orphan_smokes.sh",
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
       "scope_decisions_pending": [],
       "non_goals": "Save filename changes or historical-data deletion.",
+      "contract": {
+        "r02_versions": {
+          "run": "gate2-current-run-6",
+          "world": "world-6",
+          "combat": "threat-manager-2",
+          "future_rejection": [
+            "gate2-current-run-7",
+            "world-7"
+          ]
+        },
+        "combat_codec": {
+          "path": "scripts/systems/threat_save_contract.gd",
+          "api": [
+            "validate_current(summary: Variant) -> Dictionary",
+            "migrate_legacy(summary: Variant) -> Dictionary"
+          ]
+        },
+        "combat_initializer": {
+          "path": "scripts/systems/threat_initial_state_builder.gd",
+          "api": "build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary",
+          "production_consumer": "ThreatManager.configure_for_layout"
+        },
+        "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
+        "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
+        "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and strictly String combat_hotbar_text through inventory canonicalization.",
+        "legacy_structure_damage": {
+          "hull_tendril": 0.4,
+          "biomatter_swarm": 0.0,
+          "puppet_corpse": 0.0,
+          "stalker": 0.0,
+          "mimic": 0.0,
+          "drone_swarm": 0.0
+        },
+        "authority": "ADR-0059 decisions 33-39"
+      },
       "verification": [
         {
           "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P10 --evidence-dir artifacts/feature-completion/P10",
@@ -1987,6 +2097,20 @@
             "exit_code": 0,
             "required_output": [
               "SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/combat_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "COMBAT PERSISTENCE PASS"
             ],
             "forbidden_output": [
               "ERROR:",
@@ -2263,7 +2387,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P11",
-        "line": 797
+        "line": 827
       }
     },
     {
@@ -2499,7 +2623,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P12",
-        "line": 844
+        "line": 874
       }
     },
     {
@@ -2665,7 +2789,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P13",
-        "line": 888
+        "line": 918
       }
     },
     {
@@ -2932,7 +3056,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P14",
-        "line": 936
+        "line": 966
       }
     },
     {
@@ -3051,7 +3175,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P15",
-        "line": 977
+        "line": 1007
       }
     },
     {
@@ -3144,7 +3268,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P16",
-        "line": 999
+        "line": 1029
       }
     },
     {
@@ -3424,7 +3548,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P17",
-        "line": 1024
+        "line": 1054
       }
     },
     {
@@ -3559,7 +3683,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P18",
-        "line": 1160
+        "line": 1190
       }
     },
     {
@@ -3697,7 +3821,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P19",
-        "line": 1192
+        "line": 1222
       }
     },
     {
@@ -3844,7 +3968,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P20",
-        "line": 1220
+        "line": 1250
       }
     },
     {
@@ -3930,7 +4054,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P21",
-        "line": 1242
+        "line": 1272
       }
     },
     {
@@ -4023,7 +4147,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P22",
-        "line": 1266
+        "line": 1296
       }
     },
     {
@@ -4149,7 +4273,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P23",
-        "line": 1288
+        "line": 1318
       }
     },
     {
@@ -4272,7 +4396,7 @@
       "plan_anchor": {
         "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
         "heading": "P24",
-        "line": 1313
+        "line": 1343
       }
     }
   ]
