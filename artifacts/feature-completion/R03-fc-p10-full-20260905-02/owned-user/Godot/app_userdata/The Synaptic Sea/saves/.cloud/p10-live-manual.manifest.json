@@ -1,0 +1,12 @@
+{
+	"manifest_version": "cloud-manifest-1",
+	"device_id": "3665d664d2a304a9",
+	"build_id": "",
+	"schema_version": "world-6",
+	"payload_sha256": "e36e60716537c7a7263e0428367d371e17842734847c3f143bd8982056535476",
+	"payload_size_bytes": 37323,
+	"created_at": "2026-09-06T02:54:34",
+	"sync_eligible": true,
+	"cloud_provider": "stub",
+	"slot_id": "p10-live-manual"
+}

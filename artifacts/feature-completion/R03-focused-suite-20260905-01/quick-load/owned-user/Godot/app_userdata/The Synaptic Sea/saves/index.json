@@ -1,0 +1,25 @@
+{
+	"version": "save-index-1",
+	"godot_version": "4.7.2-stable (official)",
+	"updated_at": "2026-09-06T02:56:59",
+	"slots": [
+		{
+			"slot_id": "quicksave",
+			"slot_kind": "quick",
+			"display_name": "Quicksave",
+			"synaptic_sea_seed": 17,
+			"player_class": "engineer",
+			"current_location": "home",
+			"objective_sequence": 1,
+			"play_time_seconds": 0.0,
+			"saved_at": "2026-09-06T02:56:59",
+			"saved_at_epoch": 1788663419,
+			"world_slot_id": "",
+			"corrupt": false,
+			"frozen": false,
+			"payload_size_bytes": 44948,
+			"schema_version": "gate2-current-run-6",
+			"run_id": "1974628-5fcc"
+		}
+	]
+}

@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _on_loader_failed (res://scripts/procgen/playable_generated_ship.gd:10242)
+       [1] _on_frame (res://scripts/validation/title_load_failure_smoke.gd:49)
+WARNING: TitleMain: gameplay boot failed (smoke_forced_failure) — returning to title
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] _on_gameplay_failed (res://scripts/title_main.gd:230)
+       [1] _on_loader_failed (res://scripts/procgen/playable_generated_ship.gd:10244)
+       [2] _on_frame (res://scripts/validation/title_load_failure_smoke.gd:49)
+TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true

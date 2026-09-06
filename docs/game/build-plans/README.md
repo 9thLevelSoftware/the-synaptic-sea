@@ -1,5 +1,17 @@
 # Synaptic Sea E2E System Package Plans
 
+## Current feature-completion program
+
+- [Crafting and derelict feature completion implementation plan](../../superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md)
+  — scope/direction agreed 2026-09-04; 25 work packages, seven gates, no implementation claimed.
+- [Feature contract](../features/crafting_derelict_feature_completion.md)
+  — crafting, physical repair/replacement, restored ship use, and whole-game acceptance boundaries.
+- [Proposed ADR-0059](../adr/0059-crafting-and-derelict-restoration-transactions.md)
+  — quality lots, job/work transactions, explicit ship targets and replacement persistence.
+
+The package index below is historical input to the program's whole-game audit;
+its status text does not substitute for fresh acceptance evidence.
+
 Generated: 2026-06-25T19:59:51-04:00
 
 These files expand the 15 overview tasks into standalone production-grade design/development/implementation packages. Each package can be handed to a Kanban worker without broad clarification and includes independent verification expectations.

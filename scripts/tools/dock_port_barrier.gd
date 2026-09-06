@@ -9,6 +9,9 @@ class_name DockPortBarrier
 signal breach_opened(marker_id: String)
 
 var marker_id: String = ""
+var connection_id: String = ""
+var host_endpoint_id: String = ""
+var mobile_endpoint_id: String = ""
 var condition: String = "intact"          # "intact" | "broken"
 var player_progression                    # PlayerProgressionState | null
 var interaction_radius: float = 1.8
@@ -21,6 +24,8 @@ var _channel_player: Node = null
 var _scaled_seconds: float = 1.0
 var candidate_player: Node
 var collision_shape: CollisionShape3D
+var blocking_body: StaticBody3D
+var blocking_shape: CollisionShape3D
 var marker: MeshInstance3D
 
 func _ready() -> void:
@@ -36,6 +41,9 @@ func _ready() -> void:
 
 func configure(p_marker_id: String, p_condition: String, p_player_progression, world_position: Vector3, p_breach_seconds: float, radius := 1.8) -> void:
 	marker_id = p_marker_id
+	connection_id = ""
+	host_endpoint_id = ""
+	mobile_endpoint_id = ""
 	condition = p_condition
 	player_progression = p_player_progression
 	breach_seconds = p_breach_seconds
@@ -50,6 +58,16 @@ func configure(p_marker_id: String, p_condition: String, p_player_progression, w
 	set_meta("dock_port_barrier", true)
 	_ensure_collision(radius)
 	_ensure_marker(radius)
+
+func configure_endpoint(
+		p_marker_id: String, p_condition: String, p_player_progression,
+		endpoint: Dictionary, p_breach_seconds: float) -> void:
+	var world_position: Vector3 = endpoint.get("position", Vector3.ZERO) as Vector3
+	configure(p_marker_id, p_condition, p_player_progression, world_position,
+		p_breach_seconds, 1.8)
+	mobile_endpoint_id = str(endpoint.get("endpoint_id", ""))
+	var facing: Vector3 = endpoint.get("facing", Vector3.FORWARD) as Vector3
+	rotation.y = atan2(facing.x, facing.z)
 
 func _player_skill() -> int:
 	if player_progression != null and player_progression.has_method("get_skill_level"):
@@ -111,12 +129,12 @@ func set_opened(value: bool) -> void:
 	# Use is_instance_valid (not != null): a queue_free'd node is non-null but invalid.
 	if is_instance_valid(collision_shape):
 		collision_shape.disabled = opened   # opening removes the blocking collider
+	if is_instance_valid(blocking_shape):
+		blocking_shape.disabled = opened
 	if is_instance_valid(marker):
 		marker.visible = not opened
 
 func _interaction_radius() -> float:
-	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:
-		return (collision_shape.shape as SphereShape3D).radius
 	return interaction_radius
 
 func _is_player_in_direct_range(player_body: Node) -> bool:
@@ -132,10 +150,26 @@ func _ensure_collision(radius: float) -> void:
 		collision_shape = CollisionShape3D.new()
 		collision_shape.name = "DockPortBarrierCollisionShape3D"
 		add_child(collision_shape)
-	var sphere := SphereShape3D.new()
-	sphere.radius = radius
-	collision_shape.shape = sphere
+	var aperture := BoxShape3D.new()
+	aperture.size = Vector3(2.4, 2.8, 0.15)
+	collision_shape.position = Vector3(0.0, 1.4, 0.0)
+	collision_shape.shape = aperture
 	collision_shape.disabled = opened
+	if not is_instance_valid(blocking_body):
+		blocking_body = StaticBody3D.new()
+		blocking_body.name = "DockPortBarrierBlockingBody"
+		blocking_body.collision_layer = 1
+		blocking_body.collision_mask = 1
+		add_child(blocking_body)
+	if not is_instance_valid(blocking_shape):
+		blocking_shape = CollisionShape3D.new()
+		blocking_shape.name = "DockPortBarrierBlockingShape"
+		blocking_body.add_child(blocking_shape)
+	var blocker := BoxShape3D.new()
+	blocker.size = aperture.size
+	blocking_shape.position = collision_shape.position
+	blocking_shape.shape = blocker
+	blocking_shape.disabled = opened
 
 func _ensure_marker(radius: float) -> void:
 	if not is_instance_valid(marker):

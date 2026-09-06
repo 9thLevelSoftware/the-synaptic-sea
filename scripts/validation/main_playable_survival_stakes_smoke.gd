@@ -5,7 +5,7 @@ extends SceneTree
 ## the REAL coordinator _process tick (home branch, away_from_start=false).
 ##
 ## Pass marker:
-##   MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true
+##   MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 360
@@ -44,15 +44,17 @@ func _validate() -> void:
 		playable.threat_manager.threats.clear()
 	playable.away_from_start = false
 
-	# Exhausted stamina -> movement gate halves effective speed (before death).
+	# Low stamina -> the live vitals curve is propagated to effective speed (before death).
 	playable.vitals_state.health = 100.0
 	playable.vitals_state.stamina = 5.0
 	_pump(0.2)
-	var gate_half: bool = absf(playable.player.get_effective_move_speed() - playable.player.move_speed * 0.5) < 0.001
-	if not gate_half:
-		_fail("exhausted stamina should halve effective move speed (got %.3f of %.3f)" % [playable.player.get_effective_move_speed(), playable.player.move_speed])
+	var expected_multiplier: float = VitalsState.stamina_move_curve(
+		playable.vitals_state.stamina, playable.vitals_state.max_stamina)
+	var gate_curve: bool = expected_multiplier < 1.0 \
+		and absf(playable.player.get_effective_move_speed() - playable.player.move_speed * expected_multiplier) < 0.001
+	if not gate_curve:
+		_fail("low stamina movement curve should propagate exactly (expected mult %.3f, got speed %.3f of %.3f)" % [expected_multiplier, playable.player.get_effective_move_speed(), playable.player.move_speed])
 		return
-
 	# Drain health to 0 -> incapacitation locks movement AND ends the run as death.
 	playable.vitals_state.stamina = 100.0
 	playable.vitals_state.health = 0.0
@@ -66,7 +68,7 @@ func _validate() -> void:
 		return
 
 	finished = true
-	print("MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true")
+	print("MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true")
 	_cleanup_and_quit(0)
 
 func _pump(seconds: float) -> void:

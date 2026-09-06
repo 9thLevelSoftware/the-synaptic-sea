@@ -1,0 +1,1 @@
+C:\Users\dasbl\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path D:\the-synaptic-sea-feature-completion --script res://.superpowers/sdd/2026-09-05-remaining-feature-completion/r04_traversal_diagnostic.gd

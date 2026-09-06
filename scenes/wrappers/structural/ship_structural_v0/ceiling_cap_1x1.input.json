@@ -22,22 +22,22 @@
       "policy": "required"
     },
     "bounds": {
-      "local_max_m": [
-        2.0,
-        0.2,
-        2.0
-      ],
       "local_min_m": [
         -2.0,
-        0.0,
+        3.8,
         -2.0
       ],
+      "local_max_m": [
+        2.0,
+        4.0,
+        2.0
+      ],
+      "placement_origin": "cell-center-floor",
       "mesh_origin_offset_m": [
         0.0,
         0.0,
         0.0
-      ],
-      "placement_origin": "cell-center-floor"
+      ]
     },
     "category": "structural",
     "collision_policy": {
@@ -51,32 +51,32 @@
         "bounds": {
           "dimensions_m": [
             4.0,
-            3.5999999046325684,
-            0.25
-          ],
-          "local_max_m": [
-            2.0,
-            1.7999999523162842,
-            0.25
+            0.2,
+            4.0
           ],
           "local_min_m": [
             -2.0,
-            -1.7999999523162842,
-            0.0
+            3.8,
+            -2.0
+          ],
+          "local_max_m": [
+            2.0,
+            4.0,
+            2.0
           ]
         },
         "collision_shape_m": {
-          "base_y_m": -1.7999999523162842,
+          "base_y_m": 3.8,
           "footprint_m": [
             -2.0,
             2.0,
-            0.0,
-            0.25
+            -2.0,
+            2.0
           ],
-          "height_m": 3.5999999046325684,
+          "height_m": 0.2,
           "kind": "box",
           "name": "ceiling_cap_1x1",
-          "nav_blocker": true
+          "nav_blocker": false
         },
         "proxy_name": "ceiling_cap_1x1",
         "source_object_name": "Collision_ceiling_cap_1x1"
@@ -234,7 +234,31 @@
       "procedural_textures_allowed": false
     },
     "visual_scene_path": "res://assets/imported/structural/ship_structural_v0/ceiling_cap_1x1/ceiling_cap_1x1.glb",
-    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn"
+    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+    "physical_bounds": {
+      "min": [
+        -2.0,
+        3.8,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    },
+    "visual_bounds": {
+      "min": [
+        -2.0,
+        3.6875,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    }
   },
   "document_kind": "asset_semantics",
   "schema_version": "1.0.0"

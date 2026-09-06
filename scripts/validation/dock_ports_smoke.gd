@@ -1,7 +1,8 @@
 extends SceneTree
 
-## DockPorts derives a local-space dock port for the lifeboat (airlock) and the
-## derelict (dock room), with outward-facing normals on opposite axes.
+## DockPorts publishes only the exact authored structural endpoint for each
+## owner. Room-center fallbacks and the retired west-facing lifeboat descriptor
+## must remain unavailable.
 
 const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
@@ -12,32 +13,35 @@ func _initialize() -> void:
 
 	var lb_layout: Dictionary = LifeBoatBuilderScript.build_layout()
 	var lb_port: Dictionary = DockPortsScript.for_lifeboat(lb_layout)
+	var lb_endpoint: Dictionary = lb_layout.boarding_endpoints_v1[0]
 	if not lb_port.has("position") or not lb_port.has("facing"):
 		ok = false; msg = "lifeboat port missing fields"
-	elif (lb_port["facing"] as Vector3).distance_to(Vector3(-1, 0, 0)) > 0.001:
-		ok = false; msg = "lifeboat facing not -X"
-	elif (lb_port["position"] as Vector3).distance_to(Vector3(-2, 0, 0)) > 0.001:
-		ok = false; msg = "lifeboat port position not at expected -X nudge"
+	elif str(lb_port.get("endpoint_id", "")) != "boarding:0|h|-1|1":
+		ok = false; msg = "lifeboat endpoint identity changed"
+	elif (lb_port["facing"] as Vector3) != Vector3(0, 0, -1):
+		ok = false; msg = "lifeboat does not publish authored north normal"
+	elif (lb_port["position"] as Vector3) != _vector3(lb_endpoint.local_position):
+		ok = false; msg = "lifeboat does not publish authored outer frame face"
 
-	# A minimal derelict layout with one dock room at world x=12.
-	var der_layout := {
-		"rooms": [{
-			"id": "dock_01", "room_role": "dock",
-			"structural_placements": [
-				{"module_id": "floor_1x1", "world_position": [12.0, 0.0, 0.0]},
-			],
-		}],
-	}
+	var der_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+		"res://data/procgen/golden/coherent_ship_001/layout.json"))
+	var der_layout: Dictionary = der_variant if der_variant is Dictionary else {}
 	var der_port: Dictionary = DockPortsScript.for_derelict(der_layout)
 	if ok and (not der_port.has("position") or not der_port.has("facing")):
 		ok = false; msg = "derelict port missing fields"
-	elif ok and (der_port["position"] as Vector3).distance_to(Vector3(12, 0, 0)) > 0.001:
-		ok = false; msg = "derelict port position not at dock center"
-	elif ok and (der_port["facing"] as Vector3).distance_to(Vector3(1, 0, 0)) > 0.001:
-		ok = false; msg = "derelict facing not +X"
+	elif ok and str(der_port.get("endpoint_id", "")) != "boarding:0|v|0|-1":
+		ok = false; msg = "home endpoint identity changed"
+	elif ok and (der_port["position"] as Vector3) != Vector3(-2.1, 0, 0):
+		ok = false; msg = "home does not publish authored outer frame face"
+	elif ok and (der_port["facing"] as Vector3) != Vector3(-1, 0, 0):
+		ok = false; msg = "home does not publish authored west normal"
 
-	if ok and DockPortsScript.for_derelict({"rooms": []}).size() != 0:
-		ok = false; msg = "missing dock room should return empty"
+	var retired_room_center := {"rooms": [{
+		"id": "dock_01", "room_role": "dock", "structural_placements": [
+			{"module_id": "floor_1x1", "world_position": [12.0, 0.0, 0.0]},
+		]}]}
+	if ok and not DockPortsScript.for_derelict(retired_room_center).is_empty():
+		ok = false; msg = "retired room-center descriptor was accepted"
 
 	if ok:
 		print("DOCK PORTS PASS lifeboat=true derelict=true empty_guard=true")
@@ -45,3 +49,6 @@ func _initialize() -> void:
 	else:
 		push_error("DOCK PORTS FAIL reason=%s" % msg)
 		quit(1)
+
+func _vector3(value: Array) -> Vector3:
+	return Vector3(float(value[0]), float(value[1]), float(value[2]))

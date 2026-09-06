@@ -7,10 +7,11 @@ extends SceneTree
 #    event's pooled AudioStreamPlayer3D with stream != null, global_position
 #    == P1, bus == "sfx"; headed runs also require playing == true. Headless
 #    runs intentionally skip play() to avoid AudioServer teardown leaks.
-# 2. Honest fallback (ADR-0044): play_sfx(&"sfx.door.open", ...) — an
-#    UNcatalogued event — creates/positions its spatial player but assigns no
+# 2. Honest fallback (ADR-0044): the first sorted routed SFX event absent
+#    from STREAM_CATALOG creates/positions its spatial player but assigns no
 #    stream and does not play (volume-push-only, identical to _play_via_bus's
-#    deferred-asset fallback).
+#    deferred-asset fallback). The fixture fails explicitly if no deferred
+#    routed SFX event remains.
 # 3. Production callsite proof: a corpse loot container spawned through the
 #    REAL _on_threat_killed path, searched through the REAL try_interact path
 #    (search_loot_container_for_validation), repositions the tool-pickup
@@ -23,6 +24,8 @@ extends SceneTree
 # Writes nothing to disk. Frees the scene in both pass and fail exit paths.
 
 const PlayableShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")
+const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
+const SfxEventRouterScript := preload("res://scripts/systems/sfx_event_router.gd")
 const LAYOUT_PATH: String = "res://data/procgen/golden/coherent_ship_002/layout.json"
 const KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const GAMEPLAY_SLICE_PATH: String = "res://data/procgen/golden/coherent_ship_002/gameplay_slice.json"
@@ -68,6 +71,17 @@ func _spatial_player_for(mgr: Node, event_id: String) -> AudioStreamPlayer3D:
 			return child
 	return null
 
+
+func _deferred_spatial_sfx_id() -> String:
+	var routed_ids: Array = SfxEventRouterScript.EVENT_CATALOG.keys()
+	routed_ids.sort()
+	for id_value in routed_ids:
+		var event_id: String = String(id_value)
+		if event_id.begins_with("sfx.") and not AudioManagerScript.STREAM_CATALOG.has(event_id):
+			return event_id
+	return ""
+
+
 func _validate() -> void:
 	if not playable.has_method("get_audio_manager"):
 		_fail("get_audio_manager missing")
@@ -100,16 +114,26 @@ func _validate() -> void:
 		return
 	var catalogued_playing_ok: bool = true
 
-	# --- Criterion 2: uncatalogued event stays an honest volume-push fallback ---
-	if not mgr.play_sfx(&"sfx.door.open", FALLBACK_POS):
-		_fail("play_sfx(sfx.door.open, pos) returned false")
+	# --- Criterion 2: uncatalogued routed SFX stays an honest fallback ---
+	var fallback_event_id: String = _deferred_spatial_sfx_id()
+	if fallback_event_id.is_empty():
+		_fail("no routed SFX event remains outside STREAM_CATALOG; cannot prove ADR-0044 fallback")
 		return
-	var fb: AudioStreamPlayer3D = _spatial_player_for(mgr, "sfx.door.open")
+	if AudioManagerScript.STREAM_CATALOG.has(fallback_event_id):
+		_fail("selected fallback event unexpectedly catalogued: %s" % fallback_event_id)
+		return
+	if not mgr.play_sfx(StringName(fallback_event_id), FALLBACK_POS):
+		_fail("play_sfx(%s, pos) returned false" % fallback_event_id)
+		return
+	var fb: AudioStreamPlayer3D = _spatial_player_for(mgr, fallback_event_id)
 	if fb == null:
-		_fail("no spatial player allocated for sfx.door.open")
+		_fail("no spatial player allocated for deferred event %s" % fallback_event_id)
+		return
+	if String(fb.bus) != "sfx":
+		_fail("deferred spatial player on bus '%s', expected 'sfx'" % String(fb.bus))
 		return
 	if fb.stream != null or fb.playing:
-		_fail("uncatalogued spatial player must not stream/play (ADR-0044 honest fallback)")
+		_fail("uncatalogued spatial player must not stream/play (ADR-0044 honest fallback, id=%s)" % fallback_event_id)
 		return
 	if fb.global_position.distance_to(FALLBACK_POS) > 0.01:
 		_fail("fallback spatial player at %s, expected %s" % [str(fb.global_position), str(FALLBACK_POS)])

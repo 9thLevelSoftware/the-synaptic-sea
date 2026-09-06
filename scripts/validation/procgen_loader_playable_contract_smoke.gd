@@ -40,10 +40,11 @@ func _initialize() -> void:
 		push_error("loader contract smoke failed: invalid goal position")
 		quit(1)
 		return
-	if loader.get_objective_specs_copy().size() != 4:
+	var objective_specs: Array = loader.get_objective_specs_copy()
+	if objective_specs.size() != 1 or str(objective_specs[0].get("id", "")) != "bridge_07:reach_goal":
 		push_error(
-			"loader contract smoke failed: expected 4 objectives got %d"
-			% loader.get_objective_specs_copy().size()
+			"loader contract smoke failed: expected bridge_07:reach_goal objective count=1 got %d"
+			% objective_specs.size()
 		)
 		quit(1)
 		return
@@ -80,7 +81,7 @@ func _initialize() -> void:
 		return
 
 	print(
-		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=%d structural_live=true edge_wrappers=%d floor_wrappers=%d"
+		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=1 collision_shapes=%d structural_live=true edge_wrappers=%d floor_wrappers=%d"
 		% [loader.count_collision_shapes(), edge_wrapper_count, floor_wrapper_count]
 	)
 	quit(0)

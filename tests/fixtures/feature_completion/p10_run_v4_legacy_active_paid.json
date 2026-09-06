@@ -1,0 +1,62 @@
+{
+  "fixture": {
+    "source_revision": "f4a65669",
+    "source_serializers": [
+      "CraftingState.get_summary",
+      "StationState.get_summary"
+    ],
+    "captured_at": "2026-09-05T00:00:00Z"
+  },
+  "layout_path": "res://data/procgen/smoke/seed_000017/layout.json",
+  "kit_path": "res://data/kits/ship_structural_v0.json",
+  "gameplay_slice_path": "res://data/procgen/smoke/seed_000017/gameplay_slice.json",
+  "slice_version": "gate2-current-run-4",
+  "godot_version": "fixture-current",
+  "run_id": "fixture-run",
+  "inventory_summary": {
+    "items": {
+      "scrap_metal": 1
+    }
+  },
+  "component_placement_summary": {
+    "schema": "component_placement_v2",
+    "seed": 17,
+    "count": 1,
+    "placed": [
+      {
+        "component_instance_id": "legacy-center-0",
+        "component_id": "pump_assembly",
+        "item_form": "pump_assembly",
+        "condition": 0.42
+      }
+    ],
+    "rejected_saved_components": []
+  },
+  "crafting_summary": {
+    "recipe_count": 61,
+    "active_craft": {
+      "recipe_id": "weld_plating",
+      "station_kind": "workbench",
+      "quality_score": 0.72,
+      "quality_tier": "good",
+      "quality_multiplier": 1.25
+    },
+    "station_summaries": {
+      "workbench": {
+        "station_kind": "workbench",
+        "level": 0,
+        "tier": 0,
+        "max_queue": 8,
+        "powered": true,
+        "active_recipe_id": "weld_plating",
+        "progress_seconds": 6.0,
+        "required_seconds": 15.0,
+        "status": 1,
+        "queue": [
+          "splice_circuit",
+          "weld_plating"
+        ]
+      }
+    }
+  }
+}

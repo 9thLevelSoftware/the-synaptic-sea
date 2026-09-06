@@ -36,9 +36,22 @@ The player scavenges derelicts for scrap, circuits, fluids, and biomatter; retur
 - No final art dependency; placeholder icon/audio seams are acceptable if the runtime seam is real.
 - No broad inventory schema rewrite beyond additive crafting/material snapshot fields.
 
+The recipe-codex exclusion above records this package's original boundary. It is
+superseded at whole-program scope by approved FC-04 recipe-knowledge behavior and
+is not an active completion constraint. The other package non-goals remain active.
+
 ## Acceptance criteria
 
-Mapped 1:1 to REQ-CS-001..015 in `docs/game/05_requirements.md`.
+Mapped to existing requirement rows: `REQ-CS-001`, `REQ-CS-005`, `REQ-CS-014`.
+
+- **Gameplay:** Material inventory loads from the material catalog, retains per-material quality, and round-trips its quality summary.
+- **Gameplay:** Crafting validates and consumes the selected recipe ingredients exactly once, resolves the output quality tier deterministically, and retains active mid-craft state.
+- **Gameplay:** Stations own kind, level, power, queue progress, and pause/resume behavior; loss of power prevents powered progress and bonuses.
+- **Gameplay:** Field crafting exposes only `field_crafting` recipes and never receives powered-station bonuses.
+- **Gameplay:** Deconstruction maps eligible found gear to authored material yields.
+- **Gameplay:** Ingredient quality, skill, station level, and power are the only inputs to deterministic output quality.
+- **Gameplay:** Save/load carries crafting and material summaries without duplicating consumed ingredients or completed output.
+- **Constraint:** This package adds no vendor loop, final-art dependency, or broad inventory schema rewrite.
 
 ## Verification
 

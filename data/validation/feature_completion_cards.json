@@ -1,0 +1,5315 @@
+{
+  "schema_version": "feature-completion-card-manifest-v2",
+  "board": "synaptic-sea-stage-gate",
+  "sync_status": "pending",
+  "sync_note": "Local import manifest only; no observed board integration or card creation is claimed.",
+  "source_plan": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+  "card_contract": "Tracked-plan card scopes expanded to repository paths; planned missing paths remain explicit and do not imply implementation.",
+  "cards": [
+    {
+      "id": "P00",
+      "requirements": [
+        "FC-02"
+      ],
+      "depends_on": [],
+      "allowlist": [
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "README.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "AGENTS.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0061-persist-resolved-generation-context.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0063-lifeboat-compiled-biome-contract.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0064-versioned-current-topology-parity-fixture.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/procgen/golden/compact_seed17_current/**",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ceiling_fade_controller.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_blueprint.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/life_boat.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/room_assigner.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p00_ceiling_lifetime_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p00_native_arc_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/derelict_arc_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/item_economy_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_item_economy_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_survival_stakes_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/audio_spatial_playback_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/load_denied_sfx_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/vitals_state_save_load_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/room_assigner_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/capture_current_topology_fixture.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/procgen_golden_parity_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/procgen_layout_stress_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/procgen_playable_ship_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/procgen_loader_playable_contract_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/generated_seed_boarded_slice_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0067-native-first-run-candidate-authority.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/generated_seed_boarded_slice.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/procgen/slice/first_run_contract.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/first_run_contract.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/first_run_contract_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_damaged.glb.import",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1_breached.glb.import",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Gameplay edits, blanket reimport churn, and installs.",
+      "verification": [
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p00_ceiling_lifetime_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P00 CEILING LIFETIME PASS freed_safe=true rebound=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p00_native_arc_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P00 NATIVE ARC PASS native_selected=true seed="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/derelict_arc_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/crafting_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CRAFTING STATE PASS recipes="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/module_integrity_consequences_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MODULE INTEGRITY CONSEQUENCES PASS fire=true breach_derived=true scene=true nav=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/repair_loop_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "REPAIR LOOP PASS opening=true channeled=true persists=true home_intact=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE STATION CRAFT PASS crafted="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/pilot_switch_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PILOT SWITCH SMOKE PASS piloted="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_survival_stakes_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/audio_spatial_playback_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "AUDIO SPATIAL PASS catalogued_playing="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/vitals_state_save_load_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "VITALS SAVE LOAD PASS vitals=true sanity=true radiation=true temperature=true status=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/room_assigner_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "ROOM ASSIGNER PASS rooms="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/procgen_golden_parity_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PROCGEN CURRENT TOPOLOGY PARITY PASS seed="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --profile baseline --evidence-dir artifacts/feature-completion/P00-profile",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "feature completion PASS:"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P00",
+        "line": 246
+      }
+    },
+    {
+      "id": "P01",
+      "requirements": [
+        "FC-01",
+        "FC-23"
+      ],
+      "depends_on": [
+        "P00"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/07_risk_register.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/system_inventory.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/integration_debt.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "STATUS.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_acceptance_registry.py",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Increasing scores without evidence or hiding deferred scope.",
+      "verification": [
+        {
+          "command": "& $Python tools/build_feature_acceptance.py --check",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FEATURE ACCEPTANCE REGISTRY PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P01",
+        "line": 358
+      }
+    },
+    {
+      "id": "P02",
+      "requirements": [
+        "FC-01",
+        "FC-02",
+        "FC-03"
+      ],
+      "depends_on": [
+        "P01"
+      ],
+      "allowlist": [
+        {
+          "path": "tools/run_feature_completion.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cases.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_system_inventory.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/test_build_system_inventory.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/classify_orphan_smokes.sh",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".gitattributes",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_completion_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_acceptance_registry.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Replacing the canonical regression or relaxing diagnostic policy.",
+      "verification": [
+        {
+          "command": "& $Python -m pytest -q tests/test_feature_completion_runner.py tests/test_feature_acceptance_registry.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/test_build_system_inventory.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "BUILD INVENTORY SELFTEST PASS"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/build_system_inventory.py --check",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SYSTEM INVENTORY CHECK PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/build_system_inventory.py --coverage",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SYSTEM INVENTORY COVERAGE PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P02",
+        "line": 386
+      }
+    },
+    {
+      "id": "P03",
+      "requirements": [
+        "FC-05",
+        "FC-12"
+      ],
+      "depends_on": [
+        "P01",
+        "P02"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/item_lot_ledger.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/inventory_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/material_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/item_defs.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/production_output_full_consume_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/production_output_full_consume_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/work_yield_scoop_denied_sfx_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/work_yield_scoop_denied_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/work_yield_partial_scoop_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/work_yield_partial_scoop_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p03_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "UI, cargo, and rebalancing.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P03 --evidence-dir artifacts/feature-completion/P03",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P03 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/inventory_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "INVENTORY STATE PASS tools="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/material_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MATERIAL STATE PASS defined="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/production_output_full_consume_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PRODUCTION OUTPUT FULL CONSUME PASS hydro=true recycler=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/production_output_full_consume_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PRODUCTION OUTPUT FULL CONSUME AWAY PASS away=true hydro=true recycler=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/work_yield_scoop_denied_sfx_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORK YIELD SCOOP DENIED SFX PASS deny=true sfx=true remain=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/work_yield_scoop_denied_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORK YIELD SCOOP DENIED AWAY PASS away=true deny=true sfx=true remain=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/work_yield_partial_scoop_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORK YIELD PARTIAL SCOOP PASS deny=true partial=true residual=true finish=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/work_yield_partial_scoop_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORK YIELD PARTIAL SCOOP AWAY PASS away=true partial=true residual=true finish=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P03",
+        "line": 415
+      }
+    },
+    {
+      "id": "P04",
+      "requirements": [
+        "FC-05",
+        "FC-09"
+      ],
+      "depends_on": [
+        "P03"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/ship_inventory.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/cargo_transfer.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/cart_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/equipment_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/deconstruction_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/cargo_hold_control.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/cart_control.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/work_yield_drop.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/loot_container.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/inventory_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/inventory_row.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/inventory_drop_zone.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p04_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p04_holder_atomicity_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p04_floor_drop_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p04_objective_lots_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/equipment_carts_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_slice_inventory_ui_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/crafting_quality_knowledge_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Changing transfer distance, encumbrance, or cargo-weight policy.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P04 --evidence-dir artifacts/feature-completion/P04",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P04 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p04_holder_atomicity_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P04 HOLDER ATOMICITY PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p04_floor_drop_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P04 FLOOR DROP PERSISTENCE PASS partial=true fresh_load=true revisit=true lots=true transform=true sequence="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p04_objective_lots_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P04 OBJECTIVE LOTS PASS overflow=true fresh_load=true revisit=true exact_lots=true collect_once=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/cargo_transfer_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CARGO TRANSFER SMOKE PASS conserved=true deposited="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/equipment_carts_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "EQUIPMENT CARTS SMOKE PASS section_a=true cap_bonus=40 slowed=true cart_loaded="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_slice_inventory_ui_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "INVENTORY UI SLICE SMOKE PASS moved="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/crafting_quality_knowledge_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CRAFTING QUALITY KNOWLEDGE PASS quality=true knowledge=true reverse=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P04",
+        "line": 456
+      }
+    },
+    {
+      "id": "P05",
+      "requirements": [
+        "FC-06"
+      ],
+      "depends_on": [
+        "P03",
+        "P04"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/item_quality_effects.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/quality_effects.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/quality_tier_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/consumable_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/medicine_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/stimulant_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/effect_dispatcher.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_mount_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_modification_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/inventory_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/inventory_row.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_driver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/balance/crafting_materials_tuning.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p05_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Random stat rerolls or new item IDs.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P05 --evidence-dir artifacts/feature-completion/P05",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P05 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/quality_tier_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "QUALITY TIER PASS tiers=5 resolve=true power_bonus=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/crafting_quality_knowledge_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CRAFTING QUALITY KNOWLEDGE PASS quality=true knowledge=true reverse=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P05",
+        "line": 491
+      }
+    },
+    {
+      "id": "P06",
+      "requirements": [
+        "FC-04"
+      ],
+      "depends_on": [
+        "P01",
+        "P02"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/field_crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/recipe_knowledge_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_context.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/recipes/recipe_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/item_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/loot_tables.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p06_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "A separate metaprogression system or hundreds of recipes.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P06 --evidence-dir artifacts/feature-completion/P06",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P06 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/crafting_recipe_list_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CRAFTING RECIPE LIST PASS ready="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_slice_recipe_picker_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE RECIPE PICKER PASS station=fabricator recipe="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P06",
+        "line": 534
+      }
+    },
+    {
+      "id": "P07",
+      "requirements": [
+        "FC-07",
+        "FC-08"
+      ],
+      "depends_on": [
+        "P03",
+        "P06"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/craft_job_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_scheduler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/station_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_runtime.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p07_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/station_tiers_batch_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p06_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Queue UI or station-power rebalancing.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P07 --evidence-dir artifacts/feature-completion/P07",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P07 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/crafting_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "CRAFTING STATE PASS recipes="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/station_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "STATION STATE PASS configure=true tick=true pause_resume=true queue=true round_trip=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p06_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P06 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P07",
+        "line": 563
+      }
+    },
+    {
+      "id": "P08",
+      "requirements": [
+        "FC-08",
+        "FC-09"
+      ],
+      "depends_on": [
+        "P04",
+        "P07"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/adr/0062-ship-owned-pending-output-receipts.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/pending_output_store.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_scheduler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/station_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/field_crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/deconstruction_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/inventory_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_inventory.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/work_yield_drop.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p08_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p07_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Infinite hidden player storage.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P08 --evidence-dir artifacts/feature-completion/P08",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P08 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE STATION CRAFT PASS crafted="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_slice_salvage_picker_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE SALVAGE PICKER PASS target="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P08",
+        "line": 600
+      }
+    },
+    {
+      "id": "P09",
+      "requirements": [
+        "FC-10",
+        "FC-11"
+      ],
+      "depends_on": [
+        "P05",
+        "P06",
+        "P07",
+        "P08"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/recipes/recipe_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/materials/material_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/item_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/loot_tables.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/quality_effects.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/components/component_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/check_crafting_economy.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_crafting_economy.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_driver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p09_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p05_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p09_natural_route_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/recipe_resource_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/recipe_picker_panel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p12_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [
+        "R04 may propose a minimal balance or authored-progression change only after normal-control evidence demonstrates a specific broken link; root owns that ruling.",
+        "Full production-source closure is deferred until reviewed R03/R11 integration; R04 records exact source hashes and reachable-route limits.",
+        "R07 machinery-condition review retires old donor-healing assumptions; R04 must observe only current intended station/system benefit.",
+        "Every P09 Godot body uses the hardened feature-completion runner, which first runs the accepted FC P10 USER DATA PROBE PASS containment check with all four owned-home variables."
+      ],
+      "non_goals": "Recipe count as a completion metric; arbitrary loot or balance additions from a sampled absence; injected inventory, force repair, teleport, direct skill mutation, or snapshot seeding as natural-path evidence; retired donor healing; unproven low-repair-class softlock claims; editor/import/plugin launch; or early full-source pinning.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P09 --evidence-dir artifacts/feature-completion/P09",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P09 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p09_natural_route_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P09 NATURAL ROUTE PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/recipe_resource_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "RECIPE RESOURCE PASS recipes="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/recipe_picker_panel_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "RECIPE PICKER PANEL PASS rows=3 actions=true generation_fail_closed=true no_recipe_action=true projection=true collection=true cancellation=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m unittest tests.test_crafting_economy",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "OK"
+            ],
+            "forbidden_output": []
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P09",
+        "line": 649
+      }
+    },
+    {
+      "id": "P10",
+      "requirements": [
+        "FC-12"
+      ],
+      "depends_on": [
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-implementation-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P10-repair-proposal.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_restore_candidate.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/main.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/title_main.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/audio/audio_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/camera/iso_camera_rig.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/save_load_menu.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/menu_coordinator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/crafting_station.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_context.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/electrical_arc_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/run_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_migration_service.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_load_service.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/craft_job_scheduler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/station_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/field_crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/recipe_knowledge_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_placement_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_runtime.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/pillar_persistence.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_ai_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_save_contract.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_initial_state_builder.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/**",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p10_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p10_process_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p13_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/combat_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_p10_process_smoke.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_p10_process_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_run_v7_future.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_world_v7_future.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_generator_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/threat_ai_state_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/tendril_structure_damage_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_world_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_load_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/world_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/world_save_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/electrical_arc_state_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_quicksave_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/main_playable_meta_autosave_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/title_save_query_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/title_load_failure_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_feature_completion.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_completion_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-3-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/classify_orphan_smokes.sh",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Save filename changes, historical-data deletion, default-profile cleanup, comparison epsilon, new ignored fields, generalized oxygen normalization, combat-schema weakening, editor/import/plugin launch, or unrelated P09/P17/catalog/navigation behavior.",
+      "contract": {
+        "r02_versions": {
+          "run": "gate2-current-run-6",
+          "world": "world-6",
+          "combat": "threat-manager-2",
+          "future_rejection": [
+            "gate2-current-run-7",
+            "world-7"
+          ]
+        },
+        "combat_codec": {
+          "path": "scripts/systems/threat_save_contract.gd",
+          "api": [
+            "validate_current(summary: Variant) -> Dictionary",
+            "migrate_legacy(summary: Variant) -> Dictionary"
+          ]
+        },
+        "combat_initializer": {
+          "path": "scripts/systems/threat_initial_state_builder.gd",
+          "api": "build_initial_v2(layout: Dictionary, markers: Array, anchor: Vector3, definitions: Dictionary) -> Dictionary",
+          "production_consumer": "ThreatManager.configure_for_layout"
+        },
+        "generation_documents": {
+          "path": "scripts/procgen/ship_generator.gd",
+          "api": "generate_documents_from_seed(seed_value: int, size: int = 0, condition: int = 1) -> Dictionary",
+          "contract": "Pure native-or-fallback layout/kit/gameplay documents shared by scene generation and legacy bootstrap; no Node/RID and no fallback after a selected pipeline fails."
+        },
+        "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
+        "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
+        "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and required exact-String current combat_hotbar_text through inventory canonicalization. Recognized pre-v6 absence materializes the empty runtime default before sealing; present historical text remains byte-for-byte.",
+        "legacy_structure_damage": {
+          "hull_tendril": 0.4,
+          "biomatter_swarm": 0.0,
+          "puppet_corpse": 0.0,
+          "stalker": 0.0,
+          "mimic": 0.0,
+          "drone_swarm": 0.0
+        },
+        "authority": "ADR-0059 decisions 33-39"
+      },
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P10 --evidence-dir artifacts/feature-completion/P10",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P10 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p13_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P13 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/save_migration_service_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SAVE MIGRATION SERVICE PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/save_migration_world_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SAVE MIGRATION WORLD PASS unknown_version_passthrough="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/save_load_service_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/world_snapshot_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLD SNAPSHOT PASS round_trip=true version_gated=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/world_save_service_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/electrical_arc_state_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "ARC STATE PASS cycles="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/combat_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "COMBAT PERSISTENCE PASS schema=threat-manager-2 hull=0.4 callback=true owners=home+away"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_generator_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_quicksave_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/main_playable_meta_autosave_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/title_save_query_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/title_load_failure_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m pytest -q tests/test_p10_process_runner.py tests/test_feature_completion_runner.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/run_p10_process_smoke.py --godot $Godot --root . --evidence-dir artifacts/feature-completion/P10-process",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P10 PROCESS PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --profile crafting --evidence-dir artifacts/feature-completion/P10-profile",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "feature completion PASS:"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P10",
+        "line": 725
+      }
+    },
+    {
+      "id": "P11",
+      "requirements": [
+        "FC-13"
+      ],
+      "depends_on": [
+        "P01",
+        "P02"
+      ],
+      "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_placement_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_mount_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_modification_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/components/component_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/wall_door_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/layout_serializer.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/procgen/golden/coherent_ship_001/layout.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/procgen/golden/coherent_ship_002/layout.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_modification_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p11_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p11_live_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_modification_panel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_slot_population_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_system_link_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_dismount_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/pillar_revisit_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_power_budget_scene_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_power_budget_scene_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/hull_plating_resist_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fire_plating_resist_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [
+        "R06 adds distinct no-spend cases for authored slot identity/profile, footprint or size, socket or type, occupancy, water, unknown component, and wrong selected ship without changing FC-13 text.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Synthetic replacement slots, freeform construction, or P14 condition policy.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P11 --evidence-dir artifacts/feature-completion/P11",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P11 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P11 --evidence-dir artifacts/feature-completion/R06-P11-focused",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "R06 P11 FOCUSED PASS cases=4"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P11",
+        "line": 912
+      }
+    },
+    {
+      "id": "P12",
+      "requirements": [
+        "FC-14"
+      ],
+      "depends_on": [
+        "P03",
+        "P11"
+      ],
+      "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_transaction.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_driver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_channel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_mount_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_placement_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/repair_point.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/work_action_hud_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/work_actions/work_action_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p12_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_modification_panel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p11_live_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_power_budget_scene_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_power_budget_scene_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_dismount_interact_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_dismount_interact_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_xp_live_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_xp_live_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_sfx_live_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_sfx_live_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_remount_sfx_live_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_remount_sfx_live_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [
+        "R06 distinguishes pre-escrow admission denial from paid interruption: admission spends nothing; pause retains exact escrow and progress; explicit cancel refunds exact lots.",
+        "Commit revalidates target existence and revision, range, owner, access, occupancy, and tool; duplicate or reentrant completion may produce one receipt, effect, noise completion, and XP award.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Replacing the interaction system, adding a second mutation authority, or absorbing P15/P17 work.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P12 --evidence-dir artifacts/feature-completion/P12",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P12 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P12 --evidence-dir artifacts/feature-completion/R06-P12-focused",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "R06 P12 FOCUSED PASS cases=4"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P12",
+        "line": 959
+      }
+    },
+    {
+      "id": "P13",
+      "requirements": [
+        "FC-15"
+      ],
+      "depends_on": [
+        "P07",
+        "P12"
+      ],
+      "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-6-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_physical_work_smokes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_physical_work_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_context.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_runtime.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_access_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p13_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p07_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_inventory_sync_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_modification_panel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_remount_sfx_live_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [
+        "Physical work requires an explicit target ship and current binding generation; missing owners fail closed and may not resolve through current_ship or home_ship.",
+        "R03 already accepted the production same-ship and cross-ship exact-lot move through two reloads; R06 reruns canonical P10 and reviews those predicates instead of duplicating them.",
+        "Every R06 Godot body runs through the tracked physical-work runner, a thin hardened execute_isolated_case adapter that preserves the fresh four-variable home and separate P10 containment probe."
+      ],
+      "non_goals": "Multiplayer authority, unrelated extraction, or implicit current/home-ship owner fallback.",
+      "closure_package": "R06",
+      "owner": {
+        "integration": "sol_engineer",
+        "bounded_tests": "terra_worker",
+        "coordinator_and_acceptance": "root"
+      },
+      "feature_spec": "docs/game/features/crafting_derelict_feature_completion.md",
+      "architecture": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P13 --evidence-dir artifacts/feature-completion/P13",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P13 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m pytest -q tests/test_physical_work_runner.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "passed"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python tools/run_physical_work_smokes.py --godot $Godot --group P13 --evidence-dir artifacts/feature-completion/R06-P13-focused",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "R06 P13 FOCUSED PASS cases=4"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P10 --evidence-dir artifacts/feature-completion/R06-P10-relocation-reload",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P10 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P13",
+        "line": 1003
+      }
+    },
+    {
+      "id": "P14",
+      "requirements": [
+        "FC-16"
+      ],
+      "depends_on": [
+        "P05",
+        "P12",
+        "P13"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/README.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-04-crafting-derelict-feature-completion/P14-implementation-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/reviewed_criterion_supersessions_v1.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_feature_acceptance_registry.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_p14_health_authority.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/systems/component_placement_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/component_mount_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_systems_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_system.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_subcomponent.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_modification_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/crafting_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/repair_point.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p14_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/ship_systems_manager_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_systems_manager_force_repair_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/component_mount_dismount_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/dismount_system_damage_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/remount_system_restore_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_system_effect_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_restore_effects_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_plating_repair_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_plating_repair_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_station_tier_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_station_tier_away_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Free repair on install or balance inflation.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P14 --evidence-dir artifacts/feature-completion/P14",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P14 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/fc_p14_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P14 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_overbudget_power_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD OVERBUDGET POWER PASS over=true unpowered=true ok=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_station_tier_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD STATION TIER AWAY PASS away=true install=true tier=true uninstall=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P14",
+        "line": 1051
+      }
+    },
+    {
+      "id": "P15",
+      "requirements": [
+        "FC-17"
+      ],
+      "depends_on": [
+        "P05",
+        "P12",
+        "P13",
+        "P14"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/module_integrity_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/module_integrity_map.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_subcomponent.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/repair_point.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/work_actions/work_action_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p15_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Ordinary repair resurrecting destroyed modules.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P15 --evidence-dir artifacts/feature-completion/P15",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P15 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/repair_loop_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "REPAIR LOOP PASS opening=true channeled=true persists=true home_intact=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/module_integrity_consequences_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MODULE INTEGRITY CONSEQUENCES PASS fire=true breach_derived=true scene=true nav=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_mod_plating_repair_away_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP MOD PLATING REPAIR AWAY PASS away=true install=true repair=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P15",
+        "line": 1092
+      }
+    },
+    {
+      "id": "P16",
+      "requirements": [
+        "FC-18"
+      ],
+      "depends_on": [
+        "P01",
+        "P02"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/structural_rebuild_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/module_integrity_map.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/module_integrity_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/generated_ship_loader.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p16_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Reconstruction or altered room generation.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P16 --evidence-dir artifacts/feature-completion/P16",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P16 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/module_integrity_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MODULE INTEGRITY PASS fsm=true sparse=true determinism=true round_trip=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/nav_solid_edges_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "NAV SOLID EDGES PASS nodes="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P16",
+        "line": 1114
+      }
+    },
+    {
+      "id": "P17",
+      "requirements": [
+        "FC-18",
+        "FC-19"
+      ],
+      "depends_on": [
+        "P09",
+        "P12",
+        "P13",
+        "P16"
+      ],
+      "allowlist": [
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-brief.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-beforeimages/manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-beforeimages/runtime-after-r06-manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/r04-traversal-diagnosis.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/r17-hallucination-save-remediation-design.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-05-remaining-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0017-physical-docking-and-ports.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0042-sanity-hallucinations.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/crafting_derelict_feature_completion.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_feature_acceptance.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/structural_rebuild_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_transaction.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/module_integrity_map.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/structural_rebuild_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/runtime_physical_volume_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/runtime_physical_volume.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/structural_rebuild_collision_query.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/work_action_resolver.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/structural_rebuild_preflight.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/procgen/dock_endpoint_authoring.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/structural_edge_compiler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/structural_plan_validator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_layout_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/ship_generator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/life_boat.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/generated_ship_loader.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/modular_socket_catalog.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/dock_ports.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/docking_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_nav_graph.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/dock_port_barrier.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/run_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_load_service.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_migration_service.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_restore_candidate.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/hallucination_director.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/hallucination_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_save_contract.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/threat_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/construction/structural_rebuild_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/tools/tool_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/items/item_definitions.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/physics/runtime_physical_volume_profiles.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/procgen/golden/coherent_ship_001/layout.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.input.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/kits/ship_structural_v0.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/focused_nine_blender_recipes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/build_dock_collision_projection.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_dock_collision_projection.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/prop_visual_metadata.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_focused_nine_blender_recipes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_prop_visual_metadata.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/placement/validate_wrapper_scenes.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/check_structural_rebuild_catalog.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_structural_rebuild_catalog.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/check_runtime_physical_volume_catalog.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_runtime_physical_volume_catalog.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/classify_orphan_smokes.sh",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/work_actions/work_action_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p17_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/fc_p16_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/structural_rebuild_policy_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/runtime_physical_volume_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/structural_rebuild_collision_query_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/structural_rebuild_candidate_nav_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_r10a_docking_smokes.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_r10a_docking_runner.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/r10a_dock_endpoint_contract_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/r10a_dock_traversal_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/r10a_ceiling_clearance_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/canonical_opening_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/docking_manager_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/dock_ports_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/boot_dock_aligned_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/occupancy_flip_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/physical_travel_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/docking_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/combat_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_world_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/save_migration_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/world_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/hallucination_director_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p09_natural_route_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_run_v7_future.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_world_v7_future.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_run_v8_future.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/p10_world_v8_future.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [
+        "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
+        "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
+        "Docking derives the mobile transform from opposing authenticated descriptors and rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope; the mobile owner instantiates one separate barrier, capsule passage remains independent, and moved-owner combat positions receive the same root delta.",
+        "The fixed lifeboat owns one authored clear initial interior spawn; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
+        "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
+        "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both."
+      ],
+      "non_goals": "Claiming FC-19 from the R10-A baseline prerequisite; placement outside the original footprint; preserving room-center or diagnostic-coordinate docking; nearest-room, center-snap, silent alternate-layout, collision-disable, or invented-spawn recovery; arbitrary reinterpretation of world-6 transforms/global pose; or unreviewed cart push physics.",
+      "contract": {
+        "r10a_status": "governance_accepted_run7_world7_allocated_runtime_pending_accepted_r06_rereview_handoff",
+        "r10a_prerequisites": [
+          "P01/R01 governance",
+          "P03/R03 persistence governance",
+          "accepted R06 fix re-review handoff"
+        ],
+        "r10b_prerequisites": [
+          "R09 live blocker binding",
+          "R10-A accepted baseline"
+        ],
+        "full_p17_acceptance_prerequisites": [
+          "P09",
+          "P12",
+          "P13",
+          "P16",
+          "R10-A",
+          "R09",
+          "R10-B"
+        ],
+        "boarding_endpoints_v1_exact_fields": [
+          "endpoint_id",
+          "port_id",
+          "portal_id",
+          "type",
+          "size_class",
+          "room_id",
+          "deck",
+          "edge_cell",
+          "edge_direction",
+          "structural_edge_key",
+          "target_module_id",
+          "structural_module_id",
+          "local_position",
+          "outward_normal",
+          "threshold_nav_node_id",
+          "interior_nav_node_id",
+          "threshold_clearance_point_local",
+          "interior_clearance_point_local",
+          "join_piece_placement_ids",
+          "join_collision_fingerprint"
+        ],
+        "endpoint_geometry": "Explicit one-sided exterior portal on the projected canonical doorway frame's exact outer collision face; each non-join owner shape whose tangent/up projection intersects the finite aperture remains wholly inward and threshold clearance remains outside; all shapes remain subject to strict cross-ship pair checks; fixed lifeboat west airlock/engine seam is forbidden.",
+        "dock_collision_projection": {
+          "schema": "dock-collision-projection-v1",
+          "owner": "data/kits/ship_structural_v0.json",
+          "source": "contract-selected canonical wrapper trees",
+          "module_fields": [
+            "module_id",
+            "wrapper_scene",
+            "wrapper_sha256",
+            "content_sha256",
+            "boxes"
+          ],
+          "box_fields": [
+            "shape_path",
+            "basis",
+            "origin",
+            "dimensions"
+          ],
+          "policy": "Generated deterministically from current selected BoxShape3D wrappers while recording any finite non-singular composed basis exactly; source-byte hashes are build provenance; pure authorizer consumes a validated immutable projection; exported live loader requires exact materialized path/shape/transform/dimension and normalized-content fingerprint agreement; no missing-source bypass, GLB sidecar substitution, or hardcoded doorway half-depth."
+        },
+        "initial_player_spawn_v1_exact_fields": [
+          "spawn_id",
+          "owner_ship_id",
+          "room_id",
+          "nav_node_id",
+          "local_position"
+        ],
+        "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point, applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery.",
+        "seam_overlap_policy": "Only authenticated open-frame and directly incident floor/corridor-floor join boxes may intersect, and their exact intersection AABB must lie wholly inside the finite envelope formed by clipping contract-selected canonical wrapper boxes to both outward half-spaces. Non-join/opaque/dynamic overlap rejects; no epsilon or global margin; full capsule clearance is independent.",
+        "dock_connections_v1_exact_fields": [
+          "connection_id",
+          "port_type",
+          "slot_index",
+          "host",
+          "mobile"
+        ],
+        "connection_endpoint_exact_fields": [
+          "ship_id",
+          "endpoint_id",
+          "port_id"
+        ],
+        "player_owner_pose_v1_exact_fields": [
+          "owner_ship_id",
+          "location_kind",
+          "local_position",
+          "connection_id",
+          "endpoint_id"
+        ],
+        "boarding_port_states_v1_exact_fields": [
+          "ship_id",
+          "endpoint_id",
+          "barrier_open"
+        ],
+        "allocated_world7_current_keys": [
+          "dock_connections_v1",
+          "player_owner_pose_v1",
+          "boarding_port_states_v1",
+          "aboard_ship_id"
+        ],
+        "allocated_current_forbidden_legacy_keys": [
+          "dock_edges",
+          "player_position",
+          "player_position_in_ship",
+          "opened_ports",
+          "hallucination_summary"
+        ],
+        "player_pose_owner": "WorldSnapshot.player_owner_pose_v1 is sole current authority; RunSnapshot has no pose field in run7.",
+        "legacy_player_pose_policy": "At-home world6 requires exact embedded/top-level equality and explicit aboard owner, then migrates once; away world6 validates and discards finite obsolete home-departure coordinates and migrates only the explicit top-level owner pose.",
+        "legacy_run_admission_matrix": {
+          "raw_gate2_current_run_6": "reject unclosed_owner_graph explicitly after CURRENT_SLICE_VERSION advances; never fall through the older-run adapter",
+          "recognized_pre_v6_direct_run": "retain only the existing strict historical closed-world adapter preconditions",
+          "world_6_home": "require finite exact embedded/top-level position equality and explicit aboard owner; migrate one pose and discard duplicate",
+          "world_6_away": "require finite embedded legacy coordinate, discard it as obsolete, and migrate top-level pose through explicit aboard owner"
+        },
+        "allocated_versions": {
+          "run": "gate2-current-run-7",
+          "world": "world-7",
+          "next_future_rejection": [
+            "gate2-current-run-8",
+            "world-8"
+          ]
+        },
+        "preimplementation_sentinel_state": "R06/P10 still names run7/world7 as future rejection; implementation preserves those artifacts as history and moves active fixtures/sentinels to run8/world8 before making the allocated pair current.",
+        "threshold_owner": "mobile endpoint",
+        "precision_policy": "Preserve the accepted full-precision owner-local pose under an exact central restore receipt; unchanged recapture is bit-exact without epsilon, rounding, or another inverse transform.",
+        "legacy_spatial_policy": "Ship-local carts, floor drops, corpse drops, and station positions remain exact; version-pinned migration transforms visited combat world_position/last_known_position for moved owners and rejects any unprovable world-space field.",
+        "live_spatial_policy": "The docking pre-mutation transaction rebases active/stored combat world_position and last_known_position with the mobile root delta while established ship-local fields inherit the root; unknown world-space owners reject.",
+        "ceiling_collision_bounds": [
+          [
+            -2.0,
+            3.8,
+            -2.0
+          ],
+          [
+            2.0,
+            4.0,
+            2.0
+          ]
+        ],
+        "ceiling_visual_bounds_policy": "Transform-aware visual bounds are independent and retain decorative underside to approximately Y 3.6875.",
+        "authority": "ADR-0017 R10-A amendment, ADR-0065 section 4, and ADR-0059 accepted decisions 44-49"
+      },
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P17 --evidence-dir artifacts/feature-completion/P17",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P17 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/runtime_physical_volume_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "RUNTIME PHYSICAL VOLUME PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/structural_rebuild_collision_query_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "STRUCTURAL REBUILD COLLISION QUERY PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "STRUCTURAL REBUILD CANDIDATE NAV PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_r10a_docking_smokes.py --godot $Godot --root . --evidence-dir artifacts/feature-completion/R10-A",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "R10-A DOCKING PREREQUISITE PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python -m unittest tests.test_structural_rebuild_catalog",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "OK"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "& $Python -m unittest tests.test_runtime_physical_volume_catalog",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "OK"
+            ],
+            "forbidden_output": []
+          }
+        },
+        {
+          "command": "bash tools/classify_orphan_smokes.sh --check",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "ORPHAN CLASSIFICATION CHECK PASS"
+            ],
+            "forbidden_output": []
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P17",
+        "line": 1139
+      }
+    },
+    {
+      "id": "P18",
+      "requirements": [
+        "FC-20"
+      ],
+      "depends_on": [
+        "P17"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/procgen/structural_rebuild_applier.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/procgen/generated_ship_loader.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/slice_atmosphere_applier.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/module_integrity_consequences.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_nav_graph.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/structural_rebuild_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_work_transaction.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p18_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Visual-only replacement or native-generator replacement.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P18 --evidence-dir artifacts/feature-completion/P18",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P18 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/module_integrity_consequences_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "MODULE INTEGRITY CONSEQUENCES PASS fire=true breach_derived=true scene=true nav=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/ship_nav_graph_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SHIP NAV GRAPH PASS nodes="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/slice_atmosphere_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "SLICE ATMOSPHERE PASS ambient=true fog=true away_fog=true key_light=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/physical_travel_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PHYSICAL TRAVEL PASS aboard_lifeboat=true flush=true barrier_closed=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P18",
+        "line": 1351
+      }
+    },
+    {
+      "id": "P19",
+      "requirements": [
+        "FC-22"
+      ],
+      "depends_on": [
+        "P10",
+        "P14",
+        "P15",
+        "P18"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/pillar_persistence.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_runtime.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/run_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_snapshot.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/save_migration_service.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/**",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p19_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Silently discarding unmatched deltas.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P19 --evidence-dir artifacts/feature-completion/P19",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P19 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/pillar_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PILLAR PERSISTENCE PASS integrity=true components=true work=true fuzz=true snapshot=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/pillar_revisit_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/world_persist_restore_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/docking_persistence_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "DOCKING PERSISTENCE PASS dock_edge=true occupancy=true opened_port=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P19",
+        "line": 1383
+      }
+    },
+    {
+      "id": "P20",
+      "requirements": [
+        "FC-21",
+        "FC-22"
+      ],
+      "depends_on": [
+        "P13",
+        "P14",
+        "P19"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/systems/ship_restoration_readiness.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/systems/ship_access_state.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/travel_controller.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/docking_manager.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/ship_instance.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/tools/bridge_terminal.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p20_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Bypassing safe-return or ownership rules.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P20 --evidence-dir artifacts/feature-completion/P20",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P20 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/pilot_switch_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "PILOT SWITCH SMOKE PASS piloted="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/repair_loop_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "REPAIR LOOP PASS opening=true channeled=true persists=true home_intact=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/docking_loop_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "DOCKING LOOP PASS opening=true looped=true persisted=true"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/worldgen_wired_travel_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "WORLDGEN WIRED TRAVEL PASS cases="
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --profile restoration --evidence-dir artifacts/feature-completion/P20-profile",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "feature completion PASS:"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P20",
+        "line": 1421
+      }
+    },
+    {
+      "id": "P21",
+      "requirements": [
+        "FC-11",
+        "FC-17",
+        "FC-18",
+        "FC-19",
+        "FC-20",
+        "FC-21"
+      ],
+      "depends_on": [
+        "P09",
+        "P15",
+        "P20"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/ui/ship_restoration_panel.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/ui/ship_modification_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/work_action_hud_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/ui/recipe_picker_panel.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/playable_generated_ship.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/ui/tutorial_triggers.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/ui/input_glyphs.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/release/localization_catalog.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/fc_p21_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "A separate editor UI or final-art overhaul.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P21 --evidence-dir artifacts/feature-completion/P21",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P21 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P21",
+        "line": 1443
+      }
+    },
+    {
+      "id": "P22",
+      "requirements": [
+        "FC-04",
+        "FC-05",
+        "FC-06",
+        "FC-07",
+        "FC-08",
+        "FC-09",
+        "FC-10",
+        "FC-11",
+        "FC-12",
+        "FC-13",
+        "FC-14",
+        "FC-15",
+        "FC-16",
+        "FC-17",
+        "FC-18",
+        "FC-19",
+        "FC-20",
+        "FC-21",
+        "FC-22"
+      ],
+      "depends_on": [
+        "P10",
+        "P20",
+        "P21"
+      ],
+      "allowlist": [
+        {
+          "path": "scripts/validation/fc_p22_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "docs/game/playtests/feature-completion-restoration-protocol.md",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "data/validation/feature_completion_cases.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/fixtures/feature_completion/**",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Substituting headless helper calls for player evidence.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --case P22 --evidence-dir artifacts/feature-completion/P22",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "FC P22 PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --profile all --evidence-dir artifacts/feature-completion/P22-profile",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "feature completion PASS:"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P22",
+        "line": 1467
+      }
+    },
+    {
+      "id": "P23",
+      "requirements": [
+        "FC-23"
+      ],
+      "depends_on": [
+        "P01",
+        "P02",
+        "G4"
+      ],
+      "allowlist": [
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/05_requirements.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/01-survival-vitals-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/02-food-cooking-spoilage-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/03-crafting-materials-recipes-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/04-loot-ecosystem-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/05-consumables-medicine-stimulants-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/06-combat-threat-ai-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/07-ship-systems-sustenance-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/08-progression-skills-meta-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/09-ui-ux-accessibility-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/10-audio-music-spatial-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/11-save-load-persistence-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/12-procedural-generation-expansion-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/13-distribution-store-postlaunch-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/14-cross-system-integration-review-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/build-plans/15-systems-map-task-graph-update-e2e.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cards.json",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Completion claims for uninspected domains.",
+      "verification": [
+        {
+          "command": "& $Python tools/run_feature_completion.py --godot $Godot --profile all --evidence-dir artifacts/feature-completion/G5",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "feature completion PASS:"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P23",
+        "line": 1489
+      }
+    },
+    {
+      "id": "P24",
+      "requirements": [
+        "FC-24"
+      ],
+      "depends_on": [
+        "G4",
+        "G5"
+      ],
+      "allowlist": [
+        {
+          "path": "export_presets.cfg",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/check_export_pipeline.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/export/build_release.sh",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/export_presets_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/release_readiness_ledger_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/feature_completion_cases.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/export_regression_report.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/release_notes_template.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/performance_baseline.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/performance_profiler.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/windowed_fps_capture.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        }
+      ],
+      "scope_decisions_pending": [],
+      "non_goals": "Publishing, purchasing services, or enabling cloud integrations.",
+      "verification": [
+        {
+          "command": "& $Python tools/check_export_pipeline.py",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "EXPORT PIPELINE CHECK PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/export_presets_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "EXPORT PRESETS PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        },
+        {
+          "command": "& $Godot --headless --path . --script res://scripts/validation/release_readiness_ledger_smoke.gd",
+          "success": {
+            "exit_code": 0,
+            "required_output": [
+              "RELEASE READINESS LEDGER PASS"
+            ],
+            "forbidden_output": [
+              "ERROR:",
+              "WARNING:",
+              "SCRIPT ERROR:"
+            ]
+          }
+        }
+      ],
+      "plan_anchor": {
+        "path": "docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md",
+        "heading": "P24",
+        "line": 1514
+      }
+    }
+  ]
+}

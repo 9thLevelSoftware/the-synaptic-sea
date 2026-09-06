@@ -14,8 +14,12 @@ enum Status {
 }
 
 const DEFAULT_MAX_QUEUE: int = 8
+const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
 
 var station_kind: String = ""       # e.g. "fabricator", "workbench", "kitchen"
+var ship_id: String = ""            # physical owning ship for scheduled work
+var station_instance_id: String = "" # stable physical placement identity
+var active_job_id: String = ""       # scheduler projection; scheduler owns mutation
 var level: int = 0                  # upgrade level (0 = base); mirrors tier when unset
 var tier: int = 0                   # PKG-B2.4b: effective station tier (component-derived)
 var powered: bool = true            # power available
@@ -28,6 +32,9 @@ var max_queue: int = DEFAULT_MAX_QUEUE
 
 func configure(config: Dictionary) -> void:
 	station_kind = str(config.get("station_kind", ""))
+	ship_id = str(config.get("ship_id", ""))
+	station_instance_id = str(config.get("station_instance_id", ""))
+	active_job_id = ""
 	level = maxi(0, int(config.get("level", 0)))
 	tier = maxi(0, int(config.get("tier", level)))
 	powered = bool(config.get("powered", true))
@@ -155,6 +162,9 @@ func get_progress_ratio() -> float:
 
 func get_summary() -> Dictionary:
 	return {
+		"ship_id": ship_id,
+		"station_instance_id": station_instance_id,
+		"active_job_id": active_job_id,
 		"station_kind": station_kind,
 		"level": level,
 		"tier": tier,
@@ -170,7 +180,22 @@ func get_summary() -> Dictionary:
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():
 		return false
+	if summary.has("ship_id") or summary.has("station_instance_id") \
+			or summary.has("active_job_id"):
+		return apply_strict_summary(summary)
 	var changed: bool = false
+	var new_ship_id: String = str(summary.get("ship_id", ship_id))
+	if new_ship_id != ship_id:
+		ship_id = new_ship_id
+		changed = true
+	var new_station_id: String = str(summary.get("station_instance_id", station_instance_id))
+	if new_station_id != station_instance_id:
+		station_instance_id = new_station_id
+		changed = true
+	var new_job_id: String = str(summary.get("active_job_id", active_job_id))
+	if new_job_id != active_job_id:
+		active_job_id = new_job_id
+		changed = true
 	var new_kind: String = str(summary.get("station_kind", station_kind))
 	if new_kind != station_kind:
 		station_kind = new_kind
@@ -216,6 +241,128 @@ func apply_summary(summary: Dictionary) -> bool:
 				queue.append(str(item))
 			changed = true
 	return changed
+
+
+## Current P07 envelope loader. Unlike the legacy apply_summary shim, this
+## requires exact types and validates the complete record before mutation.
+func apply_strict_summary(summary: Dictionary) -> bool:
+	var normalized: Dictionary = _normalize_strict_summary(summary)
+	if normalized.is_empty():
+		return false
+	ship_id = normalized.ship_id
+	station_instance_id = normalized.station_instance_id
+	active_job_id = normalized.active_job_id
+	station_kind = normalized.station_kind
+	level = normalized.level
+	tier = normalized.tier
+	max_queue = normalized.max_queue
+	powered = normalized.powered
+	active_recipe_id = normalized.active_recipe_id
+	progress_seconds = normalized.progress_seconds
+	required_seconds = normalized.required_seconds
+	status = normalized.status
+	queue.clear()
+	for recipe_id in normalized.queue:
+		queue.append(recipe_id)
+	return true
+
+
+func _normalize_strict_summary(summary: Dictionary) -> Dictionary:
+	for key in ["ship_id", "station_instance_id", "active_job_id", "station_kind", "active_recipe_id"]:
+		if typeof(summary.get(key, null)) != TYPE_STRING:
+			return {}
+	for key in ["level", "tier", "max_queue", "status"]:
+		if not _is_nonnegative_json_integer(summary.get(key, null)):
+			return {}
+	if typeof(summary.get("powered", null)) != TYPE_BOOL \
+			or not summary.get("queue", null) is Array:
+		return {}
+	for key in ["progress_seconds", "required_seconds"]:
+		var value: Variant = summary.get(key, null)
+		if (typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT) \
+				or not is_finite(float(value)):
+			return {}
+	var next_ship: String = str(summary.ship_id)
+	var next_station: String = str(summary.station_instance_id)
+	var next_job: String = str(summary.active_job_id)
+	var next_kind: String = str(summary.station_kind)
+	var next_level: int = int(summary.level)
+	var next_tier: int = int(summary.tier)
+	var next_max: int = int(summary.max_queue)
+	var next_status: int = int(summary.status)
+	var next_recipe: String = str(summary.active_recipe_id)
+	var next_progress: float = float(summary.progress_seconds)
+	var next_required: float = float(summary.required_seconds)
+	var raw_queue: Array = summary.queue
+	if next_kind.is_empty() or next_level < 0 or next_tier < 0 \
+			or next_max < 1 or next_max > DEFAULT_MAX_QUEUE \
+			or next_status < Status.IDLE or next_status > Status.PAUSED_NO_MATERIALS \
+			or next_progress < 0.0 or next_required < 0.0 \
+			or next_progress > next_required + 0.0001 or raw_queue.size() > next_max \
+			or next_ship.is_empty() != next_station.is_empty() \
+			or (not next_job.is_empty() and next_ship.is_empty()):
+		return {}
+	var next_queue: Array[String] = []
+	for recipe_variant in raw_queue:
+		if typeof(recipe_variant) != TYPE_STRING or str(recipe_variant).is_empty():
+			return {}
+		next_queue.append(str(recipe_variant))
+	match next_status:
+		Status.IDLE:
+			if not next_recipe.is_empty() or not next_job.is_empty() \
+					or next_progress != 0.0 or next_required != 0.0:
+				return {}
+		Status.CRAFTING, Status.PAUSED_POWER, Status.PAUSED_NO_MATERIALS:
+			if next_recipe.is_empty() or next_required <= 0.0:
+				return {}
+		Status.COMPLETE:
+			if next_recipe.is_empty() or next_required <= 0.0 \
+					or absf(next_progress - next_required) > 0.0001:
+				return {}
+	return {
+		"ship_id": next_ship,
+		"station_instance_id": next_station,
+		"active_job_id": next_job,
+		"station_kind": next_kind,
+		"level": next_level,
+		"tier": next_tier,
+		"max_queue": next_max,
+		"powered": bool(summary.powered),
+		"active_recipe_id": next_recipe,
+		"progress_seconds": next_progress,
+		"required_seconds": next_required,
+		"status": next_status,
+		"queue": next_queue,
+	}
+
+
+static func _is_nonnegative_json_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return is_finite(number) and number >= 0.0 \
+		and number <= MAX_SAFE_JSON_INTEGER and number == floor(number)
+
+
+## Read-only projection of the scheduler authority for existing station UI/status.
+func set_scheduler_projection(job_summary: Dictionary) -> void:
+	if job_summary.is_empty():
+		active_job_id = ""
+		active_recipe_id = ""
+		progress_seconds = 0.0
+		required_seconds = 0.0
+		status = Status.IDLE
+		return
+	active_job_id = str(job_summary.get("job_id", ""))
+	active_recipe_id = str(job_summary.get("recipe_id", ""))
+	progress_seconds = float(job_summary.get("progress_seconds", 0.0))
+	required_seconds = float(job_summary.get("required_seconds", 0.0))
+	match str(job_summary.get("state", job_summary.get("phase", ""))):
+		"running", "queued": status = Status.CRAFTING
+		"paused_power": status = Status.PAUSED_POWER
+		"blocked": status = Status.PAUSED_NO_MATERIALS
+		"output_ready", "collected": status = Status.COMPLETE
+		_: status = Status.IDLE
 
 func get_status_lines() -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()

@@ -1,0 +1,60 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+ERROR: P17 candidate nav: res://data/procgen/golden/coherent_ship_002/layout.json internal classification drift
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:69)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: res://data/procgen/golden/coherent_ship_002/layout.json unresolved classification drift
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:71)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: coherent 002 unresolved edge identity drift
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _assert_fixture (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:80)
+       [2] _test_real_fixture_classification (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:33)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:15)
+ERROR: P17 candidate nav: independent blocker did not survive target overlay
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _test_candidate_paths_and_immutability (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:124)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:16)
+ERROR: P17 candidate nav: closed unlocked portal was treated as open
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _test_candidate_paths_and_immutability (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:127)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:16)
+ERROR: P17 candidate nav: closed normal portal was treated as open
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _test_candidate_paths_and_immutability (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:129)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:16)
+SCRIPT ERROR: Invalid type in function 'evaluate_edge_replacement_paths (via call)' in base 'RefCounted (ShipNavGraph)'. The array of argument 4 (Array) does not have the same element type as the expected typed array argument.
+   at: _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:413)
+   GDScript backtrace (most recent call first):
+       [0] _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:413)
+       [1] _test_fail_closed_mutants (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:168)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:17)
+SCRIPT ERROR: Invalid type in function 'evaluate_edge_replacement_paths (via call)' in base 'RefCounted (ShipNavGraph)'. The array of argument 4 (Array) does not have the same element type as the expected typed array argument.
+   at: _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:413)
+   GDScript backtrace (most recent call first):
+       [0] _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:413)
+       [1] _test_fail_closed_mutants (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:187)
+       [2] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:17)
+ERROR: P17 candidate nav: authored SOLID target closure did not deny egress_blocked: { "ok": true, "reason": "", "scene_authorized": false, "ship_id": "ship/local", "target_module_id": "edge/0|v|1|0", "actor_exit": { "endpoint_id": "endpoint/local-exit", "node_path": ["0:0:0", "0:0:1", "1:0:1", "2:0:1"], "cost": 6.0 }, "local_connection_paths": [{ "connection_id": "connection/host-local", "local_side": "host", "remote_identity": { "ship_id": "foreign/mobile", "endpoint_id": "foreign-node-never-local" }, "endpoint_id": "endpoint/local-exit", "threshold_node_id": "2:0:1", "interior_node_id": "1:0:1", "node_path": ["2:0:1", "1:0:1"], "cost": 2.0 }, { "connection_id": "connection/mobile-local", "local_side": "mobile", "remote_identity": { "ship_id": "foreign/host", "endpoint_id": "another-foreign-node" }, "endpoint_id": "endpoint/local-exit", "threshold_node_id": "2:0:1", "interior_node_id": "1:0:1", "node_path": ["2:0:1", "1:0:1"], "cost": 2.0 }], "overlay": { "edge_key": "0|v|1|0", "node_pair": ["1:0:0", "2:0:0"], "topology_kind": "SOLID", "topology_state": "SOLID", "retained_portal_state": {  } } }
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _expect (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:436)
+       [1] _expect_denial (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:415)
+       [2] _test_fail_closed_mutants (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:200)
+       [3] _init (res://scripts/validation/structural_rebuild_candidate_nav_smoke.gd:17)

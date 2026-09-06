@@ -7,6 +7,23 @@ const DEFAULT_SIZE: float = 22.0
 var follow_target: Node3D
 var offset: Vector3 = DEFAULT_OFFSET
 var camera: Camera3D
+var _current_activation_deferred: bool = false
+var _current_requested: bool = false
+
+
+func configure_restore_staging() -> bool:
+	if is_inside_tree() or camera != null:
+		return false
+	_current_activation_deferred = true
+	return true
+
+
+func activate_deferred_current() -> void:
+	if not _current_activation_deferred:
+		return
+	_current_activation_deferred = false
+	if _current_requested:
+		make_current()
 
 
 func _ready() -> void:
@@ -36,6 +53,9 @@ func _sync_camera_to_target() -> void:
 
 func make_current() -> void:
 	_ensure_camera()
+	_current_requested = true
+	if _current_activation_deferred:
+		return
 	camera.current = true
 
 
@@ -46,5 +66,5 @@ func _ensure_camera() -> void:
 	camera.name = "PlayableIsoCamera"
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = DEFAULT_SIZE
-	camera.current = true
+	camera.current = not _current_activation_deferred
 	add_child(camera)

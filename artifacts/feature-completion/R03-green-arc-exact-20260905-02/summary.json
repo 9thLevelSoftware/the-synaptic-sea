@@ -1,0 +1,22 @@
+{
+  "environment": {
+    "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-green-arc-exact-20260905-02\\user-root",
+    "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-green-arc-exact-20260905-02\\user-root",
+    "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-green-arc-exact-20260905-02\\user-root",
+    "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-green-arc-exact-20260905-02\\user-root"
+  },
+  "probe": {
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "diagnostics": [],
+    "stderr_empty": true
+  },
+  "smoke": {
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "diagnostics": [],
+    "stderr_empty": true
+  }
+}

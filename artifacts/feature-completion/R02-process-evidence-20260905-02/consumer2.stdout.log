@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+PLAYABLE SHIP LOADED sequence=1 position=(4.00,0.00,2.00)
+P10 RESTORE AUTHORITY DIFF world.home_ship.inventory_summary.combat_hotbar_text expected=Weapon: unarmed | Threat: 0.84 | Hostiles: 1 actual=Weapon: unarmed | Threat: 3.00 | Hostiles: 1

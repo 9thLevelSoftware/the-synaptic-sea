@@ -1,0 +1,12 @@
+{
+	"manifest_version": "cloud-manifest-1",
+	"device_id": "46de2e95e2c638f8",
+	"build_id": "",
+	"schema_version": "world-6",
+	"payload_sha256": "fd49cf499d8f9171d8651e176427d9872c4c37c614a2b05031c83b5a185353d3",
+	"payload_size_bytes": 78988,
+	"created_at": "2026-09-06T03:15:59",
+	"sync_eligible": true,
+	"cloud_provider": "stub",
+	"slot_id": "world"
+}

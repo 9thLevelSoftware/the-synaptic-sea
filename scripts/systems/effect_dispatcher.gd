@@ -33,8 +33,14 @@ func dispatch_inline(effect_id: String, definition: Dictionary, context: Diction
 			var vitals = context.get("vitals_state", null)
 			if vitals == null or not vitals.has_method("apply_delta"):
 				return _missing_target(effect_id, "vitals_state")
+			# P05 medicine passes this explicit context key. Only positive healing is
+			# quality-scaled; hunger, stamina, and harmful deltas retain their normal
+			# contracts.
+			var health_delta: float = float(definition.get("health", 0.0))
+			if health_delta > 0.0 and context.has("quality_potency_mult"):
+				health_delta *= maxf(0.1, float(context.get("quality_potency_mult", 1.0)))
 			vitals.apply_delta({
-				"health": float(definition.get("health", 0.0)),
+				"health": health_delta,
 				"stamina": float(definition.get("stamina", 0.0)),
 				"hunger": float(definition.get("hunger", 0.0)),
 				"thirst": float(definition.get("thirst", 0.0)),

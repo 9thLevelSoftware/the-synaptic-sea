@@ -1,13 +1,19 @@
 extends Area3D
 class_name WorkYieldDrop
 
+const ItemLotLedgerScript := preload("res://scripts/systems/item_lot_ledger.gd")
+const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
+
 ## Floor drop for WorkAction yields that could not fit the cart (overload).
 ## Interact once to scoop items into InventoryState; then free.
 
 signal scooped(drop_id: String, granted: Dictionary)
 
 var drop_id: String = ""
-var items: Dictionary = {}  # item_id -> qty
+var owning_ship_id: String = ""
+var _lot_ledger
+var items: Dictionary:
+	get: return _lot_ledger.get_quantities() if _lot_ledger != null else {}
 var inventory_state = null
 var interaction_radius: float = 1.8
 var scooped_flag: bool = false
@@ -32,9 +38,15 @@ func configure(
 		p_items: Dictionary,
 		p_inventory_state,
 		world_position: Vector3,
-		radius: float = 1.8) -> void:
+		radius: float = 1.8,
+		p_owning_ship_id: String = "") -> void:
 	drop_id = p_drop_id
-	items = p_items.duplicate(true)
+	owning_ship_id = p_owning_ship_id
+	_lot_ledger = ItemLotLedgerScript.new({}, "floor:%s" % p_drop_id)
+	var ids: Array = p_items.keys()
+	ids.sort()
+	for item_id in ids:
+		_lot_ledger.add_standard(str(item_id), int(p_items[item_id]))
 	inventory_state = p_inventory_state
 	interaction_radius = radius
 	scooped_flag = false
@@ -43,6 +55,56 @@ func configure(
 	set_meta("work_yield_drop", true)
 	_ensure_collision(radius)
 	_ensure_marker()
+
+## Restores a dropped holder without reducing its lots to aggregate quantities.
+func configure_lots(p_drop_id: String, lot_summary: Dictionary, p_inventory_state, world_position: Vector3, radius: float = 1.8, p_owning_ship_id: String = "") -> bool:
+	_lot_ledger = ItemLotLedgerScript.new({}, "floor:%s" % p_drop_id)
+	if not _lot_ledger.apply_summary(lot_summary, "floor:%s" % p_drop_id):
+		return false
+	drop_id = p_drop_id
+	owning_ship_id = p_owning_ship_id
+	inventory_state = p_inventory_state
+	interaction_radius = radius
+	scooped_flag = false
+	position = world_position
+	name = "WorkYieldDrop_%s" % drop_id
+	set_meta("work_yield_drop", true)
+	_ensure_collision(radius)
+	_ensure_marker()
+	return true
+
+func get_quantity(item_id: String) -> int:
+	return _lot_ledger.get_quantity(item_id)
+
+func get_acceptable_quantity(_item_id: String, qty: int) -> int:
+	# Floor piles have no mass policy. Their ledger remains the authoritative
+	# per-item stack guard when the complete incoming lot is deposited.
+	return maxi(0, qty)
+
+func take_lots(item_id: String, qty: int, preferred_ids: PackedStringArray = PackedStringArray()) -> Array:
+	return _lot_ledger.take_lots(item_id, qty, preferred_ids)
+
+func add_lot(lot: Dictionary) -> int:
+	return _lot_ledger.add_lot(lot)
+
+func get_lot_summary() -> Dictionary:
+	return _lot_ledger.get_summary()
+
+func get_persistence_descriptor() -> Dictionary:
+	if drop_id.is_empty() or owning_ship_id.is_empty() or _lot_ledger == null:
+		return {}
+	var value: Transform3D = transform
+	return {
+		"drop_id": drop_id,
+		"ship_id": owning_ship_id,
+		"transform": [
+			value.basis.x.x, value.basis.x.y, value.basis.x.z,
+			value.basis.y.x, value.basis.y.y, value.basis.y.z,
+			value.basis.z.x, value.basis.z.y, value.basis.z.z,
+			value.origin.x, value.origin.y, value.origin.z,
+		],
+		"item_lots_v1": _lot_ledger.get_summary(),
+	}
 
 
 func set_validation_player_in_range(player_body: Node) -> void:
@@ -62,26 +124,20 @@ func try_interact(player_body: Node) -> bool:
 	if candidate_player != player_body and not _in_range(player_body):
 		return false
 	var granted: Dictionary = {}
-	for item_id in items.keys():
-		var qty: int = int(items[item_id])
+	var item_ids: Array = items.keys()
+	item_ids.sort()
+	for item_id in item_ids:
+		var qty: int = get_quantity(str(item_id))
 		if qty <= 0:
 			continue
-		var added: int = 0
-		if inventory_state.has_method("add_item"):
-			added = int(inventory_state.call("add_item", str(item_id), qty))
+		var added: int = CargoTransferScript.move_item(self, inventory_state, str(item_id), qty)
 		if added > 0:
 			granted[str(item_id)] = added
-			items[item_id] = qty - added
 	if granted.is_empty():
 		# Inventory full / cannot accept — leave drop in place for later scoop.
 		return false
 	# Clear fully taken stacks; keep residual for partial scoops.
-	var remaining: Dictionary = {}
-	for item_id2 in items.keys():
-		var left: int = int(items[item_id2])
-		if left > 0:
-			remaining[str(item_id2)] = left
-	items = remaining
+	var remaining: Dictionary = items
 	if remaining.is_empty():
 		scooped_flag = true
 		scooped.emit(drop_id, granted)

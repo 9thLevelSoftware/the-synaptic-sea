@@ -1,0 +1,4 @@
+fc-p13 exit=1 marker=0 diag=0 stderr=0
+manual-load exit=0 marker=1 diag=0 stderr=0
+title-query exit=0 marker=1 diag=0 stderr=0
+world-save exit=0 marker=1 diag=0 stderr=0

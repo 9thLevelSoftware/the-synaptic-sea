@@ -182,6 +182,18 @@ on every run.
 - Encounter markers are loaded once at scene load and not
   persisted (the layout JSON they came from is what persists).
 
+## Acceptance criteria
+
+Mapped to existing requirement rows: `REQ-PG-001`, `REQ-PG-007`, `REQ-PG-012`.
+
+- **Gameplay:** Extended generation selects deterministically from at least six authored topology variants while preserving the legacy three-template contract when extended selection is disabled.
+- **Gameplay:** Every room receives a deterministic role-compatible variant from blueprint seed, role hash, and room index.
+- **Gameplay:** Each generated ship carries an authored biome and difficulty profile whose hazard, loot, and encounter modifiers compose multiplicatively and clamp to `[0.0, 3.0]`.
+- **Gameplay:** Encounter injection visits non-critical rooms only and emits deterministic authored spawn markers; an empty encounter list remains valid under the documented standard conditions.
+- **Gameplay:** Repeating the full pipeline with the same seed, archetype, biome, and difficulty produces byte-identical layout JSON and a stable FNV-1a fingerprint.
+- **Gameplay:** Layout and gameplay-slice JSON retain biome, difficulty, kit, room variants, and encounter markers without adding layout-time fields to `RunSnapshot`.
+- **Constraint:** This package adds no new art, combat runtime, hub/meta progression, HUD rebuild, or 1.1.0-to-1.2.0 migration tool.
+
 ## Verification
 
 Focused package smokes:

@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+FC P13 FAIL: same-generation stale target chose wrong module: { "work_id": "ship_0:0:0/cut_wall:2", "ship_id": "ship_0:0:0", "target_id": "edge/0|v|3|3", "target_kind": "module", "target_revision": "ship_0:0:0|binding:1|edge/0|v|3|3|intact|0.80000", "action_id": "cut_wall", "source_holder_id": "player:1974166-e1b4", "selected_lot_ids": [], "replacement_catalog_id": "", "payload": {  }, "state": "active", "escrow": [], "requirements": {  }, "progress": 0.0, "commit_receipt_id": "", "receipt": {  }, "last_reason": "" }

@@ -1,0 +1,15 @@
+{
+  ".superpowers/sdd/2026-09-05-remaining-feature-completion/r04_run_traversal_diagnostic.py": "bcae99d0df5c3a9f6a6d771f63e131c6c9b520eb9cb525d1a255528f0d9d1cd2",
+  ".superpowers/sdd/2026-09-05-remaining-feature-completion/r04_traversal_diagnostic.gd": "ee3b3989f64ecada801cd73b938344b9dd809c366a8d9cb3ddb9432c57881475",
+  "data/procgen/golden/coherent_ship_001/layout.json": "3740674ff7e0d51d4df4e969ebf272190e03307dbb6242c06f4006789f76bb89",
+  "docs/game/adr/0017-physical-docking-and-ports.md": "5bdbe54eab9f347fe3f2f872c15b9300e3509ef7e963fc40c75dfbd2c798c2b2",
+  "scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn": "517d909f25f25ed63a652d377dbe00530e68c485b8ecc12448894b3d89325279",
+  "scripts/player/player_controller.gd": "97085f19eac1c608a439c4697c00d952645da80dd28ca00f0916a88960cb9c0f",
+  "scripts/procgen/life_boat.gd": "783eeb0926f44aa6a09f98249f2cfd97ad58d0f21d433f58e02ebe3a13a0bf67",
+  "scripts/procgen/playable_generated_ship.gd": "da89faccd8adec93b8c91ff26f5411fb54257aaa62c99d82898b067ac964c482",
+  "scripts/systems/dock_ports.gd": "d0e6e23988877696e577cd021653aebf0f491601f2774e71039f8ac86c5e3a42",
+  "scripts/systems/docking_manager.gd": "eeed3c3d74068e5eb2d70eff517693e3381ea6ec5fed3c0db6333986ed042aa2",
+  "scripts/validation/fc_p09_natural_route_smoke.gd": "74649d0dee6e7a1f96cf7d9c2627c6dc76e81f55b90210638a403a74ae6754a1",
+  "scripts/validation/fc_p10_process_smoke.gd": "a41db13d86549be9f4ae89751ae718d38270e4d17553981169e677c1d497f855",
+  "tools/run_feature_completion.py": "c7aa933ca986f87798f1ee805c32c0eeda7bbe2421fe0229b17a43d80c2a2496"
+}

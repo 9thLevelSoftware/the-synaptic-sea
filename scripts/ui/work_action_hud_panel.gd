@@ -7,6 +7,8 @@ class_name WorkActionHudPanel
 const PANEL_COLOR: Color = Color(0.05, 0.08, 0.06, 0.88)
 const PANEL_BORDER_COLOR: Color = Color(0.95, 0.65, 0.2, 0.75)
 
+signal cancel_requested
+
 var _open: bool = false
 var _action_id: String = ""
 var _target_id: String = ""
@@ -14,7 +16,8 @@ var _verb: String = ""
 var _progress: float = 0.0
 var _status: String = "idle"
 var _noise: float = 0.0
-var _hint: String = "Hold to work · release to cancel"
+var _hint: String = "Hold to work · release to pause"
+var _reserved_lines: PackedStringArray = PackedStringArray()
 
 var _title_label: Label
 var _body_label: Label
@@ -82,9 +85,16 @@ func set_work_state(state: Dictionary) -> void:
 	_progress = clampf(float(state.get("progress", 0.0)), 0.0, 1.0)
 	_status = str(state.get("status", "idle"))
 	_noise = maxf(0.0, float(state.get("noise", 0.0)))
+	_reserved_lines.clear()
+	var reserved_v: Variant = state.get("reserved", {})
+	if reserved_v is Dictionary:
+		var reserved_ids: Array = (reserved_v as Dictionary).keys()
+		reserved_ids.sort()
+		for item_v in reserved_ids:
+			_reserved_lines.append("%s x%d" % [str(item_v), int((reserved_v as Dictionary)[item_v])])
 	if state.has("hint"):
 		_hint = str(state.get("hint"))
-	if _status == "active" or _status == "completed":
+	if _status in ["active", "paused", "completed", "ready"]:
 		open()
 	elif _status == "idle" or _status == "interrupted" or _status == "blocked":
 		if _status == "idle":
@@ -121,9 +131,15 @@ func get_status_lines() -> PackedStringArray:
 	lines.append("Progress: %s %d%%" % [bar, int(round(_progress * 100.0))])
 	if _noise > 0.0:
 		lines.append("Noise: %.2f" % _noise)
-	if not _hint.is_empty() and _status == "active":
+	if not _reserved_lines.is_empty():
+		lines.append("Reserved: %s" % ", ".join(_reserved_lines))
+	if not _hint.is_empty() and _status in ["active", "paused"]:
 		lines.append(_hint)
 	return lines
+
+
+func request_cancel() -> void:
+	cancel_requested.emit()
 
 
 func _progress_bar(ratio: float) -> String:

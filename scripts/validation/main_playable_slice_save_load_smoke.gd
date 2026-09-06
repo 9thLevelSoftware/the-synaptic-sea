@@ -13,7 +13,6 @@ extends SceneTree
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 600
-const POSITION_TOLERANCE: float = 0.01
 
 var main_node: Node
 var frame_count: int = 0
@@ -104,12 +103,17 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not playable.request_load():
 		_fail("request_load returned false")
 		return
+	playable = _find_playable(main_node)
+	if playable == null or playable != main_node.get("playable_instance"):
+		_fail("load did not publish and rebind the replacement playable")
+		return
+	service = playable.get_save_load_service()
 	if playable.get_current_objective_sequence() != 2:
 		_fail("loaded sequence=%d expected 2" % playable.get_current_objective_sequence())
 		return
 	var loaded_pos: Vector3 = playable.player.global_position
-	if loaded_pos.distance_to(saved_pos) > POSITION_TOLERANCE:
-		_fail("loaded position distance=%f > tolerance" % loaded_pos.distance_to(saved_pos))
+	if loaded_pos != saved_pos:
+		_fail("loaded position changed expected=%s actual=%s" % [saved_pos, loaded_pos])
 		return
 	var ship_summary: Dictionary = playable.get_ship_systems_summary()
 	if not bool(ship_summary.get("emergency_supplies_recovered", false)):

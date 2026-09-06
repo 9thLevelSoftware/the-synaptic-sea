@@ -1,0 +1,5 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+BAD 0|h|3|4 { "cell": [4.0, 3.0], "deck": 0.0, "direction": "south", "edge_key": "0|h|3|4", "exterior": false, "id": "edge:0|h|3|4", "key": "0|h|3|4", "kind": "OPEN", "module_id": "", "opposite_direction": "north", "other_room": "storage_09", "owner_room": "storage_09", "placement_required": false, "portal": false, "position": [16.0, 0.0, 14.0], "room_ids": ["storage_09", "storage_09"], "socket_bindings": [], "source_cells": [[4.0, 3.0, 0.0], [4.0, 4.0, 0.0]], "state": "OPEN", "variant": "damaged", "wrapper_required": false, "yaw_degrees": 0.0 }
+ cell [4.0, 3.0, 0.0] types 3 3 3 valid true
+ cell [4.0, 4.0, 0.0] types 3 3 3 valid true

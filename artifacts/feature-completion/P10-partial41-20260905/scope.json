@@ -1,0 +1,19 @@
+{
+  "scope": "partial P10 matrix only",
+  "full_p10_accepted": false,
+  "covered": [
+    "ordinary away station catchup and collect",
+    "away field pin exact lot through two scene replacements",
+    "revisit and ordinary floor collection once"
+  ],
+  "pending": [
+    "fresh processes",
+    "production component moves",
+    "complete terminal and rollback matrix",
+    "integration regressions"
+  ],
+  "hashes": {
+    "fc_p10_smoke.log": "d3d5923bc2a8145587625cea0b1176b66b968c85b16f00ec1186149903f82314",
+    "runtime_manifest.sha256": "38164f3f10946781eaf8f89c8bc400be7f0936ba7ebe4635fda3213e861099f7"
+  }
+}

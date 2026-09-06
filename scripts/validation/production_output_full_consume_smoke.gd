@@ -42,7 +42,8 @@ func _validate() -> void:
 
 	# Fill scrap_metal to max if produce is scrap; use purified_water max for recycler.
 	# Safer: force can_accept false by filling produce stack.
-	playable.inventory_state.items["purified_water"] = 20  # max_stack
+	playable.inventory_state.remove_item("purified_water", playable.inventory_state.get_quantity("purified_water"))
+	playable.inventory_state.add_item("purified_water", 20)  # max_stack
 	# Hydro harvestable with produce purified_water or similar.
 	var hydro = ProductionStationScript.new()
 	playable.add_child(hydro)

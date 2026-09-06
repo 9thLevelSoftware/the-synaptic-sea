@@ -1,0 +1,8 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+ERROR: FC P10 PROCESS FAIL: APPDATA escaped the unique runner directory actual=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-world-fixture-check-20260905-01/owned-user/appdata expected=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R03-world-fixture-check-20260905-01/owned-user
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p10_process_smoke.gd:738)
+       [1] _all_user_environment_roots_match (res://scripts/validation/fc_p10_process_smoke.gd:726)
+       [2] _initialize (res://scripts/validation/fc_p10_process_smoke.gd:21)

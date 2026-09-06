@@ -1,0 +1,37 @@
+{
+  "schema_version": "reviewed-criterion-supersessions-v1",
+  "program": "crafting-derelict-feature-completion",
+  "reviewed_supersessions": [
+    {
+      "stable_criterion_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+      "source": {
+        "path": "docs/game/05_requirements.md",
+        "heading": "REQ-SMOD-001"
+      },
+      "original": {
+        "criterion": "Catalog-linked installs restore hub ship-system sub floor; uninstall damages the sub.",
+        "natural_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "criterion_fingerprint": "ca2c7292b2639e65d66a3ccb3f6dfeda65a924a1b16c6f411f33b4b6454996cc"
+      },
+      "replacement": {
+        "criterion": "Catalog-linked installs connect the installed lot's preserved condition to the hub ship-system subcomponent; dismounting the last provider disconnects it without changing intrinsic health or item condition.",
+        "natural_id": "REQ-SMOD-001::acceptance-24253a746be5",
+        "criterion_fingerprint": "a4d1e10d64d29fbfe185be8cb8fac3cf95c98f2748a943f453739001caa1fea2"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-05"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "requirement",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "denominator_delta": 0
+      }
+    }
+  ]
+}

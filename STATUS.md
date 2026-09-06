@@ -1,16 +1,68 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-09-06
 
-## Active milestone: Vertical Slice v1
+**Execution paused at the user's request.** Resume from the
+[2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md).
+The checkpoint preserves integrated WIP and portable task evidence; it is not
+feature-complete or independently approved as a whole. R10-A's latest focused
+home/away production traversal checks pass, but its final combined qualification,
+paired run7/world7 migration and independent review remain pending. Continue
+only after the user explicitly resumes.
+
+## Current feature-completion program
+
+The approved feature-completion program is active. Its scope is the
+[2026-09-04 execution plan](docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md)
+and [crafting/derelict feature specification](docs/game/features/crafting_derelict_feature_completion.md).
+The frozen acceptance authority is
+[`docs/game/inventory/feature_acceptance.json`](docs/game/inventory/feature_acceptance.json):
+668 recorded source rows, including 11 explicit deferrals; reviewed aliases yield a
+frozen denominator of 622 active criteria.
+
+The overall P00-P24 program remains in progress; accepted implementation slices are
+recorded in the plan, and full canonical and player acceptance remain pending. No
+task-level result, focused smoke membership, or historical milestone claim constitutes
+full canonical-program acceptance. In particular, P09 and P10 are not accepted merely
+because their focused smokes are classified.
+
+Current verified progress (2026-09-05): the isolated P00 baseline passed all 652
+canonical commands and its native-generation probe, supporting ADR-0060's Windows
+Godot 4.7.2 validation decision. Later execution-worktree changes still require the
+complete regression run.
+
+P09 proves crafted quality changes actual timed work. A discovery run using repaired
+travel systems found the genuine schematic lot `loot:-2:-2:1:container_53:000` in
+`salvage_engineering`; the natural schematic and donor acquisition journey remains
+open. R02/R03 persistence closure has passed independent review of its retained
+source packages, including adversarial ownership/escrow cases, actual manual,
+quick, auto and title load paths, and a fresh three-process exact-recapture proof.
+The complete integrated regression and product acceptance still remain pending.
+R06 physical-work ownership has passed independent review after two fix rounds,
+including canonical live target range, fresh attendance, complete production
+denial side-effect checks, and the required direct snapshot regression. R04 natural crafting remains blocked by
+confirmed docking geometry and ceiling collision defects; R10-A scopes their
+correction before that journey resumes. The economy checker component has passed
+independent review, while its final production proof pin remains blocked until
+R05 qualification after reviewed rebuild integration.
+
+P17's query and physical-volume helper both pass in the full project. The helper's
+full-project evidence artifact is retained at
+`artifacts/feature-completion/P17-physical-shared-20260905/summary.json`.
+Live cart/component bindings, registered docking routes, ownership-bound candidate
+navigation, paid rebuild application, and end-to-end acceptance remain unfinished.
+The separately retained candidate-navigation smoke is pure helper evidence only.
+
+## Historical milestone: Vertical Slice v1 (as of 2026-08-11)
 
 - Contract: [`docs/game/features/vertical_slice_v1.md`](docs/game/features/vertical_slice_v1.md)
-- State: **pre-polish mechanical bar COMPLETE**; current work is productization (presentation/content/onboarding/demo), **not new simulation domains**.
+- Historical state: **pre-polish mechanical bar COMPLETE**; work was framed as
+  productization (presentation/content/onboarding/demo), **not new simulation domains**.
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
 
-## What this project actually is
+## Historical project description (as of 2026-08-11)
 
 A locked-isometric 3D space-horror **deep survival sim** (Godot 4.6.2, GDScript) — a
 "Project Zomboid in space." It is **pre-alpha with all 18 simulation loops closed**
@@ -18,14 +70,15 @@ A locked-isometric 3D space-horror **deep survival sim** (Godot 4.6.2, GDScript)
 polish, and the documented deferrals below. It is **not** a shipped release, despite
 what the archived "Gate 5 RC" docs claim.
 
-- **Project root (this machine):** `C:/Users/dasbl/Documents/The Synaptic Sea`
-- **Godot binary:** `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`
-- **This is a git repo** (branch `main`). Ignore any doc that says otherwise.
+- Historical project root on that machine: `C:/Users/dasbl/Documents/The Synaptic Sea`
+- Historical Godot binary: `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`
+- Historical checkout state: git branch `main`.
 
 ## Canonical status docs (trust these)
 
 | Doc | What it tells you |
 | --- | --- |
+| **`docs/game/inventory/feature_acceptance.json`** + **`docs/superpowers/plans/2026-09-04-crafting-derelict-feature-completion.md`** | Current feature-completion acceptance authority and execution scope. Historical inventory grades do not substitute for these criteria or fresh runtime and player evidence. |
 | **`docs/game/inventory/SYSTEM_INVENTORY.md`** + **`docs/game/inventory/system_map.html`** | **Canonical status doc.** Code-verified inventory of every runtime system/subsystem — model/reachable/driven/coupling grades with a derived completion %, plus a loop-closure + integration matrix. Generated from `system_inventory.json` by `tools/build_system_inventory.py`; the `--check` smoke fails if data/docs drift. Open `system_map.html` for the interactive card-grid + matrix view. |
 | `docs/game/system_completion_audit.md` | **Superseded — see inventory.** The earlier narrative loop-closure pass; kept for history but no longer the canonical grade source. |
 | `docs/game/integration_debt.md` | Reachability ledger — which scripts are actually mounted in the live run. |

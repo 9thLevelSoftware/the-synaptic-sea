@@ -6,12 +6,19 @@ const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 
+const CARDINAL_DIRS: Array[Vector2i] = [
+	Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0),
+]
+
 var seed17_room_count: int = 0
 var seed17_occupied_cell_count: int = 0
 var seed17_portal_count: int = 0
 var seed17_compiler_error_count: int = 0
 
 func _initialize() -> void:
+	if not _check_connector_growth_geometry_probes():
+		quit(1)
+		return
 	var generator: ShipLayoutGeneratorScript = ShipLayoutGeneratorScript.new()
 	var templates: Array[String] = ["spine", "bifurcated", "stacked"]
 	var total: int = 0
@@ -93,9 +100,10 @@ func _check_seed_17_structural_contract(layout: Dictionary, label: String) -> bo
 		if not room.has("footprint"):
 			push_error("STRESS FAIL %s seed=17 room %s has no footprint" % [label, str(room.get("id", "?"))])
 			return false
-		var footprint: Variant = room.get("footprint", null)
-		if not (footprint is Vector2i) or int((footprint as Vector2i).x) * int((footprint as Vector2i).y) != (cells as Array).size():
-			push_error("STRESS FAIL %s seed=17 room %s footprint/cell count mismatch" % [label, str(room.get("id", "?"))])
+		var geometry: Dictionary = _validate_room_cell_geometry(cells, room.get("footprint", null))
+		if not bool(geometry.get("ok", false)):
+			push_error("STRESS FAIL %s seed=17 room %s invalid cell geometry: %s" % [
+				label, str(room.get("id", "?")), str(geometry.get("reason", "unknown"))])
 			return false
 		var room_cell_coordinates: Dictionary = {}
 		for cell_variant in cells:
@@ -155,6 +163,8 @@ func _check_seed_17_structural_contract(layout: Dictionary, label: String) -> bo
 			if not room_cell_coordinates.has(floor_key):
 				push_error("STRESS FAIL %s seed=17 room %s emitted unowned floor %s" % [label, str(room.get("id", "?")), floor_key])
 				return false
+	if label == "bifurcated" and not _check_seed_17_bifurcated_connector_growth(layout):
+		return false
 	seed17_occupied_cell_count = ownership.size()
 
 	var structural_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(layout)
@@ -246,6 +256,108 @@ func _check_seed_17_structural_contract(layout: Dictionary, label: String) -> bo
 			push_error("STRESS FAIL %s seed=17 portal %s is missing its unique edge placement" % [label, portal_edge_key])
 			return false
 	return true
+
+
+# ADR-0053 / REQ-ENC-001 permit connector-grown rooms whose occupied cells do
+# not fill their axis-aligned bounding rectangle. Footprint is therefore the
+# exact positive bounding box, while cells remain the structural authority.
+func _validate_room_cell_geometry(cells_variant: Variant, footprint_variant: Variant) -> Dictionary:
+	if not (cells_variant is Array) or (cells_variant as Array).is_empty():
+		return {"ok": false, "reason": "empty cells"}
+	if not (footprint_variant is Vector2i):
+		return {"ok": false, "reason": "footprint is not Vector2i"}
+	var footprint: Vector2i = footprint_variant
+	if footprint.x <= 0 or footprint.y <= 0:
+		return {"ok": false, "reason": "footprint is not positive"}
+	var cells: Array = cells_variant
+	var owned: Dictionary = {}
+	var min_x: int = 2147483647
+	var min_y: int = 2147483647
+	var max_x: int = -2147483648
+	var max_y: int = -2147483648
+	for cell_variant in cells:
+		if not (cell_variant is Vector2i):
+			return {"ok": false, "reason": "non-integer cell"}
+		var cell: Vector2i = cell_variant
+		if owned.has(cell):
+			return {"ok": false, "reason": "duplicate cell"}
+		owned[cell] = true
+		min_x = mini(min_x, cell.x)
+		min_y = mini(min_y, cell.y)
+		max_x = maxi(max_x, cell.x)
+		max_y = maxi(max_y, cell.y)
+	var derived_footprint: Vector2i = Vector2i(max_x - min_x + 1, max_y - min_y + 1)
+	if footprint != derived_footprint:
+		return {"ok": false, "reason": "footprint is not exact derived bbox"}
+	var reachable: Dictionary = {}
+	var frontier: Array[Vector2i] = [cells[0]]
+	reachable[cells[0]] = true
+	while not frontier.is_empty():
+		var current: Vector2i = frontier.pop_front()
+		for direction in CARDINAL_DIRS:
+			var neighbor: Vector2i = current + direction
+			if owned.has(neighbor) and not reachable.has(neighbor):
+				reachable[neighbor] = true
+				frontier.append(neighbor)
+	if reachable.size() != owned.size():
+		return {"ok": false, "reason": "cells are not 4-connected"}
+	return {"ok": true, "origin": Vector2i(min_x, min_y), "footprint": derived_footprint}
+
+
+func _check_connector_growth_geometry_probes() -> bool:
+	var irregular_cells: Array[Vector2i] = [
+		Vector2i(5, 1), Vector2i(5, 3), Vector2i(6, 1), Vector2i(6, 2), Vector2i(6, 3),
+	]
+	if not bool(_validate_room_cell_geometry(irregular_cells, Vector2i(2, 3)).get("ok", false)):
+		push_error("STRESS FAIL connector-growth irregular 5-cell geometry rejected")
+		return false
+	if bool(_validate_room_cell_geometry([Vector2i(0, 0), Vector2i(0, 0)], Vector2i(1, 1)).get("ok", false)):
+		push_error("STRESS FAIL connector-growth duplicate-cell probe accepted")
+		return false
+	if bool(_validate_room_cell_geometry([Vector2i(0, 0), Vector2i(2, 0)], Vector2i(3, 1)).get("ok", false)):
+		push_error("STRESS FAIL connector-growth disconnected-cell probe accepted")
+		return false
+	if bool(_validate_room_cell_geometry([Vector2i(0, 0)], Vector2i(-1, 1)).get("ok", false)):
+		push_error("STRESS FAIL connector-growth negative-bbox probe accepted")
+		return false
+	return true
+
+
+func _check_seed_17_bifurcated_connector_growth(layout: Dictionary) -> bool:
+	var expected_cells: Dictionary = {
+		Vector2i(5, 1): true, Vector2i(5, 3): true, Vector2i(6, 1): true,
+		Vector2i(6, 2): true, Vector2i(6, 3): true,
+	}
+	for room_variant in layout.get("rooms", []):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		if str(room.get("id", "")) != "corridor_04":
+			continue
+		var cells: Array = room.get("cells", [])
+		if cells.size() != 5 or room.get("footprint", Vector2i.ZERO) != Vector2i(2, 3):
+			push_error("STRESS FAIL bifurcated seed=17 corridor_04 lost the deterministic irregular 5-cell bbox")
+			return false
+		for cell_variant in cells:
+			if not (cell_variant is Vector2i) or not expected_cells.has(cell_variant):
+				push_error("STRESS FAIL bifurcated seed=17 corridor_04 cell set changed")
+				return false
+		# The hole is deliberately not owned by corridor_04. Global ownership is
+		# checked above; another room may legally share this bounding-box area.
+		if expected_cells.has(Vector2i(5, 2)):
+			push_error("STRESS FAIL bifurcated seed=17 connector-growth proof defines its hole as occupied")
+			return false
+		for cell_variant in cells:
+			if cell_variant == Vector2i(5, 2):
+				push_error("STRESS FAIL bifurcated seed=17 corridor_04 connector-growth hole was filled")
+				return false
+		var actual_footprint: Vector2i = room.get("footprint", Vector2i.ZERO)
+		if (room.get("cells", []) as Array).size() == actual_footprint.x * actual_footprint.y:
+			push_error("STRESS FAIL bifurcated seed=17 corridor_04 no longer proves a non-rectangular connector-grown cell set")
+			return false
+		return true
+	push_error("STRESS FAIL bifurcated seed=17 corridor_04 missing connector-growth proof room")
+	return false
 
 
 func _integer_cell(raw_cell: Variant) -> Dictionary:

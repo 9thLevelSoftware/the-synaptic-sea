@@ -1,0 +1,32 @@
+{
+  "id": "p13-ship-mod-inventory-sync-away",
+  "scope": "focused",
+  "script": "scripts/validation/ship_mod_inventory_sync_away_smoke.gd",
+  "marker": "SHIP MOD INVENTORY SYNC AWAY PASS away=true install=true uninstall=true inv=true",
+  "player_accepted": false,
+  "passed": true,
+  "reason": "passed",
+  "exit_code": 0,
+  "duration_seconds": 3.719,
+  "diagnostics": [],
+  "cleanup_error": null,
+  "stdout_log": "p13-ship-mod-inventory-sync-away.stdout.log",
+  "stderr_log": "p13-ship-mod-inventory-sync-away.stderr.log",
+  "containment_probe": {
+    "passed": true,
+    "reason": "passed",
+    "exit_code": 0,
+    "timed_out": false,
+    "cleanup_error": null,
+    "duration_seconds": 2.016,
+    "marker_count": 1,
+    "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-02/user-data/p13-ship-mod-inventory-sync-away/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-02/user-data/p13-ship-mod-inventory-sync-away/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P13-focused-final-20260906-02/user-data/p13-ship-mod-inventory-sync-away",
+    "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P13-focused-final-20260906-02\\user-data\\p13-ship-mod-inventory-sync-away",
+    "diagnostics": [],
+    "unexpected_stdout": [],
+    "unexpected_stderr": [],
+    "stdout_log": "p13-ship-mod-inventory-sync-away.probe.stdout.log",
+    "stderr_log": "p13-ship-mod-inventory-sync-away.probe.stderr.log"
+  },
+  "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P13-focused-final-20260906-02\\user-data\\p13-ship-mod-inventory-sync-away"
+}

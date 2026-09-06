@@ -136,9 +136,19 @@ func _instantiate_gameplay(should_load: bool) -> void:
 	_failure_handled = false
 	main_node = MAIN_SCENE.instantiate()
 	add_child(main_node)
+	if main_node.has_signal("playable_instance_replaced") \
+			and not main_node.playable_instance_replaced.is_connected(_on_playable_instance_replaced):
+		main_node.playable_instance_replaced.connect(_on_playable_instance_replaced)
 	if is_instance_valid(menu_panel):
 		menu_panel.visible = false
 	_poll_for_playable_started(should_load)
+
+
+func _on_playable_instance_replaced(
+		_previous: PlayableGeneratedShip,
+		current: PlayableGeneratedShip) -> void:
+	playable_instance = current
+	_poll_for_playable_started(false)
 
 func _poll_for_playable_started(should_load: bool) -> void:
 	if not is_instance_valid(main_node):

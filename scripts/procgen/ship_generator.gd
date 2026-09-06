@@ -10,14 +10,18 @@ class_name ShipGenerator
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
+const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const WallDoorResolverScript := preload("res://scripts/procgen/wall_door_resolver.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const RoomVariantSelectorScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 const USE_WORLDGEN := true
 const WORLDGEN_VERSION: int = 2
@@ -61,18 +65,10 @@ func configure_run_context(p_biome_id: String, p_difficulty_id: String) -> void:
 # selection and role weighting.
 func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	assert(blueprint != null, "ShipGenerator: blueprint must not be null")
-
-	# F5: production travel often passed {}; load derelict archetype defaults so
-	# guaranteed_roles / role_weights actually apply.
-	if archetype.is_empty() and (not biome_id.is_empty() or not difficulty_id.is_empty()):
-		archetype = _default_derelict_archetype()
-
-	var layout: Dictionary = layout_generator.generate_with_options(blueprint, archetype, biome_id, difficulty_id, _extended_for(difficulty_id))
-	if layout.is_empty():
-		push_error("SHIP GENERATOR FAIL layout generation returned empty")
+	var documents: Dictionary = _generate_documents_for_blueprint(blueprint, archetype)
+	if not bool(documents.get("ok", false)):
 		return null
-
-	return _load_layout_as_scene(layout)
+	return _load_documents_as_scene(documents)
 
 
 func _default_derelict_archetype() -> Dictionary:
@@ -108,39 +104,69 @@ func generate_from_seed(
 		seed_value: int,
 		size: int = 0,
 		condition: int = 1) -> Node3D:
+	var documents: Dictionary = generate_documents_from_seed(seed_value, size, condition)
+	if not bool(documents.get("ok", false)):
+		return null
+	return _load_documents_as_scene(documents)
+
+
+# Produces the exact pure JSON-compatible documents consumed by scene
+# generation. Native availability is selected once; a failure in that selected
+# pipeline is returned to the caller and never replaced by the other pipeline.
+func generate_documents_from_seed(
+		seed_value: int,
+		size: int = 0,
+		condition: int = 1) -> Dictionary:
 	# Prefer DerelictGenerator when the platform GDExtension is loaded.
 	# The checked-in addon currently ships only win64, so Linux/macOS keep
 	# the layout pipeline rather than failing every generate_from_seed caller.
 	if USE_WORLDGEN and ClassDB.class_exists("DerelictGenerator"):
-		return _generate_via_worldgen(seed_value, size, condition)
+		return _generate_documents_via_worldgen(seed_value, size, condition)
 	var blueprint = ShipBlueprintScript.new(size, condition, seed_value)
-	return generate(blueprint)
+	return _generate_documents_for_blueprint(blueprint)
 
 
-func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3D:
+func _generate_documents_for_blueprint(blueprint, archetype: Dictionary = {}) -> Dictionary:
+	# F5: production travel often passed {}; load derelict archetype defaults so
+	# guaranteed_roles / role_weights actually apply.
+	if archetype.is_empty() and (not biome_id.is_empty() or not difficulty_id.is_empty()):
+		archetype = _default_derelict_archetype()
+	var layout: Dictionary = layout_generator.generate_with_options(
+		blueprint,
+		archetype,
+		biome_id,
+		difficulty_id,
+		_extended_for(difficulty_id))
+	if layout.is_empty():
+		push_error("SHIP GENERATOR FAIL layout generation returned empty")
+		return _documents_failure("layout_generation_returned_empty")
+	return _prepare_layout_documents(layout)
+
+
+func _generate_documents_via_worldgen(seed_value: int, size: int, condition: int) -> Dictionary:
 	if not ClassDB.class_exists("DerelictGenerator"):
 		push_error("SHIP GENERATOR FAIL DerelictGenerator class unavailable")
-		return null
+		return _documents_failure("worldgen_class_unavailable")
 
 	var generator = ClassDB.instantiate("DerelictGenerator")
 	if generator == null:
 		push_error("SHIP GENERATOR FAIL DerelictGenerator instantiation failed")
-		return null
+		return _documents_failure("worldgen_instantiation_failed")
 	if not generator.has_method("generator_version"):
 		push_error("SHIP GENERATOR FAIL DerelictGenerator generator_version() unavailable")
-		return null
+		return _documents_failure("worldgen_version_unavailable")
 	var generator_version: int = int(generator.generator_version())
 	assert(generator_version == WORLDGEN_VERSION, "ShipGenerator: unsupported DerelictGenerator version")
 	if generator_version != WORLDGEN_VERSION:
 		push_error("SHIP GENERATOR FAIL unsupported DerelictGenerator version: %d" % generator_version)
-		return null
+		return _documents_failure("unsupported_worldgen_version")
 
 	if not WORLDGEN_ARCHETYPE_BY_SIZE.has(size):
 		push_error("SHIP GENERATOR FAIL unsupported worldgen size: %d" % size)
-		return null
+		return _documents_failure("unsupported_worldgen_size")
 	if not WORLDGEN_INTACTNESS_BY_CONDITION.has(condition):
 		push_error("SHIP GENERATOR FAIL unsupported worldgen condition: %d" % condition)
-		return null
+		return _documents_failure("unsupported_worldgen_condition")
 	var archetype_id: String = str(WORLDGEN_ARCHETYPE_BY_SIZE[size])
 	var intactness_bp: int = int(WORLDGEN_INTACTNESS_BY_CONDITION[condition])
 	var params: Dictionary = {
@@ -150,59 +176,140 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 
 	if not generator.has_method("export_layout_json") or not generator.has_method("export_gameplay_slice_json"):
 		push_error("SHIP GENERATOR FAIL DerelictGenerator document export methods unavailable")
-		return null
+		return _documents_failure("worldgen_export_unavailable")
 	var layout_text: String = str(generator.export_layout_json(seed_value, params, WORLDGEN_KIT_ID))
 	if layout_text.is_empty():
 		push_error("SHIP GENERATOR FAIL worldgen layout export returned empty")
-		return null
+		return _documents_failure("worldgen_layout_export_empty")
 	var layout_variant: Variant = JSON.parse_string(layout_text)
 	if not (layout_variant is Dictionary):
 		push_error("SHIP GENERATOR FAIL worldgen layout export was not a Dictionary")
-		return null
+		return _documents_failure("worldgen_layout_export_invalid")
 	var layout: Dictionary = (layout_variant as Dictionary).duplicate(true)
+	if not stamp_native_component_slot_contracts(layout):
+		push_error("SHIP GENERATOR FAIL native layout has no component slot contracts")
+		return _documents_failure("native_component_slots_missing")
 
 	var gameplay_text: String = str(generator.export_gameplay_slice_json(seed_value, params))
 	if gameplay_text.is_empty():
 		push_error("SHIP GENERATOR FAIL worldgen gameplay slice export returned empty")
-		return null
+		return _documents_failure("worldgen_gameplay_export_empty")
 	var gameplay_variant: Variant = JSON.parse_string(gameplay_text)
 	if not (gameplay_variant is Dictionary):
 		push_error("SHIP GENERATOR FAIL worldgen gameplay slice export was not a Dictionary")
-		return null
+		return _documents_failure("worldgen_gameplay_export_invalid")
 	var exported_gameplay: Dictionary = (gameplay_variant as Dictionary).duplicate(true)
 
 	layout["kit_id"] = WORLDGEN_KIT_ID
 	layout["biome_id"] = biome_id
 	layout["difficulty_id"] = difficulty_id
+	if not _stamp_native_room_variants(layout, seed_value):
+		return _documents_failure("native_room_variant_stamp_failed")
+	layout["hazard_source"] = "runtime"
 	var biome_data: Dictionary = layout_generator._resolve_biome(biome_id)
 	var difficulty_data: Dictionary = layout_generator._resolve_difficulty(difficulty_id)
 	var biome = BiomeProfileScript.from_dict(biome_data)
 	var difficulty = DifficultyProfileScript.from_dict(difficulty_data)
 	layout = EncounterInjectorScript.new().inject(layout, biome, difficulty, seed_value)
+	var kit: Dictionary = _load_worldgen_kit()
+	if kit.is_empty():
+		return _documents_failure("worldgen_kit_load_failed")
+	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
+		layout, false, kit.get("dock_collision_projection_v1", {}),
+		LifeBoatBuilderScript.build_layout())
+	if not bool(endpoint_result.get("ok", false)):
+		push_error("SHIP GENERATOR FAIL native dock endpoint authoring failed: %s" % str(
+			endpoint_result.get("reason", "")))
+		return _documents_failure("native_dock_endpoint_authoring_failed")
 
 	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
 	var gameplay: Dictionary = gameplay_builder.build(layout)
 	if gameplay.is_empty() or not (gameplay.get("objectives", []) is Array) or (gameplay.get("objectives", []) as Array).is_empty():
 		push_error("SHIP GENERATOR FAIL worldgen gameplay slice builder returned no objectives")
-		return null
+		return _documents_failure("worldgen_gameplay_build_failed")
+	# The native export does not author builder-selected electrical arcs. The
+	# loader consumes arc_zones from layout, so preserve the same bridge used by
+	# the fallback layout pipeline before building the live scene.
+	var layout_arcs: Variant = layout.get("arc_zones", [])
+	var slice_arcs: Variant = gameplay.get("arc_zones", [])
+	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
+			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
+		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
 	var loot_tables: Dictionary = LootRollerScript.load_tables()
 	if loot_tables.is_empty():
 		push_error("SHIP GENERATOR FAIL game loot registry is empty")
-		return null
+		return _documents_failure("loot_registry_empty")
 	if not _resolve_worldgen_loot_containers(gameplay, exported_gameplay, loot_tables):
-		return null
+		return _documents_failure("worldgen_loot_resolution_failed")
 
-	var kit: Dictionary = _load_worldgen_kit()
-	if kit.is_empty():
-		return null
-	var loader: Node3D = GeneratedShipLoaderScript.new()
-	var success: bool = loader.load_from_documents(layout, kit, gameplay, true)
-	if not success:
-		push_error("SHIP GENERATOR FAIL worldgen loader returned false")
-		loader.queue_free()
-		return null
-	loader.name = "GeneratedShip"
-	return loader
+	return _documents_success(layout, kit, gameplay)
+
+
+## Native worldgen already chooses the exact room cells used as wall/center
+## component slots. Stamp the generator-authored fit profile on those records so
+## downstream placement consumes an explicit decision rather than guessing from
+## broad slot_kind. Returns false when no physical component slots exist.
+static func stamp_native_component_slot_contracts(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if not (rooms_v is Array):
+		return false
+	var authored_count: int = 0
+	var rooms: Array = rooms_v as Array
+	for room_index in range(rooms.size()):
+		if not (rooms[room_index] is Dictionary):
+			continue
+		var room: Dictionary = (rooms[room_index] as Dictionary).duplicate(true)
+		var role: String = str(room.get("room_role", room.get("role", "default")))
+		var interior: Dictionary = {}
+		var interior_v: Variant = room.get("interior_zones", {})
+		if interior_v is Dictionary:
+			interior = (interior_v as Dictionary).duplicate(true)
+		for slot_key in ["wall_slots", "center_slots"]:
+			var raw_v: Variant = interior.get(slot_key, room.get(slot_key, []))
+			if not (raw_v is Array):
+				continue
+			var slot_kind: String = "wall" if slot_key == "wall_slots" else "center"
+			var contracted: Array = []
+			for slot_index in range((raw_v as Array).size()):
+				var raw_slot: Variant = (raw_v as Array)[slot_index]
+				var record: Dictionary = (raw_slot as Dictionary).duplicate(true) if raw_slot is Dictionary else {"cell": raw_slot}
+				if not record.has("cell"):
+					continue
+				var profile_id: String = WallDoorResolverScript.component_slot_profile_for(role, slot_kind, slot_index)
+				if profile_id.is_empty():
+					continue
+				record["against_wall"] = slot_kind == "wall"
+				record["component_slot_profile_id"] = profile_id
+				contracted.append(record)
+				authored_count += 1
+			interior[slot_key] = contracted
+			room[slot_key] = contracted.duplicate(true)
+		room["interior_zones"] = interior
+		rooms[room_index] = room
+	layout["rooms"] = rooms
+	return authored_count > 0
+
+
+func _stamp_native_room_variants(layout: Dictionary, seed_value: int) -> bool:
+	var rooms_variant: Variant = layout.get("rooms", null)
+	if not (rooms_variant is Array) or (rooms_variant as Array).is_empty():
+		push_error("SHIP GENERATOR FAIL native layout rooms missing for variant stamping")
+		return false
+	var rooms: Array = rooms_variant as Array
+	var selector = RoomVariantSelectorScript.new()
+	for room_index in range(rooms.size()):
+		var room_variant: Variant = rooms[room_index]
+		if not (room_variant is Dictionary):
+			push_error("SHIP GENERATOR FAIL native layout room %d is malformed" % room_index)
+			return false
+		var room: Dictionary = room_variant
+		var role: String = str(room.get("room_role", room.get("role", "")))
+		if role.is_empty():
+			push_error("SHIP GENERATOR FAIL native layout room %d has no role" % room_index)
+			return false
+		room["variant"] = selector.pick(role, room_index, seed_value, biome_id)
+	layout["rooms"] = rooms
+	return true
 
 
 func _load_worldgen_kit() -> Dictionary:
@@ -295,7 +402,8 @@ func _has_loot_container_at(containers: Array, candidate: Dictionary) -> bool:
 	return false
 
 
-func _load_layout_as_scene(layout: Dictionary) -> Node3D:
+func _prepare_layout_documents(layout_source: Dictionary) -> Dictionary:
+	var layout: Dictionary = layout_source.duplicate(true)
 	# Skip recompile when ShipLayoutGenerator already stamped a validated plan.
 	# Never restamp wreck here — module_damage keys would drift from the plan.
 	var plan_variant: Variant = layout.get("structural_plan", {})
@@ -308,38 +416,28 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
 		if not bool(verdict.get("ok", false)):
 			push_error("SHIP GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
-			return null
+			return _documents_failure("structural_plan_validation_failed")
 		layout["structural_plan"] = structural_plan
 		layout["structural_plan_validated"] = true
+	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
+		layout, false, _load_worldgen_kit().get("dock_collision_projection_v1", {}),
+		LifeBoatBuilderScript.build_layout())
+	if not bool(endpoint_result.get("ok", false)):
+		push_error("SHIP GENERATOR FAIL dock endpoint authoring failed: %s" % str(endpoint_result.get("reason", "")))
+		return _documents_failure("dock_endpoint_authoring_failed")
 
-	# Write layout, kit reference, and minimal gameplay slice to temp files
-	var temp_dir: String = "user://procgen_temp"
-	if not DirAccess.dir_exists_absolute(temp_dir):
-		DirAccess.make_dir_absolute(temp_dir)
-
-	var layout_path: String = temp_dir + "/layout.json"
-	var gameplay_path: String = temp_dir + "/gameplay_slice.json"
-
-	# Build the gameplay slice FIRST so builder-authored hazard links can be
-	# stamped onto the layout before it is written: GeneratedShipLoader reads
-	# arc_zones from layout.json (the golden ships duplicate them in both
-	# files for the same reason).
+	# Build the gameplay slice first so builder-authored hazard links can be
+	# stamped onto the same layout document consumed by the live loader.
 	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
 	var gameplay: Dictionary = gameplay_builder.build(layout)
+	if gameplay.is_empty():
+		push_error("SHIP GENERATOR FAIL gameplay slice builder returned empty")
+		return _documents_failure("gameplay_build_failed")
 	var layout_arcs: Variant = layout.get("arc_zones", [])
 	var slice_arcs: Variant = gameplay.get("arc_zones", [])
 	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
 			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
 		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
-
-	# Write layout
-	var layout_json: String = JSON.stringify(layout, "  ")
-	var layout_file: FileAccess = FileAccess.open(layout_path, FileAccess.WRITE)
-	if layout_file == null:
-		push_error("SHIP GENERATOR FAIL cannot write layout: %s" % layout_path)
-		return null
-	layout_file.store_string(layout_json)
-	layout_file.close()
 
 	# Layout kit_id selects the structural JSON. Hazard/industrial catalogs have
 	# no modules[].godot_wrapper_scene array yet, so they fall back to v0 wrappers.
@@ -348,23 +446,32 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	# builds (.pck); ProjectSettings.globalize_path would break inside a pack.
 	if not FileAccess.file_exists(kit_path):
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
-		return null
+		return _documents_failure("structural_kit_missing")
+	var kit_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+	if not (kit_variant is Dictionary):
+		push_error("SHIP GENERATOR FAIL structural kit JSON is invalid: %s" % kit_path)
+		return _documents_failure("structural_kit_invalid")
+	return _documents_success(layout, (kit_variant as Dictionary).duplicate(true), gameplay)
 
-	# Write the gameplay slice (built above, before the layout write).
-	var gameplay_json: String = JSON.stringify(gameplay, "  ")
-	var gameplay_file: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
-	if gameplay_file == null:
-		push_error("SHIP GENERATOR FAIL cannot write gameplay slice: %s" % gameplay_path)
-		return null
-	gameplay_file.store_string(gameplay_json)
-	gameplay_file.close()
 
-	# Load via GeneratedShipLoader
-	var LoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
-	var loader: Node3D = LoaderScript.new()
+func _load_documents_as_scene(documents: Dictionary) -> Node3D:
+	if not bool(documents.get("ok", false)):
+		push_error("SHIP GENERATOR FAIL cannot load failed documents: %s" % str(documents.get("reason", "unknown")))
+		return null
+	var layout_v: Variant = documents.get("layout", {})
+	var kit_v: Variant = documents.get("kit", {})
+	var gameplay_v: Variant = documents.get("gameplay", {})
+	if not (layout_v is Dictionary) or not (kit_v is Dictionary) or not (gameplay_v is Dictionary):
+		push_error("SHIP GENERATOR FAIL generated documents have invalid types")
+		return null
+	var loader: Node3D = GeneratedShipLoaderScript.new()
 	# Generated derelicts are the away branch; pass that context to the loader's
 	# single atmosphere hook so biome fog can deepen without playable edits.
-	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path, true)
+	var success: bool = loader.load_from_documents(
+		(layout_v as Dictionary).duplicate(true),
+		(kit_v as Dictionary).duplicate(true),
+		(gameplay_v as Dictionary).duplicate(true),
+		true)
 	if not success:
 		push_error("SHIP GENERATOR FAIL loader returned false")
 		loader.queue_free()
@@ -374,6 +481,20 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	# "StructuralRoot" (geometry + nav) and "ObjectiveRoot" children under it.
 	loader.name = "GeneratedShip"
 	return loader
+
+
+func _documents_success(layout: Dictionary, kit: Dictionary, gameplay: Dictionary) -> Dictionary:
+	return {
+		"ok": true,
+		"reason": "",
+		"layout": layout.duplicate(true),
+		"kit": kit.duplicate(true),
+		"gameplay": gameplay.duplicate(true),
+	}
+
+
+func _documents_failure(reason: String) -> Dictionary:
+	return {"ok": false, "reason": reason}
 
 
 func kit_path_for_layout(layout: Dictionary) -> String:

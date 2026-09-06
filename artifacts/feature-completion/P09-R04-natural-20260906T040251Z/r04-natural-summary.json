@@ -1,0 +1,43 @@
+{
+  "case": {
+    "id": "R04-natural",
+    "scope": "scene",
+    "script": "scripts/validation/fc_p09_natural_route_smoke.gd",
+    "marker": "FC P09 NATURAL ROUTE PASS"
+  },
+  "evidence": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-natural-20260906T040251Z",
+  "result": {
+    "id": "R04-natural",
+    "scope": "scene",
+    "script": "scripts/validation/fc_p09_natural_route_smoke.gd",
+    "marker": "FC P09 NATURAL ROUTE PASS",
+    "player_accepted": false,
+    "passed": false,
+    "reason": "nonzero exit",
+    "exit_code": 1,
+    "duration_seconds": 15.812,
+    "diagnostics": [
+      "WARNING: AudioManager: stream file missing, path='res://data/audio/voice/log_beacon_01.ogg'"
+    ],
+    "cleanup_error": null,
+    "stdout_log": "r04-natural.stdout.log",
+    "stderr_log": "r04-natural.stderr.log",
+    "containment_probe": {
+      "passed": true,
+      "reason": "passed",
+      "exit_code": 0,
+      "timed_out": false,
+      "cleanup_error": null,
+      "duration_seconds": 2.032,
+      "marker_count": 1,
+      "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-natural-20260906T040251Z/user-data/r04-natural/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-natural-20260906T040251Z/user-data/r04-natural/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/P09-R04-natural-20260906T040251Z/user-data/r04-natural",
+      "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-natural-20260906T040251Z\\user-data\\r04-natural",
+      "diagnostics": [],
+      "unexpected_stdout": [],
+      "unexpected_stderr": [],
+      "stdout_log": "r04-natural.probe.stdout.log",
+      "stderr_log": "r04-natural.probe.stderr.log"
+    },
+    "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\P09-R04-natural-20260906T040251Z\\user-data\\r04-natural"
+  }
+}

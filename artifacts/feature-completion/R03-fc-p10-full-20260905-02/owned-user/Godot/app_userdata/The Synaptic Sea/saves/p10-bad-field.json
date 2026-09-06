@@ -1,0 +1,70 @@
+{
+  "component_placement_summary": {
+    "condition_authority_version": 1.0,
+    "condition_lot_sequence": 0.0,
+    "count": 0.0,
+    "placed": [],
+    "rejected_saved_components": [],
+    "schema": "component_placement_v2",
+    "seed": 0.0
+  },
+  "crafting_summary": {
+    "active_craft": {},
+    "craft_jobs_v1": {
+      "jobs": [],
+      "owners": [],
+      "schema": "craft-jobs-2"
+    },
+    "field_crafting": {
+      "active_craft": {},
+      "craft_jobs_v1": {
+        "jobs": [],
+        "owners": [],
+        "schema": "craft-jobs-2"
+      },
+      "field_pending_v1": {
+        "active_receipt_id": "field-receipt-4",
+        "pinned_destination_ship_id": "ship-home",
+        "pinned_local_position": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "receipt_history_v1": [],
+        "receipt_sequence": 4.0,
+        "schema": "field-pending-2",
+        "ship_id": "ship-away"
+      },
+      "physical_station_summaries": {},
+      "recipe_count": 0.0,
+      "station_summaries": {}
+    },
+    "physical_station_positions_v1": {
+      "owners": [],
+      "schema": "physical-station-positions-1"
+    },
+    "physical_station_summaries": {},
+    "recipe_count": 0.0,
+    "station_summaries": {}
+  },
+  "godot_version": "4.7.2-stable (official)",
+  "inventory_summary": {
+    "item_lots_v1": {
+      "holder_namespace": "player:malformed-field",
+      "lots": [],
+      "schema": "item-lots-1",
+      "sequence": 0.0
+    }
+  },
+  "recipe_knowledge_summary": {
+    "dismantle_counts": {},
+    "event_receipt_ids": [],
+    "event_sequence": 0.0,
+    "known_recipe_ids": [],
+    "migration_origin": "native",
+    "owner_id": "player:malformed-field",
+    "schema": "recipe-knowledge-1"
+  },
+  "run_id": "malformed-field",
+  "slice_version": "gate2-current-run-5"
+}

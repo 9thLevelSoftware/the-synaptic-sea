@@ -1,0 +1,143 @@
+{
+  "kind": "native_discovery_table_coverage",
+  "scope": "source/data analysis of preparatory seed17 probe; not player-journey acceptance",
+  "world_seed": 17,
+  "reachable_marker_count": 60,
+  "visited_marker_count": 12,
+  "opened_container_count": 437,
+  "table_coverage": [
+    {
+      "loot_table": "generic_crate",
+      "opened_container_count": 62,
+      "marker_count": 12,
+      "markers": [
+        "-1:-1:0",
+        "-1:-1:1",
+        "-1:-1:2",
+        "-1:0:0",
+        "-1:0:1",
+        "-1:0:2",
+        "0:-1:0",
+        "0:-1:1",
+        "0:-1:2",
+        "0:0:0",
+        "0:0:1",
+        "0:0:2"
+      ],
+      "authored_container_kind": "industrial_crate",
+      "has_fabrication_schematic_basic": false,
+      "schematic_rolls_observed": 0
+    },
+    {
+      "loot_table": "generic_locker",
+      "opened_container_count": 92,
+      "marker_count": 12,
+      "markers": [
+        "-1:-1:0",
+        "-1:-1:1",
+        "-1:-1:2",
+        "-1:0:0",
+        "-1:0:1",
+        "-1:0:2",
+        "0:-1:0",
+        "0:-1:1",
+        "0:-1:2",
+        "0:0:0",
+        "0:0:1",
+        "0:0:2"
+      ],
+      "authored_container_kind": "survivor_locker",
+      "has_fabrication_schematic_basic": false,
+      "schematic_rolls_observed": 0
+    },
+    {
+      "loot_table": "hidden_cache",
+      "opened_container_count": 6,
+      "marker_count": 2,
+      "markers": [
+        "-1:-1:2",
+        "0:-1:1"
+      ],
+      "authored_container_kind": "hidden_cache",
+      "has_fabrication_schematic_basic": false,
+      "schematic_rolls_observed": 0
+    },
+    {
+      "loot_table": "repair_parts_common",
+      "opened_container_count": 2,
+      "marker_count": 2,
+      "markers": [
+        "-1:-1:2",
+        "0:0:2"
+      ],
+      "authored_container_kind": "maintenance_cache",
+      "has_fabrication_schematic_basic": false,
+      "schematic_rolls_observed": 0
+    },
+    {
+      "loot_table": "salvage_cargo",
+      "opened_container_count": 241,
+      "marker_count": 12,
+      "markers": [
+        "-1:-1:0",
+        "-1:-1:1",
+        "-1:-1:2",
+        "-1:0:0",
+        "-1:0:1",
+        "-1:0:2",
+        "0:-1:0",
+        "0:-1:1",
+        "0:-1:2",
+        "0:0:0",
+        "0:0:1",
+        "0:0:2"
+      ],
+      "authored_container_kind": "industrial_crate",
+      "has_fabrication_schematic_basic": false,
+      "schematic_rolls_observed": 0
+    },
+    {
+      "loot_table": "salvage_engineering",
+      "opened_container_count": 34,
+      "marker_count": 9,
+      "markers": [
+        "-1:-1:0",
+        "-1:-1:1",
+        "-1:-1:2",
+        "-1:0:0",
+        "-1:0:1",
+        "0:-1:0",
+        "0:-1:1",
+        "0:0:1",
+        "0:0:2"
+      ],
+      "authored_container_kind": "maintenance_cache",
+      "has_fabrication_schematic_basic": true,
+      "schematic_rolls_observed": 0
+    }
+  ],
+  "engineering_book_table": {
+    "authored_table": "salvage_engineering",
+    "authored_container_kind": "maintenance_cache",
+    "represented_in_opened_sample": true,
+    "opened_container_count": 34,
+    "marker_count": 9,
+    "markers": [
+      "-1:-1:0",
+      "-1:-1:1",
+      "-1:-1:2",
+      "-1:0:0",
+      "-1:0:1",
+      "0:-1:0",
+      "0:-1:1",
+      "0:0:1",
+      "0:0:2"
+    ],
+    "contains_fabrication_schematic_basic_in_authored_table": true,
+    "observed_fabrication_schematic_basic_rolls": 0,
+    "conclusion": "The engineering book table is represented in the bounded sample. Zero observed schematic rolls does not show that the book route is absent; the authored weighted entry remains reachable in that table."
+  },
+  "donor_component_ids": [
+    "reactor_console"
+  ]
+}

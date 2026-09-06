@@ -120,9 +120,28 @@ func _initialize() -> void:
 	legacy.electrical_arc_summary = {"state": "DISCHARGED"}
 	legacy.objective_progress_summary = {"current": 4}
 	legacy.saved_at = "2026-06-20T00:00:00"
-	if not service.save_to_slot("slot_legacy", legacy, SaveSlotStateScript.SLOT_KIND_MANUAL, false, "Legacy"):
-		_fail("save_to_slot legacy failed")
+	var legacy_dir: String = "user://saves"
+	var legacy_path: String = "user://saves/slot_legacy.json"
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(legacy_dir)):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(legacy_dir))
+	var legacy_file := FileAccess.open(legacy_path, FileAccess.WRITE)
+	if legacy_file == null:
+		_fail("could not write legacy fixture")
 		return
+	var legacy_disk: Dictionary = _make_v1_dict()
+	legacy_disk["godot_version"] = Engine.get_version_info()["string"]
+	legacy_disk["saved_at"] = legacy.saved_at
+	legacy_file.store_string(JSON.stringify(legacy_disk, "\t", false, true))
+	legacy_file.close()
+	service.set_active_run_id("legacy-smoke")
+	var prepared_legacy: Dictionary = service.prepare_slot_load("slot_legacy")
+	if not bool(prepared_legacy.get("ok", false)):
+		_fail("prepare legacy failed: %s" % str(prepared_legacy.get("reason", "unknown")))
+		return
+	if not service.write_prepared_migration_copy(str(prepared_legacy.token)):
+		_fail("write_prepared_migration_copy rejected accepted legacy preparation")
+		return
+	service.discard_prepared_load(str(prepared_legacy.token))
 	var migrated_loaded = service.load_from_slot("slot_legacy")
 	if migrated_loaded == null:
 		_fail("load_from_slot legacy returned null (migration should have rescued it)")

@@ -1,0 +1,32 @@
+{
+  "id": "p11-component-system-link",
+  "scope": "focused",
+  "script": "scripts/validation/component_system_link_smoke.gd",
+  "marker": "COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true",
+  "player_accepted": false,
+  "passed": true,
+  "reason": "passed",
+  "exit_code": 0,
+  "duration_seconds": 0.343,
+  "diagnostics": [],
+  "cleanup_error": null,
+  "stdout_log": "p11-component-system-link.stdout.log",
+  "stderr_log": "p11-component-system-link.stderr.log",
+  "containment_probe": {
+    "passed": true,
+    "reason": "passed",
+    "exit_code": 0,
+    "timed_out": false,
+    "cleanup_error": null,
+    "duration_seconds": 2.032,
+    "marker_count": 1,
+    "resolved_user_data": "FC P10 USER DATA PROBE PASS resolved_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P11-focused-final-20260906-01/user-data/p11-component-system-link/Godot/app_userdata/The Synaptic Sea os_user=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P11-focused-final-20260906-01/user-data/p11-component-system-link/Godot/app_userdata/The Synaptic Sea root=D:/the-synaptic-sea-feature-completion/artifacts/feature-completion/R06-P11-focused-final-20260906-01/user-data/p11-component-system-link",
+    "expected_root": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P11-focused-final-20260906-01\\user-data\\p11-component-system-link",
+    "diagnostics": [],
+    "unexpected_stdout": [],
+    "unexpected_stderr": [],
+    "stdout_log": "p11-component-system-link.probe.stdout.log",
+    "stderr_log": "p11-component-system-link.probe.stderr.log"
+  },
+  "user_data_dir": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R06-P11-focused-final-20260906-01\\user-data\\p11-component-system-link"
+}

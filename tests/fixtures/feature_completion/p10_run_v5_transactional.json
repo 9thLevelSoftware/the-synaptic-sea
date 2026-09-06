@@ -1,0 +1,200 @@
+{
+  "layout_path": "res://data/procgen/smoke/seed_000017/layout.json",
+  "kit_path": "res://data/kits/ship_structural_v0.json",
+  "gameplay_slice_path": "res://data/procgen/smoke/seed_000017/gameplay_slice.json",
+  "slice_version": "gate2-current-run-5",
+  "godot_version": "fixture-current",
+  "run_id": "fixture-run",
+  "inventory_summary": {
+    "item_lots_v1": {
+      "schema": "item-lots-1",
+      "holder_namespace": "player:fixture-run",
+      "sequence": 3,
+      "lots": [
+        {
+          "lot_id": "player:fixture-run/lot-000003",
+          "item_id": "scrap_metal",
+          "quantity": 1,
+          "quality_score": 0.8,
+          "quality_tier": "excellent",
+          "condition": 0.9,
+          "origin": {
+            "kind": "salvage"
+          }
+        }
+      ]
+    }
+  },
+  "crafting_summary": {
+    "recipe_count": 61,
+    "active_craft": {},
+    "station_summaries": {},
+    "physical_station_summaries": {
+      "[\"ship-home\",\"station:workbench@0,550,0\"]": {
+        "ship_id": "ship-home",
+        "station_instance_id": "station:workbench@0,550,0",
+        "active_job_id": "ship-home/station:workbench@0,550,0/job-000001",
+        "station_kind": "workbench",
+        "level": 0,
+        "tier": 0,
+        "max_queue": 8,
+        "powered": true,
+        "active_recipe_id": "weld_plating",
+        "progress_seconds": 0.0,
+        "required_seconds": 15.0,
+        "status": 1,
+        "queue": []
+      }
+    },
+    "craft_jobs_v1": {
+      "schema": "craft-jobs-2",
+      "jobs": [
+        {
+          "job_id": "ship-home/station:workbench@0,550,0/job-000001",
+          "ship_id": "ship-home",
+          "station_instance_id": "station:workbench@0,550,0",
+          "station_kind": "workbench",
+          "recipe_id": "weld_plating",
+          "state": "queued",
+          "phase": "queued",
+          "source_holder_id": "player:fixture-run",
+          "escrow_holder_id": "ship-home/station:workbench@0,550,0/escrow",
+          "ingredient_escrow": [
+            {
+              "lot_id": "escrow-scrap",
+              "item_id": "scrap_metal",
+              "quantity": 2,
+              "quality_score": 0.5,
+              "quality_tier": "standard",
+              "condition": 1.0,
+              "origin": {
+                "kind": "inventory"
+              }
+            },
+            {
+              "lot_id": "escrow-adhesive",
+              "item_id": "adhesive_paste",
+              "quantity": 1,
+              "quality_score": 0.5,
+              "quality_tier": "standard",
+              "condition": 1.0,
+              "origin": {
+                "kind": "inventory"
+              }
+            }
+          ],
+          "consumed_lots": [],
+          "progress": 0.0,
+          "progress_seconds": 0.0,
+          "required_seconds": 15.0,
+          "output_lots": [],
+          "output_receipt_id": "",
+          "sequence": 1,
+          "blocked_reason": "",
+          "input_quality_score": -1.0,
+          "input_skill_level": -1,
+          "station_effective_tier": -1,
+          "station_powered_at_start": false,
+          "receipt_emitted": false,
+          "refunded_lots_v1": [],
+          "legacy_unreserved_cancelled_v1": false,
+          "legacy_unrecorded_cancelled_v1": false
+        }
+      ],
+      "owners": [
+        {
+          "ship_id": "ship-home",
+          "station_instance_id": "station:workbench@0,550,0",
+          "sequence": 1,
+          "job_ids": [
+            "ship-home/station:workbench@0,550,0/job-000001"
+          ]
+        }
+      ]
+    },
+    "field_crafting": {
+      "recipe_count": 61,
+      "active_craft": {},
+      "station_summaries": {},
+      "physical_station_summaries": {},
+      "craft_jobs_v1": {
+        "schema": "craft-jobs-2",
+        "jobs": [],
+        "owners": []
+      },
+      "field_pending_v1": {
+        "ship_id": "",
+        "receipt_sequence": 0,
+        "active_receipt_id": "",
+        "pinned_destination_ship_id": "",
+        "pinned_local_position": [],
+        "receipt_history_v1": [],
+        "schema": "field-pending-2"
+      }
+    },
+    "physical_station_positions_v1": {
+      "schema": "physical-station-positions-1",
+      "owners": [
+        {
+          "ship_id": "ship-home",
+          "stations": [
+            {
+              "station_kind": "workbench",
+              "station_instance_id": "station:workbench@0,550,0",
+              "floor_slot_id": "floor@0,550,0",
+              "local_position": [
+                0.0,
+                0.55,
+                0.0
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "recipe_knowledge_summary": {
+    "schema": "recipe-knowledge-1",
+    "owner_id": "player:fixture-run",
+    "known_recipe_ids": [
+      "weld_plating",
+      "splice_circuit"
+    ],
+    "event_receipt_ids": [
+      "book:manual-7",
+      "codex:alpha-2"
+    ],
+    "event_sequence": 9,
+    "dismantle_counts": {
+      "power_cell": 2
+    },
+    "migration_origin": "native"
+  },
+  "component_placement_summary": {
+    "schema": "component_placement_v2",
+    "condition_authority_version": 1,
+    "condition_lot_sequence": 0,
+    "seed": 17,
+    "count": 1,
+    "placed": [
+      {
+        "component_instance_id": "slot-power-1",
+        "component_id": "power_cell",
+        "item_form": "power_cell",
+        "mounted": true,
+        "source_lot": {
+          "lot_id": "component-source-1",
+          "item_id": "power_cell",
+          "quantity": 1,
+          "quality_score": 0.8,
+          "quality_tier": "excellent",
+          "condition": 0.75,
+          "origin": {
+            "kind": "crafted"
+          }
+        }
+      }
+    ],
+    "rejected_saved_components": []
+  }
+}

@@ -91,6 +91,16 @@ The exact randomization rules are owned by the procedural generator and validate
 - `data/procgen/golden/coherent_ship_003/gameplay_slice.json`
 - `scripts/validation/template_c_main_scenario_smoke.gd`
 
+## Acceptance criteria
+
+- **Gameplay:** Template C loads from its authored layout and gameplay-slice files as a stacked two-deck ship with both documented vertical transitions on the critical path.
+- **Gameplay:** The player traverses the ramp to the upper deck, completes the upper-deck objectives, returns by the elevator route, and reaches the reactor on deck 0.
+- **Gameplay:** All five authored objectives advance through sequence 6 and mark the run complete.
+- **Gameplay:** Restoring main power clears the oxygen-breach route state and the biomatter blockage before the reactor.
+- **Gameplay:** The timed fire remains on a non-critical side link and the optional oxygen pump spawns in the documented tool room.
+- **Constraint:** Variation uses only documented approach cells, non-critical hazard links, tool rooms, and blocked-link candidates.
+- **Constraint:** The template uses existing Gate 2 art, objective, hazard, and tool archetypes; runtime generator variation remains owned by its separate plan.
+
 ## Verification
 
 Run the main-scene smoke:

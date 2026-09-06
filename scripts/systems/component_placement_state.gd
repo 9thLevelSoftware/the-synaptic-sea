@@ -6,17 +6,33 @@ class_name ComponentPlacementState
 
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
+const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 
 const MAX_WALL_FILLS: int = 3
 const MAX_CENTER_FILLS: int = 1
+const CONDITION_AUTHORITY_VERSION: int = 1
+const CONDITION_MODE_GENERATED: String = "generated_component"
+const CONDITION_MODE_LEGACY: String = "legacy_unrecorded_component"
 
 ## placed: Array of {component_instance_id, component_id, room_id, slot_kind, slot_index, cell, condition, linked_system, linked_subcomponent, item_form, mass}
 var placed: Array = []
+## Authored/generated physical mount descriptors. Empty descriptors stay here so
+## player installation addresses real slots rather than synthetic placeholders.
+var physical_slots: Array = []
+## Saved mounted records rejected by the current layout/catalog contract. They
+## remain serialized for later recovery work, but never occupy or authorize a slot.
+var rejected_saved_components: Array = []
 var seed_value: int = 0
+var condition_authority_version: int = 0
+var condition_lot_sequence: int = 0
 
 
 func clear() -> void:
 	placed.clear()
+	physical_slots.clear()
+	rejected_saved_components.clear()
+	condition_authority_version = 0
+	condition_lot_sequence = 0
 
 
 func populate(layout: Dictionary, catalog: RefCounted, p_seed: int, occupied_cells: Dictionary = {}) -> int:
@@ -42,9 +58,55 @@ func populate(layout: Dictionary, catalog: RefCounted, p_seed: int, occupied_cel
 		if room_id.is_empty():
 			continue
 		var role: String = str(room.get("room_role", room.get("role", "default")))
+		_register_authored_physical_slots(room, room_id, "wall", "wall_slots", catalog)
+		_register_authored_physical_slots(room, room_id, "center", "center_slots", catalog)
 		instance_n += _fill_slots(room, room_id, role, "wall", "wall_slots", catalog, rng, used_keys, used_cells)
 		instance_n += _fill_slots(room, room_id, role, "center", "center_slots", catalog, rng, used_keys, used_cells)
 	return placed.size()
+
+
+## Population retains its legacy structural synthesis for world dressing, but P11
+## exposes only explicit descriptors as player-installable physical slots.
+func _register_authored_physical_slots(room: Dictionary, room_id: String, slot_kind: String, slot_key: String, catalog: RefCounted) -> void:
+	var slots: Array = _extract_authored_slots(room, slot_key)
+	for index in range(slots.size()):
+		if typeof(slots[index]) != TYPE_DICTIONARY:
+			continue
+		var info: Dictionary = slots[index] as Dictionary
+		var profile_id: String = str(info.get("component_slot_profile_id", ""))
+		if profile_id.is_empty() or catalog == null or not catalog.has_method("get_slot_profile"):
+			continue
+		var profile: Dictionary = catalog.call("get_slot_profile", profile_id)
+		if profile.is_empty():
+			continue
+		var descriptor: Dictionary = info.duplicate(true)
+		# Current catalog policy always overwrites any copied fit fields.
+		for key in ["footprint_cells", "socket_type", "allowed_component_types"]:
+			descriptor[key] = profile.get(key, [] if key != "socket_type" else "")
+		descriptor["slot_id"] = "%s_%s_%d" % [room_id, slot_kind, index]
+		descriptor["room_id"] = room_id
+		descriptor["slot_kind"] = slot_kind
+		descriptor["slot_index"] = index
+		descriptor["occupied"] = false
+		physical_slots.append(descriptor)
+
+
+func _extract_authored_slots(room: Dictionary, slot_key: String) -> Array:
+	var interior: Variant = room.get("interior_zones", null)
+	if interior is Dictionary and _interior_zones_have_slots(interior as Dictionary):
+		var interior_slots: Variant = (interior as Dictionary).get(slot_key, [])
+		if interior_slots is Array:
+			return _normalize_slots(interior_slots as Array, slot_key == "wall_slots")
+		return []
+	var direct: Variant = room.get(slot_key, null)
+	if direct is Array and not (direct as Array).is_empty():
+		return _normalize_slots(direct as Array, slot_key == "wall_slots")
+	var zones: Variant = room.get("zones", {})
+	if zones is Dictionary:
+		var zone_slots: Variant = (zones as Dictionary).get(slot_key, [])
+		if zone_slots is Array and not (zone_slots as Array).is_empty():
+			return _normalize_slots(zone_slots as Array, slot_key == "wall_slots")
+	return []
 
 
 func _fill_slots(
@@ -73,12 +135,28 @@ func _fill_slots(
 		if used_keys.has(key):
 			continue
 		var slot_info: Dictionary = slots[i] if typeof(slots[i]) == TYPE_DICTIONARY else {}
+		var profile_id: String = str(slot_info.get("component_slot_profile_id", ""))
+		var profile: Dictionary = catalog.call("get_slot_profile", profile_id) if catalog.has_method("get_slot_profile") else {}
+		if profile_id.is_empty() or profile.is_empty():
+			continue
+		for profile_key in ["footprint_cells", "socket_type", "allowed_component_types"]:
+			slot_info[profile_key] = profile.get(profile_key, [] if profile_key != "socket_type" else "")
 		var cell_value: Variant = slot_info.get("cell", "")
 		var parsed_cell: Array = LayoutSerializerScript.parse_slot_cell(cell_value)
 		var cell_key: String = _cell_occupancy_key(room_id, parsed_cell)
 		if not cell_key.is_empty() and (used_cells.has(cell_key) or reserved.has(cell_key)):
 			continue
-		var component_id: String = _weighted_pick(choices, rng)
+		var fitting_choices: Array = []
+		for choice_v in choices:
+			if not (choice_v is Dictionary):
+				continue
+			var choice_id: String = str((choice_v as Dictionary).get("component_id", ""))
+			if catalog.has_method("validate_component_fit") and bool(catalog.call("validate_component_fit", choice_id, {
+				"slot_kind": slot_kind,
+				"component_slot_profile_id": profile_id,
+			}).get("ok", false)):
+				fitting_choices.append((choice_v as Dictionary).duplicate(true))
+		var component_id: String = _weighted_pick(fitting_choices, rng)
 		if component_id.is_empty() or not catalog.call("has_component", component_id):
 			continue
 		var def: Dictionary = catalog.call("get_component", component_id)
@@ -102,12 +180,17 @@ func _fill_slots(
 			"slot_index": i,
 			"cell": stored_cell,
 			"against_wall": bool(slot_info.get("against_wall", slot_kind == "wall")),
+			"component_slot_profile_id": profile_id,
+			"footprint_cells": slot_info.get("footprint_cells", []),
+			"socket_type": str(slot_info.get("socket_type", "")),
+			"allowed_component_types": slot_info.get("allowed_component_types", []),
 			"condition": float(def.get("condition_default", 1.0)),
 			"item_form": str(def.get("item_form", component_id)),
 			"mass": float(def.get("mass", 10.0)),
 			"linked_system": str(def.get("linked_system", "")),
 			"linked_subcomponent": str(def.get("linked_subcomponent", "")),
 			"mounted": true,
+			"ship_mod_managed": false,
 		}
 		placed.append(entry)
 		used_keys[key] = true
@@ -350,24 +433,293 @@ func has_slot_collisions() -> bool:
 	return false
 
 
-func get_summary() -> Dictionary:
+## ADR-0066 detached lot initialization. Missing lots are legal only while an
+## explicit fresh-generation or P10-trusted legacy candidate is being prepared.
+## The live placement and its persistent sequence remain unchanged until commit.
+func prepare_condition_authority(
+		ship_id: String,
+		catalog: RefCounted,
+		mode: String) -> Dictionary:
+	if ship_id.is_empty() or mode not in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		return {"ok": false, "reason": "invalid_condition_authority_request"}
+	if catalog == null or not catalog.has_method("get_component"):
+		return {"ok": false, "reason": "missing_component_catalog"}
+	if condition_authority_version not in [0, CONDITION_AUTHORITY_VERSION] \
+			or condition_lot_sequence < 0:
+		return {"ok": false, "reason": "invalid_condition_authority"}
+	var base_summary: Dictionary = get_summary()
+	var candidate: Dictionary = base_summary.duplicate(true)
+	var candidate_placed: Array = candidate.get("placed", []) as Array
+	var ordered_indices: Array[int] = []
+	for index in range(candidate_placed.size()):
+		ordered_indices.append(index)
+	ordered_indices.sort_custom(func(left: int, right: int) -> bool:
+		return str((candidate_placed[left] as Dictionary).get("component_instance_id", "")) \
+			< str((candidate_placed[right] as Dictionary).get("component_instance_id", "")))
+	var seen_lot_ids: Dictionary = {}
+	var next_sequence: int = condition_lot_sequence
+	var allocated_count: int = 0
+	for index in ordered_indices:
+		var raw_entry: Variant = candidate_placed[index]
+		if not raw_entry is Dictionary:
+			return {"ok": false, "reason": "invalid_component_entry"}
+		var entry: Dictionary = (raw_entry as Dictionary).duplicate(true)
+		var slot_id: String = str(entry.get("component_instance_id", ""))
+		var component_id: String = str(entry.get("component_id", ""))
+		var definition: Dictionary = catalog.call("get_component", component_id)
+		var item_form: String = str(entry.get("item_form", definition.get("item_form", component_id)))
+		if slot_id.is_empty() or component_id.is_empty() or definition.is_empty() or item_form.is_empty():
+			return {"ok": false, "reason": "unknown_component"}
+		if entry.has("source_lot"):
+			var present_lot: Variant = entry.source_lot
+			if not present_lot is Dictionary \
+					or not _valid_source_lot(present_lot as Dictionary, item_form):
+				return {"ok": false, "reason": "invalid_source_lot"}
+			var present_id: String = str((present_lot as Dictionary).get("lot_id", ""))
+			if seen_lot_ids.has(present_id):
+				return {"ok": false, "reason": "duplicate_component_lot"}
+			seen_lot_ids[present_id] = true
+			continue
+		if condition_authority_version == CONDITION_AUTHORITY_VERSION:
+			return {"ok": false, "reason": "current_component_missing_source_lot"}
+		next_sequence += 1
+		allocated_count += 1
+		var condition: float = clampf(float(
+			entry.get("condition", definition.get("condition_default", 1.0))), 0.0, 1.0)
+		if mode == CONDITION_MODE_GENERATED:
+			condition = clampf(float(definition.get("condition_default", 1.0)), 0.0, 1.0)
+		var lot_id: String = "ship:%s:components/lot-%06d" % [ship_id, next_sequence]
+		if seen_lot_ids.has(lot_id):
+			return {"ok": false, "reason": "duplicate_component_lot"}
+		var origin: Dictionary = {
+			"kind": mode,
+			"ship_id": ship_id,
+			"slot_id": slot_id,
+		}
+		if mode == CONDITION_MODE_GENERATED:
+			origin["placement_seed"] = seed_value
+		var lot: Dictionary = {
+			"lot_id": lot_id,
+			"item_id": item_form,
+			"quantity": 1,
+			"quality_score": 0.5,
+			"quality_tier": "standard",
+			"condition": condition,
+			"origin": origin,
+		}
+		entry["item_form"] = item_form
+		entry["condition"] = condition
+		entry["source_lot"] = lot
+		entry["source_lot_id"] = lot_id
+		candidate_placed[index] = entry
+		seen_lot_ids[lot_id] = true
+	candidate["placed"] = candidate_placed
+	candidate["condition_authority_version"] = CONDITION_AUTHORITY_VERSION
+	candidate["condition_lot_sequence"] = next_sequence
 	return {
-		"schema": "component_placement_v1",
-		"seed": seed_value,
-		"count": placed.size(),
-		"placed": placed.duplicate(true),
+		"ok": true,
+		"reason": "",
+		"base_summary": base_summary,
+		"candidate_summary": candidate,
+		"allocated_count": allocated_count,
+		"ship_id": ship_id,
+		"mode": mode,
 	}
 
 
-func apply_summary(summary: Dictionary) -> bool:
+## Atomically accepts a prepared authority only while its exact base still owns
+## the placement. Retry/cancel/stale candidates therefore consume no sequence.
+func commit_condition_authority(prepared: Dictionary) -> bool:
+	if not bool(prepared.get("ok", false)) \
+			or not prepared.get("base_summary", null) is Dictionary \
+			or not prepared.get("candidate_summary", null) is Dictionary \
+			or get_summary() != prepared.base_summary:
+		return false
+	# apply_summary intentionally strips serialized fit fields because disk data
+	# cannot be physical policy. This commit is different: it upgrades condition
+	# lots on the already layout-derived live placement, so keep that verified
+	# layout authority across the otherwise atomic summary replacement.
+	var verified_physical_slots: Array = physical_slots.duplicate(true)
+	if not apply_summary(prepared.candidate_summary as Dictionary):
+		return false
+	physical_slots = verified_physical_slots
+	return true
+
+
+func get_summary() -> Dictionary:
+	var dynamic_placed: Array = []
+	for entry_v in placed:
+		if not (entry_v is Dictionary):
+			continue
+		var entry: Dictionary = (entry_v as Dictionary).duplicate(true)
+		# Fit authority and the current systems-link projection are reconstructed
+		# from the generated slot, catalog, and live systems manager. They are not
+		# persisted component authority.
+		if bool(entry.get("soft_linked", false)):
+			entry["linked_system"] = ""
+			entry["linked_subcomponent"] = ""
+		for fit_key in [
+			"footprint_cells", "socket_type", "allowed_component_types", "soft_linked"]:
+			entry.erase(fit_key)
+		dynamic_placed.append(entry)
+	return {
+		"schema": "component_placement_v2",
+		"condition_authority_version": condition_authority_version,
+		"condition_lot_sequence": condition_lot_sequence,
+		"seed": seed_value,
+		"count": dynamic_placed.size(),
+		"placed": dynamic_placed,
+		"rejected_saved_components": rejected_saved_components.duplicate(true),
+	}
+
+
+func apply_summary(summary: Dictionary, allocator_ship_id: String = "") -> bool:
 	if summary.is_empty():
 		return false
-	seed_value = int(summary.get("seed", 0))
-	var p: Variant = summary.get("placed", [])
-	if typeof(p) != TYPE_ARRAY:
+	if str(summary.get("schema", "")) != "component_placement_v2" \
+			or int(summary.get("condition_authority_version", 0)) != CONDITION_AUTHORITY_VERSION \
+			or not _is_nonnegative_json_integer(summary.get("condition_lot_sequence", null)) \
+			or not _is_json_integer(summary.get("seed", null)) \
+			or not _is_nonnegative_json_integer(summary.get("count", null)):
 		return false
-	placed = (p as Array).duplicate(true)
+	var p: Variant = summary.get("placed", [])
+	var rejected_v: Variant = summary.get("rejected_saved_components", null)
+	if typeof(p) != TYPE_ARRAY or not rejected_v is Array \
+			or int(summary.count) != (p as Array).size():
+		return false
+	var next_placed: Array = []
+	var seen_ids: Dictionary = {}
+	var mounted_lot_ids: Dictionary = {}
+	for raw_entry in p as Array:
+		if not raw_entry is Dictionary:
+			return false
+		var entry: Dictionary = raw_entry as Dictionary
+		var instance_id: String = str(entry.get("component_instance_id", ""))
+		if not entry.has("mounted") or typeof(entry.mounted) != TYPE_BOOL \
+				or instance_id.is_empty() or seen_ids.has(instance_id) \
+				or not _saved_source_lot_is_strict(entry, str(entry.get("item_form", ""))):
+			return false
+		var lot_id: String = str((entry.source_lot as Dictionary).get("lot_id", ""))
+		# Dismount retains the old slot row as immutable placement history while
+		# the same physical lot moves through inventory to another slot or ship.
+		# Only mounted rows own physical authority and therefore must be unique.
+		if entry.mounted:
+			if mounted_lot_ids.has(lot_id):
+				return false
+			mounted_lot_ids[lot_id] = true
+		var authority_sequence: int = _condition_lot_sequence(lot_id)
+		var origin_ship_id: String = str(
+			((entry.source_lot as Dictionary).get("origin", {}) as Dictionary).get(
+				"ship_id", ""))
+		# This ceiling belongs to the ship that allocated the namespace. A lot
+		# moved from another ship retains its immutable source sequence and cannot
+		# consume or forge this destination's counter.
+		if authority_sequence > int(summary.condition_lot_sequence) \
+				and (allocator_ship_id.is_empty() or origin_ship_id == allocator_ship_id):
+			return false
+		seen_ids[instance_id] = true
+		next_placed.append(entry.duplicate(true))
+	seed_value = int(summary.seed)
+	condition_authority_version = int(summary.condition_authority_version)
+	condition_lot_sequence = int(summary.condition_lot_sequence)
+	placed = next_placed
+	# Legacy summaries may contain fit fields/physical_slots. Preserve dynamic
+	# records for migration, but never restore those fields as fit authority.
+	for index in range(placed.size()):
+		if not (placed[index] is Dictionary):
+			continue
+		var entry: Dictionary = (placed[index] as Dictionary).duplicate(true)
+		for fit_key in [
+			"footprint_cells", "socket_type", "allowed_component_types", "soft_linked"]:
+			entry.erase(fit_key)
+		placed[index] = entry
+	physical_slots.clear()
+	rejected_saved_components = (rejected_v as Array).duplicate(true)
 	return true
+
+
+## Rebuild current physical policy from the active layout, then overlay only
+## saved component/mounted dynamics whose stable slot IDs still exist and fit.
+func restore_from_layout(
+		layout: Dictionary,
+		catalog: RefCounted,
+		p_seed: int,
+		summary: Dictionary,
+		occupied_cells: Dictionary = {}) -> bool:
+	var saved_v: Variant = summary.get("placed", [])
+	if not (saved_v is Array) \
+			or int(summary.get("condition_authority_version", 0)) != CONDITION_AUTHORITY_VERSION \
+			or not _is_nonnegative_json_integer(summary.get("condition_lot_sequence", null)):
+		return false
+	var prior_rejected_v: Variant = summary.get("rejected_saved_components", [])
+	var prior_rejected: Array = (prior_rejected_v as Array).duplicate(true) if prior_rejected_v is Array else []
+	var saved_by_slot: Dictionary = {}
+	for saved_entry_v in saved_v as Array:
+		if not (saved_entry_v is Dictionary):
+			return false
+		var saved_entry: Dictionary = (saved_entry_v as Dictionary).duplicate(true)
+		var saved_id: String = str(saved_entry.get("component_instance_id", ""))
+		var component_id: String = str(saved_entry.get("component_id", ""))
+		if not saved_entry.has("mounted") or typeof(saved_entry.mounted) != TYPE_BOOL \
+				or saved_id.is_empty() or saved_by_slot.has(saved_id) or component_id.is_empty():
+			return false
+		var expected_item_form: String = ""
+		if catalog != null and catalog.has_method("get_component"):
+			var definition: Dictionary = catalog.call("get_component", component_id)
+			expected_item_form = str(definition.get("item_form", component_id))
+		if not _saved_source_lot_is_strict(saved_entry, expected_item_form):
+			return false
+		saved_by_slot[saved_id] = saved_entry
+	populate(layout, catalog, p_seed, occupied_cells)
+	rejected_saved_components = prior_rejected
+	var generated_by_slot: Dictionary = {}
+	for generated_v in placed:
+		if generated_v is Dictionary:
+			generated_by_slot[str((generated_v as Dictionary).get("component_instance_id", ""))] = generated_v
+	var restored: Array = []
+	var restored_slot_ids: Dictionary = {}
+	for slot_v in physical_slots:
+		if not (slot_v is Dictionary):
+			continue
+		var slot: Dictionary = slot_v as Dictionary
+		var slot_id: String = str(slot.get("slot_id", ""))
+		var saved: Dictionary = saved_by_slot.get(slot_id, {}) as Dictionary
+		if saved.is_empty():
+			if generated_by_slot.has(slot_id):
+				restored.append((generated_by_slot[slot_id] as Dictionary).duplicate(true))
+			continue
+		restored_slot_ids[slot_id] = true
+		var component_id: String = str(saved.get("component_id", ""))
+		var fit: Dictionary = catalog.call("validate_component_fit", component_id, slot) if catalog != null and catalog.has_method("validate_component_fit") else {"ok": false, "reason": "missing_fit_contract"}
+		if not bool(fit.get("ok", false)):
+			_quarantine_saved(slot_id, str(fit.get("reason", "incompatible_fit")), saved)
+			continue
+		if not saved.mounted:
+			var dismounted: Dictionary = _entry_from_saved(slot, saved, catalog)
+			if not dismounted.is_empty():
+				dismounted["mounted"] = false
+				restored.append(dismounted)
+			continue
+		var mounted: Dictionary = _entry_from_saved(slot, saved, catalog)
+		if not mounted.is_empty():
+			mounted["mounted"] = true
+			restored.append(mounted)
+	for saved_slot_v in saved_by_slot.keys():
+		var saved_slot_id: String = str(saved_slot_v)
+		if not restored_slot_ids.has(saved_slot_id):
+			_quarantine_saved(saved_slot_id, "slot_removed", saved_by_slot[saved_slot_v] as Dictionary)
+	placed = restored
+	condition_authority_version = CONDITION_AUTHORITY_VERSION
+	condition_lot_sequence = int(summary.condition_lot_sequence)
+	return not physical_slots.is_empty()
+
+
+func _quarantine_saved(slot_id: String, reason: String, saved: Dictionary) -> void:
+	rejected_saved_components.append({
+		"slot_id": slot_id,
+		"reason": reason,
+		"saved_entry": saved.duplicate(true),
+	})
 
 
 func fingerprint() -> String:
@@ -401,6 +753,98 @@ func get_entry(instance_id: String) -> Dictionary:
 	if idx < 0:
 		return {}
 	return (placed[idx] as Dictionary).duplicate(true)
+
+
+func get_physical_slot(slot_id: String) -> Dictionary:
+	for slot_v in physical_slots:
+		if slot_v is Dictionary and str((slot_v as Dictionary).get("slot_id", "")) == slot_id:
+			return (slot_v as Dictionary).duplicate(true)
+	return {}
+
+
+func _entry_from_saved(slot: Dictionary, saved: Dictionary, catalog: RefCounted) -> Dictionary:
+	var component_id: String = str(saved.get("component_id", ""))
+	if catalog == null or not catalog.has_method("has_component") or not bool(catalog.call("has_component", component_id)):
+		return {}
+	var definition: Dictionary = catalog.call("get_component", component_id)
+	var entry: Dictionary = {
+		"component_instance_id": str(slot.get("slot_id", "")),
+		"component_id": component_id,
+		"room_id": str(slot.get("room_id", "")),
+		"slot_kind": str(slot.get("slot_kind", "")),
+		"slot_index": int(slot.get("slot_index", -1)),
+		"cell": slot.get("cell", ""),
+		"against_wall": bool(slot.get("against_wall", false)),
+		"component_slot_profile_id": str(slot.get("component_slot_profile_id", "")),
+		"footprint_cells": slot.get("footprint_cells", []),
+		"socket_type": str(slot.get("socket_type", "")),
+		"allowed_component_types": slot.get("allowed_component_types", []),
+		"condition": clampf(float(saved.get("condition", definition.get("condition_default", 1.0))), 0.0, 1.0),
+		"item_form": str(definition.get("item_form", component_id)),
+		"mass": maxf(0.0, float(definition.get("mass", 0.0))),
+		"linked_system": str(definition.get("linked_system", "")),
+		"linked_subcomponent": str(definition.get("linked_subcomponent", "")),
+		"mounted": bool(saved.get("mounted", true)),
+		"ship_mod_managed": bool(saved.get("ship_mod_managed", false)),
+	}
+	var source_lot_v: Variant = saved.get("source_lot", null)
+	if source_lot_v is Dictionary and _valid_source_lot(source_lot_v as Dictionary, str(entry.get("item_form", ""))):
+		entry["source_lot"] = (source_lot_v as Dictionary).duplicate(true)
+		entry["source_lot_id"] = str((source_lot_v as Dictionary).get("lot_id", ""))
+		entry["condition"] = float((source_lot_v as Dictionary).get("condition", entry.get("condition", 1.0)))
+	return entry
+
+
+## Converts generated/authored placement records into stable physical-slot
+## descriptors for a specific ship.  These are the only mount targets P11 accepts.
+func get_physical_slot_descriptors(ship_id: String) -> Array:
+	var descriptors: Array = []
+	if ship_id.is_empty():
+		return descriptors
+	var mounted_by_slot: Dictionary = {}
+	for entry_v in placed:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_v as Dictionary
+		var slot_id: String = str(entry.get("component_instance_id", ""))
+		var kind: String = str(entry.get("slot_kind", ""))
+		if slot_id.is_empty() or kind.is_empty():
+			continue
+		mounted_by_slot[slot_id] = bool(entry.get("mounted", true))
+	if not physical_slots.is_empty():
+		for descriptor_v in physical_slots:
+			if typeof(descriptor_v) != TYPE_DICTIONARY:
+				continue
+			var descriptor: Dictionary = (descriptor_v as Dictionary).duplicate(true)
+			var descriptor_id: String = str(descriptor.get("slot_id", ""))
+			if descriptor_id.is_empty():
+				continue
+			descriptor["ship_id"] = ship_id
+			descriptor["occupied"] = bool(mounted_by_slot.get(descriptor_id, false))
+			if descriptor["occupied"]:
+				var mounted_entry: Dictionary = get_entry(descriptor_id)
+				for dynamic_key in ["component_id", "item_form", "condition", "mass", "linked_system", "linked_subcomponent"]:
+					descriptor[dynamic_key] = mounted_entry.get(dynamic_key, "")
+			descriptors.append(descriptor)
+		return descriptors
+	return descriptors
+
+
+## Refresh exact current profile data for already-authored descriptors. Missing
+## profile IDs remain unusable; slot_kind is deliberately never consulted.
+func ensure_physical_slot_profiles(catalog: RefCounted) -> void:
+	if catalog == null or not catalog.has_method("get_slot_profile"):
+		return
+	for index in range(physical_slots.size()):
+		if not (physical_slots[index] is Dictionary):
+			continue
+		var existing: Dictionary = (physical_slots[index] as Dictionary).duplicate(true)
+		var profile: Dictionary = catalog.call("get_slot_profile", str(existing.get("component_slot_profile_id", "")))
+		if profile.is_empty():
+			continue
+		for key in ["footprint_cells", "socket_type", "allowed_component_types"]:
+			existing[key] = profile.get(key, [] if key != "socket_type" else "")
+		physical_slots[index] = existing
 
 
 func is_mounted(instance_id: String) -> bool:
@@ -443,7 +887,24 @@ func dismount(instance_id: String) -> Dictionary:
 	out["component_id"] = str(e.get("component_id", ""))
 	out["linked_system"] = str(e.get("linked_system", ""))
 	out["linked_subcomponent"] = str(e.get("linked_subcomponent", ""))
+	var source_lot_v: Variant = e.get("source_lot", null)
+	if source_lot_v is Dictionary and _valid_source_lot(source_lot_v as Dictionary, item_form):
+		out["item_lot"] = (source_lot_v as Dictionary).duplicate(true)
 	return out
+
+
+## Roll back a coordinator-side destination failure without reconstructing or
+## replacing the authoritative mounted record.
+func restore_dismounted(instance_id: String) -> bool:
+	var idx: int = find_index(instance_id)
+	if idx < 0:
+		return false
+	var entry: Dictionary = placed[idx]
+	if bool(entry.get("mounted", true)):
+		return false
+	entry["mounted"] = true
+	placed[idx] = entry
+	return true
 
 
 ## Remount into a free or previously emptied slot. Consumes one item_form from inventory dict.
@@ -454,7 +915,18 @@ func mount(
 		slot_kind: String,
 		slot_index: int,
 		inventory: Dictionary,
-		catalog: RefCounted = null) -> Dictionary:
+		catalog: RefCounted = null,
+		source_lot: Dictionary = {}) -> Dictionary:
+	return mount_by_slot_id(
+		"%s_%s_%d" % [room_id, slot_kind, slot_index], item_form, inventory, catalog, source_lot)
+
+
+func mount_by_slot_id(
+		slot_id: String,
+		item_form: String,
+		inventory: Dictionary,
+		catalog: RefCounted,
+		source_lot: Dictionary = {}) -> Dictionary:
 	var out: Dictionary = {
 		"ok": false,
 		"reason": "",
@@ -464,8 +936,30 @@ func mount(
 	if item_form.is_empty():
 		out["reason"] = "no_item"
 		return out
+	if catalog == null or not catalog.has_method("component_id_for_item_form") or not catalog.has_method("get_component"):
+		out["reason"] = "physical_slot_required"
+		return out
+	var slot: Dictionary = get_physical_slot(slot_id)
+	if slot.is_empty():
+		out["reason"] = "unknown_slot"
+		return out
+	var component_id: String = str(catalog.call("component_id_for_item_form", item_form))
+	if component_id.is_empty():
+		out["reason"] = "unknown_component"
+		return out
+	var definition: Dictionary = catalog.call("get_component", component_id)
+	if definition.is_empty() or str(definition.get("item_form", component_id)) != item_form:
+		out["reason"] = "unknown_component"
+		return out
+	var fit: Dictionary = catalog.call("validate_component_fit", component_id, slot) if catalog.has_method("validate_component_fit") else {"ok": false, "reason": "missing_fit_contract"}
+	if not bool(fit.get("ok", false)):
+		out["reason"] = str(fit.get("reason", "incompatible_fit"))
+		return out
 	if int(inventory.get(item_form, 0)) < 1:
 		out["reason"] = "missing_item"
+		return out
+	if not source_lot.is_empty() and not _valid_source_lot(source_lot, item_form):
+		out["reason"] = "invalid_source_lot"
 		return out
 	# Prefer remounting an existing dismounted entry in this slot.
 	var target_idx: int = -1
@@ -473,11 +967,7 @@ func mount(
 		if typeof(placed[i]) != TYPE_DICTIONARY:
 			continue
 		var e: Dictionary = placed[i]
-		if str(e.get("room_id", "")) != room_id:
-			continue
-		if str(e.get("slot_kind", "")) != slot_kind:
-			continue
-		if int(e.get("slot_index", -1)) != slot_index:
+		if str(e.get("component_instance_id", "")) != slot_id:
 			continue
 		target_idx = i
 		break
@@ -486,54 +976,108 @@ func mount(
 		if bool(existing.get("mounted", true)):
 			out["reason"] = "slot_occupied"
 			return out
-		# Must match the item form that was removed (or catalog-compatible).
-		var want: String = str(existing.get("item_form", existing.get("component_id", "")))
-		if want != item_form:
-			out["reason"] = "wrong_item"
-			return out
-		existing["mounted"] = true
-		placed[target_idx] = existing
-		inventory[item_form] = int(inventory.get(item_form, 0)) - 1
-		if int(inventory[item_form]) <= 0:
-			inventory.erase(item_form)
-		out["ok"] = true
-		out["instance_id"] = str(existing.get("component_instance_id", ""))
-		return out
-	# Fresh mount into empty slot — require catalog to resolve component_id from item_form.
-	if catalog == null or not catalog.has_method("component_id_for_item_form"):
-		out["reason"] = "slot_empty_needs_catalog"
-		return out
-	var component_id: String = str(catalog.call("component_id_for_item_form", item_form))
-	if component_id.is_empty():
-		out["reason"] = "unknown_item_form"
-		return out
-	var def: Dictionary = catalog.call("get_component", component_id)
-	var entry: Dictionary = {
-		"component_instance_id": "%s_%s_%d" % [room_id, slot_kind, slot_index],
+	var mounted: Dictionary = _entry_from_saved(slot, {
 		"component_id": component_id,
-		"room_id": room_id,
-		"slot_kind": slot_kind,
-		"slot_index": slot_index,
-		"cell": "",
-		"against_wall": slot_kind == "wall",
-		"condition": float(def.get("condition_default", 1.0)),
-		"item_form": item_form,
-		"mass": float(def.get("mass", 10.0)),
-		"linked_system": str(def.get("linked_system", "")),
-		"linked_subcomponent": str(def.get("linked_subcomponent", "")),
+		"condition": definition.get("condition_default", 1.0),
 		"mounted": true,
-	}
-	# Collision check
-	if occupancy_keys().has("%s|%s|%d" % [room_id, slot_kind, slot_index]):
-		out["reason"] = "slot_occupied"
+		"ship_mod_managed": true,
+	}, catalog)
+	if mounted.is_empty():
+		out["reason"] = "unknown_component"
 		return out
-	placed.append(entry)
+	if not source_lot.is_empty():
+		mounted["source_lot"] = source_lot.duplicate(true)
+		mounted["source_lot_id"] = str(source_lot.get("lot_id", ""))
+		mounted["condition"] = float(source_lot.get("condition", mounted.get("condition", 1.0)))
+	if target_idx >= 0:
+		placed[target_idx] = mounted
+	else:
+		placed.append(mounted)
 	inventory[item_form] = int(inventory.get(item_form, 0)) - 1
 	if int(inventory[item_form]) <= 0:
 		inventory.erase(item_form)
 	out["ok"] = true
-	out["instance_id"] = str(entry["component_instance_id"])
+	out["instance_id"] = slot_id
+	out["component_id"] = component_id
 	return out
+
+
+static func _valid_source_lot(lot: Dictionary, expected_item_form: String) -> bool:
+	for key in ["lot_id", "item_id", "quantity", "quality_score", "quality_tier", "condition", "origin"]:
+		if not lot.has(key):
+			return false
+	if typeof(lot.lot_id) != TYPE_STRING or typeof(lot.item_id) != TYPE_STRING \
+			or typeof(lot.quality_tier) != TYPE_STRING \
+			or str(lot.lot_id).is_empty() or str(lot.item_id) != expected_item_form \
+			or not _is_nonnegative_json_integer(lot.quantity) or int(lot.quantity) != 1 \
+			or str(lot.quality_tier).is_empty():
+		return false
+	if not (lot.get("origin", null) is Dictionary):
+		return false
+	var score_v: Variant = lot.get("quality_score", null)
+	var condition_v: Variant = lot.get("condition", null)
+	if (typeof(score_v) not in [TYPE_INT, TYPE_FLOAT]) or (typeof(condition_v) not in [TYPE_INT, TYPE_FLOAT]):
+		return false
+	var score: float = float(score_v)
+	var condition: float = float(condition_v)
+	if not is_finite(score) or score < 0.0 or score > 1.0 \
+			or not is_finite(condition) or condition < 0.0 or condition > 1.0:
+		return false
+	return str(lot.get("quality_tier")) == QualityTierResolverScript.tier_for_score(score)
+
+
+static func _saved_source_lot_is_strict(entry: Dictionary, expected_item_form: String) -> bool:
+	if not entry.has("source_lot"):
+		return false
+	var source_lot: Variant = entry.source_lot
+	if not source_lot is Dictionary or (source_lot as Dictionary).is_empty():
+		return false
+	var expected: String = expected_item_form
+	if expected.is_empty():
+		expected = str((source_lot as Dictionary).get("item_id", ""))
+	if expected.is_empty() or not _valid_source_lot(source_lot as Dictionary, expected):
+		return false
+	var lot: Dictionary = source_lot as Dictionary
+	var origin: Dictionary = lot.origin as Dictionary
+	var origin_kind: String = str(origin.get("kind", ""))
+	var lot_id: String = str(lot.get("lot_id", ""))
+	var reserved_component_namespace: bool = lot_id.begins_with("ship:") \
+		and lot_id.find(":components/lot-") >= 0
+	if reserved_component_namespace \
+			and origin_kind not in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		return false
+	if origin_kind in [CONDITION_MODE_GENERATED, CONDITION_MODE_LEGACY]:
+		var origin_ship_id: String = str(origin.get("ship_id", ""))
+		# origin.slot_id records where the immutable lot was created. It does not
+		# change when the component is installed into another physical slot.
+		if origin_ship_id.is_empty() or str(origin.get("slot_id", "")).is_empty() \
+				or not lot_id.begins_with("ship:%s:components/lot-" % origin_ship_id):
+			return false
+		if origin_kind == CONDITION_MODE_GENERATED \
+				and not _is_json_integer(origin.get("placement_seed", null)):
+			return false
+	return true
+
+
+static func _condition_lot_sequence(lot_id: String) -> int:
+	var marker: String = ":components/lot-"
+	var marker_index: int = lot_id.find(marker)
+	if marker_index < 0:
+		return 0
+	var suffix: String = lot_id.substr(marker_index + marker.length())
+	return int(suffix) if suffix.is_valid_int() and int(suffix) > 0 else 2147483647
+
+
+static func _is_nonnegative_json_integer(value: Variant) -> bool:
+	return _is_json_integer(value) and float(value) >= 0.0
+
+
+static func _is_json_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	var number: float = float(value)
+	return is_finite(number) and absf(number) <= 9007199254740991.0 \
+		and number == floor(number)
 
 
 func mounted_count() -> int:

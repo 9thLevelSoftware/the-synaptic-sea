@@ -1,0 +1,15 @@
+{
+  "kind": "isolated_byte_identical_runtime_physical_volume_smoke",
+  "probe_root": "C:\\Users\\dasbl\\AppData\\Local\\Temp\\synaptic-p17-final-isolated-264513f0bfba45faa98b0cd15440cd5d",
+  "appdata": "C:\\Users\\dasbl\\AppData\\Local\\Temp\\synaptic-p17-final-isolated-264513f0bfba45faa98b0cd15440cd5d/appdata",
+  "localappdata": "C:\\Users\\dasbl\\AppData\\Local\\Temp\\synaptic-p17-final-isolated-264513f0bfba45faa98b0cd15440cd5d/localappdata",
+  "timeout_seconds": 20,
+  "timed_out": false,
+  "exit_code": 0,
+  "stdout_log": "runtime_physical_volume.stdout.log",
+  "stderr_log": "runtime_physical_volume.stderr.log",
+  "helper_sha256": "49BEAFDF7B79C01BF9648B363484EECA91DD1DB275676B691BF2C721C19D8E8E",
+  "smoke_sha256": "303BCD1F1AFAC57BEA079884EBD790D91C7319B7749A70C160459100671393A5",
+  "catalog_sha256": "6283C31A17F9BC293CD40BDE6FF5A1D631012FA79A1807DE13A2C7076C73B4E4",
+  "data_sha256": "44220E04A0AB4B12B6FC9B486238AAF5B159A8F8490ABC7BC8D513895ED0F10C"
+}

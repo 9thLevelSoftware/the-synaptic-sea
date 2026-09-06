@@ -1,12 +1,10 @@
 extends SceneTree
 
-## PKG-B2.3b: wrench interact starts dismount_component; tick resolves strip into inventory.
+## PKG-B2.3b: wrench interact starts a timed dismount and commits its exact returned lot.
 ## Marker: COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
-const TIMEOUT_FRAMES: int = 300
-const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
-const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
+const TIMEOUT_FRAMES: int = 400
 
 var main_node: Node
 var playable
@@ -15,6 +13,7 @@ var finished: bool = false
 var phase: String = "wait"
 var tick_accum: float = 0.0
 var instance_id: String = ""
+var item_form: String = ""
 
 
 func _initialize() -> void:
@@ -42,73 +41,40 @@ func _on_frame() -> void:
 func _start() -> void:
 	if playable.threat_manager != null:
 		playable.threat_manager.threats.clear()
-	var cat = ComponentCatalogScript.new()
-	if not cat.load_default():
-		_fail("catalog"); return
-	var layout: Dictionary = {
-		"rooms": [{
-			"id": "airlock_01",
-			"room_role": "engineering",
-			"wall_slots": [{"against_wall": true, "cell": "(0,0)"}],
-			"center_slots": [],
-			"structural_placements": [
-				{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
-			],
-		}],
-	}
-	# Override layout access by stuffing ship built_layout if empty of slots.
-	if playable.current_ship != null:
-		var live: Dictionary = playable._active_layout_for_work()
-		# Merge synthetic slots into first room of live layout so room centers resolve.
-		if not live.is_empty():
-			var rooms: Array = live.get("rooms", [])
-			if rooms.size() > 0 and typeof(rooms[0]) == TYPE_DICTIONARY:
-				var r0: Dictionary = (rooms[0] as Dictionary).duplicate(true)
-				r0["wall_slots"] = [{"against_wall": true, "cell": "(0,0)"}]
-				r0["room_role"] = "engineering"
-				rooms[0] = r0
-				live["rooms"] = rooms
-				playable.current_ship.built_layout = live
-				layout = live
-	var place = ComponentPlacementStateScript.new()
-	var n: int = place.populate(layout, cat, 55)
-	if n < 1:
-		_fail("populate"); return
-	instance_id = str(place.placed[0].get("component_instance_id", ""))
-	playable.component_placement_state = place
-	playable.inventory_state.add_item("wrench", 1)
-	# Stand at origin (near room centers)
-	if playable.player.has_method("teleport_to"):
-		playable.player.teleport_to(Vector3(0.5, 0.0, 0.5))
+	var fixture: Dictionary = playable.prepare_p12_component_work_fixture_for_validation()
+	if not bool(fixture.get("ok", false)):
+		_fail("fixture: %s" % str(fixture.get("reason", ""))); return
+	instance_id = str(fixture.get("instance_id", ""))
+	item_form = str(fixture.get("item_form", ""))
+	var panel = playable.get_ship_modification_panel_for_validation()
+	if panel != null and panel.is_open():
+		panel.close()
+	var before_qty: int = playable.inventory_state.get_quantity(item_form)
 	if not playable.try_work_action_interact_for_validation():
 		_fail("interact start failed"); return
-	if not playable.work_action_driver.is_working():
+	if not playable.has_active_ship_work_for_validation() or playable.work_action_driver.work == null:
 		_fail("not working"); return
+	if not playable.component_placement_state.is_mounted(instance_id):
+		_fail("dismount mutated before timed commit"); return
 	var aid: String = str(playable.work_action_driver.work.get("action_id"))
 	if aid != "dismount_component" and aid != "unbolt_component":
 		_fail("expected dismount action got %s" % aid); return
-	# Nearest-component targeting may pick a different mounted instance than placed[0].
 	instance_id = str(playable.work_action_driver.work.get("target_id"))
-	if instance_id.is_empty():
-		_fail("no target_id"); return
+	set_meta("before_qty", before_qty)
 	phase = "tick"
-	tick_accum = 0.0
 
 
 func _tick() -> void:
-	playable._process(0.5)
+	playable.advance_active_ship_work_for_validation(0.5)
 	tick_accum += 0.5
-	if playable.work_action_driver.is_working():
+	if playable.has_active_ship_work_for_validation():
 		if tick_accum > 40.0:
-			_fail("timeout"); return
+			_fail("timeout")
 		return
-	var target: String = instance_id
-	if not playable.work_action_driver.last_resolve.is_empty():
-		target = str(playable.work_action_driver.last_resolve.get("instance_id", instance_id))
-	if playable.component_placement_state.is_mounted(target):
-		_fail("still mounted after complete id=%s resolve=%s" % [
-			target, str(playable.work_action_driver.last_resolve)
-		]); return
+	if playable.component_placement_state.is_mounted(instance_id):
+		_fail("still mounted after complete id=%s" % instance_id); return
+	if playable.inventory_state.get_quantity(item_form) <= int(get_meta("before_qty", 0)):
+		_fail("exact dismount yield missing"); return
 	print("COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true")
 	finished = true
 	quit(0)

@@ -99,8 +99,32 @@ func _init() -> void:
 		quit(1)
 		return
 
+	# --- Case 4: pure documents are the exact production loader input -------
+	var native_documents: Dictionary = generator.generate_documents_from_seed(
+		777, ShipBlueprintScript.Size.LIFE_BOAT, ShipBlueprintScript.Condition.DAMAGED)
+	var native_ship: Node3D = generator.generate_from_seed(
+		777, ShipBlueprintScript.Size.LIFE_BOAT, ShipBlueprintScript.Condition.DAMAGED)
+	if not bool(native_documents.get("ok", false)) \
+			or not _assert_document_equivalence("selected", native_documents, native_ship):
+		_free_node(native_ship)
+		quit(1)
+		return
+	_free_node(native_ship)
+
+	var fallback_blueprint = ShipBlueprintScript.new(
+		ShipBlueprintScript.Size.LIFE_BOAT, ShipBlueprintScript.Condition.DAMAGED, 778)
+	var fallback_documents: Dictionary = generator._generate_documents_for_blueprint(
+		fallback_blueprint)
+	var fallback_ship: Node3D = generator.generate(fallback_blueprint)
+	if not bool(fallback_documents.get("ok", false)) \
+			or not _assert_document_equivalence("fallback", fallback_documents, fallback_ship):
+		_free_node(fallback_ship)
+		quit(1)
+		return
+	_free_node(fallback_ship)
+
 	# --- Pass ------------------------------------------------------
-	print("SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=%d small_rooms=%d" % [
+	print("SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms=%d small_rooms=%d" % [
 		life_rooms, small_rooms,
 	])
 	quit(0)
@@ -161,6 +185,34 @@ func _room_ids(ship: Node3D) -> Array[String]:
 	for room in ship.layout_doc.get("rooms", []):
 		ids.append(str(room.get("id", "")))
 	return ids
+
+
+func _assert_document_equivalence(
+		label: String, documents: Dictionary, ship: Node3D) -> bool:
+	if not _assert_ship("%s_documents" % label, ship):
+		return false
+	if _has_runtime_value(documents):
+		push_error("SHIP GENERATOR FAIL %s pure documents contain runtime objects" % label)
+		return false
+	if ship.layout_doc != documents.get("layout", {}) \
+			or ship.gameplay_doc != documents.get("gameplay", {}):
+		push_error("SHIP GENERATOR FAIL %s scene did not consume matching documents" % label)
+		return false
+	return true
+
+
+func _has_runtime_value(value: Variant) -> bool:
+	if value is Node or value is RID:
+		return true
+	if value is Array:
+		for entry in value as Array:
+			if _has_runtime_value(entry):
+				return true
+	elif value is Dictionary:
+		for entry in (value as Dictionary).values():
+			if _has_runtime_value(entry):
+				return true
+	return false
 
 
 func _free_node(node: Node) -> void:

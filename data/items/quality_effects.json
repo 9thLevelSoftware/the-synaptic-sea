@@ -1,0 +1,233 @@
+{
+  "items": {
+    "plating": {
+      "consumer": "quantity_only"
+    },
+    "circuit_board": {
+      "consumer": "quantity_only"
+    },
+    "power_cell": {
+      "consumer": "quantity_only"
+    },
+    "sensor_module": {
+      "consumer": "quantity_only"
+    },
+    "thruster_nozzle": {
+      "consumer": "quantity_only"
+    },
+    "fuel_line": {
+      "consumer": "quantity_only"
+    },
+    "welder": {
+      "consumer": "tool_work_speed"
+    },
+    "plasma_cutter": {
+      "consumer": "tool_work_speed"
+    },
+    "oxygen_filter": {
+      "consumer": "quantity_only"
+    },
+    "sealant": {
+      "consumer": "tool_work_speed"
+    },
+    "data_core": {
+      "consumer": "quantity_only"
+    },
+    "reactor_core": {
+      "consumer": "quantity_only"
+    },
+    "medkit": {
+      "consumer": "quantity_only"
+    },
+    "stimulant": {
+      "consumer": "quantity_only"
+    },
+    "nanite_patch": {
+      "consumer": "quantity_only"
+    },
+    "cooked_meal": {
+      "consumer": "consumable_potency"
+    },
+    "synthesized_paste": {
+      "consumer": "consumable_potency"
+    },
+    "adhesive_paste": {
+      "consumer": "quantity_only"
+    },
+    "coolant_fluid": {
+      "consumer": "quantity_only"
+    },
+    "nanite_slurry": {
+      "consumer": "quantity_only"
+    },
+    "field_bandage": {
+      "consumer": "quantity_only"
+    },
+    "emergency_patch": {
+      "consumer": "quantity_only"
+    },
+    "improvised_splint": {
+      "consumer": "quantity_only"
+    },
+    "filter_mask": {
+      "consumer": "quantity_only"
+    },
+    "ferrous_shard": {
+      "consumer": "quantity_only"
+    },
+    "scrap_metal": {
+      "consumer": "quantity_only"
+    },
+    "wiring_bundle": {
+      "consumer": "quantity_only"
+    },
+    "graphene_weave": {
+      "consumer": "quantity_only"
+    },
+    "pneumatic_actuator": {
+      "consumer": "quantity_only"
+    },
+    "cryo_unit": {
+      "consumer": "quantity_only"
+    },
+    "radiation_suit_lining": {
+      "consumer": "quantity_only"
+    },
+    "memory_drive": {
+      "consumer": "quantity_only"
+    },
+    "solenoid_rig": {
+      "consumer": "quantity_only"
+    },
+    "biomatter_filter": {
+      "consumer": "quantity_only"
+    },
+    "hydraulic_clamp": {
+      "consumer": "quantity_only"
+    },
+    "thermal_pad": {
+      "consumer": "quantity_only"
+    },
+    "filter_cartridge": {
+      "consumer": "quantity_only"
+    },
+    "graphene_ink": {
+      "consumer": "quantity_only"
+    },
+    "fiber_strand": {
+      "consumer": "quantity_only"
+    },
+    "docking_brace": {
+      "consumer": "quantity_only"
+    },
+    "nav_chip": {
+      "consumer": "quantity_only"
+    },
+    "propulsion_coupling": {
+      "consumer": "quantity_only"
+    },
+    "emergency_beacon": {
+      "consumer": "quantity_only"
+    },
+    "survival_tent": {
+      "consumer": "quantity_only"
+    },
+    "breather_mask": {
+      "consumer": "quantity_only"
+    },
+    "radiation_badge": {
+      "consumer": "quantity_only"
+    },
+    "portable_oxygen_pump_mk2": {
+      "consumer": "quantity_only"
+    },
+    "junction_calibrator_mk2": {
+      "consumer": "quantity_only"
+    },
+    "fishing_line": {
+      "consumer": "quantity_only"
+    },
+    "improvised_torch": {
+      "consumer": "quantity_only"
+    },
+    "titanium_ingot": {
+      "consumer": "quantity_only"
+    },
+    "hull_sealant": {
+      "consumer": "repair_integrity"
+    },
+    "fire_extinguisher": {
+      "consumer": "quantity_only"
+    },
+    "bandage_kit": {
+      "consumer": "consumable_potency"
+    },
+    "field_medkit": {
+      "consumer": "consumable_potency"
+    },
+    "rad_patch": {
+      "consumer": "consumable_potency"
+    },
+    "antitoxin": {
+      "consumer": "consumable_potency"
+    },
+    "focus_ampoule": {
+      "consumer": "consumable_potency"
+    },
+    "combat_stim": {
+      "consumer": "consumable_potency"
+    },
+    "calm_patch": {
+      "consumer": "consumable_potency"
+    },
+    "reactor_console": {
+      "consumer": "component_efficiency"
+    },
+    "console_unit": {
+      "consumer": "component_efficiency"
+    },
+    "conduit_segment": {
+      "consumer": "component_efficiency"
+    },
+    "pump_assembly": {
+      "consumer": "component_efficiency"
+    },
+    "wall_locker": {
+      "consumer": "component_efficiency"
+    },
+    "machinery_block": {
+      "consumer": "component_efficiency"
+    },
+    "air_recycler_unit": {
+      "consumer": "component_efficiency"
+    },
+    "nav_console": {
+      "consumer": "component_efficiency"
+    },
+    "thruster_control": {
+      "consumer": "component_efficiency"
+    },
+    "sensor_rack": {
+      "consumer": "component_efficiency"
+    },
+    "plating_plate": {
+      "consumer": "component_efficiency"
+    },
+    "welding_lance": {
+      "consumer": "tool_work_speed"
+    },
+    "wrench": {
+      "consumer": "tool_work_speed"
+    },
+    "prybar": {
+      "consumer": "tool_work_speed"
+    },
+    "multitool": {
+      "consumer": "tool_work_speed"
+    },
+    "hull_plate": {
+      "consumer": "repair_integrity"
+    }
+  },
+  "version": "p05-quality-effects-2"
+}

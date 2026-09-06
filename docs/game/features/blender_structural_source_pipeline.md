@@ -46,6 +46,15 @@ The source-recovery allowlist contains these 15 modules:
 ## Future promotion gate
 A later, separately approved plan must define staged export paths, GLB byte-change review, structural variant treatment, wrapper/contract compatibility, Godot import, and the full state-safe regression bundle before any source can affect runtime assets.
 
+## Acceptance criteria
+
+- **Workflow:** Recovery produces one external `.blend` and one matching `.source.json` for each of the 15 allowlisted structural modules.
+- **Workflow:** Every recovered source contains the identity `ModuleRoot_<module_id>`, `Geometry`, `AuthoringHelpers`, origin and floor-center empties, every contract socket empty, and a non-rendering contract-bounds collision proxy.
+- **Workflow:** Recovered source records and helpers match the structural JSON contract, including the exact contract `[x, y, z]` to Blender `[x, z, y]` coordinate mapping.
+- **Workflow:** The documented recovery and validation commands process the complete 15-module allowlist and report contract-valid sources.
+- **Constraint:** Source recovery performs no GLB export, runtime imported-asset replacement, wrapper/manifest/contract edit, or manual `.source.json` edit.
+- **Deferred:** Runtime promotion remains gated on a separately approved plan covering staged paths, GLB byte review, variants, wrapper compatibility, Godot import, and the full state-safe regression bundle.
+
 ## Tools
 - `tools/structural_source_contract.py` — Pure-Python contract loading and source-record serialization
 - `tools/recover_modules.py` — Blender CLI that imports GLBs and writes .blend/.source.json

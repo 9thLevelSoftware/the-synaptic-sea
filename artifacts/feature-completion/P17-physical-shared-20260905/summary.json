@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "marker_count": 1,
+  "diagnostics": [],
+  "seconds": 0.2649999999994179,
+  "script_sha256": "303bcd1f1afac57bea079884ebd790d91c7319b7749a70c160459100671393a5",
+  "stdout_sha256": "345f509b2a0cef449fae03e7d26787b551495e87c32e3a43f26ccd23f5b443c9",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

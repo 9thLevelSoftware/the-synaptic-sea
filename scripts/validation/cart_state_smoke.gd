@@ -33,13 +33,17 @@ func _init() -> void:
 	cart.get_hold().add_item("scrap_metal", 4)
 	cart.push_speed_multiplier = 0.55   # non-default so the round-trip assertion is falsifiable
 	var summary: Dictionary = cart.get_summary()
-	var clone = CartStateScript.create("x", 1.0)
+	var clone = CartStateScript.create("", 1.0)
 	assert(clone.apply_summary(summary) == true, "apply_summary accepts")
 	assert(clone.cart_id == "cart_1", "cart_id round-tripped")
 	assert(clone.parked_ship_id == "home", "parked_ship_id round-tripped")
 	assert(clone.parked_position == Vector3(2, 0, 3), "parked_position round-tripped")
 	assert(clone.push_speed_multiplier == 0.55, "push_speed_multiplier round-tripped (clone defaults 0.7, so this fails if dropped)")
 	assert(clone.get_hold().get_quantity("scrap_metal") == 4, "cart contents round-tripped")
+	var other = CartStateScript.create("other", 1.0)
+	var before_other: Dictionary = other.get_summary()
+	assert(not other.apply_summary(summary), "an explicitly bound cart rejects another cart identity")
+	assert(other.get_summary() == before_other, "rejected cross-cart restore is atomic")
 	assert(CartStateScript.create("y").apply_summary({}) == false, "empty summary rejected")
 
 	print("CART STATE SMOKE PASS loaded=6 contents=%d" % clone.get_hold().get_quantity("scrap_metal"))

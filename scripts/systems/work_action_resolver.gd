@@ -8,6 +8,7 @@ class_name WorkActionResolver
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
 const ModuleIntegrityStateScript := preload("res://scripts/systems/module_integrity_state.gd")
 const WorkActionStateScript := preload("res://scripts/systems/work_action_state.gd")
+const ItemQualityEffectsScript := preload("res://scripts/systems/item_quality_effects.gd")
 
 
 ## Complete an active WorkActionState against optional ModuleIntegrityMap.
@@ -17,7 +18,9 @@ const WorkActionStateScript := preload("res://scripts/systems/work_action_state.
 static func resolve_completion(
 		work: RefCounted,
 		module_map: RefCounted = null,
-		module_id: String = "") -> Dictionary:
+		module_id: String = "",
+		repair_quality_multiplier: float = 1.0,
+		repair_material_lots: Array = []) -> Dictionary:
 	var out: Dictionary = {
 		"ok": false,
 		"verb": "",
@@ -52,6 +55,11 @@ static func resolve_completion(
 		out["consumed"] = work.call("materials_consumed")
 
 	var verb: String = out["verb"]
+	# Exact paid lots are the only quality authority. Legacy/no-lot calls and
+	# paid rows classified for another consumer remain neutral even if a caller
+	# supplies a scalar hint.
+	repair_quality_multiplier = repair_multiplier_for_paid_lots(repair_material_lots) \
+		if not repair_material_lots.is_empty() else 1.0
 	var target_kind: String = str(def.get("target_kind", "module"))
 	if module_map != null and not module_id.is_empty() and target_kind in ["module", "breach"]:
 		var kind: String = ""
@@ -63,14 +71,15 @@ static func resolve_completion(
 				# Destroy / heavy damage the structural module.
 				module_map.call("apply_damage", module_id, 1.0, kind)
 			"weld", "patch":
+				var restored_integrity: float = 0.35 * maxf(0.1, repair_quality_multiplier)
 				if m != null and m.has_method("repair"):
-					m.call("repair", 0.35)
+					m.call("repair", restored_integrity)
 				else:
 					# ensure then repair
 					module_map.call("ensure_module", module_id, kind)
 					m = module_map.call("get_module", module_id)
 					if m != null and m.has_method("repair"):
-						m.call("repair", 0.35)
+						m.call("repair", restored_integrity)
 			_:
 				pass
 		var st: String = str(module_map.call("get_state", module_id))
@@ -81,7 +90,31 @@ static func resolve_completion(
 		out["crawl_passable"] = bool(cons.get("crawl_passable", false))
 
 	out["ok"] = true
+	out["repair_quality_multiplier"] = repair_quality_multiplier
+	out["repair_material_lots"] = repair_material_lots.duplicate(true)
 	return out
+
+
+## Only exact paid lots authored for repair_integrity participate. Quantity-only
+## or component/tool consumers remain neutral rather than entering a global
+## material average.
+static func repair_multiplier_for_paid_lots(lots: Array) -> float:
+	var effects = ItemQualityEffectsScript.new()
+	var weighted: float = 0.0
+	var quantity: int = 0
+	for lot_v in lots:
+		if not (lot_v is Dictionary):
+			continue
+		var lot: Dictionary = lot_v as Dictionary
+		var item_id: String = str(lot.get("item_id", ""))
+		if effects.consumer_for(item_id) != "repair_integrity":
+			continue
+		var lot_quantity: int = maxi(0, int(lot.get("quantity", 0)))
+		if lot_quantity <= 0:
+			continue
+		weighted += effects.multiplier_for_lot(item_id, lot) * float(lot_quantity)
+		quantity += lot_quantity
+	return weighted / float(quantity) if quantity > 0 else 1.0
 
 
 ## Apply yields into a simple inventory Dictionary (item_id -> qty). Mutates inventory.

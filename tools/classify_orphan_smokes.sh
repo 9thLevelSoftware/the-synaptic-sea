@@ -34,18 +34,31 @@ classify() {
     #    entry because its runtime dwarfs every smoke ---------------------------
     gate1_automated_playtest)
       echo "standalone-gate" ;;
+    # Explicit feature-completion cases run through their case/profile runner;
+    # classification does not claim fresh evidence or acceptance.
+    fc_p00_native_arc_smoke|fc_p03_smoke|fc_p04_floor_drop_persistence_smoke|\
+    fc_p04_holder_atomicity_smoke|fc_p04_objective_lots_smoke|fc_p04_smoke|\
+    fc_p05_smoke|fc_p06_smoke|fc_p07_smoke|fc_p08_smoke|fc_p09_smoke|fc_p09_natural_route_smoke|\
+    combat_persistence_smoke|fc_p10_smoke|fc_p10_process_smoke|fc_p11_live_smoke|fc_p11_smoke|fc_p12_smoke|fc_p13_smoke|\
+    fc_p16_smoke|runtime_physical_volume_smoke|structural_rebuild_collision_query_smoke|\
+    structural_rebuild_candidate_nav_smoke|structural_rebuild_policy_smoke)
+      echo "standalone-feature-completion" ;;
     # -- cannot run headless (extend Node3D, no _initialize) ------------------
-    locked_iso_readability_harness|m7_web_breached_encounter_proof)
+    locked_iso_readability_harness|m7_web_breached_encounter_proof|top_down_readability_harness)
       echo "non-headless-harness" ;;
     # -- capture / export / visual artifact tools -----------------------------
     _layout_visual_capture|coherent_proof_ship_capture|main_coherent_capture|\
     main_playable_slice_capture_sequence|procgen_playable_ship_capture|\
     procgen_runtime_demo_capture|windowed_fps_capture|ship_data_export|\
-    ship_dump|ship_visualize)
+    ship_dump|ship_visualize|focused_nine_airlock_control_room_capture|\
+    focused_nine_comparison_capture|focused_nine_staged_derelict_capture|\
+    ithappy_visual_capture|meshy_asset_review_capture|worldgen_live_preview|\
+    worldgen_v2_visual_probe|capture_current_topology_fixture|refresh_seed_000017_fixture)
       echo "legacy-capture" ;;
     # -- developer probes without pass-marker discipline -----------------------
     assert_hang_test|crafting_debug_smoke|debug_apply_summary|debug_save_load|\
-    live_main_prepare_to_upgrade_probe)
+    live_main_prepare_to_upgrade_probe|collision_probe_smoke|\
+    procgen_structural_debug_export|worldgen_diff_probe|worldgen_v2_import_smoke)
       echo "debug-tool" ;;
     # -- release-process audit tools (run at export time, not per-commit) ------
     export_presets_smoke|product_audit_smoke|release_readiness_ledger_smoke)

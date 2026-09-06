@@ -1,0 +1,73 @@
+{
+  "schema": "focused_nine_current_candidate_manifest_v3",
+  "capture_commit": "fac5ca819d86480a2aef115871ae3b5b8e8ecc68",
+  "engine": "Godot 4.7.2.stable.mono.official.ed1daf0bf",
+  "engine_path": "C:\\\\Users\\\\dasbl\\\\Downloads\\\\Godot_v4.7.2-stable_mono_win64\\\\Godot_v4.7.2-stable_mono_win64\\\\Godot_v4.7.2-stable_mono_win64_console.exe",
+  "seed": 17,
+  "size": "SMALL",
+  "condition": "WRECKED",
+  "room_count_range": [
+    5,
+    8
+  ],
+  "archetype": {
+    "guaranteed_roles": [],
+    "template": "compact"
+  },
+  "candidate_sha256": "1B9FEB21C727679CF70BFF8246ABACB318DCC3B9A306E88E1FEA9E4A3EFD29EF",
+  "repeat_sha256": "1B9FEB21C727679CF70BFF8246ABACB318DCC3B9A306E88E1FEA9E4A3EFD29EF",
+  "placements": 48,
+  "wrappers": 48,
+  "portals": 8,
+  "wrapped_portal_placements": 7,
+  "optional_unwrapped_portals": 1,
+  "source_hashes": {
+    "generator": "8C40117EEF26F43B607C23878CDADE22F36015BA1ECB6494AD9C75291E90F36A",
+    "compiler": "7A3B51568C4434114813A10BDF3820A03E6770B184EC61FBAD23FD66850E9D4E",
+    "structural_validator": "36E14F9218691048807FB5999A95CA694DE6D3A16E52C1EB974FA2F613CFCE31",
+    "archetype": "9BED7992E00FEE9C6B5CE663F0FA15711B55DE15F9F87D91A64AA25413A5944E",
+    "capture_script": "CC33A5B735E7988B5370320BD588D25131C0800251F742DDFFCC5F07B2015831",
+    "ship_layout_generator": "A5B2F68680BF5C4D01527D350C2A7D778FCC82A1F130BBAD6A6486B983CFDEB6",
+    "capture_utility": "CC33A5B735E7988B5370320BD588D25131C0800251F742DDFFCC5F07B2015831",
+    "parity_smoke_current": "59C62EA794CAFAAA98217138262F41043C9312DC897E5CDD92A572B831C9AC83"
+  },
+  "plan_layout_source_hash": "A5B2F68680BF5C4D01527D350C2A7D778FCC82A1F130BBAD6A6486B983CFDEB6",
+  "canonical_validator": true,
+  "edge_keys_unique": true,
+  "portal_endpoints_valid": true,
+  "no_portal_wall_overlap": true,
+  "real_wrapper_checks": true,
+  "negative_probes": {
+    "duplicate_edge_rejected": true,
+    "portal_wall_overlap_rejected": true,
+    "endpoint_occupancy_rejected": true
+  },
+  "serializer": "scratch capture_candidate.gd; deterministic exact-input generator capture with StructuralPlanValidator and actual wrapper metadata checks",
+  "actual_checks": "wrapper transform/yaw/module/edge/kind/room IDs; all portal source endpoint occupancy ownership, adjacency, canonical edge-key, wrapper requirements; duplicate/missing/unexpected wrappers rejected",
+  "reproducibility": "two isolated APPDATA/LOCALAPPDATA captures matched candidate_sha256; current candidate only, historical focused-nine untouched",
+  "capture_utility": "scripts/validation/capture_current_topology_fixture.gd",
+  "capture_script": "scripts/validation/capture_current_topology_fixture.gd",
+  "parity_smoke": "scripts/validation/procgen_golden_parity_smoke.gd",
+  "wrapper_field_mutation_probes": [
+    "module_id",
+    "position",
+    "yaw_degrees",
+    "state"
+  ],
+  "strict_fixture_metadata": [
+    "seed:number 17",
+    "size:SMALL",
+    "condition:WRECKED",
+    "room_count_range:[5,8]",
+    "archetype:compact empty guaranteed_roles",
+    "rooms:occupancy-derived",
+    "placement/wrapper raw structural fields"
+  ],
+  "position_serialization_migration": {
+    "previous_candidate_sha256": "BBE71EF7B95D429EB09D6AE6F47FC4E38DF181998095A7A7668987D40CDF6E59",
+    "current_candidate_sha256": "1B9FEB21C727679CF70BFF8246ABACB318DCC3B9A306E88E1FEA9E4A3EFD29EF",
+    "rationale": "Only placement and wrapper position representations changed: legacy textual coordinate values serialize as typed three-number arrays for strict fixture schema. All other fields are semantically identical after that normalization.",
+    "semantic_equivalence": "verified against preserved .p00-scratch/candidate-a.json (accepted BBE candidate)"
+  },
+  "strict_numeric_contract": "all fixture numeric fields are finite integral JSON numbers before conversion: seed, range, rooms, placement_count, wrapper_count"
+}

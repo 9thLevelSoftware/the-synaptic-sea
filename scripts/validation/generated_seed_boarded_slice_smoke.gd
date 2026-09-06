@@ -11,6 +11,7 @@ const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -50,13 +51,43 @@ func _all_operational(mgr) -> void:
 func _validate() -> void:
 	finished = true
 	_all_operational(playable.get_ship_systems_manager())
+	var home_ship = playable.get_current_ship()
+	if home_ship == null:
+		_fail("home current_ship missing before travel")
+		return
+	var home_root: Node = home_ship.scene_root
 
 	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")
 		return
-	if not bool(playable.travel_to_marker_id(String(in_range[0].marker_id)).get("success", false)):
+	var selected_marker = in_range[0]
+	var selected_marker_id: String = String(selected_marker.marker_id)
+	# ADR-0067 fail-closed probe: the only offered candidate has a native
+	# LOCKED critical crossing. Rejection must happen before travel mutates the
+	# marker, world, ship registry, or active scene.
+	var preferred_before: Array = playable.first_run_contract.contract.get("preferred_seeds", []).duplicate()
+	playable.first_run_contract.contract["preferred_seeds"] = [777]
+	var marker_seed_before: int = int(selected_marker.seed_value)
+	var world_position_before: Vector3 = world.player_position
+	var generated_before: bool = world.is_generated(selected_marker_id)
+	var visited_before: int = playable.visited_ships.size()
+	var rejected: Dictionary = playable.travel_to(selected_marker)
+	if bool(rejected.get("success", false)) or str(rejected.get("reason", "")) != "first_run_contract_unsatisfied":
+		_fail("locked-only first-run contract was not denied explicitly: %s" % str(rejected))
+		return
+	if int(selected_marker.seed_value) != marker_seed_before \
+			or world.player_position != world_position_before \
+			or world.is_generated(selected_marker_id) != generated_before \
+			or playable.visited_ships.size() != visited_before \
+			or playable.get_current_ship() != home_ship \
+			or playable.away_from_start:
+		_fail("rejected first-run contract mutated marker/world/ship state")
+		return
+	playable.first_run_contract.contract["preferred_seeds"] = preferred_before
+	var travel_result: Dictionary = playable.travel_to_marker_id(selected_marker_id)
+	if not bool(travel_result.get("success", false)):
 		_fail("travel to derelict failed")
 		return
 	if not playable.away_from_start:
@@ -67,6 +98,26 @@ func _validate() -> void:
 	if cur == null:
 		_fail("current_ship missing after travel")
 		return
+	if cur == home_ship or cur.scene_root == home_root:
+		_fail("travel retained the pre-travel home ship/root")
+		return
+	if String(cur.marker_id).is_empty() or String(cur.marker_id) != selected_marker_id:
+		_fail("current marker_id=%s expected selected marker_id=%s" % [String(cur.marker_id), selected_marker_id])
+		return
+	if playable.visited_ships.get(selected_marker_id, null) != cur:
+		_fail("selected marker did not resolve to the active visited ShipInstance")
+		return
+	if travel_result.get("ship", null) != cur.scene_root:
+		_fail("travel result ship does not match active ShipInstance scene_root")
+		return
+	if cur.blueprint == null:
+		_fail("active selected ShipInstance has no blueprint")
+		return
+	# FirstRunContract may replace the transient scanner seed inside
+	# travel_to_marker_id. The active blueprint is the persisted resolved identity
+	# passed to ShipGenerator for this selected marker.
+	var selected_seed: int = int(cur.blueprint.seed_value)
+	var selected_size: int = int(cur.blueprint.size)
 	var derelict_root = cur.scene_root
 	if derelict_root == null or not is_instance_valid(derelict_root):
 		_fail("derelict scene_root missing")
@@ -85,9 +136,25 @@ func _validate() -> void:
 	if layout.is_empty():
 		_fail("boarded layout empty")
 		return
-	var program_id: String = str(layout.get("program_id", ""))
-	if program_id == "coherent-proof-ship-001" or not program_id.begins_with("procgen-"):
-		_fail("boarded layout is hub golden, program_id=%s" % program_id)
+	var loader_layout: Dictionary = loader.get_layout_copy()
+	if not layout.recursive_equal(loader_layout, 32):
+		_fail("active ShipInstance built_layout differs from GeneratedShipLoader layout")
+		return
+	var identity_reason: String = _worldgen_identity_error(layout, selected_seed, selected_size)
+	if not identity_reason.is_empty():
+		_fail(identity_reason)
+		return
+	var wrong_seed_layout: Dictionary = layout.duplicate(true)
+	var wrong_generator: Dictionary = wrong_seed_layout.get("generator", {})
+	wrong_generator["seed"] = selected_seed + 1
+	wrong_seed_layout["generator"] = wrong_generator
+	if _worldgen_identity_error(wrong_seed_layout, selected_seed, selected_size).is_empty():
+		_fail("wrong-seed worldgen identity was accepted")
+		return
+	var home_layout: Dictionary = layout.duplicate(true)
+	home_layout["program_id"] = "coherent-proof-ship-001"
+	if _worldgen_identity_error(home_layout, selected_seed, selected_size).is_empty():
+		_fail("home golden program identity was accepted")
 		return
 	if str(layout.get("schema_version", "")) != "1.2.0":
 		_fail("schema_version=%s expected 1.2.0" % str(layout.get("schema_version", "")))
@@ -120,8 +187,9 @@ func _validate() -> void:
 	var condition: int = playable._ship_condition_class(cur)
 	var wreck_expected: bool = condition == ShipBlueprintScript.Condition.DAMAGED \
 		or condition == ShipBlueprintScript.Condition.WRECKED
-	if wreck_expected and not _wreck_overlay_present(layout):
-		_fail("DAMAGED/WRECKED boarded layout missing blocked_links/LOCKED overlay or wreck_applied")
+	if wreck_expected and not _wreck_evidence_present(layout, loader, selected_seed, selected_size, condition):
+		_fail("DAMAGED/WRECKED boarded layout missing preserved native breach or fallback wreck overlay condition=%d kinds=%s generator=%s" % [
+			condition, str(_structural_edge_kind_counts(layout)), str(layout.get("generator", {}))])
 		return
 	if not wreck_expected:
 		_fail("boarded condition=%d is not DAMAGED/WRECKED; wreck overlay required" % condition)
@@ -180,6 +248,39 @@ func _validate() -> void:
 		return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
+
+
+func _worldgen_identity_error(layout: Dictionary, expected_seed: int, expected_size: int) -> String:
+	var expected_archetype: String = _worldgen_archetype_for_size(expected_size)
+	if expected_archetype.is_empty():
+		return "unsupported selected size_class=%d" % expected_size
+	var generator_v: Variant = layout.get("generator", {})
+	if not (generator_v is Dictionary):
+		return "boarded layout generator metadata missing"
+	var generator: Dictionary = generator_v as Dictionary
+	if str(generator.get("name", "")) != "worldgen" or int(generator.get("generator_version", -1)) != 2:
+		return "boarded layout is not worldgen v2"
+	if int(generator.get("seed", -1)) != expected_seed:
+		return "worldgen seed=%s expected selected seed=%d" % [str(generator.get("seed", "")), expected_seed]
+	if str(generator.get("archetype_id", "")) != expected_archetype:
+		return "worldgen archetype=%s expected size-%d archetype=%s" % [
+			str(generator.get("archetype_id", "")), expected_size, expected_archetype]
+	var expected_program_id: String = "worldgen-%s-%d" % [expected_archetype, expected_seed]
+	if str(layout.get("program_id", "")) != expected_program_id:
+		return "program_id=%s expected=%s" % [str(layout.get("program_id", "")), expected_program_id]
+	return ""
+
+
+func _worldgen_archetype_for_size(size_class: int) -> String:
+	match size_class:
+		ShipBlueprintScript.Size.LIFE_BOAT:
+			return "shuttle"
+		ShipBlueprintScript.Size.SMALL:
+			return "corvette"
+		ShipBlueprintScript.Size.MEDIUM:
+			return "freighter"
+		_:
+			return ""
 
 
 func _standing_start_to_goal(layout: Dictionary, loader: GeneratedShipLoader) -> String:
@@ -295,7 +396,102 @@ func _loot_on_interior_slot(layout: Dictionary, loot: Array) -> bool:
 	return false
 
 
-func _wreck_overlay_present(layout: Dictionary) -> bool:
+func _wreck_evidence_present(
+		layout: Dictionary,
+		loader: GeneratedShipLoader,
+		seed_value: int,
+		size: int,
+		condition: int) -> bool:
+	var generator_variant: Variant = layout.get("generator", {})
+	if generator_variant is Dictionary \
+			and str((generator_variant as Dictionary).get("name", "")) == "worldgen":
+		return _native_breach_preserved_and_loaded(layout, loader, seed_value, size, condition)
+	return _fallback_wreck_overlay_present(layout)
+
+
+func _native_breach_preserved_and_loaded(
+		layout: Dictionary,
+		loader: GeneratedShipLoader,
+		seed_value: int,
+		size: int,
+		condition: int) -> bool:
+	if not ClassDB.class_exists("DerelictGenerator"):
+		return false
+	if not ShipGeneratorScript.WORLDGEN_ARCHETYPE_BY_SIZE.has(size) \
+			or not ShipGeneratorScript.WORLDGEN_INTACTNESS_BY_CONDITION.has(condition):
+		return false
+	var generator = ClassDB.instantiate("DerelictGenerator")
+	if generator == null or not generator.has_method("export_layout_json"):
+		return false
+	var source_text: String = str(generator.export_layout_json(
+		seed_value,
+		{
+			"archetype_id": str(ShipGeneratorScript.WORLDGEN_ARCHETYPE_BY_SIZE[size]),
+			"intactness_override": int(ShipGeneratorScript.WORLDGEN_INTACTNESS_BY_CONDITION[condition]),
+		},
+		ShipGeneratorScript.WORLDGEN_KIT_ID))
+	var source_variant: Variant = JSON.parse_string(source_text)
+	if not (source_variant is Dictionary):
+		return false
+	var source_breaches: Dictionary = _structural_edges_of_kind(source_variant as Dictionary, "BREACH")
+	var loaded_breaches: Dictionary = _structural_edges_of_kind(layout, "BREACH")
+	if source_breaches.is_empty() or not source_breaches.recursive_equal(loaded_breaches, 32):
+		return false
+
+	var portal_specs_by_edge: Dictionary = {}
+	for spec_variant in loader.get_authored_portal_specs_copy():
+		if not (spec_variant is Dictionary):
+			continue
+		var spec: Dictionary = spec_variant as Dictionary
+		portal_specs_by_edge[str(spec.get("edge_key", ""))] = spec
+	var portal_nodes_by_edge: Dictionary = {}
+	for node_variant in loader.get_authored_portal_nodes():
+		if not is_instance_valid(node_variant):
+			continue
+		var portal_spec_variant: Variant = node_variant.get("portal_spec")
+		if not (portal_spec_variant is Dictionary):
+			continue
+		portal_nodes_by_edge[str((portal_spec_variant as Dictionary).get("edge_key", ""))] = node_variant
+	for edge_key_variant in source_breaches.keys():
+		var edge_key: String = str(edge_key_variant)
+		var source_edge: Dictionary = source_breaches[edge_key_variant] as Dictionary
+		var spec_variant: Variant = portal_specs_by_edge.get(edge_key, null)
+		var node_variant: Variant = portal_nodes_by_edge.get(edge_key, null)
+		if not (spec_variant is Dictionary) or not is_instance_valid(node_variant):
+			return false
+		var spec: Dictionary = spec_variant as Dictionary
+		if str(spec.get("kind", spec.get("state", ""))).to_upper() != "BREACH" \
+				or not bool(spec.get("exterior", false)) \
+				or bool(spec.get("exterior", false)) != bool(source_edge.get("exterior", false)):
+			return false
+		if str(node_variant.get("portal_kind")).to_upper() != "BREACH" \
+				or not bool(node_variant.get("is_unsafe")) \
+				or not bool(node_variant.get("is_open")) \
+				or not bool(node_variant.get("is_exterior")):
+			return false
+		var blocker_shape: CollisionShape3D = node_variant.call("get_blocker_collision_shape") as CollisionShape3D
+		if blocker_shape == null or not blocker_shape.disabled:
+			return false
+	return true
+
+
+func _structural_edges_of_kind(layout: Dictionary, required_kind: String) -> Dictionary:
+	var result: Dictionary = {}
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if not (plan_variant is Dictionary):
+		return result
+	var edges_variant: Variant = (plan_variant as Dictionary).get("edges", {})
+	if not (edges_variant is Dictionary):
+		return result
+	for edge_key_variant in (edges_variant as Dictionary).keys():
+		var edge_variant: Variant = (edges_variant as Dictionary)[edge_key_variant]
+		if edge_variant is Dictionary \
+				and str((edge_variant as Dictionary).get("kind", "")).to_upper() == required_kind:
+			result[str(edge_key_variant)] = (edge_variant as Dictionary).duplicate(true)
+	return result
+
+
+func _fallback_wreck_overlay_present(layout: Dictionary) -> bool:
 	if not bool(layout.get("wreck_applied", false)):
 		return false
 	var blocked_v: Variant = layout.get("blocked_links", [])
@@ -315,6 +511,22 @@ func _wreck_overlay_present(layout: Dictionary) -> bool:
 				if kind == "LOCKED" or kind == "BREACH":
 					return true
 	return false
+
+
+func _structural_edge_kind_counts(layout: Dictionary) -> Dictionary:
+	var counts: Dictionary = {}
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if not (plan_variant is Dictionary):
+		return counts
+	var edges_variant: Variant = (plan_variant as Dictionary).get("edges", {})
+	if not (edges_variant is Dictionary):
+		return counts
+	for edge_variant in (edges_variant as Dictionary).values():
+		if not (edge_variant is Dictionary):
+			continue
+		var kind: String = str((edge_variant as Dictionary).get("kind", "")).to_upper()
+		counts[kind] = int(counts.get(kind, 0)) + 1
+	return counts
 
 
 func _room_by_id(rooms: Array, room_id: String) -> Dictionary:

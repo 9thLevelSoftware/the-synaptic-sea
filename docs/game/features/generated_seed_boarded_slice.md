@@ -28,7 +28,7 @@ Headless `travel_to_marker_id` boarding copied from `away_branch_integrity_smoke
 
 1. Instantiate `res://scenes/main.tscn`. Wait until `playable_started` and hub loader `has_loaded_ship()`.
 2. Repair `power`, `navigation`, `scanners`, `propulsion`.
-3. `travel_to_marker_id` on the first in-range marker. Do not overwrite `seed_value` / `condition`. First away jump keeps `first_run_contract`.
+3. `travel_to_marker_id` on the first in-range marker. The first away jump validates the authored preferred seeds through the same production `ShipGenerator` route used for boarding, with the marker's size and condition plus the contract biome and difficulty. It selects the first candidate that satisfies the complete contract, including standing start-to-goal navigation. If none qualify, travel is denied before the marker or world changes.
 4. `away_from_start` is true as a result of `_attach_derelict_active`. `current_ship.scene_root` is a loaded `GeneratedShipLoader` whose layout is not `coherent_ship_001`.
 5. Layout `schema_version == 1.2.0`, enclosure validator ok, `ShipNavGraph` standing path start→goal, at least one objective spec, at least one loot spec on an `interior_zones` center or wall slot, wreck overlay when the boarded condition is DAMAGED/WRECKED.
 6. Thirty away `_process` ticks. HUD/objective surface still alive. No extract assertion.
@@ -36,7 +36,7 @@ Headless `travel_to_marker_id` boarding copied from `away_branch_integrity_smoke
 ## Inputs
 
 - Production travel path (`travel_to` → `_attach_derelict_active`)
-- First-run contract preferred seeds `[42, 777]`
+- First-run contract preferred seeds `[42, 777]`, evaluated in authored order through production generation
 - Boarded `built_layout` / loader layout copy
 
 ## Outputs
@@ -51,6 +51,7 @@ Headless `travel_to_marker_id` boarding copied from `away_branch_integrity_smoke
 3. Do not skip or null `first_run_contract`.
 4. Do not pin `seed=42` in the PASS / `run_clean` prefix. Print `seed=` as informational.
 5. Timeout 300 frames.
+6. Candidate validation never unlocks a structural edge or makes `LOCKED` / `BREACH` passable.
 
 ## Non-goals
 
@@ -64,7 +65,9 @@ Headless `travel_to_marker_id` boarding copied from `away_branch_integrity_smoke
 ## Technical design
 
 - `scripts/validation/generated_seed_boarded_slice_smoke.gd`
-- Production attach path already in `scripts/procgen/playable_generated_ship.gd`
+- Production candidate and attach path in `scripts/procgen/playable_generated_ship.gd`
+- Native room-variant integration in `scripts/procgen/ship_generator.gd`
+- Pure standing-route predicate in `scripts/procgen/first_run_contract.gd`
 
 ## Acceptance criteria
 
@@ -86,11 +89,12 @@ Expected: `GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck
 
 ## Risks
 
-- First-run contract may pick 777 when 42 fails validate. Mitigation: do not pin `seed=42`.
+- A preferred native seed can carry a critical lock. Mitigation: reject it for the first-away beat while preserving the lock and continue through the bounded authored candidate list.
+- Native and fallback layouts can drift. Mitigation: candidate validation and boarding share `ShipGenerator`, marker size/condition, and resolved biome/difficulty.
 - Away-branch `_process` early-return. Mitigation: assert `away_from_start` from the travel attach path and tick 30 away frames.
 
 ## ADRs
 
 - ADR-0054 compiler-edge nav
 - ADR-0053 socketed enclosed interiors (slots)
-- No new ADR: this is a validation proof, not an architecture change.
+- ADR-0067 native first-run candidate authority

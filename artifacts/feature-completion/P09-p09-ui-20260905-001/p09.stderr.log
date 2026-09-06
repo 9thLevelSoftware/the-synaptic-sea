@@ -1,0 +1,8 @@
+ERROR: FC P09 FAIL reason=cut_wall did not commit through the production transaction
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p09_smoke.gd:713)
+       [1] _validate_timed_tool_work (res://scripts/validation/fc_p09_smoke.gd:422)
+       [2] _validate_crafted_tool_consumers (res://scripts/validation/fc_p09_smoke.gd:347)
+       [3] _validate (res://scripts/validation/fc_p09_smoke.gd:147)
+       [4] _on_process_frame (res://scripts/validation/fc_p09_smoke.gd:39)

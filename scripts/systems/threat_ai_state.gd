@@ -234,6 +234,7 @@ func get_summary() -> Dictionary:
 		"max_health": max_health,
 		"health": health,
 		"attack_damage": attack_damage,
+		"structure_damage": structure_damage,
 		"attack_type": attack_type,
 		"attack_noise": attack_noise,
 		"attack_interval": attack_interval,

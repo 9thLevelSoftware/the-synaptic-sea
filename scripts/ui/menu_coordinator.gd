@@ -919,14 +919,14 @@ func _confirm_save_load_row() -> Dictionary:
 		# gameplay state) -- so signal the caller via action=="load_world"
 		# and let it dispatch request_load() itself, mirroring the
 		# action=="load" contract's split of responsibility.
-		if bool(row.is_world()):
-			_save_load_pending_verb = ""
-			_refresh_save_load_panel()
-			return {"screen": "save_load", "action": "load_world", "ok": true, "detail": slot_id}
-		var snapshot = save_load_menu.select_slot_for_load(slot_id)
+		var prepared: Dictionary = save_load_menu.select_slot_for_load(slot_id)
 		_save_load_pending_verb = ""
 		_refresh_save_load_panel()
-		return {"screen": "save_load", "action": "load", "ok": snapshot != null, "detail": slot_id, "snapshot": snapshot}
+		return {
+			"screen": "save_load", "action": "load",
+			"ok": bool(prepared.get("ok", false)), "detail": slot_id,
+			"prepared": prepared,
+		}
 	return {"screen": "save_load", "action": "none", "ok": false, "detail": slot_id}
 
 ## Domain 8 cursor-drift fix (review finding 1): _save_load_rows() is sorted by

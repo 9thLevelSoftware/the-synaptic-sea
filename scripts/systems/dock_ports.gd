@@ -1,6 +1,9 @@
 extends RefCounted
 class_name DockPorts
 
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
+const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
+
 ## Derives dock-port descriptors {position: Vector3 (local), facing: Vector3}
 ## from a ship layout dict. The lifeboat docks at its airlock (-X side); the
 ## derelict exposes its guaranteed `dock` room opening (+X side outward).
@@ -11,33 +14,43 @@ const CELLS_PER_SLOT: int = 2          # hangar floor cells budgeted per ship sl
 const HANGAR_BIG_CELL_THRESHOLD: int = 4   # >= this many cells -> a size-class-2 bay
 
 static func for_lifeboat(layout: Dictionary) -> Dictionary:
-	var center: Vector3 = _room_floor_center(layout, "airlock", "airlock")
-	if center == Vector3.INF:
-		return {}
-	# Airlock opening faces the dock (-X, away from the +X cockpit); nudge to the edge.
-	return {
-		"position": center + Vector3(-HALF_CELL, 0.0, 0.0),
-		"facing": Vector3(-1.0, 0.0, 0.0),
-		"type": "airlock",
-		"size_class": AIRLOCK_SIZE_CLASS,
-		"condition": "intact",
-	}
+	return _registered_port(layout, "intact")
 
 static func for_derelict(layout: Dictionary, seed_value: int = 0, condition_class: int = 0) -> Dictionary:
-	var center: Vector3 = _room_floor_center(layout, "dock", "dock")
-	# Fall back to the airlock room when no dock room exists (e.g. the home ship uses
-	# its airlock as the docking attachment point rather than a dedicated dock room).
-	if center == Vector3.INF:
-		center = _room_floor_center(layout, "airlock", "airlock")
-	if center == Vector3.INF:
+	return _registered_port(layout, condition_from_seed(seed_value, condition_class))
+
+static func _registered_port(layout: Dictionary, condition: String) -> Dictionary:
+	var verdict: Dictionary = registered_port_verdict(layout, condition)
+	return verdict.get("port", {}) as Dictionary if bool(verdict.get("ok", false)) else {}
+
+static func registered_port_verdict(layout: Dictionary, condition: String = "intact") -> Dictionary:
+	var projection: Dictionary = _dock_collision_projection()
+	var endpoint_verdict: Dictionary = DockEndpointAuthoringScript.validate_layout(
+		layout, projection)
+	if not bool(endpoint_verdict.get("ok", false)):
+		return endpoint_verdict
+	var endpoint: Dictionary = endpoint_verdict.get("endpoint", {}) as Dictionary
+	if endpoint.is_empty():
 		return {}
-	return {
-		"position": center,
-		"facing": Vector3(1.0, 0.0, 0.0),
-		"type": "airlock",
-		"size_class": AIRLOCK_SIZE_CLASS,
-		"condition": condition_from_seed(seed_value, condition_class),
-	}
+	var port: Dictionary = endpoint.duplicate(true)
+	port["position"] = _as_vector3(endpoint.get("local_position", []))
+	port["facing"] = _as_vector3(endpoint.get("outward_normal", []))
+	port["condition"] = condition
+	return {"ok": true, "reason": "ok", "port": port}
+
+static func _dock_collision_projection() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(DEFAULT_KIT_PATH))
+	if not parsed is Dictionary:
+		return {}
+	var projection: Variant = (parsed as Dictionary).get("dock_collision_projection_v1", null)
+	return (projection as Dictionary).duplicate(true) if projection is Dictionary else {}
+
+static func _as_vector3(value: Variant) -> Vector3:
+	if value is Vector3:
+		return value
+	if value is Array and (value as Array).size() == 3:
+		return Vector3(float((value as Array)[0]), float((value as Array)[1]), float((value as Array)[2]))
+	return Vector3.INF
 
 ## Ship-local floor center of the `bridge` room, or Vector3.INF if none.
 static func bridge_center(layout: Dictionary) -> Vector3:

@@ -1,0 +1,45 @@
+{
+  "crafting_summary": {
+    "active_craft": {
+      "quality_multiplier": 1.25,
+      "quality_score": 0.72,
+      "quality_tier": "good",
+      "recipe_id": "weld_plating",
+      "station_kind": "workbench"
+    },
+    "recipe_count": 61.0,
+    "station_summaries": {
+      "workbench": {
+        "active_recipe_id": "weld_plating",
+        "level": 0.0,
+        "max_queue": 8.0,
+        "powered": true,
+        "progress_seconds": 6.0,
+        "queue": [
+          "splice_circuit",
+          "weld_plating"
+        ],
+        "required_seconds": 15.0,
+        "station_kind": "workbench",
+        "status": 1.0,
+        "tier": 0.0
+      }
+    }
+  },
+  "fixture": {
+    "captured_at": "2026-09-05T00:00:00Z",
+    "source_revision": "f4a65669",
+    "source_serializers": [
+      "CraftingState.get_summary",
+      "StationState.get_summary"
+    ]
+  },
+  "godot_version": "4.7.2-stable (official)",
+  "inventory_summary": {
+    "items": {
+      "scrap_metal": 1.0
+    }
+  },
+  "run_id": "fixture-run",
+  "slice_version": "gate2-current-run-4"
+}

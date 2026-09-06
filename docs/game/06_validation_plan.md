@@ -269,7 +269,7 @@ Expected:
 
 ## Boarded generated-seed slice (REQ-SLICE-001) — GREEN
 
-Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golden `coherent_ship_001`.
+Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golden `coherent_ship_001`; first-away candidates are validated through production generation and fail closed before travel mutation.
 
 ```bash
 ROOT="${ROOT:-.}"
@@ -424,19 +424,31 @@ BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip.load_from_blueprint: bluepri
 RELEASE_LEDGER_UNKNOWN_WARNING="^WARNING: ReleaseReadinessLedger: unknown check_id=totally_made_up_check\$"
 RELEASE_LEDGER_STATUS_WARNING="^WARNING: ReleaseReadinessLedger: invalid status=WAT\$"
 RELEASE_LEDGER_EXTERNAL_WARNING="^WARNING: ReleaseReadinessLedger: external evidence rejected, evidence_path is required\$"
+RUN_CLEAN_COUNT=0
 run_clean() {
+  RUN_CLEAN_COUNT=$((RUN_CLEAN_COUNT + 1))
   label="$1"
   marker="$2"
   shift 2
   echo "=== $label ==="
+  set +e
   OUT=$("$@" 2>&1)
+  COMMAND_STATUS=$?
+  set -e
   printf '%s\n' "$OUT"
-  printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING|SCRIPT ERROR):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  if ! printf '%s\n' "$OUT" | grep -q "$marker"; then
+    echo "MISSING_MARKER in $label"
+    exit 1
+  fi
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING|SCRIPT ERROR):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
     exit 1
+  fi
+  if [ "$COMMAND_STATUS" -ne 0 ]; then
+    echo "COMMAND_FAILED exit=$COMMAND_STATUS in $label"
+    exit "$COMMAND_STATUS"
   fi
 }
 run_clean 'route control model smoke' 'ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
@@ -466,6 +478,7 @@ run_clean 'objective progress state smoke' 'OBJECTIVE PROGRESS STATE PASS sequen
 run_clean 'objective progress hud label smoke' 'OBJECTIVE PROGRESS HUD LABEL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_hud_label_smoke.gd
 run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
 run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+run_clean 'ceiling lifetime smoke' 'FC P00 CEILING LIFETIME PASS freed_safe=true rebound=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fc_p00_ceiling_lifetime_smoke.gd
 run_clean 'REQ-012 auto-save sequence smoke' 'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
 run_clean 'template C stacked layout main scenario smoke' 'TEMPLATE C MAIN SCENARIO PASS objectives=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_main_scenario_smoke.gd
 run_clean 'junction calibrator model smoke' 'JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_state_smoke.gd
@@ -492,7 +505,7 @@ run_clean 'REQ-CS-018 hydroponics crop list smoke' 'HYDROPONICS CROP LIST PASS c
 run_clean 'REQ-CS-018 main playable hydro crop picker smoke' 'MAIN PLAYABLE HYDRO CROP PICKER PASS crop=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hydro_crop_picker_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
 run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
-run_clean 'KitCatalog lifeboat biome-skin reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
+run_clean 'compiled lifeboat biome-contract reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
 run_clean 'procgen derelict encounter-injection reachability smoke' 'MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_encounter_injection_smoke.gd
 run_clean 'procgen encounter placement smoke' 'ENCOUNTER PLACEMENT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_placement_smoke.gd
 run_clean 'REQ-FC food consumption reachability smoke' 'MAIN PLAYABLE FOOD CONSUMPTION PASS hunger_restored=true thirst_restored=true spoilage_tracked=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_food_consumption_smoke.gd
@@ -502,7 +515,7 @@ run_clean 'main item economy reachability smoke' 'MAIN PLAYABLE ITEM ECONOMY PAS
 run_clean 'spoilage stage threaded into eat path smoke' 'SPOILAGE EAT SCALING PASS stale_lt_fresh=true rotten_lt_stale=true fresh_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spoilage_eat_scaling_smoke.gd
 run_clean 'M7-A breach seal point model smoke' 'BREACH SEAL POINT PASS sealed=true breach_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_point_smoke.gd
 run_clean 'M7-A life support vitals loop smoke' 'MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_life_support_vitals_smoke.gd
-run_clean 'Domain 1 survival stakes (home) smoke' 'MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_stakes_smoke.gd
+run_clean 'Domain 1 survival stakes (home) smoke' 'MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_stakes_smoke.gd
 run_clean 'Domain 1 survival attrition away-path smoke' 'MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true o2_teeth=true away_death=true no_extract_on_death=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_away_smoke.gd
 run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_smoke.gd
 run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
@@ -586,7 +599,7 @@ run_clean 'Domain 6 meta progression state smoke' 'META PROGRESSION STATE PASS p
 run_clean 'Domain 6 player progression full smoke' 'PLAYER PROGRESSION FULL PASS classes=11 cross_training=true books=true meta_payout=70 unlocks=true panels=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_progression_full_smoke.gd
 run_clean 'Domain 6 interactive meta-screens smoke' 'META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_screens_interactive_smoke.gd
 run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held gated_logged=true class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd
-run_clean 'Domain 7 room variant selector smoke' 'ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=8 legacy=3 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_variant_selector_smoke.gd
+run_clean 'Domain 7 room variant selector smoke' 'ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=14 legacy=3 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_variant_selector_smoke.gd
 run_clean 'Domain 7 procgen variation smoke' 'PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variation_smoke.gd
 run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
 run_clean 'PR 13 authored hazard overlay smoke' 'AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true contents_empty=true unique_gated=true mapped_reserved=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/authored_hazard_overlay_smoke.gd
@@ -603,7 +616,7 @@ run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" 
 run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
 run_clean 'Task 2.1 tutorial slice coverage smoke' 'TUTORIAL SLICE COVERAGE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_slice_coverage_smoke.gd
 run_clean 'Task 2.2 run results/death screen smoke' 'RUN RESULTS PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/run_results_smoke.gd
-run_clean 'Task 2.3 first-run derelict beat contract smoke' 'FIRST RUN CONTRACT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_run_contract_smoke.gd
+run_clean 'Task 2.3 native first-run derelict candidate contract smoke' 'FIRST RUN CONTRACT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_run_contract_smoke.gd
 run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
 run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
 run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd
@@ -676,7 +689,7 @@ run_clean 'ship layout generator smoke' 'SHIP LAYOUT GENERATOR PASS spine=true b
 run_clean 'ship layout integration smoke' 'SHIP LAYOUT INTEGRATION PASS generated=21/21 deterministic=true json_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_integration_smoke.gd
 run_clean 'room graph generator smoke' 'ROOM GRAPH GENERATOR PASS life_boat=4 small=5 medium=8 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_generator_smoke.gd
 run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS rooms=10 modules=24 second_rooms=8 second_modules=20 unknown_role_fallback=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_placer_smoke.gd
-run_clean 'encounter injector smoke' 'ENCOUNTER INJECTOR PASS std_markers=0 deep_markers=2 markers_valid=true deterministic=true critical_safe=true legacy_compat=true table_driven=true table_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_injector_smoke.gd
+run_clean 'encounter injector smoke' 'ENCOUNTER INJECTOR PASS std_markers=0 deep_markers=4 markers_valid=true deterministic=true critical_safe=true legacy_compat=true table_driven=true table_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_injector_smoke.gd
 run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS all 9 layouts produced valid slices loot_containers=true salvage_tables=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
 run_clean 'template c traversal smoke' 'TEMPLATE C TRAVERSAL PASS transitions_checked=1 missing=ok deck=ok cell=ok self=ok critical_path=ok pipeline_transitions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_traversal_smoke.gd
 run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determinism=3 hangar_seeds=80' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_generator_smoke.gd
@@ -684,9 +697,9 @@ run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determin
 # the full line's rooms=[9,12] is a character class under grep.
 run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
 run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
-run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=10 small_rooms=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
+run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true documents=true life_rooms=9 small_rooms=24' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
-run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
+run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=1 interactions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
 run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
 run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
 run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=6 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
@@ -694,7 +707,7 @@ run_clean 'hive biomatter kit smoke' 'HIVE BIOMATTER KIT PASS template=true kit=
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'structural wrapper collision footprint smoke' 'STRUCTURAL WRAPPER COLLISION FOOTPRINT PASS walls=true corners=true doors=true aperture=true thickness=0.2 hatch_skipped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=156 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=1 collision_shapes=225 structural_live=true edge_wrappers=70 floor_wrappers=52' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
@@ -708,7 +721,7 @@ run_clean 'ADR-0049 threat pathfinder smoke' 'THREAT PATHFINDER PASS path=true s
 run_clean 'ADR-0049 threat path follow smoke' 'THREAT PATH FOLLOW PASS advanced=true no_tunnel=true graph=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_path_follow_smoke.gd
 run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREAT PATHFINDING PASS graph=true advanced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_threat_pathfinding_smoke.gd
 run_clean 'Procgen quality gate smoke' 'PROCGEN QUALITY GATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_quality_gate_smoke.gd
-run_clean 'Procgen golden parity smoke' 'PROCGEN GOLDEN PARITY PASS goldens=3 nav=true schema=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
+run_clean 'Current procgen topology parity smoke' 'PROCGEN CURRENT TOPOLOGY PARITY PASS seed=17 placements=48 wrappers=48 portals=8 structural=true visual_only=GLB,material' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
 run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
 # --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
 run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd
@@ -1119,7 +1132,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=651 clean_output=true'
+echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
@@ -1264,7 +1277,7 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
 - [x] A11Y-P1-001 text scale smoke: `scripts/validation/main_playable_slice_text_scale_smoke.gd` (expected marker `MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present`) — proves the single `AccessibilitySettings` seam drives both the HUD `font_size` and `custom_minimum_size` (default 1.0 reproduces font=18, panel=520x250) and the world `Label3D.pixel_size` for the breach unsafe marker and fire zone label (default 0.0035 reproduces exactly), and that the same seam scales consistently to 1.5x (font=27, panel=780x375, pixel=0.002333) and 2.0x (font=36, panel=1040x500, pixel=0.001750) while HUD text remains sourced from runtime state at every scale. Added to regression bundle.
 - [x] M7-A breach seal point model smoke: `scripts/validation/breach_seal_point_smoke.gd` (expected marker `BREACH SEAL POINT PASS sealed=true breach_cleared=true`) — pure-model smoke: a BreachSealPoint channel consumes a `hull_sealant` from inventory and seals a breached HullIntegrityState compartment; asserts breach_count returns to 0 and item is consumed. Added to regression bundle.
 - [x] M7-A life support vitals loop (main-scene smoke): `scripts/validation/main_playable_life_support_vitals_smoke.gd` (expected marker `MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true`) — live-scene proof that a fouled hub atmosphere (hull breach + unpowered life support → `get_health_drain_per_second() > 0`) drains `vitals_state.health` while aboard; drain is zero while away on a derelict; restoring power halts it; player can seal via live `BreachSealPoint`. Closes the hull→atmosphere→vitals loop required by M7-A A1. Added to regression bundle.
-- [x] Domain 1 survival stakes home-path smoke: `scripts/validation/main_playable_survival_stakes_smoke.gd` (expected marker `MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true`) — live-scene proof via the real coordinator `_process` on the home branch (away_from_start=false) that (1) exhausted stamina halves the player's effective movement speed via the vitals movement gate, and (2) health reaching 0 locks movement entirely and ends the run as a death (`slice_complete=true`). Regression guard for Domain 1 survival stakes on the home path. Added to regression bundle.
+- [x] Domain 1 survival stakes home-path smoke: `scripts/validation/main_playable_survival_stakes_smoke.gd` (expected marker `MAIN PLAYABLE SURVIVAL STAKES PASS gate_curve=true gate_locked=true death=true reachable=true`) — live-scene proof via the real coordinator `_process` on the home branch (away_from_start=false) that (1) low stamina applies the current nontrivial `VitalsState.stamina_move_curve()` multiplier exactly to the player's effective movement speed via the vitals movement gate, and (2) health reaching 0 locks movement entirely and ends the run as a death (`slice_complete=true`). Regression guard for Domain 1 survival stakes on the home path. Added to regression bundle.
 - [x] Domain 1 survival attrition away-path smoke: `scripts/validation/main_playable_survival_away_smoke.gd` (expected marker `MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true`) — live-scene proof that the derelict (away_from_start=true) branch runs `_tick_survival_attrition(delta)`: radiation at 100 drains health, body temperature rises in the hazard extreme zone, and health reaching 0 ends the run as a death. Regression guard for the away early-return gap (line 4808) that previously starved all survival attrition on a boarded derelict. Added to regression bundle.
 - [x] Domain 1 player movement-gating seam smoke: `scripts/validation/player_movement_gating_smoke.gd` (expected marker `PLAYER MOVEMENT GATING PASS`) — pure-node proof that `PlayerController.set_movement_speed_multiplier()` clamps to [0,1] and `get_effective_move_speed()` scales `move_speed` accordingly (full/half/locked), the seam the coordinator's vitals gate drives. Added to regression bundle.
 - [x] Domain 4 web infestation model smoke: `scripts/validation/web_infestation_state_smoke.gd` (expected marker `WEB INFESTATION PASS grows=true recedes=true damage_live=true save_roundtrip=true reject=true`) — pure-model: coverage grows while web-attached and tick() returns hull damage; recedes when cut free; save round-trip; apply_summary rejects a mismatched hazard_kind. Added to regression bundle.
@@ -1306,7 +1319,7 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/progression_meta_smoke.gd` (marker `PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held class_persist=true`) — end-to-end closure: a purchased hub upgrade persists to disk and composes its starting-skill bonus on a fresh run; an away-context (`away_ticks=1`) kill event grants XP through `TrainingEventBus`; the live-wired `fabricate_part` advanced-skill gate blocks XP until `SkillTreeState.unlock("fabrication")`, then grants; class selection persists across a reload. Closes the Domain 6 progression/meta loop. Added to regression bundle.
   - Also fixed as part of this task: `scripts/validation/main_playable_slice_progression_smoke.gd` now defensively wipes `user://meta_progression.json` in `_initialize()` so its `class=engineer` assertion is deterministic regardless of what ran earlier in the same bundle invocation.
 - [x] Domain 7 procgen variation + variant-hazard — 4 smokes (travel loop closure):
-  - `scripts/validation/room_variant_selector_smoke.gd` (marker `ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=8 legacy=3 deterministic=true`) — pure-model: `RoomVariantSelector.pick` determinism, per-index/per-seed variation, fallback for unknown roles, `variants_for_role` counts, `TemplateSelector` extended/legacy sets, `effects_for` hazard payloads (fire, breach, empty), and `loot_bias` keys validated against `loot_tables.json`. Added to regression bundle.
+  - `scripts/validation/room_variant_selector_smoke.gd` (marker `ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=14 legacy=3 deterministic=true`) — pure-model: `RoomVariantSelector.pick` determinism, per-index/per-seed variation, fallback for unknown roles, `variants_for_role` counts, `TemplateSelector` extended/legacy sets, `effects_for` hazard payloads (fire, breach, empty), and `loot_bias` keys validated against `loot_tables.json`. Added to regression bundle.
   - `scripts/validation/procgen_variation_smoke.gd` (marker `PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true`) — pure-data generation layer: (1) two different seeds produce distinct room-variant multisets, (2) a variant with `loot_bias` changes a room's `loot_table` vs role baseline (bias-only tables `salvage_cargo`/`salvage_engineering`/`hidden_cache`/`repair_parts_common` prove the override), (3) extended templates (`compact`/`dispersed`/`stacked_v2`/`derelict_a`/`derelict_b`) engage at `deep_dive` while standard difficulty stays on legacy templates (`spine`/`bifurcated`/`stacked`), (4) same seed generated twice produces identical variant + template output. Added to regression bundle.
   - `scripts/validation/procgen_variant_hazard_smoke.gd` (marker `PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true`) — main-scene away-branch proof: injects a `burned_out` (fire) variant on an engineering room and a `breached` variant on a bridge room of the boarded derelict's layout, configures per-ship hull + fire from tuning, then calls the real `_seed_derelict_breaches()`/`_seed_derelict_fire()` and asserts: engineering ignites on the derelict fire model, bridge breaches on the DERELICT hull (`current_ship.get_hull()`), `_build_breach_seal_points()` creates a seal node for the breached bridge (PR #56 ordering fix), home hull bridge stays clean (wrong-target regression guard), and re-calling the seed functions does not re-seed (`fire_seeded`/`breach_seeded` guards). Added to regression bundle.
   - `scripts/validation/authored_hazard_overlay_smoke.gd` (marker `AUTHORED HAZARD OVERLAY PASS variant_fire=true authored_fire=true variant_breach=true authored_breach=true vented=true unmapped_visual=true hazard_source_ignored=true contents_copied=true contents_granted=true marker_matched=true contents_empty=true unique_gated=true mapped_reserved=true`) — main-scene away-branch proof of the PR 13 overlay: seed still runs with non-empty `fire_zones` and `hazard_source=runtime`, then mapped authored cids ignite/breach/vent; unmapped zones stay visual-only; fire-zone markers pin by `compartment_id` and remain reserved when that fire is absent; loot specs copy `contents` (including explicit empty, which does not roll) and `LootContainer.try_interact` grants those stacks with unique-item gating. Added to regression bundle.
@@ -1351,6 +1364,9 @@ orphan below so none is silent. Dispositions:
 - **standalone-gate** — `gate1_automated_playtest`: documented to run ON TOP OF the bundle,
   deliberately not a `run_clean` entry (its runtime dwarfs every smoke). Surfaced when the
   checker was scoped to actual `run_clean` invocations (PR #65 review).
+- **standalone-feature-completion** — an `fc_pNN` case is invoked by the explicit
+  feature-completion case/profile runner, outside the legacy canonical bundle. It
+  is not acceptance evidence until that runner records a fresh passing result.
 
 The table is generated and drift-checked by `tools/classify_orphan_smokes.sh`
 (`--check` fails on any unclassified orphan or stale row; run it whenever bundle
@@ -1386,7 +1402,6 @@ membership changes).
 | `consumable_state_smoke` | promotion-candidate |
 | `container_variety_smoke` | promotion-candidate |
 | `crafting_debug_smoke` | debug-tool |
-| `crafting_recipe_list_smoke` | promotion-candidate |
 | `crafting_state_smoke` | promotion-candidate |
 | `cross_system_dependency_smoke` | promotion-candidate |
 | `cross_training_smoke` | promotion-candidate |
@@ -1420,7 +1435,6 @@ membership changes).
 | `hangar_control_smoke` | promotion-candidate |
 | `hangar_persistence_smoke` | promotion-candidate |
 | `hangar_port_smoke` | promotion-candidate |
-| `hydroponics_crop_list_smoke` | promotion-candidate |
 | `hydroponics_state_smoke` | promotion-candidate |
 | `inventory_panel_smoke` | promotion-candidate |
 | `inventory_selection_model_smoke` | promotion-candidate |
@@ -1446,9 +1460,6 @@ membership changes).
 | `main_playable_slice_capture_sequence` | legacy-capture |
 | `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
-| `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
-| `main_playable_slice_salvage_picker_smoke` | promotion-candidate |
-| `main_playable_slice_hydro_crop_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |
@@ -1477,14 +1488,12 @@ membership changes).
 | `qt_mini_smoke` | promotion-candidate |
 | `quality_tier_smoke` | promotion-candidate |
 | `rarity_tier_smoke` | promotion-candidate |
-| `recipe_picker_panel_smoke` | promotion-candidate |
 | `recipe_resource_smoke` | promotion-candidate |
 | `recursive_travel_smoke` | promotion-candidate |
 | `release_readiness_ledger_smoke` | release-audit-tool |
 | `repair_consume_smoke` | promotion-candidate |
 | `repair_loop_smoke` | promotion-candidate |
 | `rigid_pair_travel_smoke` | promotion-candidate |
-| `salvage_list_smoke` | promotion-candidate |
 | `scanner_panel_smoke` | promotion-candidate |
 | `scanner_state_smoke` | promotion-candidate |
 | `ship_access_smoke` | promotion-candidate |
@@ -1513,3 +1522,66 @@ membership changes).
 | `travel_integration_smoke` | promotion-candidate |
 | `unique_item_state_smoke` | promotion-candidate |
 | `windowed_fps_capture` | legacy-capture |
+| `builder_authored_portals_smoke` | promotion-candidate |
+| `builder_authored_runtime_fields_smoke` | promotion-candidate |
+| `builder_placed_props_smoke` | promotion-candidate |
+| `builder_playable_runtime_fields_smoke` | promotion-candidate |
+| `capture_current_topology_fixture` | legacy-capture |
+| `ceiling_fade_smoke` | promotion-candidate |
+| `collision_probe_smoke` | debug-tool |
+| `component_imported_visual_smoke` | promotion-candidate |
+| `derelict_builder_hazard_materialization_smoke` | promotion-candidate |
+| `derelict_builder_preview_contract_smoke` | promotion-candidate |
+| `derelict_builder_preview_smoke` | promotion-candidate |
+| `fc_p00_native_arc_smoke` | standalone-feature-completion |
+| `fc_p03_smoke` | standalone-feature-completion |
+| `fc_p04_floor_drop_persistence_smoke` | standalone-feature-completion |
+| `fc_p04_holder_atomicity_smoke` | standalone-feature-completion |
+| `fc_p04_objective_lots_smoke` | standalone-feature-completion |
+| `fc_p04_smoke` | standalone-feature-completion |
+| `fc_p05_smoke` | standalone-feature-completion |
+| `fc_p06_smoke` | standalone-feature-completion |
+| `fc_p07_smoke` | standalone-feature-completion |
+| `fc_p08_smoke` | standalone-feature-completion |
+| `fc_p09_smoke` | standalone-feature-completion |
+| `fc_p09_natural_route_smoke` | standalone-feature-completion |
+| `fc_p10_smoke` | standalone-feature-completion |
+| `fc_p10_process_smoke` | standalone-feature-completion |
+| `combat_persistence_smoke` | standalone-feature-completion |
+| `fc_p11_live_smoke` | standalone-feature-completion |
+| `fc_p11_smoke` | standalone-feature-completion |
+| `fc_p12_smoke` | standalone-feature-completion |
+| `fc_p13_smoke` | standalone-feature-completion |
+| `fc_p16_smoke` | standalone-feature-completion |
+| `fire_compartment_resolver_smoke` | promotion-candidate |
+| `focused_nine_airlock_control_room_capture` | legacy-capture |
+| `focused_nine_comparison_capture` | legacy-capture |
+| `focused_nine_staged_derelict_capture` | legacy-capture |
+| `focused_nine_staged_structural_smoke` | promotion-candidate |
+| `integrity_visual_resolver_smoke` | promotion-candidate |
+| `ithappy_kit_smoke` | promotion-candidate |
+| `ithappy_visual_capture` | legacy-capture |
+| `meshy_asset_review_capture` | legacy-capture |
+| `nav_solid_edges_smoke` | promotion-candidate |
+| `objective_visual_binding_smoke` | promotion-candidate |
+| `playable_generated_ship_floor_collision_smoke` | promotion-candidate |
+| `procgen_structural_compiler_smoke` | promotion-candidate |
+| `procgen_structural_debug_export` | debug-tool |
+| `prop_visual_binding_smoke` | promotion-candidate |
+| `refresh_seed_000017_fixture` | legacy-capture |
+| `ship_instance_breach_environment_smoke` | promotion-candidate |
+| `sim_vector3_smoke` | promotion-candidate |
+| `runtime_physical_volume_smoke` | standalone-feature-completion |
+| `structural_rebuild_collision_query_smoke` | standalone-feature-completion |
+| `structural_rebuild_candidate_nav_smoke` | standalone-feature-completion |
+| `structural_rebuild_policy_smoke` | standalone-feature-completion |
+| `top_down_harness_smoke` | promotion-candidate |
+| `top_down_readability_harness` | non-headless-harness |
+| `topdown_e2e_smoke` | promotion-candidate |
+| `topdown_threat_smoke` | promotion-candidate |
+| `topdown_vertical_slice_smoke` | promotion-candidate |
+| `worldgen_diff_probe` | debug-tool |
+| `worldgen_live_preview` | legacy-capture |
+| `worldgen_v2_import_smoke` | debug-tool |
+| `worldgen_v2_visual_probe` | legacy-capture |
+| `worldgen_wired_travel_smoke` | promotion-candidate |

@@ -4,14 +4,15 @@ class_name RepairPoint
 ## A spatial, parts-gated, timed repair node bound to one (system_id, subcomponent_id)
 ## of a specific ship's ShipSystemsManager. Interacting starts a Project-Zomboid-style
 ## channel that ticks in this node's OWN _process (independent of the coordinator's frozen
-## per-frame loop). Leaving range cancels with no part loss; completing consumes the parts
-## and restores the subcomponent.
+## per-frame loop). Environmental interruption pauses exact escrow and progress;
+## completing commits the parts and restores the subcomponent once.
 ##
 ## PKG-B2.5: progress/interrupt rides WorkActionChannel (action repair_subcomponent).
-## Domain gates + repair_with_inventory completion stay here; authored repair_point
+## Domain gates and the once-only transaction commit stay here; authored repair_point
 ## remains the objective wrapper.
 
 const WorkActionChannelScript := preload("res://scripts/systems/work_action_channel.gd")
+const ShipWorkTransactionScript := preload("res://scripts/systems/ship_work_transaction.gd")
 const WORK_ACTION_ID: String = "repair_subcomponent"
 
 signal repair_completed(system_id: String, subcomponent_id: String)
@@ -36,6 +37,9 @@ var repaired: bool = false
 var _channel_player: Node = null
 var _scaled_seconds: float = 1.0
 var _work_channel: RefCounted = null ## WorkActionChannel while channeling
+var _transaction: RefCounted = null ## ShipWorkTransaction
+var _work_id: String = ""
+var _ship_id: String = ""
 var candidate_player: Node
 var collision_shape: CollisionShape3D
 var marker: MeshInstance3D
@@ -52,7 +56,7 @@ func _ready() -> void:
 	if not body_exited.is_connected(_on_body_exited):
 		body_exited.connect(_on_body_exited)
 
-func configure(p_system_id: String, p_subcomponent_id: String, p_target_manager, p_inventory_state, p_player_progression, world_position: Vector3, p_repair_seconds: float, p_min_skill: int, radius := 1.8) -> void:
+func configure(p_system_id: String, p_subcomponent_id: String, p_target_manager, p_inventory_state, p_player_progression, world_position: Vector3, p_repair_seconds: float, p_min_skill: int, radius := 1.8, p_ship_id: String = "legacy_ship", p_transaction = null) -> void:
 	system_id = p_system_id
 	subcomponent_id = p_subcomponent_id
 	target_manager = p_target_manager
@@ -61,6 +65,13 @@ func configure(p_system_id: String, p_subcomponent_id: String, p_target_manager,
 	repair_seconds = p_repair_seconds
 	min_skill = p_min_skill
 	interaction_radius = radius
+	_ship_id = p_ship_id if not p_ship_id.is_empty() else "legacy_ship"
+	if p_transaction != null and str(p_transaction.get("ship_id")) == _ship_id:
+		_transaction = p_transaction
+	else:
+		_transaction = ShipWorkTransactionScript.new()
+		_transaction.configure(_ship_id)
+	_work_id = ""
 	channeling = false
 	progress = 0.0
 	repaired = false
@@ -118,9 +129,38 @@ func try_start(player_body: Node) -> bool:
 		return true
 	var factor: float = 1.0 + 0.1 * float(maxi(0, skill - min_skill))
 	_scaled_seconds = maxf(0.01, repair_seconds / factor)
+	var requirements: Dictionary = {}
+	for part in sub.required_parts:
+		requirements[String(part)] = int(requirements.get(String(part), 0)) + 1
+	var selected_ids: PackedStringArray = _selected_part_lot_ids(requirements)
+	if not requirements.is_empty() and selected_ids.is_empty():
+		emit_signal("repair_blocked", system_id, subcomponent_id, "missing_parts")
+		return true
+	_work_id = _transaction.create_work_id("repair_subcomponent")
+	var prepared: Dictionary = _transaction.prepare({
+		"work_id": _work_id,
+		"ship_id": _ship_id,
+		"target_id": "%s/%s" % [system_id, subcomponent_id],
+		"target_revision": _target_revision(),
+		"action_id": WORK_ACTION_ID,
+		"source_holder_id": inventory_state.get_holder_namespace(),
+		"selected_lot_ids": selected_ids,
+		"replacement_catalog_id": "",
+	}, inventory_state, requirements)
+	if not bool(prepared.get("ok", false)):
+		_work_id = ""
+		emit_signal("repair_blocked", system_id, subcomponent_id, str(prepared.get("reason", "reserve_failed")))
+		return true
 	var channel = WorkActionChannelScript.new()
 	var target_key: String = "%s/%s" % [system_id, subcomponent_id]
 	if not channel.begin(WORK_ACTION_ID, target_key, _scaled_seconds, {}):
+		_transaction.cancel(_work_id, inventory_state, null, "work_action")
+		_work_id = ""
+		emit_signal("repair_blocked", system_id, subcomponent_id, "work_action")
+		return true
+	if not _transaction.activate(_work_id):
+		_transaction.cancel(_work_id, inventory_state, null, "work_action")
+		_work_id = ""
 		emit_signal("repair_blocked", system_id, subcomponent_id, "work_action")
 		return true
 	_work_channel = channel
@@ -152,13 +192,21 @@ func _precheck_reason(sub, skill: int) -> String:
 func _process(delta: float) -> void:
 	if not channeling:
 		return
-	# Cancel if the channelling player was freed or left range (PZ-style: walking away
-	# aborts with no part loss). Pure range check — no candidate_player bypass.
+	# Environmental gates pause the paid work. Returning to a valid range/tool state
+	# resumes from the same progress; only explicit cancellation refunds escrow.
 	if not is_instance_valid(_channel_player):
-		_cancel()
+		_pause("missing_player")
 		return
 	if not _is_player_in_direct_range(_channel_player):
-		_cancel()
+		_pause("out_of_range")
+		return
+	if not _required_tools_present():
+		_pause("missing_tool")
+		return
+	if _target_revision() != str(_transaction.get_record(_work_id).get("target_revision", "")):
+		_pause("stale_target")
+		return
+	if _work_channel != null and bool(_work_channel.call("is_paused")) and not _resume():
 		return
 	advance_channel(delta)
 
@@ -177,25 +225,159 @@ func _complete() -> void:
 	if _work_channel != null:
 		_work_channel.call("cancel")
 		_work_channel = null
-	var skill: int = _player_skill()
-	var result: Dictionary = target_manager.repair_with_inventory(system_id, subcomponent_id, inventory_state, skill)
-	if bool(result.get("success", false)):
-		set_repaired(true)
-		if player_progression != null and player_progression.has_method("grant_xp"):
-			player_progression.grant_xp("repair", 25)
-		emit_signal("repair_completed", system_id, subcomponent_id)
-	else:
-		# Lost the parts/tools mid-channel (shouldn't normally happen); reset to idle.
+	if _transaction == null or _work_id.is_empty() or not _transaction.mark_channel_completed(_work_id):
 		progress = 0.0
-		emit_signal("repair_blocked", system_id, subcomponent_id, String(result.get("reason", "failed")))
+		emit_signal("repair_blocked", system_id, subcomponent_id, "transaction")
+		return
+	var receipt: Dictionary = _transaction.commit(_work_id, {
+		"ship_id": _ship_id,
+		"target_id": "%s/%s" % [system_id, subcomponent_id],
+		"target_exists": not _target_revision().is_empty(),
+		"target_revision": _target_revision(),
+		"in_range": _is_player_in_direct_range(_channel_player),
+		"has_required_tool": _required_tools_present(),
+		"damaged": false,
+		"stage": func(_record: Dictionary) -> Dictionary: return {"ok": true},
+		"commit": Callable(self, "_commit_reserved_repair"),
+	})
+	if bool(receipt.get("ok", false)):
+		set_repaired(true)
+	else:
+		progress = 0.0
+		emit_signal("repair_blocked", system_id, subcomponent_id, String(receipt.get("reason", "failed")))
+	# Keep the committed receipt addressable for idempotent retries; only the active
+	# handle clears.
+	if bool(receipt.get("ok", false)):
+		_work_id = ""
 
-func _cancel() -> void:
+
+func _cancel(reason: String = "explicit_cancel") -> void:
+	if _transaction != null and not _work_id.is_empty() and inventory_state != null:
+		_transaction.cancel(_work_id, inventory_state, null, reason)
 	channeling = false
 	progress = 0.0
 	_channel_player = null
 	if _work_channel != null:
 		_work_channel.call("cancel")
 		_work_channel = null
+	_work_id = ""
+
+
+func _pause(reason: String) -> bool:
+	if _work_channel == null or _transaction == null or _work_id.is_empty():
+		return false
+	var was_paused: bool = bool(_work_channel.call("is_paused"))
+	var previous_reason: String = str(_transaction.call("get_record", _work_id).get("last_reason", ""))
+	if not was_paused and not bool(_work_channel.call("pause")):
+		return false
+	if not bool(_transaction.call("pause_channel", _work_id, progress, reason)):
+		if not was_paused:
+			_work_channel.call("resume", {})
+		return false
+	progress = float(_work_channel.call("progress_ratio"))
+	if not was_paused or previous_reason != reason:
+		emit_signal("repair_blocked", system_id, subcomponent_id, reason)
+	return true
+
+
+func _resume() -> bool:
+	if _work_channel == null or _transaction == null or _work_id.is_empty():
+		return false
+	if not bool(_transaction.call("resume_channel", _work_id)):
+		return false
+	if not bool(_work_channel.call("resume", {})):
+		_transaction.call("pause_channel", _work_id, progress, "resume_failed")
+		return false
+	return true
+
+
+func cancel_work(reason: String = "explicit_cancel") -> bool:
+	if not channeling:
+		return false
+	_cancel(reason)
+	return true
+
+
+func interrupt_on_damage() -> bool:
+	if not channeling:
+		return false
+	return _pause("damaged")
+
+
+func get_reserved_lots() -> Array:
+	return _transaction.get_escrow(_work_id) if _transaction != null and not _work_id.is_empty() else []
+
+
+func _selected_part_lot_ids(requirements: Dictionary) -> PackedStringArray:
+	var selected: PackedStringArray = PackedStringArray()
+	if inventory_state == null or not inventory_state.has_method("get_lot_summary"):
+		return selected
+	var lots: Array = inventory_state.get_lot_summary().get("lots", []) as Array
+	var ids: Array = requirements.keys()
+	ids.sort()
+	for item_v in ids:
+		var item_id: String = str(item_v)
+		var candidates: Array = []
+		for lot_v in lots:
+			if lot_v is Dictionary and str((lot_v as Dictionary).get("item_id", "")) == item_id:
+				candidates.append(lot_v as Dictionary)
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return str(a.get("lot_id", "")) < str(b.get("lot_id", "")))
+		var remaining: int = int(requirements[item_v])
+		for lot in candidates:
+			if remaining <= 0:
+				break
+			selected.append(str((lot as Dictionary).get("lot_id", "")))
+			remaining -= int((lot as Dictionary).get("quantity", 0))
+		if remaining > 0:
+			return PackedStringArray()
+	return selected
+
+
+func _target_revision() -> String:
+	if target_manager == null:
+		return ""
+	var system = target_manager.get_system(system_id)
+	var sub = system.get_subcomponent(subcomponent_id) if system != null else null
+	if sub == null:
+		return ""
+	return "%s/%s|%.5f" % [system_id, subcomponent_id, float(sub.health)]
+
+
+func _required_tools_present() -> bool:
+	if target_manager == null or inventory_state == null:
+		return false
+	var system = target_manager.get_system(system_id)
+	var sub = system.get_subcomponent(subcomponent_id) if system != null else null
+	if sub == null:
+		return false
+	for tool in sub.required_tools:
+		if inventory_state.get_quantity(String(tool)) <= 0:
+			return false
+	return true
+
+
+func _commit_reserved_repair(record: Dictionary) -> Dictionary:
+	var parts: Array = []
+	for lot_v in record.get("escrow", []) as Array:
+		if lot_v is Dictionary:
+			parts.append(str((lot_v as Dictionary).get("item_id", "")))
+	var tools: Array = []
+	if inventory_state != null:
+		for entry in inventory_state.get_items_by_category("tool"):
+			tools.append(String(entry["id"]))
+	var result: Dictionary = target_manager.repair(system_id, subcomponent_id, parts, tools, _player_skill())
+	if not bool(result.get("success", false)):
+		return {"ok": false, "reason": str(result.get("reason", "repair_failed"))}
+	if player_progression != null and player_progression.has_method("grant_xp"):
+		player_progression.grant_xp("repair", 25)
+	emit_signal("repair_completed", system_id, subcomponent_id)
+	return {
+		"ok": true,
+		"awarded_event_ids": ["repair"],
+		"noise": 0.35,
+		"committed_target_revision": _target_revision(),
+	}
 
 
 ## PKG-B2.5: catalog action driving this channel (empty when idle).

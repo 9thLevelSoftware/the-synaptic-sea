@@ -259,8 +259,8 @@ func _serialize_portals(portals: Array) -> Array:
 func _serialize_interior_zones(zones: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 	result["reserved_cells"] = _serialize_cell_list(zones.get("reserved_cells", []))
-	result["center_slots"] = _serialize_cell_list(zones.get("center_slots", []))
-	result["wall_slots"] = _serialize_wall_slots(zones.get("wall_slots", []))
+	result["center_slots"] = _serialize_component_slots(zones.get("center_slots", []), false)
+	result["wall_slots"] = _serialize_component_slots(zones.get("wall_slots", []), true)
 	return result
 
 
@@ -315,16 +315,16 @@ func _serialize_cell_list(cells: Array) -> Array:
 	return serialized
 
 
-func _serialize_wall_slots(slots: Array) -> Array:
+func _serialize_component_slots(slots: Array, default_against_wall: bool) -> Array:
 	var serialized: Array = []
 	for slot_variant in slots:
 		var cell_value: Variant = slot_variant
-		var against_wall: bool = true
+		var against_wall: bool = default_against_wall
 		var extra: Dictionary = {}
 		if typeof(slot_variant) == TYPE_DICTIONARY:
 			var slot: Dictionary = slot_variant
 			cell_value = slot.get("cell", null)
-			against_wall = bool(slot.get("against_wall", true))
+			against_wall = bool(slot.get("against_wall", default_against_wall))
 			for key in slot.keys():
 				if str(key) == "cell" or str(key) == "against_wall":
 					continue

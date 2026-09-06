@@ -11,7 +11,8 @@ const WorkActionStateScript := preload("res://scripts/systems/work_action_state.
 static func resolve_dismount(
 		work: RefCounted,
 		placement: RefCounted,
-		inventory: Dictionary) -> Dictionary:
+		inventory: Dictionary,
+		dismount_context: Dictionary = {}) -> Dictionary:
 	var out: Dictionary = {
 		"ok": false,
 		"reason": "",
@@ -38,7 +39,8 @@ static func resolve_dismount(
 		return out
 	var item_form: String = str(result.get("item_form", ""))
 	var qty: int = maxi(1, int(result.get("qty", 1)))
-	inventory[item_form] = int(inventory.get(item_form, 0)) + qty
+	if not bool(dismount_context.get("defer_inventory", false)):
+		inventory[item_form] = int(inventory.get(item_form, 0)) + qty
 	out["ok"] = true
 	out["item_form"] = item_form
 	out["mass"] = float(result.get("mass", 0.0))
@@ -48,6 +50,8 @@ static func resolve_dismount(
 	out["component_id"] = str(result.get("component_id", ""))
 	out["linked_system"] = str(result.get("linked_system", ""))
 	out["linked_subcomponent"] = str(result.get("linked_subcomponent", ""))
+	if result.get("item_lot", null) is Dictionary:
+		out["item_lot"] = (result.get("item_lot") as Dictionary).duplicate(true)
 	return out
 
 
@@ -90,14 +94,27 @@ static func resolve_mount(
 	if item_form.is_empty() or room_id.is_empty():
 		out["reason"] = "bad_target"
 		return out
+	var paid_lot: Dictionary = {}
+	var paid_lots_v: Variant = mount_context.get("paid_item_lots", [])
+	if paid_lots_v is Array and not (paid_lots_v as Array).is_empty():
+		var paid_lots: Array = paid_lots_v as Array
+		if paid_lots.size() != 1 or not (paid_lots[0] is Dictionary):
+			out["reason"] = "invalid_paid_component_lot"
+			return out
+		paid_lot = (paid_lots[0] as Dictionary).duplicate(true)
+		if str(paid_lot.get("item_id", "")) != item_form or int(paid_lot.get("quantity", 0)) != 1:
+			out["reason"] = "invalid_paid_component_lot"
+			return out
 	var result: Dictionary = placement.call(
-		"mount", item_form, room_id, slot_kind, slot_index, inventory, catalog)
+		"mount", item_form, room_id, slot_kind, slot_index, inventory, catalog, paid_lot)
 	if not bool(result.get("ok", false)):
 		out["reason"] = str(result.get("reason", "mount_failed"))
 		return out
 	out["ok"] = true
 	out["item_form"] = item_form
 	out["instance_id"] = str(result.get("instance_id", ""))
+	if not paid_lot.is_empty():
+		out["source_lot_id"] = str(paid_lot.get("lot_id", ""))
 	out["noise"] = float(work.call("noise")) if work.has_method("noise") else 0.20
 	out["xp_event"] = str(work.call("xp_event")) if work.has_method("xp_event") else "repair"
 	return out

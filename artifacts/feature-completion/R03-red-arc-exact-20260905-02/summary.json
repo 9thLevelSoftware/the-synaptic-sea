@@ -1,0 +1,24 @@
+{
+  "environment": {
+    "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-arc-exact-20260905-02\\user-root",
+    "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-arc-exact-20260905-02\\user-root",
+    "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-arc-exact-20260905-02\\user-root",
+    "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-arc-exact-20260905-02\\user-root"
+  },
+  "probe": {
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "diagnostics": [],
+    "stderr_empty": true
+  },
+  "smoke": {
+    "exit_code": 1,
+    "timed_out": false,
+    "pass_marker_count": 0,
+    "diagnostics": [
+      "ERROR: ARC STATE FAIL reason=sub-millisecond phase authority drifted expected={ \"arcing\": false, \"arcing_duration\": 2.5, \"cycle_duration\": 4.0, \"discharged_duration\": 1.5, \"hazard_kind\": \"electrical_arc\", \"passability_blocked\": false, \"phase\": 0.0, \"remaining_in_state\": 1.49954052188553, \"state\": \"DISCHARGED\", \"time_in_state\": 0.00045947811447, \"zone_ids\": [\"inactive_owner_arc\"] } actual={ \"hazard_kind\": \"electrical_arc\", \"state\": \"DISCHARGED\", \"phase\": 0, \"time_in_state\": 0.0, \"cycle_duration\": 4.0, \"arcing\": false, \"passability_blocked\": false, \"arcing_duration\": 2.5, \"discharged_duration\": 1.5, \"remaining_in_state\": 1.5, \"zone_ids\": [\"inactive_owner_arc\"] }"
+    ],
+    "stderr_empty": false
+  }
+}

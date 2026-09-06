@@ -1,0 +1,5 @@
+WARNING: SaveLoadService: cannot save null world snapshot
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] save_world (res://scripts/systems/save_load_service.gd:674)
+       [1] _initialize (res://scripts/validation/world_save_service_smoke.gd:54)

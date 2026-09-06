@@ -39,7 +39,16 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0052 | docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md | portable prop sidecars, generated bindings, and visual-only runtime binding |
 | 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
 | 0058 | docs/game/adr/0058-meshy-candidates-blender-authority.md | Meshy candidate-only generation, Blender canonical masters, staged review, and Godot runtime authority |
-| 0060 | docs/game/adr/0060-meshy-offline-evidence-rebind.md | Offline, fail-closed rebinding of protected Meshy evidence and resolved plan references |
+| 0059 | docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md | Accepted contract; implementation pending: persistent quality lots, paid jobs, ship-scoped physical work and structural replacement |
+| 0060 | docs/game/adr/0060-windows-feature-completion-validation-runtime.md | Accepted: Windows 4.7.2 validation baseline, 652 canonical checks and native probe verified; export qualification pending |
+| 0061 | docs/game/adr/0061-persist-resolved-generation-context.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
+| 0062 | docs/game/adr/0062-ship-owned-pending-output-receipts.md | Accepted P08 contract: ship-owned immutable pending receipts supersede only ADR-0059's pending-output placeholder; focused validation pending |
+| 0063 | docs/game/adr/0063-lifeboat-compiled-biome-contract.md | Accepted contract: scoped implementation and focused validation complete; full baseline pending |
+| 0064 | docs/game/adr/0064-versioned-current-topology-parity-fixture.md | Accepted contract: version current topology parity as a reviewed fixture; candidate validation and implementation pending |
+| 0065 | docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md | Accepted for implementation, validation pending: exact same-module replacement, live safety/egress preflight, and mandatory APPLYING/finalize atomic scene boundary |
+| 0066 | docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md | Accepted for implementation, runtime pending P10/P13: exact-lot machinery condition, effective system health, paid intrinsic/provider repair, and audited frozen-criterion supersession |
+| 0067 | docs/game/adr/0067-native-first-run-candidate-authority.md | Accepted for implementation: validate first-away standing route and hazards through the actual native generation path |
+| 0068 | docs/game/adr/0060-meshy-offline-evidence-rebind.md | Offline, fail-closed rebinding of protected Meshy evidence and resolved plan references |
 
 ## Notes
 

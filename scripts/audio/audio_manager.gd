@@ -94,11 +94,32 @@ var _warned_missing_paths: Dictionary = {}
 ## Used to skip player.play() calls that create AudioStreamPlayback
 ## objects whose references are held by the AudioServer's mixing thread.
 var _headless: bool = false
+## A disposable restore sibling may build and hydrate its pure audio models,
+## but it must not change process-global AudioServer buses before Main accepts
+## the complete world. The coordinator enables writes exactly once at the
+## successful activation boundary.
+var _server_writes_deferred: bool = false
+var _physical_playback_count_for_validation: int = 0
+
+
+func configure_restore_staging() -> bool:
+	if is_inside_tree():
+		return false
+	_server_writes_deferred = true
+	return true
+
+
+func activate_deferred_server_writes() -> void:
+	if not _server_writes_deferred:
+		return
+	_server_writes_deferred = false
+	_apply_bus_volumes()
 
 func _ready() -> void:
 	_headless = DisplayServer.get_name() == "headless"
 	_build_stream_players()
-	_apply_bus_volumes()
+	if not _server_writes_deferred:
+		_apply_bus_volumes()
 	_initialize_sub_models()
 
 ## Explicit teardown: release all cached AudioStream references so the
@@ -188,6 +209,8 @@ func _engine_bus_name(bus_id: StringName) -> StringName:
 ## .tres has not been loaded). The pure-model state remains the source
 ## of truth in that case.
 func _apply_bus_volumes() -> void:
+	if _server_writes_deferred:
+		return
 	for bus in bus_config.buses:
 		if typeof(bus) != TYPE_DICTIONARY:
 			continue
@@ -236,21 +259,31 @@ func apply_summary(summary: Dictionary) -> bool:
 	if typeof(meta) == TYPE_DICTIONARY:
 		if meta_event_state.apply_summary(meta):
 			changed = true
+	var voice_id_v: Variant = summary.get("current_voice_log_id", "")
+	if typeof(voice_id_v) != TYPE_STRING:
+		return false
+	current_voice_log_id = str(voice_id_v)
+	changed = true
 	return changed
 
 ## Collect a summary from the manager (and its six sub-models). The result
 ## is a flat dictionary with six sub-dicts plus a small set of manager-level
-## fields (current_voice_log_id, listener_attached).
+## fields (current_voice_log_id). Listener attachment is derived from the live
+## player/camera tree and is deliberately not persisted as gameplay authority.
 func get_summary() -> Dictionary:
+	var persisted_sfx: Dictionary = sfx_router.get_summary()
+	# Pending caption rows are transient presentation events. The router exposes
+	# their count for diagnostics, but no payload capable of recreating them;
+	# persisting only the count would create false authority that cannot roundtrip.
+	persisted_sfx.erase("caption_queue_size")
 	return {
 		"bus_config": bus_config.get_summary(),
 		"ambient": ambient_zone_state.get_summary(),
-		"sfx_router": sfx_router.get_summary(),
+		"sfx_router": persisted_sfx,
 		"music": music_state.get_summary(),
 		"spatial": spatial_resolver.get_summary(),
 		"meta_event": meta_event_state.get_summary(),
 		"current_voice_log_id": current_voice_log_id,
-		"listener_attached": _listener_anchor != null and is_instance_valid(_listener_anchor),
 	}
 
 ## Update the player-vitals / hazard / engagement flags driving the music
@@ -292,6 +325,12 @@ func tick(delta_seconds: float) -> Array:
 ## When `position` is provided and the AudioStreamPlayer3D pool has a slot,
 ## the sound is emitted spatially (REQ-AU-005).
 func play_sfx(event_id: StringName, position: Variant = null) -> bool:
+	# Scene reconstruction can invoke ordinary consequence emitters (for
+	# example dock/land). A disposable sibling must remain acoustically and
+	# model-silent: routing would mutate cooldown/caption history even if the
+	# actual player.play() call were suppressed.
+	if _server_writes_deferred:
+		return false
 	var route_result: Variant = sfx_router.route(event_id)
 	if route_result == null:
 		return false
@@ -383,6 +422,8 @@ func transition_music(target_state: StringName) -> bool:
 
 ## Schedule an AudioLog entry for playback through the voice bus.
 func play_voice_log(entry_id: StringName) -> bool:
+	if _server_writes_deferred:
+		return false
 	if not audio_log.has_entry(entry_id):
 		push_warning("AudioManager: unknown voice log entry '%s'" % String(entry_id))
 		return false
@@ -401,7 +442,7 @@ func play_voice_log(entry_id: StringName) -> bool:
 
 ## Trigger an immediate meta-event (in addition to the scheduled ones).
 func trigger_meta_event(event_id: StringName) -> bool:
-	if String(event_id).is_empty():
+	if _server_writes_deferred or String(event_id).is_empty():
 		return false
 	var bus_id: String = _bus_for_meta_event_id(String(event_id))
 	var vol: float = -6.0
@@ -425,6 +466,10 @@ func get_spatial_player_count() -> int:
 	for key in _spatial_pool.keys():
 		total += (_spatial_pool[key] as Array).size()
 	return total
+
+
+func get_physical_playback_count_for_validation() -> int:
+	return _physical_playback_count_for_validation
 
 ## Internal: load (and cache) an AudioStream from a res:// path. Returns null
 ## on a missing/corrupt file; logs exactly one push_warning per path (never
@@ -463,6 +508,8 @@ func _load_stream_cached(path: String) -> AudioStream:
 ## entries) pass it directly; it takes precedence over the catalog lookup and
 ## goes through the same warn-once loader.
 func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"", stream_path: String = "") -> void:
+	if _server_writes_deferred:
+		return
 	var player: AudioStreamPlayer = _bus_players.get(bus_id, null)
 	if player == null:
 		return
@@ -478,6 +525,7 @@ func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"",
 			if player.stream != stream:
 				player.stream = stream
 			if not _headless:
+				_physical_playback_count_for_validation += 1
 				player.play()
 
 ## Internal: play through a spatial AudioStreamPlayer3D pool entry. Stream
@@ -486,6 +534,8 @@ func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"",
 ## event keeps the volume-push-only fallback so the deferred asset library
 ## stays honest about what plays.
 func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volume_db: float) -> void:
+	if _server_writes_deferred:
+		return
 	var key: String = String(event_id)
 	var pool: Array = _spatial_pool.get(key, [])
 	# Reuse a free entry if any, otherwise allocate a new one.
@@ -509,6 +559,7 @@ func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volu
 			if player.stream != stream:
 				player.stream = stream
 			if not _headless:
+				_physical_playback_count_for_validation += 1
 				player.play()
 
 ## Internal: deterministic "is this emitter occluded" check. Real LOS

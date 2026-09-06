@@ -8309,6 +8309,1977 @@
         "achievement_state integration is opt-in (no per-run service attached by default), so that edge is dormant in the base run"
       ],
       "subsystems": []
+    },
+    {
+      "id": "unassessed_camera_top_down_camera_rig",
+      "file": "scripts/camera/top_down_camera_rig.gd",
+      "name": "Top Down Camera Rig",
+      "domain": "camera",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_interaction_authored_portal_runtime",
+      "file": "scripts/interaction/authored_portal_runtime.gd",
+      "name": "Authored Portal Runtime",
+      "domain": "interaction",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_interaction_topdown_interactor",
+      "file": "scripts/interaction/topdown_interactor.gd",
+      "name": "Topdown Interactor",
+      "domain": "interaction",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_main",
+      "file": "scripts/main.gd",
+      "name": "Main",
+      "domain": "entrypoints",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_placement_gameplay_prop_factory",
+      "file": "scripts/placement/gameplay_prop_factory.gd",
+      "name": "Gameplay Prop Factory",
+      "domain": "placement",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_player_top_down_player_controller",
+      "file": "scripts/player/top_down_player_controller.gd",
+      "name": "Top Down Player Controller",
+      "domain": "player",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_ceiling_fade_controller",
+      "file": "scripts/procgen/ceiling_fade_controller.gd",
+      "name": "Ceiling Fade Controller",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_derelict_builder_preview",
+      "file": "scripts/procgen/derelict_builder_preview.gd",
+      "name": "Derelict Builder Preview",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_fire_compartment_resolver",
+      "file": "scripts/procgen/fire_compartment_resolver.gd",
+      "name": "Fire Compartment Resolver",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_first_run_contract",
+      "file": "scripts/procgen/first_run_contract.gd",
+      "name": "First Run Contract",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_layout_mutator",
+      "file": "scripts/procgen/layout_mutator.gd",
+      "name": "Layout Mutator",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_modular_socket_catalog",
+      "file": "scripts/procgen/modular_socket_catalog.gd",
+      "name": "Modular Socket Catalog",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_runtime_prop_visual_binder",
+      "file": "scripts/procgen/runtime_prop_visual_binder.gd",
+      "name": "Runtime Prop Visual Binder",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_slice_atmosphere_applier",
+      "file": "scripts/procgen/slice_atmosphere_applier.gd",
+      "name": "Slice Atmosphere Applier",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_structural_edge_compiler",
+      "file": "scripts/procgen/structural_edge_compiler.gd",
+      "name": "Structural Edge Compiler",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_structural_edge_plan",
+      "file": "scripts/procgen/structural_edge_plan.gd",
+      "name": "Structural Edge Plan",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_structural_plan_validator",
+      "file": "scripts/procgen/structural_plan_validator.gd",
+      "name": "Structural Plan Validator",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_procgen_walkability_contract",
+      "file": "scripts/procgen/walkability_contract.gd",
+      "name": "Walkability Contract",
+      "domain": "procgen",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_render_sprite_anim_driver",
+      "file": "scripts/render/sprite_anim_driver.gd",
+      "name": "Sprite Anim Driver",
+      "domain": "render",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_render_topdown_lighting",
+      "file": "scripts/render/topdown_lighting.gd",
+      "name": "Topdown Lighting",
+      "domain": "render",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_schemas_controller_glyph_schema",
+      "file": "scripts/schemas/controller_glyph_schema.gd",
+      "name": "Controller Glyph Schema",
+      "domain": "schemas",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_schemas_menu_state_schema",
+      "file": "scripts/schemas/menu_state_schema.gd",
+      "name": "Menu State Schema",
+      "domain": "schemas",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_schemas_settings_state_schema",
+      "file": "scripts/schemas/settings_state_schema.gd",
+      "name": "Settings State Schema",
+      "domain": "schemas",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_schemas_tooltip_schema",
+      "file": "scripts/schemas/tooltip_schema.gd",
+      "name": "Tooltip Schema",
+      "domain": "schemas",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_schemas_tutorial_state_schema",
+      "file": "scripts/schemas/tutorial_state_schema.gd",
+      "name": "Tutorial State Schema",
+      "domain": "schemas",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_component_catalog",
+      "file": "scripts/systems/component_catalog.gd",
+      "name": "Component Catalog",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_component_mount_resolver",
+      "file": "scripts/systems/component_mount_resolver.gd",
+      "name": "Component Mount Resolver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_component_placement_state",
+      "file": "scripts/systems/component_placement_state.gd",
+      "name": "Component Placement State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_food_travel_planner",
+      "file": "scripts/systems/food_travel_planner.gd",
+      "name": "Food Travel Planner",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_hydroponics_work_resolver",
+      "file": "scripts/systems/hydroponics_work_resolver.gd",
+      "name": "Hydroponics Work Resolver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_integrity_visual_resolver",
+      "file": "scripts/systems/integrity_visual_resolver.gd",
+      "name": "Integrity Visual Resolver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_manifestation_pool",
+      "file": "scripts/systems/manifestation_pool.gd",
+      "name": "Manifestation Pool",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_module_damage_router",
+      "file": "scripts/systems/module_damage_router.gd",
+      "name": "Module Damage Router",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_module_integrity_consequences",
+      "file": "scripts/systems/module_integrity_consequences.gd",
+      "name": "Module Integrity Consequences",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_module_integrity_map",
+      "file": "scripts/systems/module_integrity_map.gd",
+      "name": "Module Integrity Map",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_module_integrity_state",
+      "file": "scripts/systems/module_integrity_state.gd",
+      "name": "Module Integrity State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_pillar_persistence",
+      "file": "scripts/systems/pillar_persistence.gd",
+      "name": "Pillar Persistence",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_prop_visual_binding_catalog",
+      "file": "scripts/systems/prop_visual_binding_catalog.gd",
+      "name": "Prop Visual Binding Catalog",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_recipe_knowledge_state",
+      "file": "scripts/systems/recipe_knowledge_state.gd",
+      "name": "Recipe Knowledge State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_sea_graph",
+      "file": "scripts/systems/sea_graph.gd",
+      "name": "Sea Graph",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_ship_modification_state",
+      "file": "scripts/systems/ship_modification_state.gd",
+      "name": "Ship Modification State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_ship_nav_graph",
+      "file": "scripts/systems/ship_nav_graph.gd",
+      "name": "Ship Nav Graph",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_ship_runtime",
+      "file": "scripts/systems/ship_runtime.gd",
+      "name": "Ship Runtime",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_sim_keys",
+      "file": "scripts/systems/sim_keys.gd",
+      "name": "Sim Keys",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_skill_effects_resolver",
+      "file": "scripts/systems/skill_effects_resolver.gd",
+      "name": "Skill Effects Resolver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_spatial_perception_state",
+      "file": "scripts/systems/spatial_perception_state.gd",
+      "name": "Spatial Perception State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_threat_pathfinder",
+      "file": "scripts/systems/threat_pathfinder.gd",
+      "name": "Threat Pathfinder",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_tuning_catalog",
+      "file": "scripts/systems/tuning_catalog.gd",
+      "name": "Tuning Catalog",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_work_action_catalog",
+      "file": "scripts/systems/work_action_catalog.gd",
+      "name": "Work Action Catalog",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_work_action_channel",
+      "file": "scripts/systems/work_action_channel.gd",
+      "name": "Work Action Channel",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_work_action_driver",
+      "file": "scripts/systems/work_action_driver.gd",
+      "name": "Work Action Driver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_work_action_resolver",
+      "file": "scripts/systems/work_action_resolver.gd",
+      "name": "Work Action Resolver",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_work_action_state",
+      "file": "scripts/systems/work_action_state.gd",
+      "name": "Work Action State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_systems_wound_state",
+      "file": "scripts/systems/wound_state.gd",
+      "name": "Wound State",
+      "domain": "systems",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_threats_placeholder_threat_2d",
+      "file": "scripts/threats/placeholder_threat_2d.gd",
+      "name": "Placeholder Threat 2d",
+      "domain": "threats",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_threats_topdown_threat_manager",
+      "file": "scripts/threats/topdown_threat_manager.gd",
+      "name": "Topdown Threat Manager",
+      "domain": "threats",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_title_main",
+      "file": "scripts/title_main.gd",
+      "name": "Title Main",
+      "domain": "entrypoints",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_away_breach_field_coordinator",
+      "file": "scripts/topdown/away_breach_field_coordinator.gd",
+      "name": "Away Breach Field Coordinator",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_dithart_tile_mapper",
+      "file": "scripts/topdown/dithart_tile_mapper.gd",
+      "name": "Dithart Tile Mapper",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_hub_scene_coordinator",
+      "file": "scripts/topdown/hub_scene_coordinator.gd",
+      "name": "Hub Scene Coordinator",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_hub_ship_builder",
+      "file": "scripts/topdown/hub_ship_builder.gd",
+      "name": "Hub Ship Builder",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_layout_tilemap_adapter",
+      "file": "scripts/topdown/layout_tilemap_adapter.gd",
+      "name": "Layout Tilemap Adapter",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_td_scene_manager",
+      "file": "scripts/topdown/td_scene_manager.gd",
+      "name": "Td Scene Manager",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_td_travel_controller",
+      "file": "scripts/topdown/td_travel_controller.gd",
+      "name": "Td Travel Controller",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_topdown_topdown_playable_ship",
+      "file": "scripts/topdown/topdown_playable_ship.gd",
+      "name": "Topdown Playable Ship",
+      "domain": "topdown",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_ui_recipe_picker_panel",
+      "file": "scripts/ui/recipe_picker_panel.gd",
+      "name": "Recipe Picker Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_ui_run_results_panel",
+      "file": "scripts/ui/run_results_panel.gd",
+      "name": "Run Results Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_ui_ship_modification_panel",
+      "file": "scripts/ui/ship_modification_panel.gd",
+      "name": "Ship Modification Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_ui_work_action_hud_panel",
+      "file": "scripts/ui/work_action_hud_panel.gd",
+      "name": "Work Action Hud Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_ui_wounds_panel",
+      "file": "scripts/ui/wounds_panel.gd",
+      "name": "Wounds Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_world_cell_occupancy",
+      "file": "scripts/world/cell_occupancy.gd",
+      "name": "Cell Occupancy",
+      "domain": "world",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_world_grid_coordinate",
+      "file": "scripts/world/grid_coordinate.gd",
+      "name": "Grid Coordinate",
+      "domain": "world",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
+    },
+    {
+      "id": "unassessed_tools_work_yield_drop",
+      "file": "scripts/tools/work_yield_drop.gd",
+      "name": "Work Yield Drop",
+      "domain": "tools",
+      "kind": "simulation",
+      "assessment": "unassessed",
+      "model_exists": true,
+      "reachable": false,
+      "driven": false,
+      "input": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "output": {
+        "live": false,
+        "desc": "Not assessed."
+      },
+      "confidence": "U",
+      "content": "none",
+      "content_note": "Inventory coverage entry only. No completion or acceptance claim.",
+      "gaps": [
+        "Runtime reachability, coupling, authored content, and acceptance are not assessed."
+      ],
+      "integrations": [],
+      "subsystems": []
     }
   ],
   "loops": [

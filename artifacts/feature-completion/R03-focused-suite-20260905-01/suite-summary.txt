@@ -1,0 +1,14 @@
+fc-p13 exit=1 marker=0 diag=0 stderr=0
+migration-service exit=0 marker=1 diag=0 stderr=0
+migration-world exit=0 marker=1 diag=0 stderr=0
+save-load-service exit=0 marker=1 diag=0 stderr=0
+world-snapshot exit=0 marker=1 diag=0 stderr=0
+world-save exit=0 marker=1 diag=0 stderr=0
+ship-mod-run exit=0 marker=1 diag=0 stderr=0
+combat exit=0 marker=1 diag=0 stderr=0
+ship-generator exit=0 marker=1 diag=0 stderr=0
+manual-load exit=1 marker=0 diag=2 stderr=846
+quick-load exit=0 marker=1 diag=0 stderr=0
+auto-load exit=0 marker=1 diag=0 stderr=0
+title-query exit=1 marker=0 diag=2 stderr=695
+title-failure exit=0 marker=1 diag=2 stderr=759

@@ -55,7 +55,7 @@ func _run_section_b() -> void:
 	# the real interact dispatch and then triggers the panel's deposit-all, returning the
 	# moved count — a return of 0 means the control is not wired into the interact path.
 	ship.inventory_state.add_item("scrap_metal", 6)
-	var deposited: int = ship.cargo_interact_deposit_for_validation(home_id)
+	var deposited: int = await ship.cargo_interact_deposit_for_validation(home_id)
 	assert(ship.inventory_panel_is_open_for_validation(), "interact at hold opened the transfer panel")
 	assert(deposited == 6, "panel deposit-all moved 6 (got %d)" % deposited)
 	assert(ship.ship_hold_quantity_for_validation(home_id, "scrap_metal") == 6, "hold holds 6")

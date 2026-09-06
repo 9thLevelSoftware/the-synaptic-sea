@@ -139,6 +139,21 @@ All five added to `docs/game/06_validation_plan.md` regression bundle.
 - `user://crash/<timestamp>.bundle.json` — keyed list of `{message, context, stack, captured_at}`. Caps at 256 entries per file.
 - `ReleaseReadinessLedger` is in-memory only — it is rebuilt at every boot from `data/release/release_checklist.json` plus the on-disk evidence rows (out of scope: a `user://release_evidence.json` seam).
 
+## Acceptance criteria
+
+Mapped to existing requirement rows: `REQ-RL-001`, `REQ-RL-003`, `REQ-RL-008`.
+
+- **Workflow:** Dry-run configuration validation parses all four export presets, confirms each configured `runnable` flag and required field, and verifies each authored export path begins with `build/exports/<preset_name>/`; native platform launch remains a separate P24 check.
+- **Gameplay:** Build metadata is the shared source of build kind for demo gating, readiness accounting, and the release badge.
+- **Gameplay:** Authored gameplay events unlock only known achievements, persist those unlocks within the current run, and start a fresh run with an empty set.
+- **Gameplay:** Localization returns the selected translation when present and the caller's default text for unknown strings, languages, or missing translations.
+- **Gameplay:** Demo gating deterministically applies the authored restriction manifest and rejects unknown feature IDs.
+- **Workflow:** Crash bundles round-trip to disk and retain no more than the newest 256 entries.
+- **Workflow:** Release-readiness rows distinguish local and external evidence and reject an external pass without a non-empty evidence path.
+- **Gameplay:** Credits render the authored attribution catalog, and release UI scripts load with the badge matching demo, release, or development build kind.
+- **Workflow:** The release checklist contains at least one pre-launch, launch-day, and post-launch entry.
+- **Deferred:** Steamworks achievement publishing, itch.io upload automation, non-English translation authoring, crash-server upload, and Steam Deck validation remain explicit external follow-up work.
+
 ## Verification
 
 Run focused smokes:

@@ -1,0 +1,7 @@
+fc-p10 exit=0 marker=1 diag=0 stderr=0
+fc-p13 exit=0 marker=1 diag=0 stderr=0
+migration-service exit=0 marker=1 diag=0 stderr=0
+migration-world exit=0 marker=1 diag=0 stderr=0
+save-load-service exit=0 marker=1 diag=0 stderr=0
+world-snapshot exit=0 marker=1 diag=0 stderr=0
+combat exit=0 marker=1 diag=0 stderr=0

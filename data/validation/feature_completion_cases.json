@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id": "P03", "profile": "crafting", "script": "scripts/validation/fc_p03_smoke.gd", "marker": "FC P03 PASS", "scope": "model", "status": "planned"},
+    {"id": "P04", "profile": "crafting", "script": "scripts/validation/fc_p04_smoke.gd", "marker": "FC P04 PASS", "scope": "model", "status": "planned"},
+    {"id": "P05", "profile": "crafting", "script": "scripts/validation/fc_p05_smoke.gd", "marker": "FC P05 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P06", "profile": "crafting", "script": "scripts/validation/fc_p06_smoke.gd", "marker": "FC P06 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P07", "profile": "crafting", "script": "scripts/validation/fc_p07_smoke.gd", "marker": "FC P07 PASS", "scope": "model", "status": "planned"},
+    {"id": "P08", "profile": "crafting", "script": "scripts/validation/fc_p08_smoke.gd", "marker": "FC P08 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P09", "profile": "crafting", "script": "scripts/validation/fc_p09_smoke.gd", "marker": "FC P09 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P10", "profile": "crafting", "script": "scripts/validation/fc_p10_smoke.gd", "marker": "FC P10 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P11", "profile": "restoration", "script": "scripts/validation/fc_p11_smoke.gd", "marker": "FC P11 PASS", "scope": "model", "status": "planned"},
+    {"id": "P12", "profile": "restoration", "script": "scripts/validation/fc_p12_smoke.gd", "marker": "FC P12 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P13", "profile": "restoration", "script": "scripts/validation/fc_p13_smoke.gd", "marker": "FC P13 PASS", "scope": "model", "status": "planned"},
+    {"id": "P14", "profile": "restoration", "script": "scripts/validation/fc_p14_smoke.gd", "marker": "FC P14 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P15", "profile": "restoration", "script": "scripts/validation/fc_p15_smoke.gd", "marker": "FC P15 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P16", "profile": "restoration", "script": "scripts/validation/fc_p16_smoke.gd", "marker": "FC P16 PASS", "scope": "model", "status": "planned"},
+    {"id": "P17", "profile": "restoration", "script": "scripts/validation/fc_p17_smoke.gd", "marker": "FC P17 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P18", "profile": "restoration", "script": "scripts/validation/fc_p18_smoke.gd", "marker": "FC P18 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P19", "profile": "restoration", "script": "scripts/validation/fc_p19_smoke.gd", "marker": "FC P19 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P20", "profile": "restoration", "script": "scripts/validation/fc_p20_smoke.gd", "marker": "FC P20 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P21", "profile": "restoration", "script": "scripts/validation/fc_p21_smoke.gd", "marker": "FC P21 PASS", "scope": "scene", "status": "planned"},
+    {"id": "P22", "profile": "restoration", "script": "scripts/validation/fc_p22_smoke.gd", "marker": "FC P22 PASS", "scope": "scene", "status": "planned"}
+  ]
+}

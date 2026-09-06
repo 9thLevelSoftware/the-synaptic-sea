@@ -30,10 +30,18 @@ func _collect(node: Node) -> void:
 
 
 func _process(_delta: float) -> void:
-	if _player == null:
+	# Reload teardown frees the former player before this controller is removed
+	# or rebound. A freed Object remains non-null in GDScript, so checking only
+	# for null would read global_position through an invalid reference.
+	if _player == null or not is_instance_valid(_player):
+		_player = null
 		return
 	var pp: Vector3 = _player.global_position
 	for c in _ceilings:
+		# The generated layout may also be replaced during a reload. Leave stale
+		# entries inert until configure() collects the new layout and player.
+		if not is_instance_valid(c):
+			continue
 		var d: float = c.global_position.distance_to(pp)
 		var near: bool = d <= fade_radius_m
 		c.visible = true

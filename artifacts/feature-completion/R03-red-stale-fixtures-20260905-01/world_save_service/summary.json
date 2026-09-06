@@ -1,0 +1,25 @@
+{
+  "environment": {
+    "APPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-stale-fixtures-20260905-01\\world_save_service\\user-root",
+    "LOCALAPPDATA": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-stale-fixtures-20260905-01\\world_save_service\\user-root",
+    "GODOT_USER_PATH": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-stale-fixtures-20260905-01\\world_save_service\\user-root",
+    "XDG_DATA_HOME": "D:\\the-synaptic-sea-feature-completion\\artifacts\\feature-completion\\R03-red-stale-fixtures-20260905-01\\world_save_service\\user-root"
+  },
+  "probe": {
+    "exit_code": 0,
+    "timed_out": false,
+    "marker_count": 1,
+    "diagnostics": [],
+    "stderr_empty": true
+  },
+  "smoke": {
+    "exit_code": 1,
+    "timed_out": false,
+    "marker_count": 0,
+    "diagnostics": [
+      "WARNING: SaveLoadService: rejected incoherent world save reason=invalid_visited_ship",
+      "ERROR: WORLD SAVE SERVICE FAIL reason=save_world returned false"
+    ],
+    "stderr_empty": false
+  }
+}

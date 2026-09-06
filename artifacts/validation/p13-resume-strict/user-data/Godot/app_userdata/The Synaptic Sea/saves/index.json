@@ -1,0 +1,25 @@
+{
+	"godot_version": "4.7.2-stable (official)",
+	"slots": [
+		{
+			"corrupt": false,
+			"current_location": "",
+			"display_name": "World",
+			"frozen": false,
+			"objective_sequence": 0,
+			"payload_size_bytes": 58264,
+			"play_time_seconds": 0.0,
+			"player_class": "",
+			"run_id": "1882765-5781",
+			"saved_at": "2026-09-05T16:18:25",
+			"saved_at_epoch": 1788625105,
+			"schema_version": "world-5",
+			"slot_id": "world",
+			"slot_kind": "world",
+			"synaptic_sea_seed": 0,
+			"world_slot_id": ""
+		}
+	],
+	"updated_at": "2026-09-05T16:18:25",
+	"version": "save-index-1"
+}

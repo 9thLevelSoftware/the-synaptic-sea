@@ -2,7 +2,7 @@
 [ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/ceiling_cap_1x1/ceiling_cap_1x1.glb" id="1_visual"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(1, 1, 1)
+size = Vector3(4, 0.2, 4)
 
 [node name="Ceiling_Cap_1x1" type="Node3D"]
 
@@ -15,6 +15,7 @@ collision_layer = 1
 collision_mask = 1
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionRoot"]
+position = Vector3(0, 3.9, 0)
 shape = SubResource("BoxShape3D_1")
 
 [node name="Visual" type="Node3D" parent="."]

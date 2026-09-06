@@ -21,12 +21,30 @@ func _run() -> void:
 	assert(ship.inventory_open_self_for_validation(), "toggle opened the inventory")
 	assert(ship.player_frozen_for_validation(), "player frozen while panel open")
 	ship.inventory_close_for_validation()
+	var home_id: String = ship.home_ship_id_for_validation()
+
+	# P04: two same-item lots render as separate rows and the dragged row carries
+	# its exact stable lot ID into the constrained transfer path.
+	ship.inventory_state.add_lot({"lot_id":"ui-good", "item_id":"scrap_metal", "quantity":1, "quality_score":0.82, "quality_tier":"excellent", "condition":0.4, "origin":{"ui":true}})
+	ship.inventory_state.add_lot({"lot_id":"ui-standard", "item_id":"scrap_metal", "quantity":1, "quality_score":0.5, "quality_tier":"standard", "condition":1.0, "origin":{"ui":true}})
+	ship._open_transfer_panel_for_ship(home_id)
+	var lot_rows: Array = ship.inventory_panel._rows["self"]
+	var selected_row = null
+	for row in lot_rows:
+		if str(row.lot_id) == "ui-good": selected_row = row
+	assert(selected_row != null, "excellent lot has its own rendered row")
+	var payload: Dictionary = ship.inventory_panel.row_lot_drag_payload("self", "scrap_metal", "ui-good", 1)
+	assert(str(payload.get("lot_id", "")) == "ui-good", "drag payload preserves selected lot id")
+	ship.inventory_panel.zone_drop("container", payload)
+	assert(ship.inventory_state.get_quantity("scrap_metal") >= 1, "only selected lot moved from player")
+	ship.inventory_state.remove_item("scrap_metal", 1)
+	ship._find_ship_by_id(home_id).get_inventory().remove_item("scrap_metal", 1)
+	ship.inventory_close_for_validation()
 	for _j in range(2):
 		await process_frame
 	assert(not ship.player_frozen_for_validation(), "player control restored on close")
 
 	# Per-item transfer at the home hold.
-	var home_id: String = ship.home_ship_id_for_validation()
 	ship.inventory_state.add_item("scrap_metal", 6)
 	ship._open_transfer_panel_for_ship(home_id)
 	assert(ship.inventory_panel_is_open_for_validation(), "transfer panel open at hold")

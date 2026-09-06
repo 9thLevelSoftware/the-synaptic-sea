@@ -27,6 +27,9 @@ const EncounterInjectorScript := preload("res://scripts/procgen/encounter_inject
 const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
 const LayoutMutatorScript := preload("res://scripts/procgen/layout_mutator.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
+const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
+const DOCK_COLLISION_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
@@ -186,9 +189,24 @@ func _generate_once(
 	if not _stamp_structural_plan(layout):
 		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed")
 		return {}
+	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
+		layout, false, _dock_collision_projection(),
+		LifeBoatBuilderScript.build_layout())
+	if not bool(endpoint_result.get("ok", false)):
+		push_error("SHIP LAYOUT GENERATOR FAIL dock endpoint authoring failed: %s" % str(endpoint_result.get("reason", "")))
+		return {}
 	_apply_wreck_to_compiled_plan(layout, blueprint)
 
 	return layout
+
+
+func _dock_collision_projection() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+		DOCK_COLLISION_KIT_PATH))
+	if not parsed is Dictionary:
+		return {}
+	var projection: Variant = (parsed as Dictionary).get("dock_collision_projection_v1", null)
+	return (projection as Dictionary).duplicate(true) if projection is Dictionary else {}
 
 
 func _apply_condition_mutators(layout: Dictionary, blueprint: RefCounted) -> void:

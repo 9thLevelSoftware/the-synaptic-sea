@@ -37,6 +37,14 @@ var contact_boost_provider: Callable = Callable()
 var module_integrity: RefCounted = null
 ## PKG-D6.1: optional ComponentPlacementState owned by this runtime.
 var component_placement: RefCounted = null
+## FC-07: optional paid craft-job authority owned by this ship runtime.
+var craft_job_scheduler: RefCounted = null
+## Callable() -> Dictionary containing this ship's live inventory/station/knowledge context.
+var craft_job_context_provider: Callable = Callable()
+## Callable(Array) forwards completion events to the gameplay delivery owner.
+var craft_job_receipt_sink: Callable = Callable()
+## Durable event hand-off for callers that collect completed craft receipts.
+var craft_job_receipts: Array = []
 
 var _slow_acc: float = 0.0
 var _lazy_acc: float = 0.0
@@ -58,10 +66,19 @@ func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 		contact_boost_provider = provider as Callable
 	else:
 		contact_boost_provider = Callable()
-	var mi: Variant = opts.get("module_integrity", null)
+	var mi: Variant = opts.get("module_integrity",
+		ship.call("get_live_module_integrity") if ship != null and ship.has_method("get_live_module_integrity") else null)
 	module_integrity = mi as RefCounted if mi is RefCounted else null
-	var cp: Variant = opts.get("component_placement", null)
+	var cp: Variant = opts.get("component_placement",
+		ship.call("get_live_component_placement") if ship != null and ship.has_method("get_live_component_placement") else null)
 	component_placement = cp as RefCounted if cp is RefCounted else null
+	var scheduler_opt: Variant = opts.get("craft_job_scheduler", null)
+	craft_job_scheduler = scheduler_opt as RefCounted if scheduler_opt is RefCounted else null
+	var craft_provider: Variant = opts.get("craft_job_context_provider", Callable())
+	craft_job_context_provider = craft_provider as Callable if craft_provider is Callable else Callable()
+	var craft_sink: Variant = opts.get("craft_job_receipt_sink", Callable())
+	craft_job_receipt_sink = craft_sink as Callable if craft_sink is Callable else Callable()
+	craft_job_receipts.clear()
 	_slow_acc = 0.0
 	_lazy_acc = 0.0
 	frame_band_fires = 0
@@ -109,6 +126,7 @@ func advance(delta: float, world_time: float) -> void:
 	var systems_manager: Variant = ship.get("systems_manager")
 	if systems_manager != null and systems_manager is Object and (systems_manager as Object).has_method("advance"):
 		(systems_manager as Object).call("advance", delta)
+	_advance_craft_jobs(delta)
 	var web: RefCounted = _resolve_web()
 	var hull: RefCounted = _resolve_hull()
 	if web == null or hull == null:
@@ -204,12 +222,24 @@ func to_snapshot() -> Dictionary:
 		var ship_cp: Variant = ship.get("component_placement_summary")
 		if typeof(ship_cp) == TYPE_DICTIONARY and not (ship_cp as Dictionary).is_empty():
 			out["component_manifest"] = (ship_cp as Dictionary).duplicate(true)
+	if craft_job_scheduler != null and craft_job_scheduler.has_method("get_summary_for_ship"):
+		out["craft_jobs_v1"] = craft_job_scheduler.call("get_summary_for_ship", ship_id)
 	return out
 
 
-func from_snapshot(data: Dictionary) -> void:
+func from_snapshot(data: Dictionary) -> bool:
 	if ship == null or data.is_empty():
-		return
+		return false
+	var restore_ship_id: String = str(ship.get("ship_id"))
+	if data.has("craft_jobs_v1"):
+		var strict_jobs: Variant = data.get("craft_jobs_v1", null)
+		if not _valid_current_craft_snapshot(data, restore_ship_id) \
+				or craft_job_scheduler == null \
+				or not craft_job_scheduler.has_method("merge_summary_for_ship") \
+				or not strict_jobs is Dictionary \
+				or not bool(craft_job_scheduler.call(
+					"merge_summary_for_ship", restore_ship_id, strict_jobs)):
+			return false
 	if data.has("last_sim_time"):
 		ship.set("last_sim_time", float(data.get("last_sim_time", ship.get("last_sim_time"))))
 	if data.has("ship_summary") and ship.has_method("apply_summary"):
@@ -229,8 +259,62 @@ func from_snapshot(data: Dictionary) -> void:
 		if typeof(cp) == TYPE_DICTIONARY:
 			var cp_dict: Dictionary = cp as Dictionary
 			if component_placement != null and component_placement.has_method("apply_summary"):
-				component_placement.call("apply_summary", cp_dict)
+				component_placement.call("apply_summary", cp_dict, restore_ship_id)
 			ship.set("component_placement_summary", cp_dict.duplicate(true))
+	return true
+
+
+func _valid_current_craft_snapshot(data: Dictionary, restore_ship_id: String) -> bool:
+	for key in [
+		"schema", "ship_id", "last_sim_time", "is_home",
+		"module_integrity", "component_manifest", "craft_jobs_v1",
+	]:
+		if not data.has(key):
+			return false
+	var time_variant: Variant = data.last_sim_time
+	if restore_ship_id.is_empty() \
+			or typeof(data.schema) != TYPE_STRING or str(data.schema) != "ship_runtime_v1" \
+			or typeof(data.ship_id) != TYPE_STRING or str(data.ship_id) != restore_ship_id \
+			or (typeof(time_variant) != TYPE_INT and typeof(time_variant) != TYPE_FLOAT) \
+			or not is_finite(float(time_variant)) \
+			or typeof(data.is_home) != TYPE_BOOL or bool(data.is_home) != is_home \
+			or not data.module_integrity is Dictionary \
+			or not data.component_manifest is Dictionary \
+			or not data.craft_jobs_v1 is Dictionary:
+		return false
+	if data.has("ship_summary"):
+		if not data.ship_summary is Dictionary:
+			return false
+		var ship_summary: Dictionary = data.ship_summary
+		if typeof(ship_summary.get("ship_id", null)) != TYPE_STRING \
+				or str(ship_summary.ship_id) != restore_ship_id:
+			return false
+	return true
+
+
+func _advance_craft_jobs(delta: float) -> void:
+	if ship == null or craft_job_scheduler == null \
+			or not craft_job_scheduler.has_method("advance") \
+			or not craft_job_context_provider.is_valid():
+		return
+	var resolved: Variant = craft_job_context_provider.call()
+	if not (resolved is Dictionary):
+		return
+	var context: Dictionary = resolved as Dictionary
+	var runtime_ship_id: String = str(ship.get("ship_id"))
+	if runtime_ship_id.is_empty() or typeof(context.get("ship_id", null)) != TYPE_STRING \
+			or str(context.get("ship_id", "")) != runtime_ship_id:
+		return
+	var emitted: Variant = craft_job_scheduler.call("advance", delta, context)
+	if emitted is Array:
+		var receipts: Array = []
+		for receipt in emitted:
+			if receipt is Dictionary:
+				var copied: Dictionary = (receipt as Dictionary).duplicate(true)
+				craft_job_receipts.append(copied)
+				receipts.append(copied)
+		if not receipts.is_empty() and craft_job_receipt_sink.is_valid():
+			craft_job_receipt_sink.call(receipts)
 
 
 ## Compose multiple runtimes into one dictionary for multi-ship persistence tests.

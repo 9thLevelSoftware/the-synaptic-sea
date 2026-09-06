@@ -1,0 +1,14 @@
+{
+	"highest_skill_level_seen": 3,
+	"last_payout_currency": 0,
+	"last_payout_reason": "death",
+	"meta_currency": 0,
+	"saved_at": "2026-09-06T04:33:17",
+	"schema": "meta-progression-1",
+	"selected_class_id": "",
+	"total_runs_completed": 0,
+	"total_runs_deaths": 1,
+	"unlocked_class_ids": {},
+	"unlocked_codex_entry_ids": {},
+	"unlocked_hub_upgrade_ids": {}
+}

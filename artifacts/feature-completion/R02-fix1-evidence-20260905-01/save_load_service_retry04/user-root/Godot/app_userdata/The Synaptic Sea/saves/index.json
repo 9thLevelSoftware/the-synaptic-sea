@@ -1,0 +1,25 @@
+{
+	"version": "save-index-1",
+	"godot_version": "4.7.2-stable (official)",
+	"updated_at": "2026-09-06T01:56:44",
+	"slots": [
+		{
+			"slot_id": "autosave_active",
+			"slot_kind": "auto",
+			"display_name": "current_run_alias",
+			"synaptic_sea_seed": 0,
+			"player_class": "engineer",
+			"current_location": "",
+			"objective_sequence": 2,
+			"play_time_seconds": 0.0,
+			"saved_at": "2026-09-06T01:56:44",
+			"saved_at_epoch": 1788659804,
+			"world_slot_id": "",
+			"corrupt": false,
+			"frozen": false,
+			"payload_size_bytes": 23298,
+			"schema_version": "gate2-current-run-6",
+			"run_id": "save-load-service-smoke"
+		}
+	]
+}

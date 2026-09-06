@@ -72,6 +72,28 @@ Seven parts:
    player is bodily in their ship until they breach the barrier and cross fully into the host. The
    spec edge-case table was updated to record this.
 
+### 2026-09-06 R10-A baseline amendment
+
+The registered exterior-endpoint and bounded join-envelope contract in ADR-0065
+supersedes room-center/fixed-offset port derivation for every production home,
+native, fallback and fixed-lifeboat layout. This is an accepted governance gate;
+runtime evidence remains pending. A connection is not published until its exact
+endpoint identities, complete-hull placement, endpoint-owned join pieces,
+physical barrier and open-state capsule clearance agree.
+
+The canonical opening continues to start the player aboard the docked piloted
+lifeboat. The fixed lifeboat layout therefore owns one strict
+`initial_player_spawn_v1` row with exactly `spawn_id`, `owner_ship_id`, `room_id`,
+`nav_node_id`, and `local_position`. Its point is authored strictly inside the
+lifeboat and must be distinct from every dock threshold and clearance anchor.
+After the corrected home/lifeboat pair and the closed home barrier have been
+constructed, New Game resolves that point through the lifeboat root and proves
+the complete player capsule clear against the live pair. It places the player
+once, then publishes occupancy only if it resolves exactly to the lifeboat and
+the closed barrier excludes the home ship. Failure aborts New Game publication;
+there is no room-center, nearest-ship, clamp, later teleport, or migration/save
+fallback. Save/load never consumes this initial-spawn row.
+
 ## Rejected alternatives
 
 - **Keep menu-teleport travel with a cosmetic docked lifeboat**: does not deliver physical

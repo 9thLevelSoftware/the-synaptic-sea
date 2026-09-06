@@ -1,0 +1,7 @@
+ERROR: FC P10 PROCESS FAIL: consumer two production post-collection load failed
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _fail (res://scripts/validation/fc_p10_process_smoke.gd:685)
+       [1] _fail_bool (res://scripts/validation/fc_p10_process_smoke.gd:680)
+       [2] _run_consumer_two (res://scripts/validation/fc_p10_process_smoke.gd:180)
+       [3] _on_frame (res://scripts/validation/fc_p10_process_smoke.gd:46)

@@ -1,0 +1,17 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.2.stable.mono.official, safeguards balanced)
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+The Synaptic Sea coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=5 collision_shapes=112
+ACHIEVEMENT UNLOCKED trigger=loot_searched target=start_supply_a id=first_loot
+LOOT CONTAINER SEARCHED marker= container=start_supply_a granted=1
+LOOT CONTAINER SEARCHED marker= container=start_supply_b granted=2
+ACHIEVEMENT UNLOCKED trigger=repair_consumed target=propulsion.nav_linkage id=first_repair
+REPAIR COMPLETED system=propulsion sub=nav_linkage operational=true
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT STARTED station=workbench recipe=weld_plating
+CRAFT COMPLETED item=plating qty=1 quality=good
+CRAFT STARTED station=workbench recipe=craft_welder
+CRAFT COMPLETED item=welder qty=1 quality=good
+CRAFT STARTED station=fabricator recipe=craft_plasma_cutter
+CRAFT COMPLETED item=plasma_cutter qty=1 quality=good

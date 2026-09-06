@@ -3,6 +3,7 @@
   "biome_id": "breach_field",
   "difficulty_id": "standard",
   "preferred_seeds": [42, 777],
+  "require_standing_route": true,
   "require_any": ["fire_zone", "breach_zone"],
   "require_min_loot_containers": 1,
   "require_min_encounters": 1

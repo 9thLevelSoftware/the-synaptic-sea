@@ -72,10 +72,14 @@ func _on_playable_ready(summary: Dictionary) -> void:
 	if collision_shape_count <= 0:
 		_fail("collision shape count is zero")
 		return
-	# Tranche 5: seed_000017 regenerated through the real pipeline — the
-	# default fixture now carries 4 objectives (3 salvage + reach-goal).
-	if objective_count != 4:
-		_fail("expected 4 objectives got %d" % objective_count)
+	# seed_000017 is the worldgen v2 fixture from 149ed476 and carries one
+	# reach-goal objective in bridge_07.
+	if objective_count != 1:
+		_fail("expected 1 objective got %d" % objective_count)
+		return
+	var objective_specs: Array = playable_ship.loader.get_objective_specs_copy()
+	if objective_specs.is_empty() or str(objective_specs[0].get("id", "")) != "bridge_07:reach_goal":
+		_fail("expected bridge_07:reach_goal objective")
 		return
 	var player_position: Vector3 = playable_ship.player.global_position
 	var nearest_floor_top_y: float = _nearest_floor_collision_top_y(player_position)
@@ -160,7 +164,7 @@ func _validate_and_pass() -> void:
 	if not interaction_completed or completed_count < 1:
 		_fail("interaction_completed=false")
 		return
-	if objective_count != 4:
+	if objective_count != 1:
 		_fail("objective_count=%d" % objective_count)
 		return
 	finished = true

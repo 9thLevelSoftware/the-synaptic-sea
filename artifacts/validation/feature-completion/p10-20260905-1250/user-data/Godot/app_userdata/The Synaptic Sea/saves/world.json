@@ -1,0 +1,94 @@
+{
+  "aboard_ship_id": "ship_start",
+  "current_location": "",
+  "dock_edges": [],
+  "godot_version": "4.7.2-stable (official)",
+  "home_ship": {
+    "component_placement_summary": {
+      "count": 0.0,
+      "placed": [],
+      "rejected_saved_components": [],
+      "schema": "component_placement_v2",
+      "seed": 0.0
+    },
+    "crafting_summary": {
+      "active_craft": {},
+      "craft_jobs_v1": {
+        "jobs": [],
+        "owners": [],
+        "schema": "craft-jobs-1"
+      },
+      "field_crafting": {
+        "active_craft": {},
+        "craft_jobs_v1": {
+          "jobs": [],
+          "owners": [],
+          "schema": "craft-jobs-1"
+        },
+        "field_pending_v1": {
+          "active_receipt_id": "",
+          "pinned_destination_ship_id": "",
+          "pinned_local_position": [],
+          "receipt_sequence": 0.0,
+          "ship_id": ""
+        },
+        "physical_station_summaries": {},
+        "recipe_count": 0.0,
+        "station_summaries": {}
+      },
+      "physical_station_summaries": {},
+      "recipe_count": 0.0,
+      "station_summaries": {}
+    },
+    "godot_version": "4.7.2-stable (official)",
+    "recipe_knowledge_summary": {
+      "dismantle_counts": {},
+      "event_receipt_ids": [],
+      "event_sequence": 0.0,
+      "known_recipe_ids": [],
+      "migration_origin": "native",
+      "owner_id": "player:malformed-world",
+      "schema": "recipe-knowledge-1"
+    },
+    "run_id": "malformed-world",
+    "slice_version": "gate2-current-run-5"
+  },
+  "home_ship_carts": [],
+  "opened_ports": [],
+  "piloted_ship_id": "",
+  "player_position_in_ship": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "run_id": "malformed-world",
+  "slice_version": "world-5",
+  "visited_ships": {
+    "marker-bad": {
+      "inventory": {
+        "item_lots_v1": {
+          "holder_namespace": "ship:ship-bad:cargo",
+          "lots": [
+            {
+              "condition": 1.0,
+              "item_id": "scrap_metal",
+              "lot_id": "ship:ship-bad:cargo/lot-000001",
+              "origin": {
+                "kind": "salvage"
+              },
+              "quality_score": 0.5,
+              "quality_tier": "standard",
+              "quantity": 1.5
+            }
+          ],
+          "schema": "item-lots-1",
+          "sequence": 1.0
+        },
+        "max_weight": 120.0
+      },
+      "marker_id": "marker-bad",
+      "ship_id": "ship-bad"
+    }
+  },
+  "world_time": 0.0
+}

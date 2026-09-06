@@ -9,6 +9,7 @@ const STATUS_ACTIVE: String = "active"
 const STATUS_COMPLETED: String = "completed"
 const STATUS_INTERRUPTED: String = "interrupted"
 const STATUS_BLOCKED: String = "blocked"
+const STATUS_PAUSED: String = "paused"
 
 var action_id: String = ""
 var definition: Dictionary = {}
@@ -92,6 +93,26 @@ func tick(delta: float, context: Dictionary = {}) -> String:
 		status = STATUS_COMPLETED
 		progress = duration
 	return status
+
+
+## Pause is distinct from interruption: reserved work retains progress and may
+## resume after the hold input returns.
+func pause() -> bool:
+	if status != STATUS_ACTIVE:
+		return false
+	status = STATUS_PAUSED
+	return true
+
+
+func resume(context: Dictionary = {}) -> bool:
+	if status != STATUS_PAUSED:
+		return false
+	if not can_start(context):
+		status = STATUS_BLOCKED
+		return false
+	status = STATUS_ACTIVE
+	block_reason = ""
+	return true
 
 
 func interrupt() -> void:

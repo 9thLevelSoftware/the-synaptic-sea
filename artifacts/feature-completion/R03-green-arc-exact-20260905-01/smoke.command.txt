@@ -1,0 +1,1 @@
+C:\Users\dasbl\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe --headless --path D:\the-synaptic-sea-feature-completion --log-file D:\the-synaptic-sea-feature-completion\artifacts\feature-completion\R03-green-arc-exact-20260905-01\smoke.godot.log --script res://scripts/validation/electrical_arc_state_smoke.gd

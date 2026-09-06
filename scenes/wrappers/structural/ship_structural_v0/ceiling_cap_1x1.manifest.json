@@ -42,7 +42,31 @@
         "ceiling"
       ]
     },
-    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn"
+    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+    "physical_bounds": {
+      "min": [
+        -2.0,
+        3.8,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    },
+    "visual_bounds": {
+      "min": [
+        -2.0,
+        3.6875,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        4.0,
+        2.0
+      ]
+    }
   },
   "document_kind": "godot_wrapper_scene",
   "generated": {

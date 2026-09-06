@@ -30,6 +30,18 @@ var seed_value: int = 0
 # callers can override it for special cases (debug, fixture loads).
 var room_count_range: Vector2i = Vector2i(8, 12)
 
+# Optional persisted context used by the native-capable generation route.  The
+# payload name is its version: only {biome, difficulty} is supported here.
+# Keep an explicit status so malformed saved data cannot be mistaken for the
+# absent legacy field and silently regenerated under a different context.
+var generation_context_v1: Dictionary = {}
+var _generation_context_v1_status: String = "absent"
+var _generation_context_v1_error: String = ""
+# Retain every persisted generation-context key when rejecting it. This keeps a
+# bad/newer save distinguishable from a legacy context-free blueprint after a
+# save/load cycle.
+var _generation_context_raw_fields: Dictionary = {}
+
 
 func _init(
 		p_size: int = Size.MEDIUM,
@@ -77,10 +89,70 @@ func get_system_online_chance() -> float:
 			return 0.5
 
 
+func _valid_generation_context_v1(context: Variant) -> Dictionary:
+	if typeof(context) != TYPE_DICTIONARY:
+		return {}
+	var payload: Dictionary = context as Dictionary
+	if payload.size() != 2 or not payload.has("biome") or not payload.has("difficulty") \
+			or typeof(payload["biome"]) != TYPE_STRING or typeof(payload["difficulty"]) != TYPE_STRING \
+			or str(payload["biome"]).is_empty() or str(payload["difficulty"]).is_empty():
+		return {}
+	return {
+		"biome": str(payload["biome"]),
+		"difficulty": str(payload["difficulty"]),
+	}
+
+
+# Public mutation is atomic: an invalid attempted update leaves a previously
+# valid persisted context intact.
+func set_generation_context_v1(context: Variant) -> bool:
+	var normalized: Dictionary = _valid_generation_context_v1(context)
+	if normalized.is_empty():
+		return false
+	generation_context_v1 = normalized
+	_generation_context_v1_status = "valid"
+	_generation_context_v1_error = ""
+	_generation_context_raw_fields.clear()
+	return true
+
+
+# Persistence ingestion intentionally records invalid data as invalid instead
+# of using the public atomic setter, so it cannot later be laundered as legacy.
+func _load_generation_context_fields(fields: Dictionary) -> void:
+	_generation_context_raw_fields = fields.duplicate(true)
+	generation_context_v1 = {}
+	_generation_context_v1_error = ""
+	if fields.size() != 1 or not fields.has("generation_context_v1"):
+		_generation_context_v1_status = "unsupported"
+		_generation_context_v1_error = "unsupported or ambiguous generation context payload"
+		return
+	var raw: Variant = fields["generation_context_v1"]
+	var normalized: Dictionary = _valid_generation_context_v1(raw)
+	if normalized.is_empty():
+		_generation_context_v1_status = "malformed"
+		_generation_context_v1_error = "generation_context_v1 requires non-empty biome and difficulty strings"
+		return
+	generation_context_v1 = normalized
+	_generation_context_v1_status = "valid"
+	_generation_context_raw_fields.clear()
+
+
+func has_generation_context_v1() -> bool:
+	return _generation_context_v1_status != "absent"
+
+
+func is_generation_context_v1_valid() -> bool:
+	return _generation_context_v1_status == "valid"
+
+
+func get_generation_context_v1_error() -> String:
+	return _generation_context_v1_error
+
+
 # Serialises the blueprint to a plain Dictionary so it can be persisted
 # to JSON alongside layout / kit / gameplay fixtures.
 func to_dict() -> Dictionary:
-	return {
+	var summary: Dictionary = {
 		"size": size,
 		"condition": condition,
 		"seed_value": seed_value,
@@ -89,6 +161,13 @@ func to_dict() -> Dictionary:
 			"max": room_count_range.y,
 		},
 	}
+	if _generation_context_v1_status == "valid":
+		summary["generation_context_v1"] = generation_context_v1.duplicate(true)
+	elif _generation_context_v1_status != "absent":
+		for raw_key in _generation_context_raw_fields:
+			var raw_value: Variant = _generation_context_raw_fields[raw_key]
+			summary[raw_key] = raw_value.duplicate(true) if raw_value is Dictionary or raw_value is Array else raw_value
+	return summary
 
 
 # Rebuilds a blueprint from a Dictionary produced by `to_dict()`. Any
@@ -100,6 +179,13 @@ static func from_dict(data: Dictionary) -> RefCounted:
 	# reference. The result is a ShipBlueprint instance.
 	var script: GDScript = load("res://scripts/procgen/ship_blueprint.gd")
 	var bp = script.new()
+	var generation_context_fields: Dictionary = {}
+	for key_variant in data.keys():
+		var key: String = str(key_variant)
+		if key.begins_with("generation_context_"):
+			generation_context_fields[key] = data[key_variant]
+	if not generation_context_fields.is_empty():
+		bp._load_generation_context_fields(generation_context_fields)
 	if data.has("size"):
 		bp.size = int(data["size"])
 	if data.has("condition"):
