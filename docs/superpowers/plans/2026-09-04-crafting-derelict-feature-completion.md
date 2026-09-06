@@ -785,7 +785,9 @@ complete v2 `threats: []` remains authoritative. Outer source version pins every
 migration: current v6 receives no v5 crafting adaptation and world v6 embeds run
 v6 exactly. Home inventory combat and visited ship combat remain separate owner
 state; candidate inventory normalization retains validated `threat_summary` and
-strictly String `combat_hotbar_text`. The frozen legacy archetype map and complete
+required exact-String current `combat_hotbar_text`. Recognized pre-v6 absence
+materializes `""` before sealing, while present historical text is retained
+byte-for-byte. The frozen legacy archetype map and complete
 validation/rollback/proof obligations are specified by ADR-0059 decisions 33-39.
 Review-fix compatibility follows ADR-0059 decisions 40-42. The exact historical
 embedded pairings are world v1/run v1, world v2/run v1, world v3/run v1,

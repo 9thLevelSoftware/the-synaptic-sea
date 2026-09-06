@@ -174,7 +174,7 @@ CARD_CONTRACTS = {
         },
         "version_policy": "Run v5-to-v6 performs pinned v5 normalization then combat migration; declared run v6 is strict. World v5-to-v6 alone migrates its embedded run; declared world v6 requires embedded run v6 exactly.",
         "bootstrap_policy": "Current run v6 requires initialized home combat and current world v6 requires active-away combat. Recognized pre-v6 absence or empty data at those paths is initialized before strict decode and sealing from validated original layout, markers, owner anchor, generation context, and injected canonical definitions. Inactive never-initialized owners may remain absent; current present empty dictionaries reject; complete v2 empty managers are authoritative.",
-        "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and strictly String combat_hotbar_text through inventory canonicalization.",
+        "owner_policy": "Embedded inventory threat_summary belongs to home_ship; active visited combat belongs to that visited ship and is synchronized before capture; inactive owners retain stored combat. SaveRestoreCandidate retains validated threat_summary and required exact-String current combat_hotbar_text through inventory canonicalization. Recognized pre-v6 absence materializes the empty runtime default before sealing; present historical text remains byte-for-byte.",
         "legacy_structure_damage": {
             "hull_tendril": 0.4,
             "biomatter_swarm": 0.0,

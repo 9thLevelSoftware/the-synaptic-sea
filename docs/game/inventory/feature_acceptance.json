@@ -2930,145 +2930,145 @@
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:215",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:218",
       "criterion_ids": [
         "FC-01"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:216",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:219",
       "criterion_ids": [
         "FC-02"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:217",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:220",
       "criterion_ids": [
         "FC-03"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:218",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:221",
       "criterion_ids": [
         "FC-04"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:219",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:222",
       "criterion_ids": [
         "FC-05"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:220",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:223",
       "criterion_ids": [
         "FC-06"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:221",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:224",
       "criterion_ids": [
         "FC-07"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:222",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:225",
       "criterion_ids": [
         "FC-08"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:223",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:226",
       "criterion_ids": [
         "FC-09"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:224",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:227",
       "criterion_ids": [
         "FC-10"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:225",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:228",
       "criterion_ids": [
         "FC-11"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:226",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:229",
       "criterion_ids": [
         "FC-12"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:227",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:230",
       "criterion_ids": [
         "FC-13"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:228",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:231",
       "criterion_ids": [
         "FC-14"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:229",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:232",
       "criterion_ids": [
         "FC-15"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:230",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:233",
       "criterion_ids": [
         "FC-16"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:231",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:234",
       "criterion_ids": [
         "FC-17"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:232",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:235",
       "criterion_ids": [
         "FC-18"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:233",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:236",
       "criterion_ids": [
         "FC-19"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:234",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:237",
       "criterion_ids": [
         "FC-20"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:235",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:238",
       "criterion_ids": [
         "FC-21"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:236",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:239",
       "criterion_ids": [
         "FC-22"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:237",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:240",
       "criterion_ids": [
         "FC-23"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:238",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:241",
       "criterion_ids": [
         "FC-24"
       ]
@@ -7878,7 +7878,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 215
+        "line": 218
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7908,7 +7908,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 216
+        "line": 219
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7938,7 +7938,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 217
+        "line": 220
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7968,7 +7968,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 218
+        "line": 221
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7998,7 +7998,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 219
+        "line": 222
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8028,7 +8028,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 220
+        "line": 223
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8058,7 +8058,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 221
+        "line": 224
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8088,7 +8088,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 222
+        "line": 225
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8118,7 +8118,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 223
+        "line": 226
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8148,7 +8148,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 224
+        "line": 227
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8178,7 +8178,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 225
+        "line": 228
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8208,7 +8208,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 226
+        "line": 229
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8238,7 +8238,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 227
+        "line": 230
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8268,7 +8268,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 228
+        "line": 231
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8298,7 +8298,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 229
+        "line": 232
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8328,7 +8328,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 230
+        "line": 233
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8358,7 +8358,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 231
+        "line": 234
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8388,7 +8388,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 232
+        "line": 235
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8418,7 +8418,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 233
+        "line": 236
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8448,7 +8448,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 234
+        "line": 237
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8478,7 +8478,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 235
+        "line": 238
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8508,7 +8508,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 236
+        "line": 239
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8538,7 +8538,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 237
+        "line": 240
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8568,7 +8568,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 238
+        "line": 241
       },
       "verification_source": [],
       "domain": "crafting_derelict",

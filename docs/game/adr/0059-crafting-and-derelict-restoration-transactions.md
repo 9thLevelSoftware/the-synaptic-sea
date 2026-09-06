@@ -482,6 +482,16 @@ and preserve the P19 recovery boundary. Acceptance evidence remains pending.
     `GODOT_USER_PATH`, and `XDG_DATA_HOME` all name one new task-owned root. The
     focused smoke processes use that same four-variable isolation and never use
     the default profile.
+43. R03 clarifies current combat display authority: every production v6 capture
+    writes `inventory_summary.combat_hotbar_text`, so a declared current v6 run
+    requires that key with an exact String value. Missing or non-String current
+    data rejects before staging; current absence is never normalized. Recognized
+    pre-v6 data may omit the field, in which case migration materializes the
+    runtime initial value `""` in the detached candidate before sealing. A
+    present historical String, including nonempty stale display text, is
+    preserved byte-for-byte. This supersedes decision 38's word `optional` only;
+    combat display remains an inventory-envelope extension owned by the
+    coordinator rather than InventoryState.
 
 ## Locked transaction payloads
 

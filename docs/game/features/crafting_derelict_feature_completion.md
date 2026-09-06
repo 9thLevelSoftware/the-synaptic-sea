@@ -136,6 +136,9 @@ save/load or repeated callbacks.
   knowledge, component, and access payloads are strict. Old schemas migrate only
   through their declared version boundary, and a migrated sidecar is published
   only after the detached candidate commits successfully.
+- Current v6 captures require exact String `combat_hotbar_text`. Recognized
+  pre-v6 absence becomes the explicit empty runtime default before sealing;
+  present historical text remains byte-for-byte.
 - Exact numeric authority survives serialization and two restores, including
   lot quality and electrical-arc phase timers. The sole staged recapture
   exception is `home_ship.oxygen_summary.player_in_breach_zone`, which is a
