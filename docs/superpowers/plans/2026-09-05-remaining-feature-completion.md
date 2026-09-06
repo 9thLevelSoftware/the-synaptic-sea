@@ -94,14 +94,16 @@ Each task uses this review cycle: reproduce its stated failure or missing behavi
 
 **Files:** `STATUS.md`; original plan; `docs/game/inventory/feature_acceptance.json`; `data/validation/feature_completion_cards.json`; `tools/build_feature_acceptance.py`; `docs/game/06_validation_plan.md`; `tools/classify_orphan_smokes.sh`; durable evidence under `artifacts/feature-completion/`.
 
-- [ ] Capture HEAD, scoped tracked/untracked changes, toolchain version, and current source hashes. Separate existing accepted slices, unreviewed WIP, and generated import noise.
-- [ ] Independently inspect the final process proof, its symmetric full-precision JSON comparison, all three raw logs, input/output digests, and exact-source manifest. Confirm integer/float wire representation is normalized symmetrically without numeric tolerance or relaxed lot identity.
-- [ ] Copy the latest P10 matrix and P13 integration logs plus source manifests from `.tmp` to durable evidence. Review reported coverage before updating its status.
-- [ ] Reconcile stale STATUS statements about fresh-process and candidate-nav work. Preserve partial/full distinctions.
-- [ ] Classify new process/nav smokes as standalone unless a reviewed canonical promotion is justified; regenerate both registry and card manifest, then run their checks and orphan classification.
-- [ ] Publish counts for implemented, production-reachable, fresh-validating, and player-accepted criteria. If evidence mapping is incomplete, publish its coverage and unknown count rather than a guessed percentage.
+- [x] Capture HEAD, scoped tracked/untracked changes, toolchain version, and current source hashes. Separate existing accepted slices, unreviewed WIP, and generated import noise.
+- [x] Independently inspect the final process proof, its symmetric full-precision JSON comparison, all three raw logs, input/output digests, and exact-source manifest. Confirm integer/float wire representation is normalized symmetrically without numeric tolerance or relaxed lot identity.
+- [x] Copy the latest P10 matrix and P13 integration logs plus source manifests from `.tmp` to durable evidence. Review reported coverage before updating its status.
+- [x] Reconcile stale STATUS statements about fresh-process and candidate-nav work. Preserve partial/full distinctions.
+- [x] Classify new process/nav smokes as standalone unless a reviewed canonical promotion is justified; regenerate both registry and card manifest, then run their checks and orphan classification.
+- [x] Publish counts for implemented, production-reachable, fresh-validating, and player-accepted criteria. If evidence mapping is incomplete, publish its coverage and unknown count rather than a guessed percentage.
 
 **Exit:** all 622 criteria retain stable identities and an explicit disposition; no new helper evidence claims a full FC row; current progress documents agree.
+
+**Reviewed outcome:** R01 passed independent spec and quality review at `a12d3eed`. The P13 run8 log is retained as historical evidence, but its exact source snapshot is unavailable; the older P13 manifest is explicitly unrelated context. Evidence mapping remains incomplete, so product completion percentages remain unknown.
 
 ### Task 2: R02 — Preserve threat structural damage through old and new saves
 
