@@ -368,6 +368,18 @@ one-to-one identities preserve their validated payload. Migration acceptance mus
 cover consistent split/shared mappings, conflicting incident damage, missing or
 duplicate coverage, payload ambiguity, and exact recapture after reload/revisit.
 
+Historical integrity initialization must preserve the frozen restore semantics:
+an absent or empty summary regenerates the historical condition's `module_damage`;
+a valid nonempty summary with `deltas: []` explicitly records full repair and
+suppresses regeneration. Reconstruct the former using the version-pinned historical
+condition, mutator, compiler, validator, and required catalog inputs before mapping
+health. Omitted rows are pristine only within an initialized explicit summary.
+Use the final current post-authoring plan, including its compiled exterior portal,
+for target identity; detached discovery output is not migration authority. Validate
+migrated identities against registered loader descriptors and apply migrated health
+before scene-state recapture or publication. Acceptance must distinguish absent,
+empty, and explicitly repaired summaries on damaged historical ships.
+
 Current procedural-generation regression fixtures must validate unique physical
 placement identities and exact half-span coverage rather than unique primary edge
 keys. Preserve the historical `compact_seed17_current` fixture unchanged; record
