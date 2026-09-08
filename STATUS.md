@@ -2,6 +2,12 @@
 
 **Last updated:** 2026-09-08
 
+**Paused at the user's request on 2026-09-08.** All active workers and the Godot
+lane stopped safely; no test process remains. Resume only when requested, using
+the [formal pause handoff](docs/superpowers/handoffs/2026-09-08-feature-completion-pause-handoff.md).
+The last accepted implementation commit is `1e165e50`; historical attachment
+projection WIP is checkpointed as `fa2c5fc3` and remains unaccepted.
+
 **Execution resumed at the user's explicit request on 2026-09-07.** PR #548 was
 merged as `2f9c6913`; continuing work uses `codex/feature-completion-resume` in
 `D:/the-synaptic-sea-feature-completion`. The full program remains incomplete.
@@ -30,11 +36,17 @@ The world-7 pure model is independently approved and committed as `14eb8071`.
 Review fixes enforce the fixed home root and resolve the current visited owner;
 focused tests cover all four cardinal transforms, overflow, duplicate roots, and
 cycles. This accepts the pure model only; live capture/restore remains unfinished.
-Strict current-integrity admission passed six focused checks with clean output and
-stable source hashes in `R10-A-integrity-admission-final-01` and is under independent
-review. Historical attachment projection passed its focused comparison against
+Strict current-integrity admission is independently approved and committed as
+`1e165e50`. Six focused checks passed in `R10-A-integrity-admission-final-01`;
+review identified an integer-health precision defect, fixed and re-reviewed with
+clean RED/GREEN evidence in `R10-A-integrity-admission-fix1-green-01`.
+The strict application API preserves accepted health and rejects invalid state
+atomically; live staged-restore wiring remains unfinished.
+Historical attachment projection passed its focused comparison against
 pinned c51 fallback and authenticated native reference outputs in
-`R10-A-world6-layout-projection-green-03`; independent review remains pending.
+`R10-A-world6-layout-projection-green-03`. Independent review requires fixes to
+runtime/RNG authentication, native-document completeness, historical witness
+provenance, and rejection-path evidence; these fixes are underway.
 Its shared compiled-placement integrity-ID prerequisite is independently approved
 and committed as `c3bdf40b`. Historical damage conversion is still unfinished.
 
