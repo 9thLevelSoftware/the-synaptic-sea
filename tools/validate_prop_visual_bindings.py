@@ -16,6 +16,7 @@ if __package__ in (None, ""):
 from tools.generate_prop_sidecars import (  # noqa: E402
     DRESSING_SURFACES,
     OBJECTIVE_IDS,
+    OPTIONAL_DRESSING_ASSETS,
     PROP_GROUPS,
     _ensure_contained,
     build_index,
@@ -99,10 +100,15 @@ def _validate_inventory(project_root: Path, errors: list[str]) -> list[tuple[str
         glbs = sorted(group_root.glob("*.glb"), key=lambda path: path.name)
         sidecars = sorted(group_root.glob("*.sidecar.json"), key=lambda path: path.name)
         expected_count = EXPECTED_COUNTS[group]
-        if len(glbs) != expected_count:
-            errors.append(f"expected {expected_count} {group} GLBs, found {len(glbs)}")
-        if len(sidecars) != expected_count:
-            errors.append(f"expected {expected_count} {group} sidecars, found {len(sidecars)}")
+        allowed_count = expected_count + len(OPTIONAL_DRESSING_ASSETS) if group == "dressing" else expected_count
+        if not expected_count <= len(glbs) <= allowed_count:
+            errors.append(f"expected {expected_count}–{allowed_count} {group} GLBs, found {len(glbs)}")
+        if not expected_count <= len(sidecars) <= allowed_count:
+            errors.append(f"expected {expected_count}–{allowed_count} {group} sidecars, found {len(sidecars)}")
+        if group == "dressing":
+            unknown = sorted(glb_path.stem for glb_path in glbs if glb_path.stem not in DRESSING_SURFACES)
+            for asset_id in unknown:
+                errors.append(f"unexpected dressing asset: {asset_id}")
         glb_names = {path.stem for path in glbs}
         unsafe_sidecars: set[Path] = set()
         for sidecar_path in sidecars:

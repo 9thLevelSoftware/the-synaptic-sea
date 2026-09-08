@@ -3,7 +3,7 @@
   "version": "gameplay-prop-v0",
   "props": {
     "loot_crate": {
-      "mesh_path": "",
+      "mesh_path": "res://assets/imported/props/dressing/loot_container_derelict_v1.glb",
       "primitive": "box",
       "albedo": "#c88a35",
       "y_offset": 0.45,
@@ -35,7 +35,7 @@
       "height_hint": 1.6
     },
     "workbench": {
-      "mesh_path": "",
+      "mesh_path": "res://assets/imported/props/dressing/maintenance_bench.glb",
       "primitive": "box",
       "albedo": "#2d9f9a",
       "y_offset": 0.55,

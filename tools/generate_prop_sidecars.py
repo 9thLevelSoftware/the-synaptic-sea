@@ -18,6 +18,7 @@ from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar, writ
 
 PROP_GROUPS = ("components", "dressing", "objectives")
 EXPECTED_ASSET_COUNTS = {"component": 11, "dressing": 11, "objective": 4}
+OPTIONAL_DRESSING_ASSETS = frozenset({"loot_container_derelict_v1"})
 DRESSING_SURFACES = {
     "cable_tray": "wall",
     "emergency_wall": "wall",
@@ -30,6 +31,7 @@ DRESSING_SURFACES = {
     "medical_cabinet": "floor",
     "salvage_cart": "floor",
     "service_rack": "floor",
+    "loot_container_derelict_v1": "floor",
 }
 OBJECTIVE_IDS = {
     "medbay_terminal": ["medbay_terminal"],
@@ -127,13 +129,14 @@ def _validate_complete_inventory(
     diagnostics: list[str] = []
     for prop_kind in ("component", "dressing", "objective"):
         expected = expected_asset_ids[prop_kind]
+        allowed = expected | OPTIONAL_DRESSING_ASSETS if prop_kind == "dressing" else expected
         if len(expected) != EXPECTED_ASSET_COUNTS[prop_kind]:
             diagnostics.append(
                 f"invalid governed {prop_kind} asset inventory: expected {EXPECTED_ASSET_COUNTS[prop_kind]} assets, found {len(expected)}"
             )
         for asset_id in sorted(expected - actual_asset_ids[prop_kind]):
             diagnostics.append(f"missing {prop_kind} asset: {asset_id}")
-        for asset_id in sorted(actual_asset_ids[prop_kind] - expected):
+        for asset_id in sorted(actual_asset_ids[prop_kind] - allowed):
             diagnostics.append(f"unexpected {prop_kind} asset: {asset_id}")
 
     if diagnostics:
@@ -260,7 +263,7 @@ def build_index(project_root: Path) -> dict[str, Any]:
     glbs = _iter_glbs(project_root)
     _validate_complete_inventory(
         glbs,
-        {"component": component_ids, "dressing": set(DRESSING_SURFACES), "objective": set(OBJECTIVE_IDS)},
+        {"component": component_ids, "dressing": set(DRESSING_SURFACES) - OPTIONAL_DRESSING_ASSETS, "objective": set(OBJECTIVE_IDS)},
     )
     owned_component_ids: set[str] = set()
     for prop_kind, glb_path in glbs:
