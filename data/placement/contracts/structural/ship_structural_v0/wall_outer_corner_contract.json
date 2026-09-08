@@ -9,16 +9,16 @@
   "grid_step_m": 4.0,
   "bounds": {
     "local_min_m": [
-      -2.0,
+      0.0,
       0.0,
       -2.0
     ],
     "local_max_m": [
       2.0,
       3.0,
-      2.0
+      0.0
     ],
-    "placement_origin": "edge-center",
+    "placement_origin": "vertex-center",
     "mesh_origin_offset_m": [
       0.0,
       0.0,
@@ -34,7 +34,7 @@
       "id": "outer_corner_vertex_north_01",
       "kind": "outer_corner_vertex",
       "position_m": [
-        2.0,
+        0.0,
         0.0,
         -2.0
       ],
@@ -47,9 +47,9 @@
       "id": "inner_corner_vertex_south_01",
       "kind": "inner_corner_vertex",
       "position_m": [
-        -2.0,
+        2.0,
         0.0,
-        2.0
+        0.0
       ],
       "compatible_kinds": [
         "wall_edge",
@@ -61,14 +61,15 @@
     "kind": "static-body-proxy",
     "nav_blocker": true,
     "proxy_shape": "box",
-    "notes": "authored simple proxy, never decorative collision"
+    "notes": "authored compound 2 m vertex rays, matching visible geometry"
   },
   "provenance": {
-    "source_platform": "self-authored",
+    "source_platform": "recovered-then-self-authored",
     "license_state": "self-authored",
-    "provenance_id": "ship_structural_v0:wall_outer_corner"
+    "provenance_id": "ship_structural_v0:wall_outer_corner",
+    "source_authority": "vertex-half-span-2026-09-08"
   },
-  "source_asset_path": "assets/_processed/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
+  "source_asset_path": "assets/imported/structural/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
   "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
   "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
   "inspection_path": null,
@@ -80,20 +81,20 @@
       "kit_id": "ship_structural_v0",
       "module_id": "wall_outer_corner",
       "module_family": "corner",
-      "pivot_policy": "edge-center"
+      "pivot_policy": "vertex-center"
     },
     "bounds": {
       "local_min_m": [
-        -2.0,
+        0.0,
         0.0,
         -2.0
       ],
       "local_max_m": [
         2.0,
         3.0,
-        2.0
+        0.0
       ],
-      "placement_origin": "edge-center",
+      "placement_origin": "vertex-center",
       "mesh_origin_offset_m": [
         0.0,
         0.0,
@@ -109,7 +110,7 @@
         "id": "outer_corner_vertex_north_01",
         "kind": "outer_corner_vertex",
         "position_m": [
-          2.0,
+          0.0,
           0.0,
           -2.0
         ],
@@ -122,9 +123,9 @@
         "id": "inner_corner_vertex_south_01",
         "kind": "inner_corner_vertex",
         "position_m": [
-          -2.0,
+          2.0,
           0.0,
-          2.0
+          0.0
         ],
         "compatible_kinds": [
           "wall_edge",
@@ -136,14 +137,15 @@
       "kind": "static-body-proxy",
       "nav_blocker": true,
       "proxy_shape": "box",
-      "notes": "authored simple proxy, never decorative collision"
+      "notes": "authored compound 2 m vertex rays, matching visible geometry"
     },
     "provenance": {
-      "source_platform": "self-authored",
+      "source_platform": "recovered-then-self-authored",
       "license_state": "self-authored",
-      "provenance_id": "ship_structural_v0:wall_outer_corner"
+      "provenance_id": "ship_structural_v0:wall_outer_corner",
+      "source_authority": "vertex-half-span-2026-09-08"
     },
-    "source_asset_path": "assets/_processed/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
+    "source_asset_path": "assets/imported/structural/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
     "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
     "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres"
   }

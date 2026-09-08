@@ -77,7 +77,7 @@ func _check_seed(seed_value: int) -> void:
 	if not bool(verdict.get("ok", false)):
 		failures.append("seed=%d validator errors=%s" % [seed_value, JSON.stringify(verdict.get("errors", []))])
 		return
-	if not _check_duplicate_edges(seed_value, plan):
+	if not _check_physical_placement_coverage(seed_value, plan):
 		return
 	if not _check_flood_connectivity(seed_value, plan):
 		return
@@ -131,18 +131,25 @@ func _check_room_footprints(seed_value: int, rooms: Array) -> bool:
 	return true
 
 
-func _check_duplicate_edges(seed_value: int, plan: Dictionary) -> bool:
+func _check_physical_placement_coverage(seed_value: int, plan: Dictionary) -> bool:
 	var edges: Variant = plan.get("edges", null)
 	var placements: Variant = plan.get("placements", null)
 	if not (edges is Dictionary) or not (placements is Array):
 		failures.append("seed=%d canonical edge/placement collections are malformed" % seed_value)
 		return false
-	var placement_counts: Dictionary = {}
+	var placement_ids: Dictionary = {}
+	var half_span_owners: Dictionary = {}
+	var materialized_counts: Dictionary = {}
 	for placement_variant in placements:
 		if not (placement_variant is Dictionary):
 			failures.append("seed=%d placement record is not a Dictionary" % seed_value)
 			return false
 		var placement: Dictionary = placement_variant
+		var placement_id: String = str(placement.get("placement_id", ""))
+		if placement_id.is_empty() or placement_ids.has(placement_id):
+			failures.append("seed=%d missing or duplicate physical placement_id=%s" % [seed_value, placement_id])
+			return false
+		placement_ids[placement_id] = true
 		var edge_key: String = str(placement.get("edge_key", ""))
 		if edge_key.is_empty():
 			failures.append("seed=%d placement is missing edge_key" % seed_value)
@@ -151,14 +158,37 @@ func _check_duplicate_edges(seed_value: int, plan: Dictionary) -> bool:
 		if kind == "OPEN":
 			failures.append("seed=%d OPEN edge has a physical placement" % seed_value)
 			return false
-		var count: int = int(placement_counts.get(edge_key, 0)) + 1
-		placement_counts[edge_key] = count
-		if count > 1:
-			failures.append("seed=%d duplicate edge placement=%s" % [seed_value, edge_key])
+		var edge_keys_variant: Variant = placement.get("edge_keys", null)
+		if not (edge_keys_variant is Array) or (edge_keys_variant as Array).is_empty() \
+				or not (edge_keys_variant as Array).has(edge_key):
+			failures.append("seed=%d placement=%s has malformed edge_keys" % [seed_value, placement_id])
 			return false
-		if not edges.has(edge_key):
-			failures.append("seed=%d placement references missing edge=%s" % [seed_value, edge_key])
+		for edge_key_variant in edge_keys_variant as Array:
+			var bound_edge_key: String = str(edge_key_variant)
+			if not edges.has(bound_edge_key):
+				failures.append("seed=%d placement=%s references missing edge=%s" % [seed_value, placement_id, bound_edge_key])
+				return false
+			var bound_edge: Dictionary = edges[bound_edge_key] as Dictionary
+			if str(bound_edge.get("kind", bound_edge.get("state", ""))).to_upper() != kind:
+				failures.append("seed=%d placement=%s kind disagrees with edge=%s" % [seed_value, placement_id, bound_edge_key])
+				return false
+			materialized_counts[bound_edge_key] = int(materialized_counts.get(bound_edge_key, 0)) + 1
+		var covered_variant: Variant = placement.get("covered_half_spans", null)
+		if not (covered_variant is Array):
+			failures.append("seed=%d placement=%s has malformed half-span coverage" % [seed_value, placement_id])
 			return false
+		for span_variant in covered_variant as Array:
+			var span_id: String = str(span_variant)
+			var span_edge_key: String = span_id.get_slice("@", 0)
+			if span_id.is_empty() or half_span_owners.has(span_id) or not edges.has(span_edge_key):
+				failures.append("seed=%d placement=%s has duplicate or invalid half-span=%s" % [seed_value, placement_id, span_id])
+				return false
+			var span_edge: Dictionary = edges[span_edge_key] as Dictionary
+			if str(span_edge.get("kind", "")).to_upper() != "SOLID" \
+					or not (span_edge.get("half_span_ids", []) as Array).has(span_id):
+				failures.append("seed=%d placement=%s claims non-canonical half-span=%s" % [seed_value, placement_id, span_id])
+				return false
+			half_span_owners[span_id] = placement_id
 
 	for edge_key_variant in edges.keys():
 		var edge_key: String = str(edge_key_variant)
@@ -168,10 +198,24 @@ func _check_duplicate_edges(seed_value: int, plan: Dictionary) -> bool:
 			return false
 		var edge: Dictionary = edge_variant
 		var kind: String = str(edge.get("kind", edge.get("state", ""))).to_upper()
-		var expected: int = 1 if kind in MATERIALIZED_EDGE_KINDS else 0
-		if int(placement_counts.get(edge_key, 0)) != expected:
-			failures.append("seed=%d edge=%s expected=%d placements=%d" % [
-				seed_value, edge_key, expected, int(placement_counts.get(edge_key, 0))])
+		if kind == "SOLID":
+			var half_span_ids: Variant = edge.get("half_span_ids", null)
+			if not (half_span_ids is Array) or (half_span_ids as Array).size() != 2 \
+					or str((half_span_ids as Array)[0]) != "%s@a" % edge_key \
+					or str((half_span_ids as Array)[1]) != "%s@b" % edge_key:
+				failures.append("seed=%d SOLID edge=%s lacks exact @a/@b authority" % [seed_value, edge_key])
+				return false
+			for span_variant in half_span_ids as Array:
+				var span_id: String = str(span_variant)
+				if not half_span_owners.has(span_id):
+					failures.append("seed=%d SOLID edge=%s has uncovered half-span=%s" % [seed_value, edge_key, span_id])
+					return false
+		elif kind in MATERIALIZED_EDGE_KINDS and int(materialized_counts.get(edge_key, 0)) != 1:
+			failures.append("seed=%d edge=%s expected one physical placement got=%d" % [
+				seed_value, edge_key, int(materialized_counts.get(edge_key, 0))])
+			return false
+		elif kind == "OPEN" and int(materialized_counts.get(edge_key, 0)) != 0:
+			failures.append("seed=%d OPEN edge=%s has physical placement" % [seed_value, edge_key])
 			return false
 	return true
 

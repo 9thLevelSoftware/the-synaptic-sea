@@ -1,17 +1,31 @@
 extends SceneTree
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
+const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
 const TIMEOUT_FRAMES: int = 300
 var main_node: Node
 var frame_count := 0
 var finished := false
 var running := false
 var _exit_code := 0
+var opening_publication_events: Array[String] = []
 
 func _initialize() -> void:
 	main_node = MAIN_SCENE.instantiate()
+	# Main creates the playable during its own _ready(). Observe the child as it
+	# enters the tree so this connection exists before the playable's _ready()
+	# synchronously publishes the fresh opening transaction.
+	main_node.child_entered_tree.connect(_on_main_child_entered_tree)
 	get_root().add_child(main_node)
 	process_frame.connect(_on_frame)
+
+
+func _on_main_child_entered_tree(child: Node) -> void:
+	if not child is PlayableGeneratedShip:
+		return
+	child.fresh_opening_publication_event.connect(
+		func(kind: String, owner_ship_id: String) -> void:
+			opening_publication_events.append("%s:%s" % [kind, owner_ship_id]))
 
 func _on_frame() -> void:
 	if finished: return
@@ -31,13 +45,17 @@ func _run(p) -> void:
 	if lifeboat.parent_ship != derelict: _fail("lifeboat not docked to starting derelict"); return
 	# Two ships co-present, separated.
 	if p.active_ship_root_count_for_validation() < 2: _fail("pair not co-present"); return
-	# Phase 5b Task 5 (physical-travel contract): the player now BOOTS INSIDE the docked
-	# lifeboat (their ride), which is port-docked to the starting derelict's airlock. The
-	# The two hulls meet without positive non-join overlap, and occupancy resolves the
-	# player from their actual fresh lifeboat spawn to the LIFEBOAT — the new
+	# R10-A physical-travel contract: the player boots inside the docked lifeboat
+	# (their ride), which is port-docked to the starting derelict's airlock. The two
+	# hulls meet without any positive cross-hull overlap, and occupancy resolves the player
+	# from their actual fresh lifeboat spawn to the lifeboat — the new
 	# "aboard your ride, docked to the starting derelict" semantics. (Pre-5b this asserted
 	# occupancy == home derelict; the ride-aboard model supersedes teleport-into-derelict.)
 	if p.player == null: _fail("no player"); return
+	if opening_publication_events != ["fresh_spawn_placed:lifeboat",
+			"occupancy_published:lifeboat"]:
+		_fail("fresh opening placement/publication order invalid: %s" % str(
+			opening_publication_events)); return
 	p.recompute_occupancy()
 	if p.get_current_occupancy_for_validation() != lifeboat:
 		_fail("player not aboard docked lifeboat at boot (occupancy != lifeboat) pos=%s bounds=%s" % [
@@ -49,9 +67,12 @@ func _run(p) -> void:
 		_fail("authored initial lifeboat spawn is not collision-clear"); return
 	var missing_spawn: Dictionary = spawn_layout.duplicate(true)
 	missing_spawn.erase("initial_player_spawn_v1")
+	var event_count_before_denial: int = opening_publication_events.size()
 	if str(p.validate_initial_lifeboat_spawn_for_validation(
 			missing_spawn).get("reason", "")) != "spawn_missing":
 		_fail("missing initial spawn did not fail closed"); return
+	if opening_publication_events.size() != event_count_before_denial:
+		_fail("failed spawn validation partially published opening state"); return
 	var malformed_spawn: Dictionary = spawn_layout.duplicate(true)
 	malformed_spawn.initial_player_spawn_v1.local_position = [4.0, 0.55]
 	if str(p.validate_initial_lifeboat_spawn_for_validation(
@@ -63,10 +84,24 @@ func _run(p) -> void:
 			foreign_spawn).get("reason", "")) != "spawn_owner_mismatch":
 		_fail("foreign initial spawn owner did not fail closed"); return
 	var blocked_spawn: Dictionary = spawn_layout.duplicate(true)
-	blocked_spawn.initial_player_spawn_v1.local_position = [4.0, 0.55, 0.0]
-	if str(p.validate_initial_lifeboat_spawn_for_validation(
-			blocked_spawn).get("reason", "")) != "spawn_capsule_blocked":
-		_fail("blocked initial spawn did not fail closed"); return
+	var blocked_fixture: Dictionary = _blocked_spawn_fixture(spawn_layout)
+	if not bool(blocked_fixture.get("ok", false)):
+		_fail("could not derive blocked spawn from compiled wall placement"); return
+	blocked_spawn.initial_player_spawn_v1.local_position = blocked_fixture.position
+	var authority_verdict: Dictionary = p.validate_initial_lifeboat_spawn_for_validation(
+		blocked_spawn)
+	if str(authority_verdict.get("reason", "")) != "spawn_layout_invalid" \
+			or str(authority_verdict.get("detail", "")) != "spawn_authority":
+		_fail("moved spawn bypassed authored authority: %s" % JSON.stringify(
+			authority_verdict)); return
+	var blocked_verdict: Dictionary = DockingManagerScript.validate_registered_spawn_clear(
+		spawn_layout, (lifeboat.scene_root as Node3D).global_transform,
+		_vector3(blocked_fixture.position))
+	if str(blocked_verdict.get("reason", "")) != "spawn_capsule_blocked" \
+			or str(blocked_verdict.get("placement_id", "")) \
+				!= str(blocked_fixture.placement_id):
+		_fail("blocked initial spawn did not fail closed: %s fixture=%s" % [
+			JSON.stringify(blocked_verdict), JSON.stringify(blocked_fixture)]); return
 	# Lifeboat propulsion offline at boot (opening damage retained).
 	var mgr = p.get_ship_systems_manager()
 	if mgr.is_operational("propulsion"): _fail("lifeboat propulsion should be offline at boot"); return
@@ -162,6 +197,23 @@ func _find(n: Node):
 		var f = _find(c)
 		if f != null: return f
 	return null
+
+
+func _blocked_spawn_fixture(layout: Dictionary) -> Dictionary:
+	var structural_plan: Dictionary = layout.get("structural_plan", {}) as Dictionary
+	for placement_variant in structural_plan.get("placements", []):
+		if not placement_variant is Dictionary:
+			continue
+		var placement: Dictionary = placement_variant
+		var module_id: String = str(placement.get("module_id", ""))
+		var position_variant: Variant = placement.get("position", null)
+		if not module_id.begins_with("wall_") or not position_variant is Vector3:
+			continue
+		var wall_position: Vector3 = position_variant as Vector3
+		return {"ok": true,
+			"placement_id": str(placement.get("placement_id", "")),
+			"position": [wall_position.x, 0.55, wall_position.z]}
+	return {"ok": false}
 
 func _walk_player(p, target: Vector3, max_frames: int) -> Dictionary:
 	var body = p.player

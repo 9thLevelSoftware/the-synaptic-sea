@@ -5,6 +5,9 @@ class_name DockEndpointAuthoring
 ## every production ship layout exposes. Endpoints name already-compiled
 ## structural records; consumers never derive them from a room center.
 
+const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+
 const ENDPOINT_KEYS := [
     "endpoint_id", "port_id", "portal_id", "type", "size_class", "room_id",
     "deck", "edge_cell", "edge_direction", "structural_edge_key",
@@ -44,19 +47,25 @@ static func author_layout(
     var projection_verdict: Dictionary = validate_collision_projection(collision_projection)
     if not bool(projection_verdict.get("ok", false)):
         return projection_verdict
-    var plan_variant: Variant = layout.get("structural_plan", null)
-    if not plan_variant is Dictionary:
-        return {"ok": false, "reason": "missing_structural_plan"}
-    var plan: Dictionary = plan_variant
+    var existing: Variant = layout.get("boarding_endpoints_v1", null)
+    if existing is Array and not (existing as Array).is_empty():
+        return validate_layout(layout, collision_projection)
+
+    # Discovery compilation is deliberately detached and never published. It only
+    # supplies canonical boundary geometry for choosing an exterior candidate.
+    var source: Dictionary = layout.duplicate(true)
+    source.erase("structural_plan")
+    source.erase("structural_plan_validated")
+    source.erase("boarding_endpoints_v1")
+    source.erase("initial_player_spawn_v1")
+    source.erase("dock_navigation_nodes_v1")
+    var plan: Dictionary = StructuralEdgeCompilerScript.new().compile(source)
     var edges_variant: Variant = plan.get("edges", null)
     var placements_variant: Variant = plan.get("placements", null)
     var floors_variant: Variant = plan.get("floor_placements", null)
     if not edges_variant is Dictionary or not placements_variant is Array \
-            or not floors_variant is Array:
-        return {"ok": false, "reason": "malformed_structural_plan"}
-    var existing: Variant = layout.get("boarding_endpoints_v1", null)
-    if existing is Array and not (existing as Array).is_empty():
-        return validate_layout(layout, collision_projection)
+            or not floors_variant is Array or not (plan.get("errors", []) as Array).is_empty():
+        return {"ok": false, "reason": "discovery_structural_plan_invalid"}
 
     var room_roles: Dictionary = {}
     for room_variant in layout.get("rooms", []):
@@ -78,7 +87,9 @@ static func author_layout(
             continue
         var room_id: String = str(edge.get("owner_room", ""))
         var role: String = str(room_roles.get(room_id, ""))
-        var role_rank: int = 0 if role == "dock" else (1 if role == "airlock" else 2)
+        if role != "dock" and role != "airlock":
+            continue
+        var role_rank: int = 0 if role == "dock" else 1
         var direction_rank: int = _direction_rank(direction, fixed_lifeboat)
         var candidate: Dictionary = edge.duplicate(true)
         candidate["_sort_key"] = "%d|%d|%s|%s" % [
@@ -95,8 +106,12 @@ static func author_layout(
     var deck: int = 0
     var cell_key: String = ""
     var supporting_candidate_count: int = 0
+    var supporting_rejections: Array[Dictionary] = []
     var pair_rejections: Array[Dictionary] = []
+    var selected_support_verdict: Dictionary = {}
     var selected_pair_verdict: Dictionary = {}
+    var selected_source: Dictionary = {}
+    var selected_plan: Dictionary = {}
     for selected in candidates:
         var candidate_key: String = str(selected.get("edge_key", selected.get("key", "")))
         var candidate_edge: Dictionary = (edges_variant as Dictionary).get(candidate_key, {})
@@ -112,42 +127,112 @@ static func author_layout(
         var candidate_floor: Dictionary = _floor_placement(floors_variant, candidate_cell_key)
         if candidate_floor.is_empty():
             continue
-        if not _candidate_has_supporting_plane(
-                plan, candidate_edge, candidate_placement, candidate_floor,
-                collision_projection):
+        var direction: String = str(candidate_edge.get("direction", ""))
+        var outward: Vector3 = OUTWARD_NORMALS[direction]
+        var edge_position: Vector3 = _as_vector3(candidate_edge.get("position", []))
+        var port_position: Vector3 = edge_position + outward * _portal_outward_extent(
+            collision_projection, candidate_placement)
+        var threshold_point: Vector3 = port_position - outward * 0.25 \
+            + Vector3.UP * PLAYER_CLEARANCE_Y
+        var interior_point: Vector3 = port_position - outward * 1.0 \
+            + Vector3.UP * PLAYER_CLEARANCE_Y
+        var portal_id: String = "boarding_portal:%s" % candidate_key
+        var candidate_source: Dictionary = source.duplicate(true)
+        var portals: Array = (candidate_source.get("portals", []) as Array).duplicate(true)
+        var outside_cell: Vector2i = candidate_cell + (DIRECTIONS[direction] as Vector2i)
+        portals.append({
+            "id": portal_id,
+            "from_room": str(candidate_edge.get("owner_room", "")),
+            "to_room": "",
+            "from_cell": [candidate_cell.x, candidate_cell.y, candidate_deck],
+            "to_cell": [outside_cell.x, outside_cell.y, candidate_deck],
+            "edge_direction": direction,
+            "module_id": PORTAL_MODULE,
+            "state": "DOOR",
+            "exterior": true,
+        })
+        candidate_source["portals"] = portals
+        var edge_placement_id: String = "edge:%s" % candidate_key
+        var floor_placement_id: String = "floor:%s" % candidate_cell_key
+        candidate_source["dock_navigation_nodes_v1"] = [
+            {
+                "node_id": "dock-threshold:%s" % candidate_key,
+                "kind": "threshold",
+                "portal_id": portal_id,
+                "room_id": str(candidate_edge.get("owner_room", "")),
+                "deck": candidate_deck,
+                "cell": [candidate_cell.x, candidate_cell.y, candidate_deck],
+                "structural_placement_id": edge_placement_id,
+                "local_position": _vector_array(threshold_point),
+            },
+            {
+                "node_id": "dock-interior:%s" % candidate_cell_key,
+                "kind": "interior",
+                "portal_id": portal_id,
+                "room_id": str(candidate_edge.get("owner_room", "")),
+                "deck": candidate_deck,
+                "cell": [candidate_cell.x, candidate_cell.y, candidate_deck],
+                "structural_placement_id": floor_placement_id,
+                "local_position": _vector_array(interior_point),
+            },
+        ]
+        var candidate_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(
+            candidate_source)
+        var plan_verdict: Dictionary = StructuralPlanValidatorScript.new().validate(
+            candidate_plan, candidate_source)
+        if not bool(plan_verdict.get("ok", false)):
+            pair_rejections.append({"ok": false,
+                "reason": "candidate_authoritative_compile_invalid",
+                "edge_key": candidate_key,
+                "errors": plan_verdict.get("errors", [])})
+            continue
+        var authoritative_edge: Dictionary = candidate_plan.get("edges", {}).get(
+            candidate_key, {}) as Dictionary
+        var authoritative_placement: Dictionary = _edge_placement(
+            candidate_plan.get("placements", []), candidate_key)
+        var authoritative_floor: Dictionary = _floor_placement(
+            candidate_plan.get("floor_placements", []), candidate_cell_key)
+        var support_verdict: Dictionary = _candidate_supporting_plane_verdict(
+            candidate_plan, authoritative_edge, authoritative_placement,
+            authoritative_floor, collision_projection)
+        if not bool(support_verdict.get("ok", false)):
+            support_verdict["edge_key"] = candidate_key
+            support_verdict["direction"] = direction
+            supporting_rejections.append(support_verdict)
             continue
         supporting_candidate_count += 1
         var pair_verdict: Dictionary = _candidate_pair_clear(
-                plan, candidate_edge, candidate_placement, candidate_floor,
+                candidate_plan, authoritative_edge, authoritative_placement,
+                authoritative_floor,
                 counterpart_layout, collision_projection)
         if not bool(pair_verdict.get("ok", false)):
             pair_rejections.append(pair_verdict)
             continue
-        edge = candidate_edge
-        edge_placement = candidate_placement
-        floor_placement = candidate_floor
+        edge = authoritative_edge
+        edge_placement = authoritative_placement
+        floor_placement = authoritative_floor
+        selected_source = candidate_source
+        selected_plan = candidate_plan
+        selected_support_verdict = support_verdict.duplicate(true)
         selected_pair_verdict = pair_verdict.duplicate(true)
         cell = candidate_cell
         deck = candidate_deck
         cell_key = candidate_cell_key
         break
     if edge.is_empty():
-        if supporting_candidate_count > 0 and not counterpart_layout.is_empty():
-            return {"ok": false, "reason": "no_compatible_exterior_edge",
-                "candidate_pair_rejections": pair_rejections}
-        return {"ok": false, "reason": "no_supporting_exterior_edge"}
+        var failure_reason: String = "no_supporting_exterior_edge"
+        if supporting_candidate_count > 0:
+            failure_reason = "no_compatible_exterior_edge" \
+                if not counterpart_layout.is_empty() \
+                else "no_authoritative_exterior_edge"
+        return {"ok": false,
+            "reason": failure_reason,
+            "supporting_candidate_count": supporting_candidate_count,
+            "supporting_rejections": supporting_rejections,
+            "candidate_pair_rejections": pair_rejections}
     var edge_key: String = str(edge.get("edge_key", edge.get("key", "")))
 
     var portal_id: String = "boarding_portal:%s" % edge_key
-    for target in [edge, edge_placement]:
-        target["kind"] = "DOOR"
-        target["state"] = "DOOR"
-        target["module_id"] = PORTAL_MODULE
-        target["portal"] = true
-        target["exterior"] = true
-        target["wrapper_required"] = true
-        target["placement_required"] = true
-        target["portal_id"] = portal_id
     var direction: String = str(edge.get("direction", ""))
     var outward: Vector3 = OUTWARD_NORMALS[direction]
     var edge_position: Vector3 = _as_vector3(edge.get("position", Vector3.ZERO))
@@ -155,7 +240,7 @@ static func author_layout(
     # two cell-center planes would overlap both frames and their adjacent walls.
     var port_position: Vector3 = edge_position + outward * _portal_outward_extent(
         collision_projection, edge_placement)
-    var threshold_point: Vector3 = port_position - outward * 0.35 + Vector3.UP * PLAYER_CLEARANCE_Y
+    var threshold_point: Vector3 = port_position - outward * 0.25 + Vector3.UP * PLAYER_CLEARANCE_Y
     var interior_point: Vector3 = port_position - outward * 1.0 + Vector3.UP * PLAYER_CLEARANCE_Y
     var edge_placement_id: String = str(edge_placement.get("placement_id", "edge:%s" % edge_key))
     var floor_placement_id: String = str(floor_placement.get("placement_id", "floor:%s" % cell_key))
@@ -183,9 +268,11 @@ static func author_layout(
             edge_placement_id, floor_placement_id,
             str(floor_placement.get("module_id", "floor_1x1")), collision_projection),
     }
-    layout["boarding_endpoints_v1"] = [endpoint]
+    selected_source["structural_plan"] = selected_plan
+    selected_source["structural_plan_validated"] = true
+    selected_source["boarding_endpoints_v1"] = [endpoint]
     if fixed_lifeboat:
-        layout["initial_player_spawn_v1"] = {
+        selected_source["initial_player_spawn_v1"] = {
             "spawn_id": "lifeboat-initial-airlock",
             "owner_ship_id": "lifeboat",
             "room_id": str(edge.get("owner_room", "airlock_01")),
@@ -195,11 +282,24 @@ static func author_layout(
             # corner wing and is therefore not a valid physical spawn authority.
             "local_position": _vector_array(interior_point),
         }
-    var validation: Dictionary = validate_layout(layout, collision_projection)
+    var validation: Dictionary = validate_layout(selected_source, collision_projection)
     if bool(validation.get("ok", false)):
+        layout["portals"] = selected_source["portals"].duplicate(true)
+        layout["dock_navigation_nodes_v1"] = selected_source[
+            "dock_navigation_nodes_v1"].duplicate(true)
+        layout["structural_plan"] = selected_plan.duplicate(true)
+        layout["structural_plan_validated"] = true
+        layout["boarding_endpoints_v1"] = [endpoint.duplicate(true)]
+        if fixed_lifeboat:
+            layout["initial_player_spawn_v1"] = selected_source[
+                "initial_player_spawn_v1"].duplicate(true)
+        else:
+            layout.erase("initial_player_spawn_v1")
         validation["candidate_count"] = candidates.size()
         validation["supporting_candidate_count"] = supporting_candidate_count
+        validation["supporting_rejections"] = supporting_rejections
         validation["candidate_pair_rejections"] = pair_rejections
+        validation["selected_support"] = selected_support_verdict
         validation["selected_pair"] = selected_pair_verdict
     return validation
 
@@ -222,39 +322,224 @@ static func validate_layout(layout: Dictionary, collision_projection: Dictionary
             return {"ok": false, "reason": "endpoint_missing_%s" % key}
     var edge_key: String = str(endpoint.get("structural_edge_key", ""))
     var plan_variant: Variant = layout.get("structural_plan", null)
-    if not plan_variant is Dictionary:
+    if not plan_variant is Dictionary or not bool(layout.get(
+            "structural_plan_validated", false)):
         return {"ok": false, "reason": "missing_structural_plan"}
-    var edge_variant: Variant = (plan_variant as Dictionary).get("edges", {}).get(edge_key, null)
+    var plan: Dictionary = plan_variant
+    var recompiled: Dictionary = StructuralEdgeCompilerScript.new().compile(layout)
+    var plan_verdict: Dictionary = StructuralPlanValidatorScript.new().validate(
+        recompiled, layout)
+    if not bool(plan_verdict.get("ok", false)) or recompiled != plan:
+        return {"ok": false, "reason": "structural_plan_roundtrip_mismatch"}
+    var edge_variant: Variant = plan.get("edges", {}).get(edge_key, null)
     if not edge_variant is Dictionary:
         return {"ok": false, "reason": "endpoint_edge_missing"}
     var edge: Dictionary = edge_variant
+    var direction: String = str(endpoint.get("edge_direction", ""))
+    var deck_authority: Dictionary = _strict_integral_authority(
+        endpoint.get("deck", null))
+    var size_authority: Dictionary = _strict_integral_authority(
+        endpoint.get("size_class", null))
+    if not bool(deck_authority.get("ok", false)) \
+            or not bool(size_authority.get("ok", false)) \
+            or int(size_authority.get("value", -1)) != 1:
+        return {"ok": false, "reason": "endpoint_scalar_authority"}
+    var deck: int = int(deck_authority.get("value", -1))
+    var cell_authority: Dictionary = _strict_deck_cell_authority(
+        endpoint.get("edge_cell", null), deck)
+    if not bool(cell_authority.get("ok", false)):
+        return {"ok": false, "reason": "endpoint_cell_authority"}
+    var cell: Vector2i = cell_authority.get("cell", Vector2i.ZERO) as Vector2i
+    var room_id: String = str(endpoint.get("room_id", ""))
+    var room: Dictionary = _room_by_id(layout, room_id)
+    var room_role: String = str(room.get("room_role", room.get("role", "")))
+    var cell_key: String = "%d|%d|%d" % [deck, cell.x, cell.y]
+    var edge_placement: Dictionary = _edge_placement(plan.get("placements", []), edge_key)
+    var floor_placement: Dictionary = _floor_placement(
+        plan.get("floor_placements", []), cell_key)
+    var portal_id: String = str(endpoint.get("portal_id", ""))
     if not bool(edge.get("exterior", false)) or not str(edge.get("other_room", "")).is_empty() \
             or str(edge.get("kind", "")) != "DOOR" \
-            or str(edge.get("module_id", "")) != PORTAL_MODULE:
+            or str(edge.get("module_id", "")) != PORTAL_MODULE \
+            or str(edge.get("portal_id", "")) != portal_id \
+            or str(edge.get("owner_room", "")) != room_id \
+            or int(edge.get("deck", -1)) != deck \
+            or _as_cell(edge.get("cell", [])) != cell \
+            or str(edge.get("direction", "")) != direction \
+            or room.is_empty() or (room_role != "dock" and room_role != "airlock"):
         return {"ok": false, "reason": "endpoint_not_exterior_portal"}
-    var direction: String = str(endpoint.get("edge_direction", ""))
+    var exterior_portal: Dictionary = _exterior_portal_by_id(layout, portal_id)
+    var outside_cell: Vector2i = cell + (DIRECTIONS.get(
+        direction, Vector2i(99999, 99999)) as Vector2i)
+    var portal_from_authority: Dictionary = _strict_deck_cell_authority(
+        exterior_portal.get("from_cell", null), deck)
+    var portal_to_authority: Dictionary = _strict_deck_cell_authority(
+        exterior_portal.get("to_cell", null), deck)
+    if exterior_portal.is_empty() or str(exterior_portal.get("from_room", "")) != room_id \
+            or not str(exterior_portal.get("to_room", "missing")).is_empty() \
+            or not bool(portal_from_authority.get("ok", false)) \
+            or not bool(portal_to_authority.get("ok", false)) \
+            or portal_from_authority.get("cell", Vector2i.ZERO) != cell \
+            or portal_to_authority.get("cell", Vector2i.ZERO) != outside_cell \
+            or str(exterior_portal.get("edge_direction", "")) != direction \
+            or str(exterior_portal.get("module_id", "")) != PORTAL_MODULE \
+            or str(exterior_portal.get("state", "")) != "DOOR":
+        return {"ok": false, "reason": "endpoint_portal_authority"}
+    var outward_authority: Dictionary = _strict_vector3_authority(
+        endpoint.get("outward_normal", null))
     if not OUTWARD_NORMALS.has(direction) \
-            or _as_vector3(endpoint.get("outward_normal", [])) != OUTWARD_NORMALS[direction]:
+            or not bool(outward_authority.get("ok", false)) \
+            or outward_authority.get("value", Vector3.INF) != OUTWARD_NORMALS[direction]:
         return {"ok": false, "reason": "endpoint_normal"}
+    var position_authority: Dictionary = _strict_vector3_authority(
+        endpoint.get("local_position", null))
     var expected_position: Vector3 = _as_vector3(edge.get("position", [])) \
         + (OUTWARD_NORMALS[direction] as Vector3) * _portal_outward_extent(
-            collision_projection, _edge_placement(
-                (plan_variant as Dictionary).get("placements", []), edge_key))
-    if _as_vector3(endpoint.get("local_position", [])) != expected_position:
+            collision_projection, edge_placement)
+    if not expected_position.is_finite() \
+            or not bool(position_authority.get("ok", false)) \
+            or position_authority.get("value", Vector3.INF) != expected_position \
+            or str(endpoint.get("endpoint_id", "")) != "boarding:%s" % edge_key \
+            or str(endpoint.get("port_id", "")) != "airlock:%s" % edge_key \
+            or str(endpoint.get("type", "")) != "airlock" \
+            or str(endpoint.get("target_module_id", "")) != PORTAL_MODULE \
+            or str(endpoint.get("structural_module_id", "")) != PORTAL_MODULE:
         return {"ok": false, "reason": "endpoint_position"}
     var join_ids: Variant = endpoint.get("join_piece_placement_ids", null)
-    if not join_ids is Array or (join_ids as Array).size() != 2 \
-            or str((join_ids as Array)[0]).is_empty() or str((join_ids as Array)[1]).is_empty():
+    var expected_edge_placement_id: String = "edge:%s" % edge_key
+    var expected_floor_placement_id: String = "floor:%s" % cell_key
+    if edge_placement.is_empty() or floor_placement.is_empty() \
+            or str(edge_placement.get("placement_id", "")) != expected_edge_placement_id \
+            or str(edge_placement.get("module_id", "")) != PORTAL_MODULE \
+            or str(floor_placement.get("placement_id", "")) != expected_floor_placement_id \
+            or not ["floor_1x1", "corridor_floor_1x1"].has(str(
+                floor_placement.get("module_id", ""))) \
+            or str(floor_placement.get("room_id", "")) != room_id \
+            or not join_ids is Array or join_ids != [
+                expected_edge_placement_id, expected_floor_placement_id]:
         return {"ok": false, "reason": "endpoint_join_ids"}
     var expected_fingerprint: String = join_collision_fingerprint(
-        str((join_ids as Array)[0]), str((join_ids as Array)[1]),
-        _placement_module(plan_variant, str((join_ids as Array)[1])), collision_projection)
+        expected_edge_placement_id, expected_floor_placement_id,
+        str(floor_placement.get("module_id", "")), collision_projection)
     if str(endpoint.get("join_collision_fingerprint", "")) != expected_fingerprint:
         return {"ok": false, "reason": "endpoint_join_fingerprint"}
-    if _as_vector3(endpoint.get("threshold_clearance_point_local", [])) \
-            == _as_vector3(endpoint.get("interior_clearance_point_local", [])):
+    var threshold_node: Dictionary = _compiled_navigation_node(
+        plan, str(endpoint.get("threshold_nav_node_id", "")))
+    var interior_node: Dictionary = _compiled_navigation_node(
+        plan, str(endpoint.get("interior_nav_node_id", "")))
+    var threshold_authority: Dictionary = _strict_vector3_authority(
+        endpoint.get("threshold_clearance_point_local", null))
+    var interior_authority: Dictionary = _strict_vector3_authority(
+        endpoint.get("interior_clearance_point_local", null))
+    if not bool(threshold_authority.get("ok", false)) \
+            or not bool(interior_authority.get("ok", false)):
+        return {"ok": false, "reason": "endpoint_clearance_authority"}
+    var threshold_point: Vector3 = threshold_authority.get("value", Vector3.INF) as Vector3
+    var interior_point: Vector3 = interior_authority.get("value", Vector3.INF) as Vector3
+    var threshold_position_authority: Dictionary = _strict_vector3_authority(
+        threshold_node.get("local_position", null))
+    var interior_position_authority: Dictionary = _strict_vector3_authority(
+        interior_node.get("local_position", null))
+    var threshold_deck_authority: Dictionary = _strict_integral_authority(
+        threshold_node.get("deck", null))
+    var interior_deck_authority: Dictionary = _strict_integral_authority(
+        interior_node.get("deck", null))
+    var threshold_cell_authority: Dictionary = _strict_deck_cell_authority(
+        threshold_node.get("cell", null), deck)
+    var interior_cell_authority: Dictionary = _strict_deck_cell_authority(
+        interior_node.get("cell", null), deck)
+    var outward: Vector3 = OUTWARD_NORMALS[direction]
+    if threshold_node.is_empty() or interior_node.is_empty() \
+            or threshold_node == interior_node \
+            or str(threshold_node.get("kind", "")) != "threshold" \
+            or str(interior_node.get("kind", "")) != "interior" \
+            or str(threshold_node.get("portal_id", "")) != portal_id \
+            or str(interior_node.get("portal_id", "")) != portal_id \
+            or str(threshold_node.get("room_id", "")) != room_id \
+            or str(interior_node.get("room_id", "")) != room_id \
+            or not bool(threshold_deck_authority.get("ok", false)) \
+            or not bool(interior_deck_authority.get("ok", false)) \
+            or int(threshold_deck_authority.get("value", -1)) != deck \
+            or int(interior_deck_authority.get("value", -1)) != deck \
+            or not bool(threshold_cell_authority.get("ok", false)) \
+            or not bool(interior_cell_authority.get("ok", false)) \
+            or threshold_cell_authority.get("cell", Vector2i.ZERO) != cell \
+            or interior_cell_authority.get("cell", Vector2i.ZERO) != cell \
+            or str(threshold_node.get("structural_placement_id", "")) \
+                != expected_edge_placement_id \
+            or str(interior_node.get("structural_placement_id", "")) \
+                != expected_floor_placement_id \
+            or not bool(threshold_position_authority.get("ok", false)) \
+            or not bool(interior_position_authority.get("ok", false)) \
+            or threshold_position_authority.get("value", Vector3.INF) != threshold_point \
+            or interior_position_authority.get("value", Vector3.INF) != interior_point \
+            or not threshold_point.is_finite() or not interior_point.is_finite() \
+            or (threshold_point - expected_position).dot(outward) >= 0.0 \
+            or (interior_point - threshold_point).dot(outward) >= 0.0 \
+            or threshold_point.distance_to(interior_point) < 0.7:
         return {"ok": false, "reason": "endpoint_clearance_points"}
+    var requires_initial_spawn: bool = str(layout.get(
+        "program_id", "")) == "life_boat_fixed"
+    if requires_initial_spawn and not layout.has("initial_player_spawn_v1"):
+        return {"ok": false, "reason": "spawn_authority"}
+    if layout.has("initial_player_spawn_v1"):
+        var spawn_variant: Variant = layout.get("initial_player_spawn_v1", null)
+        if not spawn_variant is Dictionary:
+            return {"ok": false, "reason": "spawn_authority"}
+        var spawn: Dictionary = spawn_variant
+        var spawn_keys: Array = ["spawn_id", "owner_ship_id", "room_id",
+            "nav_node_id", "local_position"]
+        var spawn_fields_valid: bool = spawn.size() == spawn_keys.size()
+        for field in spawn_keys:
+            spawn_fields_valid = spawn_fields_valid and spawn.has(field)
+        var spawn_position_authority: Dictionary = _strict_vector3_authority(
+            spawn.get("local_position", null))
+        if not spawn_fields_valid \
+                or str(spawn.get("spawn_id", "")) != "lifeboat-initial-airlock" \
+                or str(spawn.get("owner_ship_id", "")) != "lifeboat" \
+                or str(spawn.get("room_id", "")) != room_id \
+                or str(spawn.get("nav_node_id", "")) != str(
+                    endpoint.get("interior_nav_node_id", "")) \
+                or not bool(spawn_position_authority.get("ok", false)) \
+                or spawn_position_authority.get("value", Vector3.INF) != interior_point:
+            return {"ok": false, "reason": "spawn_authority"}
     return {"ok": true, "reason": "ok", "endpoint": endpoint}
+
+
+static func _room_by_id(layout: Dictionary, room_id: String) -> Dictionary:
+    var found: Dictionary = {}
+    for room_variant in layout.get("rooms", []):
+        if room_variant is Dictionary and str((room_variant as Dictionary).get(
+                "id", "")) == room_id:
+            if not found.is_empty():
+                return {}
+            found = room_variant as Dictionary
+    return found
+
+
+static func _exterior_portal_by_id(layout: Dictionary, portal_id: String) -> Dictionary:
+    var found: Dictionary = {}
+    var exterior_count: int = 0
+    for portal_variant in layout.get("portals", []):
+        if not portal_variant is Dictionary:
+            continue
+        var portal: Dictionary = portal_variant
+        if bool(portal.get("exterior", false)):
+            exterior_count += 1
+            if str(portal.get("id", "")) == portal_id:
+                found = portal
+    return found if exterior_count == 1 else {}
+
+
+static func _compiled_navigation_node(plan: Dictionary, node_id: String) -> Dictionary:
+    var found: Dictionary = {}
+    for node_variant in plan.get("dock_navigation_nodes", []):
+        if node_variant is Dictionary and str((node_variant as Dictionary).get(
+                "node_id", "")) == node_id:
+            if not found.is_empty():
+                return {}
+            found = node_variant as Dictionary
+    return found
 
 
 static func endpoint(layout: Dictionary, collision_projection: Dictionary = {}) -> Dictionary:
@@ -305,6 +590,60 @@ static func _as_vector3(value: Variant) -> Vector3:
         return Vector3(float((value as Array)[0]), float((value as Array)[1]),
             float((value as Array)[2]))
     return Vector3.INF
+
+
+## External endpoint authority must preserve its authored numeric types and all
+## three coordinates. These helpers are intentionally separate from the
+## compiler's permissive internal conversion helpers below.
+static func _strict_integral_authority(value: Variant) -> Dictionary:
+    if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+        return {"ok": false}
+    var numeric: float = float(value)
+    if not is_finite(numeric) or numeric != floor(numeric) \
+            or numeric < -2147483648.0 or numeric > 2147483647.0:
+        return {"ok": false}
+    return {"ok": true, "value": int(numeric)}
+
+
+static func _strict_deck_cell_authority(
+        value: Variant, expected_deck: int) -> Dictionary:
+    if value is Vector3i:
+        var typed: Vector3i = value as Vector3i
+        if typed.z != expected_deck:
+            return {"ok": false}
+        return {"ok": true, "cell": Vector2i(typed.x, typed.y)}
+    if not value is Array or (value as Array).size() != 3:
+        return {"ok": false}
+    var parts: Array = value as Array
+    var x_result: Dictionary = _strict_integral_authority(parts[0])
+    var y_result: Dictionary = _strict_integral_authority(parts[1])
+    var deck_result: Dictionary = _strict_integral_authority(parts[2])
+    if not bool(x_result.get("ok", false)) or not bool(y_result.get("ok", false)) \
+            or not bool(deck_result.get("ok", false)) \
+            or int(deck_result.get("value", expected_deck + 1)) != expected_deck:
+        return {"ok": false}
+    return {"ok": true, "cell": Vector2i(
+        int(x_result.get("value", 0)), int(y_result.get("value", 0)))}
+
+
+static func _strict_vector3_authority(value: Variant) -> Dictionary:
+    if value is Vector3:
+        var typed: Vector3 = value as Vector3
+        return {"ok": typed.is_finite(), "value": typed}
+    if value is Vector3i:
+        var typed_integer: Vector3i = value as Vector3i
+        return {"ok": true, "value": Vector3(
+            float(typed_integer.x), float(typed_integer.y), float(typed_integer.z))}
+    if not value is Array or (value as Array).size() != 3:
+        return {"ok": false}
+    var parts: Array = value as Array
+    for part in parts:
+        if typeof(part) != TYPE_INT and typeof(part) != TYPE_FLOAT:
+            return {"ok": false}
+        if not is_finite(float(part)):
+            return {"ok": false}
+    return {"ok": true, "value": Vector3(
+        float(parts[0]), float(parts[1]), float(parts[2]))}
 
 
 static func _vector_array(value: Vector3) -> Array:
@@ -454,6 +793,11 @@ static func _placement_transform(record: Dictionary) -> Transform3D:
         basis = Basis(Vector3(0.0, 0.0, 1.0), Vector3.UP, Vector3(-1.0, 0.0, 0.0))
     else:
         return Transform3D(Basis.IDENTITY, Vector3.INF)
+    var placement_scale: Vector3 = _as_vector3(record.get("scale", Vector3.ONE))
+    if not placement_scale.is_finite() or placement_scale.x <= 0.0 \
+            or placement_scale.y <= 0.0 or placement_scale.z <= 0.0:
+        return Transform3D(Basis.IDENTITY, Vector3.INF)
+    basis = basis * Basis.from_scale(placement_scale)
     return Transform3D(basis, _as_vector3(record.get("position", [])))
 
 
@@ -476,14 +820,14 @@ static func _portal_outward_extent(
     return extent
 
 
-static func _candidate_has_supporting_plane(
+static func _candidate_supporting_plane_verdict(
         plan: Dictionary, edge: Dictionary, edge_placement: Dictionary,
-        floor_placement: Dictionary, collision_projection: Dictionary) -> bool:
+        floor_placement: Dictionary, collision_projection: Dictionary) -> Dictionary:
     var outward: Vector3 = OUTWARD_NORMALS.get(str(edge.get("direction", "")), Vector3.ZERO)
     var edge_position: Vector3 = _as_vector3(edge.get("position", []))
     var extent: float = _portal_outward_extent(collision_projection, edge_placement)
     if outward == Vector3.ZERO or not is_finite(extent):
-        return false
+        return {"ok": false, "reason": "support_geometry_invalid"}
     var plane_distance: float = edge_position.dot(outward) + extent
     var tangent := Vector3(-outward.z, 0.0, outward.x)
     var aperture_min_t: float = INF
@@ -509,7 +853,8 @@ static func _candidate_has_supporting_plane(
     for group in ["floor_placements", "placements", "ceiling_placements"]:
         for placement_variant in plan.get(group, []):
             if not placement_variant is Dictionary:
-                return false
+                return {"ok": false, "reason": "support_record_invalid",
+                    "group": group}
             var record: Dictionary = placement_variant
             var placement_id: String = str(record.get("placement_id", record.get("id", "")))
             if join_ids.has(placement_id):
@@ -518,7 +863,9 @@ static func _candidate_has_supporting_plane(
                 collision_projection, str(record.get("module_id", "")))
             var placement: Transform3D = _placement_transform(record)
             if module.is_empty() or not placement.is_finite():
-                return false
+                return {"ok": false, "reason": "support_projection_invalid",
+                    "placement_id": placement_id,
+                    "module_id": str(record.get("module_id", ""))}
             for box_variant in module.get("boxes", []):
                 var box: Dictionary = box_variant
                 var size: Vector3 = _projection_dimensions(box)
@@ -536,8 +883,15 @@ static func _candidate_has_supporting_plane(
                 var up_overlap: bool = minf(bounds.end.y, aperture_max_y) \
                     > maxf(bounds.position.y, aperture_min_y)
                 if tangent_overlap and up_overlap and max_outward > plane_distance:
-                    return false
-    return true
+                    return {"ok": false, "reason": "support_shape_outward",
+                        "placement_id": placement_id,
+                        "module_id": str(record.get("module_id", "")),
+                        "shape_path": str(box.get("shape_path", "")),
+                        "max_outward": max_outward,
+                        "plane_distance": plane_distance,
+                        "tangent_overlap": tangent_overlap,
+                        "up_overlap": up_overlap}
+    return {"ok": true, "reason": "ok"}
 
 
 ## Checks a prospective host endpoint against the complete authenticated
@@ -600,12 +954,11 @@ static func _candidate_pair_clear(
     if not bool(counterpart_boxes.get("ok", false)):
         return counterpart_boxes
     var collision_verdict: Dictionary = validate_projected_cross_hull_boxes(
-        host_boxes.get("boxes", []), counterpart_boxes.get("boxes", []),
-        host_position)
+        host_boxes.get("boxes", []), counterpart_boxes.get("boxes", []))
     if not bool(collision_verdict.get("ok", false)):
         var rejection: Dictionary = collision_verdict.duplicate(true)
-        if str(rejection.get("reason", "")) == "non_join_hull_overlap":
-            rejection["reason"] = "candidate_non_join_hull_overlap"
+        if str(rejection.get("reason", "")) == "cross_hull_overlap":
+            rejection["reason"] = "candidate_cross_hull_overlap"
         rejection.merge({
             "edge_key": str(edge.get("edge_key", edge.get("key", ""))),
             "direction": direction,
@@ -717,14 +1070,11 @@ static func _positive_intersection(a: AABB, b: AABB) -> AABB:
 
 
 ## Shared pure static collision transaction used by both endpoint selection and
-## DockingManager publication. Join/join intersections are accepted only under
-## the same measured finite seam envelope; every positive non-join intersection
-## rejects.
+## DockingManager publication. Every positive-volume cross-hull intersection
+## rejects. Join labels authenticate placement identity and grant no exception.
 static func validate_projected_cross_hull_boxes(
-        host_boxes: Array, mobile_boxes: Array,
-        seam_center: Vector3) -> Dictionary:
-    var join_intersections: Array[AABB] = []
-    var non_join_overlaps: Array[Dictionary] = []
+        host_boxes: Array, mobile_boxes: Array) -> Dictionary:
+    var overlaps: Array[Dictionary] = []
     for host_box_variant in host_boxes:
         if not host_box_variant is Dictionary:
             return {"ok": false, "reason": "malformed_collision_record"}
@@ -738,48 +1088,23 @@ static func validate_projected_cross_hull_boxes(
                 mobile_box.get("aabb", AABB()) as AABB)
             if intersection.size == Vector3.ZERO:
                 continue
-            if bool(host_box.get("join", false)) \
-                    and bool(mobile_box.get("join", false)):
-                join_intersections.append(intersection)
-                continue
-            non_join_overlaps.append({
+            overlaps.append({
                 "host": _box_identity(host_box),
                 "mobile": _box_identity(mobile_box),
+                "host_join": bool(host_box.get("join", false)),
+                "mobile_join": bool(mobile_box.get("join", false)),
                 "intersection_position": _vector_array(intersection.position),
                 "intersection_size": _vector_array(intersection.size),
             })
-    if not non_join_overlaps.is_empty():
-        return {"ok": false, "reason": "non_join_hull_overlap",
-            "non_join_overlap_count": non_join_overlaps.size(),
-            "non_join_overlaps": non_join_overlaps,
-            # Candidate diagnostics retain the historical concise field names.
-            "overlap_count": non_join_overlaps.size(),
-            "overlaps": non_join_overlaps}
-    var seam := AABB(seam_center, Vector3.ZERO)
-    if not join_intersections.is_empty():
-        seam = join_intersections[0]
-        for index in range(1, join_intersections.size()):
-            seam = seam.merge(join_intersections[index])
-        for intersection in join_intersections:
-            if not _contains_aabb(seam, intersection):
-                return {"ok": false, "reason": "join_overlap_outside_seam"}
-    return {"ok": true, "reason": "ok", "non_join_overlap_count": 0,
-        "join_overlap_count": join_intersections.size(),
-        "seam_envelope": seam}
+    if not overlaps.is_empty():
+        return {"ok": false, "reason": "cross_hull_overlap",
+            "overlap_count": overlaps.size(), "overlaps": overlaps}
+    return {"ok": true, "reason": "ok", "cross_hull_overlap_count": 0}
 
 
 static func _box_identity(box: Dictionary) -> String:
     return "%s/%s" % [str(box.get("placement_id", "")), str(
         box.get("shape_path", box.get("shape_name", "")))]
-
-
-static func _contains_aabb(outer: AABB, inner: AABB) -> bool:
-    return inner.position.x >= outer.position.x \
-        and inner.position.y >= outer.position.y \
-        and inner.position.z >= outer.position.z \
-        and inner.end.x <= outer.end.x \
-        and inner.end.y <= outer.end.y \
-        and inner.end.z <= outer.end.z
 
 
 static func _edge_placement(placements_variant: Variant, edge_key: String) -> Dictionary:

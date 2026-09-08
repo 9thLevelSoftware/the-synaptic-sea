@@ -143,8 +143,8 @@ static func host_port_to_world(host_inst, local_port: Dictionary) -> Dictionary:
 
 
 ## Validates the complete registered pair before a mobile root is moved. Every
-## positive-volume cross-hull collision must be between the two explicitly named
-## join pieces and contained by the exact 0.2 m doorway seam slab.
+## positive-volume cross-hull collision rejects, including authenticated join
+## pieces; exact zero-volume contact remains legal.
 static func preflight_registered_pair(
 		host_layout: Dictionary, mobile_layout: Dictionary,
 		host_transform: Transform3D, host_port: Dictionary,
@@ -175,12 +175,9 @@ static func preflight_registered_pair(
 	if not bool(host_boxes.get("ok", false)) or not bool(mobile_boxes.get("ok", false)):
 		return host_boxes if not bool(host_boxes.get("ok", false)) else mobile_boxes
 	var collision_verdict: Dictionary = DockEndpointAuthoringScript \
-		.validate_projected_cross_hull_boxes(host_boxes.boxes, mobile_boxes.boxes,
-			host_port.get("position", Vector3.ZERO) as Vector3)
+		.validate_projected_cross_hull_boxes(host_boxes.boxes, mobile_boxes.boxes)
 	if not bool(collision_verdict.get("ok", false)):
 		return collision_verdict
-	var seam: AABB = collision_verdict.get("seam_envelope", AABB()) as AABB
-	var join_overlap_count: int = int(collision_verdict.get("join_overlap_count", 0))
 	var capsule_clear: bool = _registered_capsule_path_clear(
 		host_verdict.endpoint, mobile_verdict.endpoint, host_transform,
 		mobile_transform, host_facing, host_boxes.boxes, mobile_boxes.boxes)
@@ -190,10 +187,8 @@ static func preflight_registered_pair(
 		"ok": true,
 		"reason": "ok",
 		"mobile_transform": mobile_transform,
-		"non_join_overlap_count": 0,
-		"join_overlap_count": join_overlap_count,
+		"cross_hull_overlap_count": 0,
 		"open_capsule_clear": true,
-		"seam_envelope": seam,
 		"host_collision_boxes": host_boxes.boxes,
 		"mobile_collision_boxes": mobile_boxes.boxes,
 	}
@@ -272,8 +267,13 @@ static func _layout_collision_boxes(
 				float(record.get("yaw_degrees", 0.0)))
 			if not placement_basis_variant is Basis:
 				return {"ok": false, "reason": "non_cardinal_hull_transform"}
+			var placement_scale: Vector3 = _as_vector3(
+				record.get("scale", Vector3.ONE))
+			if not placement_scale.is_finite() or placement_scale.x <= 0.0 \
+					or placement_scale.y <= 0.0 or placement_scale.z <= 0.0:
+				return {"ok": false, "reason": "invalid_hull_scale"}
 			var placement_transform := Transform3D(
-				placement_basis_variant as Basis,
+				(placement_basis_variant as Basis) * Basis.from_scale(placement_scale),
 				_as_vector3(record.get("position", Vector3.ZERO)))
 			var append_result: Dictionary = _append_projected_collision_boxes(
 				module, root_transform * placement_transform, boxes, placement_id,
@@ -480,28 +480,6 @@ static func _collision_content_string(boxes: Array[Dictionary]) -> String:
 	return result
 
 
-static func _seam_envelope(
-		host_port: Dictionary, host_boxes: Array,
-		mobile_boxes: Array) -> AABB:
-	var center: Vector3 = host_port.get("position", Vector3.ZERO) as Vector3
-	var result := AABB(center, Vector3.ZERO)
-	var has_overlap: bool = false
-	for host_variant in host_boxes:
-		var host: Dictionary = host_variant
-		if not bool(host.get("join", false)):
-			continue
-		for mobile_variant in mobile_boxes:
-			var mobile: Dictionary = mobile_variant
-			if not bool(mobile.get("join", false)):
-				continue
-			var overlap: AABB = _positive_intersection(host.aabb, mobile.aabb)
-			if overlap.size == Vector3.ZERO:
-				continue
-			result = overlap if not has_overlap else result.merge(overlap)
-			has_overlap = true
-	return result
-
-
 static func _positive_intersection(a: AABB, b: AABB) -> AABB:
 	var minimum := Vector3(maxf(a.position.x, b.position.x),
 		maxf(a.position.y, b.position.y), maxf(a.position.z, b.position.z))
@@ -510,12 +488,6 @@ static func _positive_intersection(a: AABB, b: AABB) -> AABB:
 	if maximum.x <= minimum.x or maximum.y <= minimum.y or maximum.z <= minimum.z:
 		return AABB()
 	return AABB(minimum, maximum - minimum)
-
-
-static func _contains_aabb(outer: AABB, inner: AABB) -> bool:
-	return inner.position.x >= outer.position.x and inner.position.y >= outer.position.y \
-		and inner.position.z >= outer.position.z and inner.end.x <= outer.end.x \
-		and inner.end.y <= outer.end.y and inner.end.z <= outer.end.z
 
 
 static func _registered_capsule_path_clear(

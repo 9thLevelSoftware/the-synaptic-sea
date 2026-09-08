@@ -1,0 +1,50 @@
+{
+  "command": "C:/Users/dasbl/Downloads/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path D:/the-synaptic-sea-feature-completion --script res://.superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-work-evidence/fix-round-01-compiler-wip-01/capture_compact_seed17_halfspan.gd",
+  "component_authorities": {
+    "integrity_seeder_source": "67329c66a2cbe6e9cef2b63d3ab417242d95c994740174358a48f0abe805871f",
+    "vertex_asset_freeze_manifest": "b40db66c1ca9a7929c95648a885eb38c4df76e0dc86134d6a8a4afd5be0151eb"
+  },
+  "engine_process_executable": "C:/Users/dasbl/Downloads/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64.exe",
+  "engine_version": "4.7.2-stable (official)",
+  "fixture": "edge_map.json",
+  "fixture_sha256": "8802e6dfea01370af2f233c800a99f61ab13efae7ce847a75c3263f959863361",
+  "generator_input": {
+    "archetype": {
+      "guaranteed_roles": [],
+      "template": "compact"
+    },
+    "condition": "WRECKED",
+    "room_count_range": [
+      5,
+      8
+    ],
+    "seed": 17,
+    "size": "SMALL"
+  },
+  "godot_executable": "C:/Users/dasbl/Downloads/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe",
+  "schema": "compact_seed17_halfspan_provenance_v1",
+  "source_commit": "04e2da8c4bc9c164a7cc9fe1224d90862d088577",
+  "source_hashes": {
+    "assets/imported/structural/ship_structural_v0/wall_inner_corner/wall_inner_corner.glb": "16ee34d1644050b06a3c715633405192e505ed39a3ba7ad1a234e7d778f92dc0",
+    "assets/imported/structural/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb": "16ee34d1644050b06a3c715633405192e505ed39a3ba7ad1a234e7d778f92dc0",
+    "assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb": "4fec20a2dd01012fb15baf4c276ce21e4f361ff34db8cda762b95fb316ea44f4",
+    "data/kits/ship_structural_v0.json": "2f97dff4e8440a7b972c5f83883bbae6b5a922c71a3e823251079d5e7baad062",
+    "data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.json": "3c03a6919837f1a9d72874f7f409c9872e06e27bc5b34806159f8ea304b0e07d",
+    "data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.json": "342afda80619f7a7a0eeae26d71c9454bd62eb72e5dc7251c5165e1283cae9c6",
+    "data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.json": "5cf4571032b1a5d18c664c2b64665bbeb49129f3d21e3f749b22fcdc53b36a0d",
+    "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn": "d6d19c0c6518258b40a11579c9b374b55ffa9a5f8240b01e1339233e91060d99",
+    "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn": "9726544c240ffcae63146ddb128f5c01d4ff236183f69a61b774f73f5c334d4a",
+    "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn": "05d331c5eced0e4f0018aedcae827e27472f7a3cb8b7a60c8a7f62169a1c3ea7",
+    "scripts/procgen/cell_layout_engine.gd": "45a2dc1fc7b8bd781e20ec2ba3ee76148017947cf117dfdc828530832646356f",
+    "scripts/procgen/dock_endpoint_authoring.gd": "ea0b5080aa512d8c8d616f910916b9652f475ba6b60b16717d6d16ab9c7fb2f1",
+    "scripts/procgen/generated_ship_loader.gd": "b8cc14cb687acc6009d46ebcc3d06ff741606d320ad8bf09c3cdfa1d3f72c496",
+    "scripts/procgen/life_boat.gd": "81f879dad930da6794b416691545af1e27d297b971f2f979c87932062872ce8e",
+    "scripts/procgen/modular_socket_catalog.gd": "d5406e5594bf6ed8796af3a3adec963cd7e0337f8baf319f336ccf7336a358ff",
+    "scripts/procgen/ship_generator.gd": "2082faf7e8fd3ce04f11846dbfb1e02ba23352c2b473a048998584cdc964fe7e",
+    "scripts/procgen/ship_layout_generator.gd": "3863eb4e9154c7a8f9327991aa63b562960a6ae29e6bedee8e9af142349f0c14",
+    "scripts/procgen/structural_edge_compiler.gd": "846aa76f0700e778cd192969bfd95fba25e1ed5c31aa0dca61be4af58a03a33e",
+    "scripts/procgen/structural_plan_validator.gd": "3cd5478b952b17cd11dd5b509bb8adf8be2520db671b39c22d6687fcc1a87dfb"
+  },
+  "stderr_log": "artifacts/feature-completion/R10-A-fix1-compact-seed17-capture-03/compact_seed17_halfspan_capture.stderr.log",
+  "stdout_log": "artifacts/feature-completion/R10-A-fix1-compact-seed17-capture-03/compact_seed17_halfspan_capture.stdout.log"
+}

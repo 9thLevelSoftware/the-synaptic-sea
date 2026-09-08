@@ -7,16 +7,17 @@ extends SceneTree
 ## ShipGenerator/GeneratedShipLoader wrappers, then compares only the
 ## canonical structural inventory. GLB/material and scene-path differences are
 ## visual-only and intentionally excluded from the structural comparison.
-## Marker: PROCGEN CURRENT TOPOLOGY PARITY PASS seed=17 placements=48 wrappers=48 portals=8 structural=true visual_only=GLB,material
+## Marker: PROCGEN CURRENT TOPOLOGY PARITY PASS seed=17 placements=<n> wrappers=<n> portals=<n> structural=true visual_only=GLB,material
 
 const ShipBlueprintScript: GDScript = preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipGeneratorScript: GDScript = preload("res://scripts/procgen/ship_generator.gd")
 const GeneratedShipLoaderScript: GDScript = preload("res://scripts/procgen/generated_ship_loader.gd")
 
 const SEED: int = 17
-const STAGED_OVERLAY_EVIDENCE: String = "res://data/procgen/golden/compact_seed17_current/edge_map.json"
-const STAGED_SCHEMA: String = "focused_nine_current_candidate_v2"
-const STAGED_CAPTURE_ID: String = "CurrentFocusedNine"
+const STAGED_OVERLAY_EVIDENCE: String = "res://data/procgen/golden/compact_seed17_halfspan/edge_map.json"
+const PROVENANCE_EVIDENCE: String = "res://data/procgen/golden/compact_seed17_halfspan/provenance.json"
+const STAGED_SCHEMA: String = "compact_seed17_halfspan_v1"
+const STAGED_CAPTURE_ID: String = "CompactSeed17Halfspan"
 const STRUCTURAL_FIELDS: Array[String] = [
 	"placement_id",
 	"edge_key",
@@ -53,6 +54,10 @@ func _initialize() -> void:
 	var staged_error := _validate_staged_overlay_evidence(staged_overlay, SEED)
 	if not staged_error.is_empty():
 		_fail(staged_error)
+		return
+	var provenance_error := _validate_provenance()
+	if not provenance_error.is_empty():
+		_fail(provenance_error)
 		return
 
 	var live_plan: Dictionary = live_result["plan"]
@@ -156,9 +161,12 @@ func _validate_staged_overlay_evidence(document: Dictionary, seed_value: int) ->
 	var validation: Variant = document.get("validation", null)
 	if not (validation is Dictionary):
 		return "staged overlay evidence validation record is missing"
-	for field in ["edge_keys_unique", "portal_endpoints_valid", "no_portal_wall_overlap", "canonical_validator", "negative_duplicate_edge_probe", "negative_portal_wall_probe", "negative_endpoint_probe", "real_wrapper_checks"]:
+	for field in ["placement_ids_unique", "solid_half_span_coverage", "portal_endpoints_valid", "no_portal_wall_overlap", "canonical_validator", "negative_duplicate_placement_probe", "negative_portal_wall_probe", "negative_endpoint_probe", "real_wrapper_checks"]:
 		if (validation as Dictionary).get(field, false) != true:
 			return "staged overlay evidence failed validation field %s" % field
+	var half_span_error := _validate_fixture_half_span_coverage(document)
+	if not half_span_error.is_empty():
+		return half_span_error
 	if not _is_integral_json_number(document.get("seed", null)) or not _json_integer_equals(document["seed"], seed_value):
 		return "staged overlay evidence seed differs from live generation"
 	if str(document.get("size", "")) != "SMALL" or str(document.get("condition", "")) != "WRECKED":
@@ -176,6 +184,82 @@ func _validate_staged_overlay_evidence(document: Dictionary, seed_value: int) ->
 	if not _is_integral_json_number(placement_count) or not _is_integral_json_number(wrapper_count) or not _json_integer_equals(placement_count, (document.get("placements", []) as Array).size()) or not _json_integer_equals(wrapper_count, (document.get("wrapper_metadata", []) as Array).size()):
 		return "staged overlay evidence count metadata is inconsistent"
 	return ""
+
+
+func _validate_fixture_half_span_coverage(document: Dictionary) -> String:
+	var edges: Dictionary = document.get("edges", {}) as Dictionary
+	var placement_ids: Dictionary = {}
+	var span_owners: Dictionary = {}
+	for placement_variant in document.get("placements", []) as Array:
+		if not placement_variant is Dictionary:
+			return "half-span fixture placement is malformed"
+		var placement: Dictionary = placement_variant
+		var placement_id: String = str(placement.get("placement_id", ""))
+		if placement_id.is_empty() or placement_ids.has(placement_id):
+			return "half-span fixture has duplicate physical placement_id=%s" % placement_id
+		placement_ids[placement_id] = true
+		var covered_variant: Variant = placement.get("covered_half_spans", null)
+		if not covered_variant is Array:
+			return "half-span fixture placement has no coverage=%s" % placement_id
+		for span_variant in covered_variant as Array:
+			var span_id: String = str(span_variant)
+			var edge_key: String = span_id.get_slice("@", 0)
+			if span_id.is_empty() or span_owners.has(span_id) or not edges.has(edge_key):
+				return "half-span fixture has invalid or duplicate span=%s" % span_id
+			var edge: Dictionary = edges[edge_key] as Dictionary
+			if str(edge.get("kind", "")) != "SOLID" \
+					or not (edge.get("half_span_ids", []) as Array).has(span_id):
+				return "half-span fixture span is not canonical=%s" % span_id
+			span_owners[span_id] = placement_id
+	for edge_key_variant in edges.keys():
+		var edge_key: String = str(edge_key_variant)
+		var edge: Dictionary = edges[edge_key_variant] as Dictionary
+		if str(edge.get("kind", "")) != "SOLID":
+			continue
+		var spans: Variant = edge.get("half_span_ids", null)
+		if not spans is Array or (spans as Array).size() != 2 \
+				or str((spans as Array)[0]) != "%s@a" % edge_key \
+				or str((spans as Array)[1]) != "%s@b" % edge_key:
+			return "half-span fixture SOLID edge has malformed @a/@b authority=%s" % edge_key
+		for span_variant in spans as Array:
+			if not span_owners.has(str(span_variant)):
+				return "half-span fixture SOLID edge is uncovered=%s" % str(span_variant)
+	return ""
+
+
+func _validate_provenance() -> String:
+	var provenance: Dictionary = _load_json(PROVENANCE_EVIDENCE)
+	if provenance.is_empty():
+		return "half-span fixture provenance could not be loaded"
+	if str(provenance.get("schema", "")) != "compact_seed17_halfspan_provenance_v1" \
+			or str(provenance.get("fixture", "")) != "edge_map.json":
+		return "half-span fixture provenance schema is invalid"
+	if str(provenance.get("fixture_sha256", "")).to_upper() != _sha256_file(STAGED_OVERLAY_EVIDENCE):
+		return "half-span fixture provenance hash differs from edge_map.json"
+	var input: Variant = provenance.get("generator_input", null)
+	if not input is Dictionary or int((input as Dictionary).get("seed", -1)) != SEED \
+			or str((input as Dictionary).get("size", "")) != "SMALL" \
+			or str((input as Dictionary).get("condition", "")) != "WRECKED":
+		return "half-span fixture provenance generator input is invalid"
+	var source_hashes: Variant = provenance.get("source_hashes", null)
+	if not source_hashes is Dictionary or (source_hashes as Dictionary).is_empty():
+		return "half-span fixture provenance source hashes are missing"
+	for source_path_variant in (source_hashes as Dictionary).keys():
+		var source_path: String = str(source_path_variant)
+		var expected_hash: String = str((source_hashes as Dictionary)[source_path_variant]).to_upper()
+		if source_path.is_empty() or expected_hash.length() != 64:
+			return "half-span fixture provenance source hash is malformed path=%s" % source_path
+	return ""
+
+
+func _sha256_file(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var context := HashingContext.new()
+	if context.start(HashingContext.HASH_SHA256) != OK:
+		return ""
+	context.update(FileAccess.get_file_as_bytes(path))
+	return context.finish().hex_encode().to_upper()
 
 
 
@@ -209,9 +293,38 @@ func _compare_canonical_topology(live_plan: Dictionary, fixture: Dictionary) -> 
 		var fixture_value: Variant = fixture.get(collection_name, null)
 		if not (live_value is Dictionary) or not (fixture_value is Dictionary):
 			return "%s is missing" % collection_name
-		if JSON.stringify(live_value) != JSON.stringify(fixture_value):
+		if _canonical_json_value(live_value) != _canonical_json_value(fixture_value):
 			return "%s changed" % collection_name
 	return ""
+
+
+func _canonical_json_value(value: Variant) -> Variant:
+	## Capture persists grid/vector values as JSON arrays. Normalize only runtime
+	## representations at this boundary; every key and array element remains in
+	## the comparison, so topology drift cannot be hidden by serialization.
+	if value is Vector2i:
+		var vector2i: Vector2i = value
+		return [float(vector2i.x), float(vector2i.y)]
+	if value is Vector3:
+		var vector3: Vector3 = value
+		return [float(vector3.x), float(vector3.y), float(vector3.z)]
+	if value is Dictionary:
+		var canonical: Dictionary = {}
+		for key_variant in (value as Dictionary).keys():
+			canonical[str(key_variant)] = _canonical_json_value((value as Dictionary)[key_variant])
+		return canonical
+	if value is Array:
+		var canonical_array: Array = []
+		for item in value as Array:
+			canonical_array.append(_canonical_json_value(item))
+		return canonical_array
+	# JSON.parse_string represents every numeric scalar as float. Convert native
+	# integer fields to that same lossless representation so Dictionary equality
+	# compares values rather than their serialization types. Do not round, reorder,
+	# or discard any topology field.
+	if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
+		return float(value)
+	return value
 
 
 func _portal_count(plan: Dictionary) -> int:

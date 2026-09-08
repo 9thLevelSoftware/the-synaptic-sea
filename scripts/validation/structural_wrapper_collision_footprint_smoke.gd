@@ -23,13 +23,16 @@ func _initialize() -> void:
 	var failures: Array[String] = []
 	var walls_ok: bool = _check_walls(failures)
 	var corners_ok: bool = _check_corners(failures)
+	var materialized_visuals_ok: bool = _check_materialized_vertex_visuals(failures)
 	var doors_ok: bool = _check_doors(failures)
 	var aperture_ok: bool = _check_aperture(failures)
 	var thickness_ok: bool = _check_thickness(failures)
 	var hatch_skipped: bool = _check_hatch_skipped(failures)
-	if not (walls_ok and corners_ok and doors_ok and aperture_ok and thickness_ok and hatch_skipped):
-		failures.append("flag mismatch walls=%s corners=%s doors=%s aperture=%s thickness=%s hatch_skipped=%s" % [
-			str(walls_ok), str(corners_ok), str(doors_ok), str(aperture_ok), str(thickness_ok), str(hatch_skipped)
+	if not (walls_ok and corners_ok and materialized_visuals_ok and doors_ok \
+			and aperture_ok and thickness_ok and hatch_skipped):
+		failures.append("flag mismatch walls=%s corners=%s visuals=%s doors=%s aperture=%s thickness=%s hatch_skipped=%s" % [
+			str(walls_ok), str(corners_ok), str(materialized_visuals_ok), str(doors_ok),
+			str(aperture_ok), str(thickness_ok), str(hatch_skipped)
 		])
 	if not failures.is_empty():
 		for failure in failures:
@@ -74,9 +77,9 @@ func _check_walls(failures: Array[String]) -> bool:
 
 func _check_corners(failures: Array[String]) -> bool:
 	var wing_size := Vector3(
-		WalkabilityContractScript.WALL_HALF_SPAN_M * 2.0,
+		WalkabilityContractScript.SLAB_THICKNESS_M,
 		WalkabilityContractScript.WALL_HEIGHT_M,
-		WalkabilityContractScript.SLAB_THICKNESS_M
+		WalkabilityContractScript.WALL_HALF_SPAN_M
 	)
 	var ok: bool = true
 	ok = _check_two_wing_corner(INNER_CORNER_PATH, wing_size, failures) and ok
@@ -93,6 +96,11 @@ func _check_corners(failures: Array[String]) -> bool:
 		return false
 	if not _box_size_close(_box_size(north), wing_size) or not _box_size_close(_box_size(east), wing_size) or not _box_size_close(_box_size(west), wing_size):
 		failures.append("%s wing sizes must be %s" % [T_JUNCTION_PATH, str(wing_size)])
+		ok = false
+	if north.position.distance_to(Vector3(0.0, 1.5, -1.0)) > POS_EPS \
+			or east.position.distance_to(Vector3(1.0, 1.5, 0.0)) > POS_EPS \
+			or west.position.distance_to(Vector3(-1.0, 1.5, 0.0)) > POS_EPS:
+		failures.append("%s rays must be vertex-owned 2 m north/east/west spans" % T_JUNCTION_PATH)
 		ok = false
 	if not _is_yaw_identity(north) or not _is_yaw_90(east) or not _is_yaw_90(west):
 		failures.append("%s wing axes must match north/east/west sockets" % T_JUNCTION_PATH)
@@ -116,7 +124,76 @@ func _check_two_wing_corner(scene_path: String, wing_size: Vector3, failures: Ar
 	if not _is_yaw_identity(north) or not _is_yaw_90(east):
 		failures.append("%s wing axes must match north/east sockets" % scene_path)
 		return false
+	if north.position.distance_to(Vector3(0.0, 1.5, -1.0)) > POS_EPS \
+			or east.position.distance_to(Vector3(1.0, 1.5, 0.0)) > POS_EPS:
+		failures.append("%s rays must be vertex-owned 2 m north/east spans" % scene_path)
+		return false
 	return true
+
+
+func _check_materialized_vertex_visuals(failures: Array[String]) -> bool:
+	## ResourceLoader must resolve the current GLB imports, and the composed wrapper
+	## visuals must occupy the same canonical rays as their collision proxies.
+	var cases: Array[Dictionary] = [
+		{"path": INNER_CORNER_PATH,
+			"expected": AABB(Vector3(-0.1, 0.0, -2.0), Vector3(2.1, 3.0, 2.1))},
+		{"path": OUTER_CORNER_PATH,
+			"expected": AABB(Vector3(-0.1, 0.0, -2.0), Vector3(2.1, 3.0, 2.1))},
+		{"path": T_JUNCTION_PATH,
+			"expected": AABB(Vector3(-2.0, 0.0, -2.0), Vector3(4.0, 3.0, 2.1))},
+	]
+	var ok: bool = true
+	for case in cases:
+		var scene_path: String = str(case.get("path", ""))
+		var packed: PackedScene = ResourceLoader.load(scene_path, "PackedScene",
+			ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		if packed == null:
+			failures.append("materialized wrapper failed to load: %s" % scene_path)
+			ok = false
+			continue
+		var wrapper: Node3D = packed.instantiate() as Node3D
+		if wrapper == null:
+			failures.append("materialized wrapper failed to instantiate: %s" % scene_path)
+			ok = false
+			continue
+		var visual_bounds: Dictionary = _materialized_mesh_bounds(wrapper)
+		var expected: AABB = case.get("expected", AABB()) as AABB
+		if not bool(visual_bounds.get("ok", false)):
+			failures.append("materialized wrapper has no mesh geometry: %s" % scene_path)
+			ok = false
+		else:
+			var actual: AABB = visual_bounds.get("bounds", AABB()) as AABB
+			if actual.position.distance_to(expected.position) > SIZE_EPS \
+					or actual.size.distance_to(expected.size) > SIZE_EPS:
+				failures.append("materialized visual ray bounds mismatch %s actual=%s expected=%s" % [
+					scene_path, str(actual), str(expected)])
+				ok = false
+		wrapper.free()
+	return ok
+
+
+func _materialized_mesh_bounds(wrapper: Node3D) -> Dictionary:
+	var state: Dictionary = {"has_bounds": false, "bounds": AABB()}
+	_collect_materialized_mesh_bounds(wrapper, Transform3D.IDENTITY, state)
+	return {"ok": bool(state.get("has_bounds", false)),
+		"bounds": state.get("bounds", AABB())}
+
+
+func _collect_materialized_mesh_bounds(
+		node: Node, parent_transform: Transform3D, state: Dictionary) -> void:
+	var local_to_wrapper: Transform3D = parent_transform
+	if node is Node3D:
+		local_to_wrapper = parent_transform * (node as Node3D).transform
+	if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+		var mesh_node: MeshInstance3D = node as MeshInstance3D
+		var bounds: AABB = local_to_wrapper * mesh_node.mesh.get_aabb()
+		if bool(state.get("has_bounds", false)):
+			state["bounds"] = (state.get("bounds", AABB()) as AABB).merge(bounds)
+		else:
+			state["has_bounds"] = true
+			state["bounds"] = bounds
+	for child in node.get_children():
+		_collect_materialized_mesh_bounds(child, local_to_wrapper, state)
 
 
 func _check_doors(failures: Array[String]) -> bool:
@@ -219,9 +296,12 @@ func _check_thickness(failures: Array[String]) -> bool:
 	for scene_path in paths:
 		var boxes: Array[CollisionShape3D] = _load_boxes(scene_path, failures)
 		for box_node in boxes:
-			var size: Vector3 = _box_size(box_node)
-			if absf(size.z - expected) > SIZE_EPS:
-				failures.append("%s slab thickness actual=%.3f expected=%.2f" % [scene_path, size.z, expected])
+			var world_size: Vector3 = (box_node.transform * AABB(
+				-_box_size(box_node) * 0.5, _box_size(box_node))).size
+			var horizontal_thickness: float = minf(world_size.x, world_size.z)
+			if absf(horizontal_thickness - expected) > SIZE_EPS:
+				failures.append("%s slab thickness actual=%.3f expected=%.2f" % [
+					scene_path, horizontal_thickness, expected])
 				return false
 	return true
 
@@ -401,7 +481,7 @@ func _is_yaw_90(node: CollisionShape3D) -> bool:
 
 
 func _find_wing_at_axis(boxes: Array[CollisionShape3D], axis: String) -> CollisionShape3D:
-	var half_span: float = WalkabilityContractScript.WALL_HALF_SPAN_M
+	var half_span: float = WalkabilityContractScript.WALL_HALF_SPAN_M * 0.5
 	for box_node in boxes:
 		match axis:
 			"north":

@@ -2,29 +2,40 @@ extends SceneTree
 
 const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 
 func _initialize() -> void:
     call_deferred("_run")
 
 func _run() -> void:
+    if not _check_positive_join_overlap_rejects():
+        return
     if not _check_nested_fractional_projection():
         return
-    var home: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+    var home_source: Variant = JSON.parse_string(FileAccess.get_file_as_string(
         "res://data/procgen/golden/coherent_ship_001/layout.json"))
     var lifeboat: Dictionary = LifeBoatBuilderScript.build_layout()
-    if not home is Dictionary:
+    if not home_source is Dictionary:
         _fail("home layout missing")
         return
-    var host_port: Dictionary = DockPortsScript.for_derelict(home as Dictionary)
+    var home_documents: Dictionary = ShipGeneratorScript.new()._prepare_layout_documents(
+        home_source as Dictionary)
+    if not bool(home_documents.get("ok", false)):
+        _fail("production home materialization failed: %s" % str(
+            home_documents.get("reason", "")))
+        return
+    var home: Dictionary = home_documents.get("layout", {}) as Dictionary
+    var host_port: Dictionary = DockPortsScript.for_derelict(home)
     var mobile_port: Dictionary = DockPortsScript.for_lifeboat(lifeboat)
     var preflight: Dictionary = DockingManagerScript.preflight_registered_pair(
-        home as Dictionary, lifeboat, Transform3D.IDENTITY, host_port, mobile_port)
+        home, lifeboat, Transform3D.IDENTITY, host_port, mobile_port)
     if not bool(preflight.get("ok", false)):
         _fail("registered pair preflight failed: %s" % JSON.stringify(preflight))
         return
-    if int(preflight.get("non_join_overlap_count", -1)) != 0 \
+    if int(preflight.get("cross_hull_overlap_count", -1)) != 0 \
             or not bool(preflight.get("open_capsule_clear", false)):
         _fail("pair is not collision/traversal clear")
         return
@@ -34,7 +45,7 @@ func _run() -> void:
             + (preflight.get("mobile_collision_boxes", []) as Array):
         _add_static_box(collision_root, (box_variant as Dictionary).aabb)
     await physics_frame
-    var host_endpoint: Dictionary = (home as Dictionary).boarding_endpoints_v1[0]
+    var host_endpoint: Dictionary = home.boarding_endpoints_v1[0]
     var mobile_endpoint: Dictionary = lifeboat.boarding_endpoints_v1[0]
     var host_interior: Vector3 = _as_vector3(
         host_endpoint.interior_clearance_point_local)
@@ -89,6 +100,24 @@ func _run() -> void:
     barrier.free()
     print("R10A DOCK TRAVERSAL PASS")
     quit(0)
+
+func _check_positive_join_overlap_rejects() -> bool:
+    var host: Array = [{"placement_id": "host-join", "shape_path": "shape",
+        "join": true, "aabb": AABB(Vector3.ZERO, Vector3.ONE)}]
+    var mobile: Array = [{"placement_id": "mobile-join", "shape_path": "shape",
+        "join": true, "aabb": AABB(Vector3(0.5, 0.0, 0.0), Vector3.ONE)}]
+    var verdict: Dictionary = DockEndpointAuthoringScript.validate_projected_cross_hull_boxes(
+        host, mobile)
+    if bool(verdict.get("ok", false)) \
+            or str(verdict.get("reason", "")) != "cross_hull_overlap":
+        _fail("positive authenticated join overlap did not fail closed")
+        return false
+    mobile[0].aabb = AABB(Vector3(1.0, 0.0, 0.0), Vector3.ONE)
+    if not bool(DockEndpointAuthoringScript.validate_projected_cross_hull_boxes(
+            host, mobile).get("ok", false)):
+        _fail("exact zero-volume join contact was rejected")
+        return false
+    return true
 
 func _check_nested_fractional_projection() -> bool:
     var scene_path: String = "user://r10a_nested_fractional_wrapper.tscn"

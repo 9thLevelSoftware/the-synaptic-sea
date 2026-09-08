@@ -6,10 +6,15 @@ class_name StructuralPlanValidator
 ## floors identify occupied cells; edge records identify canonical boundaries.
 
 const CompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
+const ModularSocketCatalogScript: GDScript = preload("res://scripts/procgen/modular_socket_catalog.gd")
 const WalkabilityContractScript: GDScript = preload("res://scripts/procgen/walkability_contract.gd")
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 const CEILING_MODULES: Array[String] = ["ceiling_cap_1x1"]
 const EDGE_KINDS: Array[String] = ["SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"]
+const PROJECTED_WALL_HEIGHT_M: float = 3.0
+const PROJECTED_WALL_THICKNESS_M: float = 0.2
+const PROJECTED_HALF_SPAN_M: float = 2.0
+const PROJECTED_GEOMETRY_EPSILON_M: float = 0.00001
 
 
 func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
@@ -53,6 +58,7 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 		errors.append("placements must be an array")
 	var placements: Array = placements_variant if typeof(placements_variant) == TYPE_ARRAY else []
 	stats["edge_placements"] = placements.size()
+	_validate_authoritative_compiler_roundtrip(plan, topology, errors)
 
 	_validate_occupancy_records(occupancy, errors)
 	_validate_floor_placements(plan, occupancy, topology, errors, stats)
@@ -60,10 +66,21 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	_validate_socket_bindings(plan, errors, stats)
 	_validate_not_floor_only(plan, occupancy, errors)
 	_validate_edge_placements(edges, placements, errors)
+	_validate_projected_half_span_coverage(edges, placements, topology, errors)
 	_validate_portal_endpoints(topology, occupancy, edges, errors)
+	_validate_dock_navigation_nodes(plan, topology, occupancy, edges, placements, errors)
 	_validate_walkable_flood_fill(topology, occupancy, edges, errors)
 
 	return _verdict(errors, stats)
+
+
+func _validate_authoritative_compiler_roundtrip(
+		plan: Dictionary, topology: Dictionary, errors: Array[String]) -> void:
+	var expected: Dictionary = CompilerScript.new().compile(topology)
+	for field in ["occupancy", "edges", "placements", "floor_placements",
+			"ceiling_placements", "socket_bindings", "dock_navigation_nodes", "errors"]:
+		if not plan.has(field) or plan[field] != expected.get(field, null):
+			errors.append("structural plan does not match authoritative compiler output: %s" % field)
 
 
 func _verdict(errors: Array[String], stats: Dictionary) -> Dictionary:
@@ -336,20 +353,22 @@ func _vertical_opening_keys(topology: Dictionary) -> Dictionary:
 
 
 func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Array[String]) -> void:
-	var seen_edge_keys: Dictionary = {}
+	var seen_placement_ids: Dictionary = {}
+	var span_owners: Dictionary = {}
 	for placement_variant in placements:
 		if typeof(placement_variant) != TYPE_DICTIONARY:
 			errors.append("edge placement must be an object")
 			continue
 		var placement: Dictionary = placement_variant
+		var placement_id: String = str(placement.get("placement_id", ""))
+		if placement_id.is_empty() or seen_placement_ids.has(placement_id):
+			errors.append("missing or duplicate edge placement identity: %s" % placement_id)
+			continue
+		seen_placement_ids[placement_id] = true
 		var edge_key_value: String = str(placement.get("edge_key", ""))
 		if edge_key_value.is_empty():
 			errors.append("edge placement missing edge_key")
 			continue
-		if seen_edge_keys.has(edge_key_value):
-			errors.append("duplicate edge placement: %s" % edge_key_value)
-			continue
-		seen_edge_keys[edge_key_value] = true
 		if not edges.has(edge_key_value):
 			errors.append("edge placement references missing edge: %s" % edge_key_value)
 			continue
@@ -365,10 +384,29 @@ func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Arr
 			errors.append("OPEN edge must not have a placement: %s" % edge_key_value)
 		if FLOOR_MODULES.has(str(placement.get("module_id", ""))):
 			errors.append("floor module cannot be an edge placement: %s" % edge_key_value)
-		if str(edge.get("kind", edge.get("state", ""))) != kind:
-			errors.append("edge placement kind mismatch: %s" % edge_key_value)
-		if str(edge.get("module_id", "")) != str(placement.get("module_id", "")):
-			errors.append("edge placement module mismatch: %s" % edge_key_value)
+		var edge_keys_variant: Variant = placement.get("edge_keys", null)
+		if not edge_keys_variant is Array or (edge_keys_variant as Array).is_empty():
+			errors.append("edge placement edge_keys malformed: %s" % placement_id)
+			continue
+		var edge_keys: Array = edge_keys_variant
+		if not edge_keys.has(edge_key_value):
+			errors.append("edge placement primary edge absent from edge_keys: %s" % placement_id)
+		for bound_edge_key_variant in edge_keys:
+			var bound_edge_key: String = str(bound_edge_key_variant)
+			var bound_edge_variant: Variant = edges.get(bound_edge_key, null)
+			if not bound_edge_variant is Dictionary \
+					or str((bound_edge_variant as Dictionary).get("kind", "")) != kind:
+				errors.append("edge placement bound edge mismatch: %s" % placement_id)
+		var covered_variant: Variant = placement.get("covered_half_spans", null)
+		if not covered_variant is Array:
+			errors.append("edge placement half-span authority malformed: %s" % placement_id)
+		else:
+			for span_id_variant in covered_variant:
+				var span_id: String = str(span_id_variant)
+				if span_id.is_empty() or span_owners.has(span_id):
+					errors.append("duplicate or empty half-span placement: %s" % span_id)
+				else:
+					span_owners[span_id] = placement_id
 		_validate_edge_pose(placement, edge_key_value, errors)
 
 	for edge_key_variant in edges.keys():
@@ -381,8 +419,31 @@ func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Arr
 		var kind: String = str(edge.get("kind", edge.get("state", "")))
 		if not EDGE_KINDS.has(kind):
 			errors.append("unsupported edge kind: %s" % kind)
-		if kind != "OPEN" and bool(edge.get("wrapper_required", edge.get("placement_required", true))) and not seen_edge_keys.has(edge_key_value):
-			errors.append("required edge has no placement: %s" % edge_key_value)
+		if kind == "SOLID":
+			var expected_spans_variant: Variant = edge.get("half_span_ids", null)
+			var span_bindings_variant: Variant = edge.get("half_span_placement_ids", null)
+			if not expected_spans_variant is Array \
+					or (expected_spans_variant as Array).size() != 2 \
+					or not span_bindings_variant is Dictionary:
+				errors.append("solid edge half-span authority malformed: %s" % edge_key_value)
+				continue
+			var expected_spans: Array = expected_spans_variant
+			var span_bindings: Dictionary = span_bindings_variant
+			if span_bindings.size() != 2:
+				errors.append("solid edge half-span coverage incomplete: %s" % edge_key_value)
+			for span_id_variant in expected_spans:
+				var span_id: String = str(span_id_variant)
+				var declared_owner: String = str(span_bindings.get(span_id, ""))
+				if str(span_owners.get(span_id, "")) != declared_owner \
+						or declared_owner.is_empty() \
+						or not seen_placement_ids.has(declared_owner):
+					errors.append("solid edge half-span owner mismatch: %s" % span_id)
+		elif kind != "OPEN" and bool(edge.get("wrapper_required", edge.get("placement_required", true))):
+			var placement_ids_variant: Variant = edge.get("placement_ids", null)
+			if not placement_ids_variant is Array \
+					or (placement_ids_variant as Array).size() != 1 \
+					or not seen_placement_ids.has(str((placement_ids_variant as Array)[0])):
+				errors.append("required edge has no exact placement: %s" % edge_key_value)
 
 
 func _validate_edge_pose(placement: Dictionary, edge_key_value: String, errors: Array[String]) -> void:
@@ -400,13 +461,277 @@ func _validate_edge_pose(placement: Dictionary, edge_key_value: String, errors: 
 	var expected_key: String = CompilerScript.edge_key(deck, cell, direction)
 	if expected_key != edge_key_value:
 		errors.append("edge placement edge_key mismatch: %s" % edge_key_value)
-	var expected_position: Vector3 = CompilerScript.edge_world_position(deck, cell, direction)
+	var edge_position: Vector3 = CompilerScript.edge_world_position(deck, cell, direction)
+	var expected_position: Vector3 = edge_position
 	var position: Dictionary = _read_position(placement.get("position", null))
+	var anchor_kind: String = str(placement.get("anchor_kind", ""))
+	var expected_scale := Vector3.ONE
+	if anchor_kind == "vertex" or anchor_kind == "half_span":
+		var anchor_variant: Variant = placement.get("anchor_vertex", null)
+		if not anchor_variant is Array or (anchor_variant as Array).size() != 3 \
+				or not _is_integer((anchor_variant as Array)[0]) \
+				or not _is_integer((anchor_variant as Array)[1]) \
+				or not _is_integer((anchor_variant as Array)[2]):
+			errors.append("edge placement anchor vertex malformed: %s" % edge_key_value)
+			return
+		var anchor: Array = anchor_variant
+		var vertex_position := Vector3(
+			float(int(anchor[0])) * CompilerScript.CELL_SIZE - CompilerScript.CELL_SIZE * 0.5,
+			float(int(anchor[2])) * CompilerScript.DECK_HEIGHT,
+			float(int(anchor[1])) * CompilerScript.CELL_SIZE - CompilerScript.CELL_SIZE * 0.5)
+		expected_position = vertex_position
+		if anchor_kind == "half_span":
+			expected_position = vertex_position.lerp(edge_position, 0.5)
+			expected_scale = Vector3(0.5, 1.0, 1.0)
+	elif anchor_kind != "edge":
+		errors.append("edge placement anchor kind malformed: %s" % edge_key_value)
 	if not bool(position.get("ok", false)) or not (position["value"] as Vector3).is_equal_approx(expected_position):
 		errors.append("edge placement position mismatch: %s" % edge_key_value)
+	var scale: Dictionary = _read_position(placement.get("scale", null))
+	if not bool(scale.get("ok", false)) or not (scale["value"] as Vector3).is_equal_approx(expected_scale):
+		errors.append("edge placement scale mismatch: %s" % edge_key_value)
 	var expected_yaw: float = float(CompilerScript.YAW_DEGREES[direction])
-	if not _is_number(placement.get("yaw_degrees", null)) or not is_equal_approx(float(placement.get("yaw_degrees")), expected_yaw):
+	if anchor_kind == "vertex":
+		expected_yaw = float(placement.get("yaw_degrees", -1.0))
+	if not _is_number(placement.get("yaw_degrees", null)) \
+			or fposmod(float(placement.get("yaw_degrees")), 90.0) != 0.0 \
+			or (anchor_kind != "vertex" and not is_equal_approx(float(placement.get("yaw_degrees")), expected_yaw)):
 		errors.append("edge placement yaw mismatch: %s" % edge_key_value)
+
+
+func _validate_projected_half_span_coverage(
+		edges: Dictionary, placements: Array, topology: Dictionary,
+		errors: Array[String]) -> void:
+	## Reconstruct span ownership from collision geometry independently of the
+	## compiler's declared edge_keys/covered_half_spans. This catches a common-mode
+	## compiler error where labels are internally consistent but a ray points at a
+	## different physical boundary.
+	var catalog = ModularSocketCatalogScript.new()
+	var kit_id: String = str(topology.get(
+		"structural_kit_id", ModularSocketCatalogScript.DEFAULT_KIT_ID))
+	if not catalog.load_kit(kit_id):
+		errors.append("projected half-span catalog unavailable: %s" % kit_id)
+		return
+	var expected: Dictionary = _expected_projected_half_spans(edges, errors)
+	var reconstructed_owners: Dictionary = {}
+	for placement_variant in placements:
+		if not placement_variant is Dictionary:
+			continue
+		var placement: Dictionary = placement_variant
+		if str(placement.get("kind", "")) != "SOLID":
+			continue
+		var placement_id: String = str(placement.get("placement_id", ""))
+		var boxes: Array = catalog.collision_boxes_of(str(placement.get("module_id", "")))
+		if boxes.is_empty():
+			errors.append("solid placement has no collision projection: %s" % placement_id)
+			continue
+		var reconstructed: Array[String] = []
+		for box_variant in boxes:
+			if not box_variant is Dictionary:
+				errors.append("solid placement projection box malformed: %s" % placement_id)
+				continue
+			var segment: Dictionary = _projected_centerline_segment(
+				placement, box_variant as Dictionary)
+			if not bool(segment.get("ok", false)):
+				errors.append("solid placement projection is not a governed wall ray: %s" % placement_id)
+				continue
+			var matches: Array[String] = _matching_expected_half_spans(segment, expected)
+			var expected_count: int = int(roundf(
+				float(segment.get("length", 0.0)) / PROJECTED_HALF_SPAN_M))
+			if matches.size() != expected_count \
+					or not _matched_spans_exactly_fill_segment(segment, matches, expected):
+				errors.append("solid placement projection has missing or extra centerline span: %s segment=%s matches=%s" % [
+					placement_id, str(segment), str(matches)])
+				continue
+			for span_id in matches:
+				if reconstructed.has(span_id):
+					errors.append("solid placement projection duplicates its half-span: %s" % span_id)
+				else:
+					reconstructed.append(span_id)
+		reconstructed.sort()
+		var declared_variant: Variant = placement.get("covered_half_spans", null)
+		var declared: Array[String] = []
+		if declared_variant is Array:
+			for span_id_variant in declared_variant:
+				declared.append(str(span_id_variant))
+			declared.sort()
+		if declared != reconstructed:
+			errors.append("solid placement declared spans do not match collision projection: %s declared=%s reconstructed=%s" % [
+				placement_id, str(declared), str(reconstructed)])
+		for span_id in reconstructed:
+			if reconstructed_owners.has(span_id):
+				errors.append("collision projections duplicate half-span: %s" % span_id)
+			else:
+				reconstructed_owners[span_id] = placement_id
+	for span_id_variant in expected.keys():
+		var span_id: String = str(span_id_variant)
+		if not reconstructed_owners.has(span_id):
+			errors.append("collision projection leaves half-span uncovered: %s" % span_id)
+
+
+func _expected_projected_half_spans(
+		edges: Dictionary, errors: Array[String]) -> Dictionary:
+	var expected: Dictionary = {}
+	for edge_key_variant in edges.keys():
+		var edge_key_value: String = str(edge_key_variant)
+		var edge_variant: Variant = edges[edge_key_variant]
+		if not edge_variant is Dictionary \
+				or str((edge_variant as Dictionary).get("kind", "")) != "SOLID":
+			continue
+		var edge: Dictionary = edge_variant
+		var position_result: Dictionary = _read_position(edge.get("position", null))
+		var spans_variant: Variant = edge.get("half_span_ids", null)
+		var direction: String = str(edge.get("direction", ""))
+		if not bool(position_result.get("ok", false)) \
+				or not spans_variant is Array or (spans_variant as Array).size() != 2 \
+				or direction not in ["north", "east", "south", "west"]:
+			errors.append("solid edge cannot define projected half-spans: %s" % edge_key_value)
+			continue
+		var center: Vector3 = position_result.get("value", Vector3.INF) as Vector3
+		var along := Vector3.RIGHT if direction in ["north", "south"] \
+			else Vector3(0.0, 0.0, 1.0)
+		var endpoint_a: Vector3 = center - along * PROJECTED_HALF_SPAN_M
+		var endpoint_b: Vector3 = center + along * PROJECTED_HALF_SPAN_M
+		var spans: Array = spans_variant as Array
+		expected[str(spans[0])] = _centerline_segment(endpoint_a, center)
+		expected[str(spans[1])] = _centerline_segment(center, endpoint_b)
+	return expected
+
+
+func _projected_centerline_segment(
+		placement: Dictionary, box: Dictionary) -> Dictionary:
+	var placement_transform: Dictionary = _projected_placement_transform(placement)
+	var shape_transform: Dictionary = _projected_shape_transform(box)
+	var dimensions_result: Dictionary = _read_position(box.get("dimensions", null))
+	if not bool(placement_transform.get("ok", false)) \
+			or not bool(shape_transform.get("ok", false)) \
+			or not bool(dimensions_result.get("ok", false)):
+		return {"ok": false}
+	var dimensions: Vector3 = dimensions_result.get("value", Vector3.INF) as Vector3
+	if not dimensions.is_finite() or dimensions.x <= 0.0 \
+			or dimensions.y <= 0.0 or dimensions.z <= 0.0:
+		return {"ok": false}
+	var world_transform: Transform3D = (placement_transform.get("value") as Transform3D) \
+		* (shape_transform.get("value") as Transform3D)
+	var bounds: AABB = world_transform * AABB(-dimensions * 0.5, dimensions)
+	var deck_y: float = float(int(placement.get("deck", -1))) * CompilerScript.DECK_HEIGHT
+	if not _projected_close(bounds.position.y, deck_y) \
+			or not _projected_close(bounds.size.y, PROJECTED_WALL_HEIGHT_M):
+		return {"ok": false}
+	var from_point: Vector3
+	var to_point: Vector3
+	if _projected_close(bounds.size.z, PROJECTED_WALL_THICKNESS_M) \
+			and (_projected_close(bounds.size.x, PROJECTED_HALF_SPAN_M) \
+				or _projected_close(bounds.size.x, PROJECTED_HALF_SPAN_M * 2.0)):
+		var z: float = bounds.position.z + bounds.size.z * 0.5
+		from_point = Vector3(bounds.position.x, deck_y, z)
+		to_point = Vector3(bounds.end.x, deck_y, z)
+	elif _projected_close(bounds.size.x, PROJECTED_WALL_THICKNESS_M) \
+			and (_projected_close(bounds.size.z, PROJECTED_HALF_SPAN_M) \
+				or _projected_close(bounds.size.z, PROJECTED_HALF_SPAN_M * 2.0)):
+		var x: float = bounds.position.x + bounds.size.x * 0.5
+		from_point = Vector3(x, deck_y, bounds.position.z)
+		to_point = Vector3(x, deck_y, bounds.end.z)
+	else:
+		return {"ok": false}
+	var segment: Dictionary = _centerline_segment(from_point, to_point)
+	segment["ok"] = true
+	return segment
+
+
+func _projected_placement_transform(placement: Dictionary) -> Dictionary:
+	var position_result: Dictionary = _read_position(placement.get("position", null))
+	var scale_result: Dictionary = _read_position(placement.get("scale", null))
+	var yaw_variant: Variant = placement.get("yaw_degrees", null)
+	if not bool(position_result.get("ok", false)) \
+			or not bool(scale_result.get("ok", false)) or not _is_number(yaw_variant):
+		return {"ok": false}
+	var position: Vector3 = position_result.get("value", Vector3.INF) as Vector3
+	var scale: Vector3 = scale_result.get("value", Vector3.INF) as Vector3
+	var yaw: float = fposmod(float(yaw_variant), 360.0)
+	if not position.is_finite() or not scale.is_finite() or scale.x <= 0.0 \
+			or scale.y <= 0.0 or scale.z <= 0.0 \
+			or not _projected_close(fposmod(yaw, 90.0), 0.0):
+		return {"ok": false}
+	var basis := Basis.IDENTITY.rotated(Vector3.UP, deg_to_rad(yaw)) \
+		* Basis.from_scale(scale)
+	return {"ok": true, "value": Transform3D(basis, position)}
+
+
+func _projected_shape_transform(box: Dictionary) -> Dictionary:
+	var basis_variant: Variant = box.get("basis", null)
+	var origin_result: Dictionary = _read_position(box.get("origin", null))
+	if not basis_variant is Array or (basis_variant as Array).size() != 9 \
+			or not bool(origin_result.get("ok", false)):
+		return {"ok": false}
+	var values: Array = basis_variant as Array
+	for value in values:
+		if not _is_number(value):
+			return {"ok": false}
+	var basis := Basis(
+		Vector3(float(values[0]), float(values[1]), float(values[2])),
+		Vector3(float(values[3]), float(values[4]), float(values[5])),
+		Vector3(float(values[6]), float(values[7]), float(values[8])))
+	var origin: Vector3 = origin_result.get("value", Vector3.INF) as Vector3
+	if not basis.is_finite() or not origin.is_finite():
+		return {"ok": false}
+	return {"ok": true, "value": Transform3D(basis, origin)}
+
+
+func _centerline_segment(from_point: Vector3, to_point: Vector3) -> Dictionary:
+	var horizontal: bool = _projected_close(from_point.z, to_point.z)
+	return {
+		"axis": "h" if horizontal else "v",
+		"coordinate": from_point.z if horizontal else from_point.x,
+		"minimum": minf(from_point.x, to_point.x) if horizontal \
+			else minf(from_point.z, to_point.z),
+		"maximum": maxf(from_point.x, to_point.x) if horizontal \
+			else maxf(from_point.z, to_point.z),
+		"y": from_point.y,
+		"length": from_point.distance_to(to_point),
+	}
+
+
+func _matching_expected_half_spans(
+		segment: Dictionary, expected: Dictionary) -> Array[String]:
+	var matches: Array[String] = []
+	for span_id_variant in expected.keys():
+		var span_id: String = str(span_id_variant)
+		var candidate: Dictionary = expected[span_id_variant]
+		if str(candidate.get("axis", "")) == str(segment.get("axis", "")) \
+				and _projected_close(float(candidate.get("coordinate", INF)),
+					float(segment.get("coordinate", -INF))) \
+				and _projected_close(float(candidate.get("y", INF)),
+					float(segment.get("y", -INF))) \
+				and float(candidate.get("minimum", -INF)) \
+					>= float(segment.get("minimum", INF)) - PROJECTED_GEOMETRY_EPSILON_M \
+				and float(candidate.get("maximum", INF)) \
+					<= float(segment.get("maximum", -INF)) + PROJECTED_GEOMETRY_EPSILON_M:
+			matches.append(span_id)
+	matches.sort()
+	return matches
+
+
+func _matched_spans_exactly_fill_segment(
+		segment: Dictionary, matches: Array[String], expected: Dictionary) -> bool:
+	if matches.is_empty():
+		return false
+	var minimum: float = INF
+	var maximum: float = -INF
+	var total_length: float = 0.0
+	for span_id in matches:
+		var candidate: Dictionary = expected.get(span_id, {}) as Dictionary
+		minimum = minf(minimum, float(candidate.get("minimum", INF)))
+		maximum = maxf(maximum, float(candidate.get("maximum", -INF)))
+		total_length += float(candidate.get("length", 0.0))
+	return _projected_close(minimum, float(segment.get("minimum", INF))) \
+		and _projected_close(maximum, float(segment.get("maximum", -INF))) \
+		and _projected_close(total_length, float(segment.get("length", -INF)))
+
+
+func _projected_close(left: float, right: float) -> bool:
+	return is_finite(left) and is_finite(right) \
+		and absf(left - right) <= PROJECTED_GEOMETRY_EPSILON_M
 
 
 func _validate_portal_endpoints(topology: Dictionary, occupancy: Dictionary, edges: Dictionary, errors: Array[String]) -> void:
@@ -422,6 +747,10 @@ func _validate_portal_endpoints(topology: Dictionary, occupancy: Dictionary, edg
 		var portal: Dictionary = portal_variant
 		var from_room: String = str(portal.get("from_room", ""))
 		var to_room: String = str(portal.get("to_room", ""))
+		if bool(portal.get("exterior", false)):
+			_validate_exterior_portal(portal, from_room, to_room, room_decks,
+				occupancy, edges, errors)
+			continue
 		if not room_decks.has(from_room) or not room_decks.has(to_room):
 			errors.append("portal room endpoints are not reciprocal: %s" % str(portal.get("id", "")))
 			continue
@@ -474,6 +803,109 @@ func _validate_portal_endpoints(topology: Dictionary, occupancy: Dictionary, edg
 			errors.append("topology-connected rooms blocked by SOLID edge: %s" % edge_key_value)
 		if logical_boundary and str(edge.get("other_room", "")) != to_room:
 			errors.append("logical portal room endpoint mismatch: %s" % edge_key_value)
+
+
+func _validate_exterior_portal(
+		portal: Dictionary, from_room: String, to_room: String,
+		room_decks: Dictionary, occupancy: Dictionary, edges: Dictionary,
+		errors: Array[String]) -> void:
+	var portal_id: String = str(portal.get("id", ""))
+	if portal_id.is_empty() or not room_decks.has(from_room) or not to_room.is_empty():
+		errors.append("exterior portal endpoints are invalid: %s" % portal_id)
+		return
+	var deck: int = int(room_decks[from_room])
+	var from_info: Dictionary = _read_cell(portal.get("from_cell", null), deck)
+	var to_info: Dictionary = _read_cell(portal.get("to_cell", null), deck)
+	if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)) \
+			or int(from_info.get("deck", -1)) != deck \
+			or int(to_info.get("deck", -1)) != deck:
+		errors.append("exterior portal cells are malformed: %s" % portal_id)
+		return
+	var from_cell: Vector2i = from_info["cell"]
+	var to_cell: Vector2i = to_info["cell"]
+	var from_key: String = CompilerScript.cell_key(deck, from_cell)
+	var to_key: String = CompilerScript.cell_key(deck, to_cell)
+	if _occupancy_room(occupancy, from_key) != from_room or occupancy.has(to_key):
+		errors.append("exterior portal cells are not owner/interior-to-empty: %s" % portal_id)
+		return
+	var direction: String = ""
+	var delta: Vector2i = to_cell - from_cell
+	for candidate in CompilerScript.DIRECTIONS:
+		if (CompilerScript.DIRECTIONS[candidate] as Vector2i) == delta:
+			direction = str(candidate)
+			break
+	if direction.is_empty() or str(portal.get("edge_direction", direction)) != direction:
+		errors.append("exterior portal cells are not cardinally adjacent: %s" % portal_id)
+		return
+	var edge_key_value: String = CompilerScript.edge_key(deck, from_cell, direction)
+	var edge_variant: Variant = edges.get(edge_key_value, null)
+	if not edge_variant is Dictionary:
+		errors.append("exterior portal has no canonical edge: %s" % edge_key_value)
+		return
+	var edge: Dictionary = edge_variant
+	if not bool(edge.get("portal", false)) or not bool(edge.get("exterior", false)) \
+			or not str(edge.get("other_room", "missing")).is_empty() \
+			or str(edge.get("portal_id", "")) != portal_id \
+			or str(edge.get("kind", "")) != "DOOR" \
+			or str(edge.get("module_id", "")) != CompilerScript.DOOR_MODULE:
+		errors.append("exterior portal compiled authority mismatch: %s" % portal_id)
+
+
+func _validate_dock_navigation_nodes(
+		plan: Dictionary, topology: Dictionary, occupancy: Dictionary,
+		edges: Dictionary, placements: Array, errors: Array[String]) -> void:
+	var source_variant: Variant = topology.get("dock_navigation_nodes_v1", [])
+	var compiled_variant: Variant = plan.get("dock_navigation_nodes", [])
+	if not source_variant is Array or not compiled_variant is Array \
+			or source_variant != compiled_variant:
+		errors.append("compiled dock navigation nodes do not match authored source")
+		return
+	var nodes: Array = compiled_variant
+	if nodes.is_empty():
+		return
+	var exterior_edges: Array[Dictionary] = []
+	for edge_variant in edges.values():
+		if edge_variant is Dictionary and bool((edge_variant as Dictionary).get(
+				"portal", false)) and bool((edge_variant as Dictionary).get(
+				"exterior", false)):
+			exterior_edges.append(edge_variant as Dictionary)
+	if exterior_edges.size() != 1 or nodes.size() != 2:
+		errors.append("dock navigation node count does not match exterior portal")
+		return
+	var edge: Dictionary = exterior_edges[0]
+	var deck: int = int(edge.get("deck", -1))
+	var cell: Vector2i = edge.get("cell", Vector2i.ZERO) as Vector2i
+	var expected: Dictionary = {
+		"threshold": "edge:%s" % str(edge.get("edge_key", "")),
+		"interior": "floor:%s" % CompilerScript.cell_key(deck, cell),
+	}
+	var placement_ids: Dictionary = {}
+	for placement_variant in placements + (plan.get("floor_placements", []) as Array):
+		if placement_variant is Dictionary:
+			placement_ids[str((placement_variant as Dictionary).get(
+				"placement_id", ""))] = true
+	var seen: Dictionary = {}
+	for node_variant in nodes:
+		if not node_variant is Dictionary:
+			errors.append("compiled dock navigation node is malformed")
+			continue
+		var node: Dictionary = node_variant
+		var kind: String = str(node.get("kind", ""))
+		var placement_id: String = str(node.get("structural_placement_id", ""))
+		var position: Dictionary = _read_position(node.get("local_position", null))
+		if seen.has(kind) or not expected.has(kind) \
+				or placement_id != str(expected[kind]) or not placement_ids.has(placement_id) \
+				or str(node.get("portal_id", "")) != str(edge.get("portal_id", "")) \
+				or str(node.get("room_id", "")) != str(edge.get("owner_room", "")) \
+				or int(node.get("deck", -1)) != deck \
+				or not bool(position.get("ok", false)) \
+				or not (position.get("value", Vector3.INF) as Vector3).is_finite():
+			errors.append("compiled dock navigation node authority mismatch: %s" % str(
+				node.get("node_id", "")))
+			continue
+		seen[kind] = true
+	if seen.size() != 2:
+		errors.append("compiled dock navigation node kinds are incomplete")
 
 
 func _occupancy_room(occupancy: Dictionary, cell_key_value: String) -> String:

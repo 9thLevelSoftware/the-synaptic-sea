@@ -26,11 +26,9 @@ const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profi
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
 const LayoutMutatorScript := preload("res://scripts/procgen/layout_mutator.gd")
-const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DOCK_COLLISION_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
-const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
 var template_selector: RefCounted = TemplateSelectorScript.new()
@@ -180,20 +178,18 @@ func _generate_once(
 	# remain optional overlays (goldens may still author markers).
 	layout["hazard_source"] = "runtime"
 
-	# Overlay locks/breaches before compile so the plan sees LOCKED/BREACH kinds.
-	# Recompile after stamp / kit_id so occupancy, ceilings, and socket_bindings
-	# match the solved footprints rather than the serializer's first pass.
-	# Wreck module_damage is keyed by compiler module_key and must land after
-	# the last compile (quality-gate never calls ShipGenerator).
+	# Overlay locks/breaches before endpoint authoring. DockEndpointAuthoring uses
+	# a detached discovery compile, then publishes only the authoritative compile
+	# produced after its explicit exterior portal and navigation nodes are authored.
+	# Wreck module_damage is keyed by compiler module_key and lands afterward.
 	_apply_condition_mutators(layout, blueprint)
-	if not _stamp_structural_plan(layout):
-		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed")
-		return {}
 	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
 		layout, false, _dock_collision_projection(),
 		LifeBoatBuilderScript.build_layout())
 	if not bool(endpoint_result.get("ok", false)):
-		push_error("SHIP LAYOUT GENERATOR FAIL dock endpoint authoring failed: %s" % str(endpoint_result.get("reason", "")))
+		push_error(
+			"SHIP LAYOUT GENERATOR FAIL dock endpoint authoring failed seed=%d template=%s verdict=%s"
+			% [int(blueprint.seed_value), str(template.id), JSON.stringify(endpoint_result)])
 		return {}
 	_apply_wreck_to_compiled_plan(layout, blueprint)
 
@@ -219,19 +215,6 @@ func _apply_condition_mutators(layout: Dictionary, blueprint: RefCounted) -> voi
 	LayoutMutatorScript.apply_branch_overlays(layout, seed_value)
 	var wrecked: bool = condition == ShipBlueprintScript.Condition.WRECKED
 	LayoutMutatorScript.apply_portal_overlays(layout, seed_value, wrecked)
-
-
-func _stamp_structural_plan(layout: Dictionary) -> bool:
-	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-	var structural_plan: Dictionary = compiler.compile(layout)
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
-		layout["structural_plan_validated"] = false
-		return false
-	layout["structural_plan"] = structural_plan
-	layout["structural_plan_validated"] = true
-	return true
 
 
 func _apply_wreck_to_compiled_plan(layout: Dictionary, blueprint: RefCounted) -> void:

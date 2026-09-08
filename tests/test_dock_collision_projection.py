@@ -81,7 +81,8 @@ def test_real_selected_wrappers_have_exact_projected_boxes():
     assert doorway["boxes"][0]["origin"] == [0.0, 2.700000047683716, 0.0]
     corner = projection["modules"]["wall_inner_corner"]
     assert corner["boxes"][0]["basis"] == [0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0]
-    assert corner["boxes"][0]["origin"] == [2.0, 1.5, 0.0]
+    assert corner["boxes"][0]["origin"] == [1.0, 1.5, 0.0]
+    assert corner["boxes"][0]["dimensions"] == [0.20000000298023224, 3.0, 2.0]
     ceiling = projection["modules"]["ceiling_cap_1x1"]["boxes"]
     assert ceiling == [{
         "shape_path": "CollisionRoot/CollisionShape3D",

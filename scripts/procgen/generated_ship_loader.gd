@@ -5,6 +5,8 @@ const MODULAR_ASSET_SPEC_SCRIPT_PATH: String = "res://scripts/placement/modular_
 
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
+const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
 const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
 const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
@@ -178,11 +180,10 @@ func load_from_documents(
 	if module_to_scene.is_empty():
 		return _fail_load("kit contains no usable module wrapper scenes: %s" % kit_abs)
 
-	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
-	if not bool(structural_verdict.get("ok", false)):
-		return _fail_load("layout structural plan validation failed: %s" % str(structural_verdict.get("errors", [])))
-	if not _preflight_structural_wrappers(module_to_scene, layout_doc.get("structural_plan", {})):
-		return _fail_load("structural wrapper preflight failed")
+	var loading_authority: Dictionary = _validate_loading_authority(module_to_scene)
+	if not bool(loading_authority.get("ok", false)):
+		return _fail_load("layout loading authority failed: %s" % str(
+			loading_authority.get("errors", [loading_authority.get("reason", "invalid")])))
 
 	objective_specs = _build_objective_specs(layout_doc, gameplay_doc, gameplay_slice_abs)
 	if objective_specs.is_empty():
@@ -277,6 +278,11 @@ func _apply_slice_atmosphere(source_layout: Dictionary, is_away: bool) -> void:
 
 
 func _fail_load(reason: String) -> bool:
+	# Candidate documents are assigned before validation so the shared loading
+	# authority can use the same code paths as a successful load. A rejection
+	# must clear that candidate before observers receive load_failed or can query
+	# get_layout_copy().
+	clear_loaded_ship()
 	push_error(reason)
 	emit_signal("load_failed", reason)
 	return false
@@ -423,15 +429,72 @@ func _validate_structural_plan_for_loading() -> Dictionary:
 		return {"ok": false, "errors": ["layout missing validated structural_plan"]}
 	var structural_plan: Dictionary = structural_plan_variant
 	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout_doc)
+	if not bool(verdict.get("ok", false)):
+		return verdict
+	if not _requires_dock_authority(structural_plan):
+		return verdict
+	var projection_variant: Variant = kit_doc.get("dock_collision_projection_v1", null)
+	if not projection_variant is Dictionary:
+		return {"ok": false, "errors": ["dock collision projection missing"]}
+	var endpoint_verdict: Dictionary = DockEndpointAuthoringScript.validate_layout(
+		layout_doc, projection_variant as Dictionary)
+	if not bool(endpoint_verdict.get("ok", false)):
+		return {"ok": false, "errors": ["dock endpoint authority invalid: %s" % str(
+			endpoint_verdict.get("reason", "invalid"))]}
 	return verdict
 
 
-func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan: Dictionary) -> bool:
+func _requires_dock_authority(structural_plan: Dictionary) -> bool:
+	if str(layout_doc.get("program_id", "")) == "life_boat_fixed" \
+			or layout_doc.has("boarding_endpoints_v1") \
+			or layout_doc.has("initial_player_spawn_v1"):
+		return true
+	for room_variant in layout_doc.get("rooms", []):
+		if room_variant is Dictionary:
+			var room: Dictionary = room_variant
+			if ["dock", "airlock"].has(str(room.get(
+					"room_role", room.get("role", "")))):
+				return true
+	for portal_variant in layout_doc.get("portals", []):
+		if portal_variant is Dictionary and bool((portal_variant as Dictionary).get(
+				"exterior", false)):
+			return true
+	var edges_variant: Variant = structural_plan.get("edges", {})
+	if edges_variant is Dictionary:
+		for edge_variant in (edges_variant as Dictionary).values():
+			if edge_variant is Dictionary:
+				var edge: Dictionary = edge_variant as Dictionary
+				if bool(edge.get("exterior", false)) \
+						and str(edge.get("kind", "")) == "DOOR":
+					return true
+	return false
+
+
+func _validate_loading_authority(module_to_scene: Dictionary) -> Dictionary:
+	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
+	if not bool(structural_verdict.get("ok", false)):
+		return structural_verdict
+	return _preflight_structural_wrappers(
+		module_to_scene, layout_doc.get("structural_plan", {}) as Dictionary)
+
+
+func _preflight_structural_wrappers(
+		module_to_scene: Dictionary, structural_plan: Dictionary) -> Dictionary:
 	var edge_variant: Variant = structural_plan.get("placements", null)
 	var floor_variant: Variant = structural_plan.get("floor_placements", null)
 	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
-		push_error("structural plan wrapper preflight requires edge and floor placement arrays")
-		return false
+		return {"ok": false, "errors": [
+			"structural plan wrapper preflight requires edge and floor placement arrays"]}
+	var projection_variant: Variant = kit_doc.get("dock_collision_projection_v1", null)
+	if not projection_variant is Dictionary:
+		return {"ok": false, "errors": ["dock collision projection missing"]}
+	var projection: Dictionary = projection_variant as Dictionary
+	var projection_verdict: Dictionary = DockEndpointAuthoringScript.validate_collision_projection(
+		projection)
+	if not bool(projection_verdict.get("ok", false)):
+		return {"ok": false, "errors": ["dock collision projection invalid: %s" % str(
+			projection_verdict.get("reason", "invalid"))]}
+	var projected_modules: Dictionary = projection.get("modules", {}) as Dictionary
 	var all_records: Array = []
 	all_records.append_array(edge_variant as Array)
 	all_records.append_array(floor_variant as Array)
@@ -441,32 +504,28 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 	var probed_modules: Dictionary = {}
 	for record_variant in all_records:
 		if typeof(record_variant) != TYPE_DICTIONARY:
-			push_error("structural plan wrapper preflight found non-object placement")
-			return false
+			return {"ok": false, "errors": [
+				"structural plan wrapper preflight found non-object placement"]}
 		var record: Dictionary = record_variant
 		var module_id: String = str(record.get("module_id", ""))
 		if probed_modules.has(module_id):
 			continue
 		var scene_path: String = str(module_to_scene.get(module_id, ""))
 		if module_id.is_empty() or scene_path.is_empty():
-			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
-			return false
-		if not ResourceLoader.exists(scene_path):
-			push_error("structural plan wrapper preflight missing scene %s" % scene_path)
-			return false
-		var scene: Resource = ResourceLoader.load(scene_path)
-		if scene == null or not (scene is PackedScene):
-			push_error("structural plan wrapper preflight scene is not PackedScene: %s" % scene_path)
-			return false
-		var probe: Node = (scene as PackedScene).instantiate()
-		if probe == null or not (probe is Node3D):
-			if probe != null:
-				probe.free()
-			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
-			return false
-		probe.free()
+			return {"ok": false, "errors": [
+				"structural plan wrapper preflight missing wrapper for module %s" % module_id]}
+		var projected_variant: Variant = projected_modules.get(module_id, null)
+		if not projected_variant is Dictionary:
+			return {"ok": false, "errors": [
+				"structural plan wrapper preflight missing projection for module %s" % module_id]}
+		var materialized: Dictionary = DockingManagerScript.validate_materialized_wrapper(
+			scene_path, projected_variant as Dictionary)
+		if not bool(materialized.get("ok", false)):
+			return {"ok": false, "errors": [
+				"structural plan materialized wrapper invalid: module=%s reason=%s" % [
+					module_id, str(materialized.get("reason", "invalid"))]]}
 		probed_modules[module_id] = true
-	return true
+	return {"ok": true, "errors": []}
 
 
 func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, gameplay_slice_path: String) -> Array:
@@ -834,7 +893,8 @@ func _append_original_descriptors(
 		if layer == "edge":
 			for key in [
 				"edge_key", "source_cells", "direction", "opposite_direction",
-				"owner_room", "other_room", "exterior", "portal",
+				"owner_room", "other_room", "exterior", "portal", "edge_keys",
+				"covered_half_spans", "anchor_kind", "anchor_vertex",
 			]:
 				if record.has(key):
 					edge_binding[key] = _duplicate_variant(record[key])
@@ -859,6 +919,7 @@ func _append_original_descriptors(
 			"transform": {
 				"position": placement_position.duplicate(true),
 				"yaw_degrees": float(record.get("yaw_degrees", 0.0)),
+				"scale": _read_placement_scale(record),
 			},
 			"footprint": (contract_identity.get("footprint_cells", []) as Array).duplicate(true),
 			"sockets": (contract_identity.get("socket_names", []) as Array).duplicate(true),
@@ -1002,7 +1063,11 @@ func _build_kit_module_record_map(source_kit: Dictionary) -> Dictionary:
 
 
 func _structural_target_id(record: Dictionary, layer: String) -> String:
-	var key_part: String = str(record.get("edge_key", record.get("key", ""))) if layer == "edge" else str(record.get("cell_key", ""))
+	var key_part: String = str(record.get("cell_key", ""))
+	if layer == "edge":
+		var edge_key_value: String = str(record.get("edge_key", record.get("key", "")))
+		var placement_id: String = str(record.get("placement_id", record.get("id", "")))
+		key_part = edge_key_value if placement_id == "edge:%s" % edge_key_value else placement_id
 	if key_part.is_empty():
 		return ""
 	return "%s/%s" % [layer, key_part]
@@ -1073,6 +1138,11 @@ func _instantiate_structural_record(
 		return null
 	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
+	var placement_scale: Array = _read_placement_scale(record)
+	if placement_scale.size() != 3:
+		wrapper.free()
+		return null
+	wrapper.scale = Vector3(float(placement_scale[0]), float(placement_scale[1]), float(placement_scale[2]))
 	var placement_id: String = str(record.get("placement_id", record.get("id", "")))
 	if layer == "floor":
 		var cell_key_value: String = str(record.get("cell_key", ""))
@@ -1096,13 +1166,15 @@ func _instantiate_structural_record(
 		wrapper.set_meta("room_id", str(record.get("room_id", "")))
 	else:
 		var edge_key_value: String = str(record.get("edge_key", ""))
-		wrapper.name = "StructuralEdge_%s" % edge_key_value.replace("|", "_")
+		wrapper.name = "StructuralEdge_%s" % placement_id.replace(":", "_").replace("|", "_").replace("@", "_")
 		wrapper.set_meta("structural_edge_key", edge_key_value)
+		wrapper.set_meta("structural_edge_keys", _array_field(record, "edge_keys"))
+		wrapper.set_meta("structural_half_spans", _array_field(record, "covered_half_spans"))
 		wrapper.set_meta("structural_kind", str(record.get("kind", "")))
 		wrapper.set_meta("structural_placement_id", placement_id)
 		wrapper.set_meta("structural_room_ids", (record.get("room_ids", []) as Array).duplicate(true))
 		wrapper.set_meta("module_kind", module_id)
-		wrapper.set_meta("module_key", "edge/%s" % edge_key_value)
+		wrapper.set_meta("module_key", _structural_target_id(record, "edge"))
 		var room_ids: Array = record.get("room_ids", []) if typeof(record.get("room_ids", [])) == TYPE_ARRAY else []
 		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
 	wrapper.set_meta("integrity_state", "intact")
@@ -1363,6 +1435,23 @@ func _read_placement_position(placement: Dictionary) -> Array:
 		if t == TYPE_STRING and not String(v).is_valid_float():
 			return []
 	return arr
+
+
+func _read_placement_scale(placement: Dictionary) -> Array:
+	var raw: Variant = placement.get("scale", Vector3.ONE)
+	var values: Array = []
+	if raw is Vector3:
+		var vector: Vector3 = raw
+		values = [vector.x, vector.y, vector.z]
+	elif raw is Array:
+		values = (raw as Array).duplicate()
+	if values.size() != 3:
+		return []
+	for value in values:
+		if (typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT) \
+				or not is_finite(float(value)) or float(value) <= 0.0:
+			return []
+	return [float(values[0]), float(values[1]), float(values[2])]
 
 
 func _parse_vector_string(value: String, expected: int) -> Array:

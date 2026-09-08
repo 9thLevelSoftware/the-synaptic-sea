@@ -6,6 +6,9 @@ extends SceneTree
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
 const ModuleIntegrityStateScript := preload("res://scripts/systems/module_integrity_state.gd")
+const LayoutMutatorScript := preload("res://scripts/procgen/layout_mutator.gd")
+const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 
 
@@ -141,6 +144,162 @@ func _initialize() -> void:
 	if float(shared_mod.integrity) > 0.05:
 		_fail("shared wall should take max compartment intensity, integrity=%s" % str(shared_mod.integrity))
 		return
+	# Compile the vertex/span fixture through the production compiler. A two-cell
+	# strip has corner placements and residual half-spans sharing a primary edge.
+	var physical_source: Dictionary = {
+		"schema_version": "ship-layout-v1",
+		"kit_id": "ship_structural_v0",
+		"rooms": [{
+			"id": "strip",
+			"deck": 0,
+			"role": "room",
+			"room_role": "room",
+			"cells": [[0, 0, 0], [1, 0, 0]],
+		}],
+		"portals": [],
+		"vertical_connections": [],
+		"critical_path": [],
+	}
+	var physical_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(physical_source)
+	var physical_verdict: Dictionary = StructuralPlanValidatorScript.new().validate(physical_plan, physical_source)
+	if not (physical_plan.get("errors", []) as Array).is_empty() or not bool(physical_verdict.get("ok", false)):
+		_fail("physical compiler fixture should be valid")
+		return
+	var vertex_record: Dictionary = {}
+	var span_record: Dictionary = {}
+	var placements: Array = physical_plan.get("placements", []) as Array
+	for candidate_v in placements:
+		if not (candidate_v is Dictionary):
+			continue
+		var candidate: Dictionary = candidate_v
+		if str(candidate.get("anchor_kind", "")) != "vertex":
+			continue
+		var primary_edge: String = str(candidate.get("edge_key", ""))
+		for span_v in placements:
+			if not (span_v is Dictionary):
+				continue
+			var span: Dictionary = span_v
+			if str(span.get("anchor_kind", "")) == "half_span" \
+					and str(span.get("edge_key", "")) == primary_edge:
+				vertex_record = candidate
+				span_record = span
+				break
+		if not span_record.is_empty():
+			break
+	if vertex_record.is_empty() or span_record.is_empty():
+		_fail("compiler fixture should produce vertex/span placements sharing an edge")
+		return
+	var physical_layout: Dictionary = {"structural_plan": physical_plan}
+	var physical_map = ModuleIntegrityMapScript.new()
+	var expected_registered: int = placements.size() \
+			+ (physical_plan.get("floor_placements", []) as Array).size() \
+			+ (physical_plan.get("ceiling_placements", []) as Array).size()
+	var physical_seeded: int = ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(physical_map, physical_layout, false)
+	if physical_seeded != expected_registered:
+		_fail("physical placement seed expected=%d got=%d" % [expected_registered, physical_seeded])
+		return
+	if physical_map.size() != expected_registered:
+		_fail("physical placement map expected=%d got=%d" % [expected_registered, physical_map.size()])
+		return
+	var vertex_id: String = "edge/%s" % str(vertex_record.get("placement_id", ""))
+	var span_id: String = "edge/%s" % str(span_record.get("placement_id", ""))
+	if vertex_id == span_id or not physical_map.has_module(vertex_id) or not physical_map.has_module(span_id):
+		_fail("physical placement seed lost distinct canonical identities")
+		return
+	var vertex_mod = physical_map.get_module(vertex_id)
+	var span_mod = physical_map.get_module(span_id)
+	if not _has_exact_compiler_owners(vertex_mod, vertex_record):
+		_fail("vertex placement should retain every compiler owner room")
+		return
+	if not _has_exact_compiler_owners(span_mod, span_record):
+		_fail("span placement should retain every compiler owner room")
+		return
+	physical_map.apply_damage(vertex_id, 0.30, str(vertex_record.get("module_id", "")))
+	physical_map.apply_damage(span_id, 0.60, str(span_record.get("module_id", "")))
+	var physical_summary: Dictionary = physical_map.get_summary()
+	var sparse_deltas: Variant = physical_summary.get("deltas", [])
+	if not (sparse_deltas is Array) or (sparse_deltas as Array).size() != 2:
+		_fail("physical placement sparse deltas should retain two independent damages")
+		return
+	var physical_round_trip = ModuleIntegrityMapScript.new()
+	if not physical_round_trip.apply_summary(physical_summary):
+		_fail("physical placement sparse delta summary should load")
+		return
+	if physical_round_trip.get_state(vertex_id) != physical_map.get_state(vertex_id) or physical_round_trip.get_state(span_id) != physical_map.get_state(span_id):
+		_fail("physical placement sparse deltas should round-trip independently")
+		return
+	# Deterministic one-record mutator fixtures preserve the compiler-produced
+	# vertex/span records and prove each damage row uses the seeder's key.
+	for mutator_record_v in [vertex_record, span_record]:
+		var mutator_record: Dictionary = mutator_record_v as Dictionary
+		var mutator_layout: Dictionary = {
+			"structural_plan": {
+				"placements": [mutator_record.duplicate(true)],
+				"floor_placements": [],
+				"ceiling_placements": [],
+			},
+		}
+		if LayoutMutatorScript.apply_wreck_to_compiled_plan(mutator_layout, 19, null, 0.05) != 1:
+			_fail("one-record mutator fixture should stamp its physical placement")
+			return
+		var mutator_damage: Variant = mutator_layout.get("module_damage", [])
+		if not (mutator_damage is Array) or (mutator_damage as Array).size() != 1:
+			_fail("one-record mutator should emit one physical damage row")
+			return
+		var mutator_row: Dictionary = (mutator_damage as Array)[0]
+		var expected_mutator_id: String = "edge/%s" % str(mutator_record.get("placement_id", ""))
+		if str(mutator_row.get("module_key", "")) != expected_mutator_id:
+			_fail("mutator damage key should match its compiler placement identity")
+			return
+		var mutator_map = ModuleIntegrityMapScript.new()
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(mutator_map, mutator_layout)
+		if mutator_map.get_state(expected_mutator_id) == ModuleIntegrityStateScript.STATE_INTACT:
+			_fail("seeded mutator damage row should target its physical placement")
+			return
+	# A production-compiled portal retains the legacy full-edge identity.
+	var canonical_source: Dictionary = {
+		"schema_version": "ship-layout-v1",
+		"kit_id": "ship_structural_v0",
+		"rooms": [
+			{"id": "port_a", "deck": 0, "role": "room", "room_role": "room", "cells": [[0, 0, 0]]},
+			{"id": "port_b", "deck": 0, "role": "room", "room_role": "room", "cells": [[1, 0, 0]]},
+		],
+		"portals": [{
+			"id": "canonical_portal",
+			"from_room": "port_a",
+			"to_room": "port_b",
+			"from_cell": [0, 0, 0],
+			"to_cell": [1, 0, 0],
+			"state": "DOOR",
+			"module_id": "doorway_frame_open_1x1",
+			"edge_key": "0|v|0|0",
+		}],
+		"vertical_connections": [],
+		"critical_path": [],
+	}
+	var canonical_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(canonical_source)
+	var canonical_verdict: Dictionary = StructuralPlanValidatorScript.new().validate(canonical_plan, canonical_source)
+	if not (canonical_plan.get("errors", []) as Array).is_empty() or not bool(canonical_verdict.get("ok", false)):
+		_fail("canonical full-edge compiler fixture should be valid compiler=%s validator=%s" % [
+			JSON.stringify(canonical_plan.get("errors", [])),
+			JSON.stringify(canonical_verdict.get("errors", [])),
+		])
+		return
+	var canonical_record: Dictionary = {}
+	for candidate_v in (canonical_plan.get("placements", []) as Array):
+		if candidate_v is Dictionary and str((candidate_v as Dictionary).get("anchor_kind", "")) == "edge":
+			canonical_record = candidate_v as Dictionary
+			break
+	var canonical_edge: String = str(canonical_record.get("edge_key", ""))
+	var canonical_id: String = "edge/%s" % canonical_edge
+	if canonical_record.is_empty() or str(canonical_record.get("placement_id", "")) != "edge:%s" % canonical_edge:
+		_fail("canonical compiler fixture should emit a full-edge placement")
+		return
+	var canonical_map = ModuleIntegrityMapScript.new()
+	ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(canonical_map, {"structural_plan": canonical_plan}, false)
+	if not canonical_map.has_module(canonical_id) or canonical_map.has_module("edge/%s" % str(canonical_record.get("placement_id", ""))):
+		_fail("canonical full edge should retain edge/<edge_key> identity")
+		return
 	var breaches: int = ModuleIntegrityConsequencesScript.derived_breach_count(map)
 	if breaches < 1 and st != ModuleIntegrityStateScript.STATE_DAMAGED:
 		# damaged only is ok short-term; force more damage
@@ -212,3 +371,26 @@ func _initialize() -> void:
 func _fail(msg: String) -> void:
 	print("MODULE INTEGRITY CONSEQUENCES FAIL: %s" % msg)
 	quit(1)
+
+
+func _has_exact_compiler_owners(module: RefCounted, record: Dictionary) -> bool:
+	if module == null:
+		return false
+	var expected: PackedStringArray = PackedStringArray()
+	for room_v in (record.get("room_ids", []) as Array):
+		var room_id: String = str(room_v)
+		if not room_id.is_empty() and not expected.has(room_id):
+			expected.append(room_id)
+	var primary: String = str(record.get("room_id", ""))
+	if not primary.is_empty() and not expected.has(primary):
+		expected.insert(0, primary)
+	var actual: PackedStringArray = PackedStringArray()
+	var module_primary: String = str(module.get("room_id"))
+	if not module_primary.is_empty():
+		actual.append(module_primary)
+	var shared: Variant = module.get("owner_rooms")
+	if shared is PackedStringArray:
+		for room_id in (shared as PackedStringArray):
+			if not room_id.is_empty() and not actual.has(room_id):
+				actual.append(room_id)
+	return actual.size() == expected.size() and actual == expected

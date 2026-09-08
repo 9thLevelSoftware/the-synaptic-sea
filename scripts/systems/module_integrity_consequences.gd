@@ -175,10 +175,9 @@ static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, l
 			continue
 		var rec: Dictionary = rec_v
 		var kind: String = str(rec.get("module_id", rec.get("module", "")))
-		var key_part: String = str(rec.get("edge_key", rec.get("key", ""))) if layer == "edge" else str(rec.get("cell_key", ""))
-		if key_part.is_empty():
+		var mid: String = _compiled_module_id(rec, layer)
+		if mid.is_empty():
 			continue
-		var mid: String = "%s/%s" % [layer, key_part]
 		var owners: PackedStringArray = PackedStringArray()
 		var rooms_v: Variant = rec.get("room_ids", [])
 		if rooms_v is Array:
@@ -195,6 +194,20 @@ static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, l
 			inst.set("owner_rooms", owners)
 		n += 1
 	return n
+
+
+## Compiler full-edge records keep their historical edge/<edge_key> identity.
+## Corner and span records can share that primary edge while representing distinct
+## physical geometry, so their canonical placement id is the integrity identity.
+static func _compiled_module_id(rec: Dictionary, layer: String) -> String:
+	var key_part: String = str(rec.get("edge_key", rec.get("key", ""))) if layer == "edge" else str(rec.get("cell_key", ""))
+	if key_part.is_empty():
+		return ""
+	if layer == "edge":
+		var placement_id: String = str(rec.get("placement_id", rec.get("id", "")))
+		if not placement_id.is_empty() and placement_id != "edge:%s" % key_part:
+			key_part = placement_id
+	return "%s/%s" % [layer, key_part]
 
 
 static func _seed_map_from_layout_filtered(

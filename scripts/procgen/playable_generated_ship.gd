@@ -145,6 +145,7 @@ const SealedHatchScript := preload("res://scripts/interaction/sealed_hatch.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
+signal fresh_opening_publication_event(kind: String, owner_ship_id: String)
 signal playable_interaction_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String)
 signal playable_slice_completed(summary: Dictionary)
 ## ADR-0043: emitted when the player chooses to leave gameplay back to the
@@ -554,7 +555,7 @@ var demo_scope_gate               # DemoScopeGate
 var _last_derelict_hazard_budget: int = -1   # validation seam: hazard cap applied on last derelict travel (-1 unlimited)
 var _last_derelict_hazards_seeded: Array = []  # validation seam: hazard kinds whose seeding RAN on last travel
 
-## NOTE: This scene relies on GeneratedShipLoader.load_from_paths() being
+## NOTE: This scene relies on _load_configured_layout_source() being
 ## SYNCHRONOUS and emitting `ship_loaded` on the same call stack — the
 ## _on_ship_loaded handler (and therefore _spawn_player / _spawn_camera /
 ## _build_interactables) depends on that ordering. If the loader is ever
@@ -568,9 +569,32 @@ func _ready() -> void:
 		_crafting_station_positions_by_owner = (
 			_staged_restore_candidate.get("station_positions_by_owner") as Dictionary).duplicate(true)
 	_build_runtime_nodes()
-	loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+	_load_configured_layout_source()
 	if _restore_staging_mode:
 		_finish_restore_staging()
+
+
+## Materializes a source layout through the same production endpoint/final-compile
+## transaction as generated ships, then gives the loader validated documents.
+## The tracked golden layout deliberately remains authoring input and does not
+## carry stale derived structural_plan bytes.
+func _load_configured_layout_source() -> bool:
+	var source_layout: Dictionary = _load_json_dict(layout_path)
+	var source_kit: Dictionary = _load_json_dict(kit_path)
+	var source_gameplay: Dictionary = _load_json_dict(gameplay_slice_path)
+	if source_layout.is_empty() or source_kit.is_empty() or source_gameplay.is_empty() \
+			or ship_generator == null:
+		return false
+	var documents: Dictionary = ship_generator._prepare_layout_documents(source_layout)
+	if not bool(documents.get("ok", false)):
+		return false
+	return loader.load_from_documents(
+		(documents.get("layout", {}) as Dictionary).duplicate(true),
+		source_kit.duplicate(true),
+		source_gameplay.duplicate(true),
+		false,
+		{"layout": layout_path, "kit": kit_path,
+			"gameplay_slice": gameplay_slice_path})
 
 
 func configure_restore_staging(candidate, failure_point: String = "") -> bool:
@@ -10438,7 +10462,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# (e.g. completing a repair_junction after load) crashes with
 	# "Nonexistent function 'mark_completed' in base 'previously freed'".
 	_build_hud_layer()
-	_spawn_player()
+	_construct_player()
 	_spawn_camera()
 	_attach_ceiling_fade_controller()
 	_refresh_ui_shell_runtime()
@@ -10478,8 +10502,6 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		_spawn_hangar_control(home_ship)
 		_spawn_cargo_hold_control(home_ship)
 		_spawn_cart_controls_for_ship(home_ship)
-		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
-		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
 		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
 		var lifeboat_boot: Dictionary = _build_lifeboat_at_home()
@@ -10640,9 +10662,11 @@ func _apply_initial_lifeboat_spawn_once() -> Dictionary:
 	if not bool(verdict.get("ok", false)):
 		return verdict
 	player.teleport_to(verdict.get("world_position", Vector3.INF) as Vector3)
+	fresh_opening_publication_event.emit("fresh_spawn_placed", "lifeboat")
 	recompute_occupancy()
 	if current_occupancy != lifeboat_ship:
 		return {"ok": false, "reason": "spawn_occupancy_mismatch"}
+	fresh_opening_publication_event.emit("occupancy_published", "lifeboat")
 	_initial_lifeboat_spawn_applied = true
 	return {"ok": true, "reason": "ok"}
 
@@ -10747,11 +10771,10 @@ func _attach_ceiling_fade_controller() -> void:
 	add_child(controller)
 	controller.configure(loader, player)
 
-func _spawn_player() -> void:
+func _construct_player() -> void:
 	player = PlayerControllerScript.new()
 	player.name = "PlayerController"
 	add_child(player)
-	player.teleport_to(loader.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
 	player.interact_requested.connect(_on_player_interact_requested)
 	player.field_craft_requested.connect(_on_player_field_craft_requested)
 
@@ -13512,7 +13535,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# _on_ship_loaded after a reload does NOT mark playable_started
 	# prematurely (it must re-emit).
 	playable_started = false
-	loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+	_load_configured_layout_source()
 	if not playable_started:
 		# Loader must have failed; _on_ship_loaded bailed out.
 		_is_reloading = false
@@ -14797,9 +14820,8 @@ func _reset_runtime_for_reload() -> void:
 	_last_autosave_result = {}
 	if autosave_policy != null:
 		autosave_policy.reset()
-	# The loader's own load_from_paths() entry point calls
-	# clear_loaded_ship() first, so re-driving it is safe without any
-	# extra reset here.
+	# The configured source path clears the loader through load_from_documents(),
+	# so re-driving it is safe without any extra reset here.
 
 ## Menu-modal guard (Tranche 4, 2026-07-06 audit HIGH): true when no menu is
 ## open, so gameplay panel toggles (scanner / chart / inventory) may act.

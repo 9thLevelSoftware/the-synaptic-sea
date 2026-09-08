@@ -30,14 +30,17 @@ const WALL_JOIN_KINDS: Array[String] = ["wall_edge", "wall_end", "wall_base"]
 
 var kit_id: String = ""
 var modules: Dictionary = {}
+var collision_projection_modules: Dictionary = {}
 
 
 func load_kit(p_kit_id: String) -> bool:
 	modules.clear()
+	collision_projection_modules.clear()
 	kit_id = p_kit_id if not p_kit_id.is_empty() else DEFAULT_KIT_ID
 	if not _load_kit_directory(kit_id) or modules.is_empty():
 		if kit_id != DEFAULT_KIT_ID:
 			_load_kit_directory(DEFAULT_KIT_ID)
+	_load_collision_projection(kit_id)
 	return not modules.is_empty()
 
 
@@ -89,6 +92,14 @@ func module_family(module_id: String) -> String:
 	return str((record_variant as Dictionary).get("module_family", ""))
 
 
+func collision_boxes_of(module_id: String) -> Array:
+	var module_variant: Variant = collision_projection_modules.get(module_id, null)
+	if not module_variant is Dictionary:
+		return []
+	var boxes_variant: Variant = (module_variant as Dictionary).get("boxes", null)
+	return (boxes_variant as Array).duplicate(true) if boxes_variant is Array else []
+
+
 func choose_module(required_kinds: Array, preferred_id: String = "") -> String:
 	if not preferred_id.is_empty() and has_module(preferred_id) and has_all_kinds(preferred_id, required_kinds):
 		return preferred_id
@@ -119,8 +130,11 @@ func sockets_compatible(socket_a: Dictionary, socket_b: Dictionary) -> bool:
 	return accepts_b or accepts_a
 
 
-func world_socket_position(placement_position: Vector3, yaw_degrees: float, local_position: Vector3) -> Vector3:
-	var rotated: Vector3 = local_position.rotated(Vector3.UP, deg_to_rad(yaw_degrees))
+func world_socket_position(
+		placement_position: Vector3, yaw_degrees: float, local_position: Vector3,
+		placement_scale: Vector3 = Vector3.ONE) -> Vector3:
+	var scaled: Vector3 = local_position * placement_scale
+	var rotated: Vector3 = scaled.rotated(Vector3.UP, deg_to_rad(yaw_degrees))
 	return placement_position + rotated
 
 
@@ -155,6 +169,27 @@ func _load_kit_directory(load_kit_id: String) -> bool:
 	if not names.is_empty():
 		kit_id = load_kit_id
 	return not modules.is_empty()
+
+
+func _load_collision_projection(load_kit_id: String) -> void:
+	var kit_path: String = "res://data/kits/%s.json" % load_kit_id
+	if not FileAccess.file_exists(kit_path):
+		kit_path = "res://data/kits/%s.json" % DEFAULT_KIT_ID
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+	if not parsed is Dictionary:
+		return
+	var projection_variant: Variant = (parsed as Dictionary).get(
+		"dock_collision_projection_v1", null)
+	if not projection_variant is Dictionary and load_kit_id != DEFAULT_KIT_ID:
+		kit_path = "res://data/kits/%s.json" % DEFAULT_KIT_ID
+		parsed = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+		projection_variant = (parsed as Dictionary).get(
+			"dock_collision_projection_v1", null) if parsed is Dictionary else null
+	if not projection_variant is Dictionary:
+		return
+	var projected_modules: Variant = (projection_variant as Dictionary).get("modules", null)
+	if projected_modules is Dictionary:
+		collision_projection_modules = (projected_modules as Dictionary).duplicate(true)
 
 
 func _load_contract(path: String) -> void:

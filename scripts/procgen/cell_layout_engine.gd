@@ -12,6 +12,8 @@ const ALL_DIRS: Array[Vector2i] = [DIR_NORTH, DIR_EAST, DIR_SOUTH, DIR_WEST]
 
 const SENTINEL: Vector2i = Vector2i(-99999, -99999)
 const MAX_GROW_STEPS: int = 24
+const DOCKING_OUTWARD_CELLS: int = 2
+const DOCKING_TANGENT_RADIUS_CELLS: int = 2
 
 # Ship axis: bow = +X (east), stern = -X (west).
 # Lateral = north/south (port/starboard).
@@ -41,6 +43,8 @@ const CREW_COMFORT_ROLES: Array[String] = [
 ]
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var last_failure_reason: String = ""
+var _docking_reservations_per_deck: Dictionary = {}
 
 
 func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int) -> Dictionary:
@@ -48,6 +52,8 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 	# grid. Same-deck links must share a cardinal cell edge; cross-deck links
 	# stay vertical. Inventing portals between non-touching rooms is forbidden.
 	rng.seed = seed_value
+	last_failure_reason = ""
+	_docking_reservations_per_deck.clear()
 
 	var zone_rooms_map: Dictionary = {}
 	for room in room_plan:
@@ -81,10 +87,16 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 				zone_rooms_map, occupied_per_deck, placed)
 			if committed:
 				last_in_zone = rid
+			elif not last_failure_reason.is_empty():
+				# A late docking-envelope conflict invalidates the whole solved layout.
+				# Returning already placed rooms would publish topology that cannot dock.
+				return {}
 			else:
 				push_error("CellLayoutEngine: could not place room %s" % rid)
 
-	_realize_missing_connectors(graph, zone_rooms_map, occupied_per_deck, placed)
+	_realize_missing_connectors(
+		graph, zone_rooms_map, occupied_per_deck, placed,
+		_docking_reservations_per_deck)
 
 	var adjacencies: Array[Dictionary] = _discover_adjacencies(placed)
 	_add_vertical_adjacencies(
@@ -291,6 +303,7 @@ func _place_one_room(
 	if not occupied_per_deck.has(deck):
 		occupied_per_deck[deck] = {}
 	var occupied: Dictionary = occupied_per_deck[deck]
+	var reserved: Dictionary = _reserved_cells_for_deck(deck)
 
 	if placed.is_empty() or occupied.is_empty():
 		var vertical_ids: Array[String] = _filter_placed(
@@ -298,7 +311,7 @@ func _place_one_room(
 				rid, zone_id, parent_zone_id, last_in_zone, graph, zone_rooms_map, placed),
 			placed, deck, false)
 		var aligned: Dictionary = _best_aligned_rect(
-			fp, hint, occupied, role, placed, vertical_ids, target_cells)
+			fp, hint, occupied, reserved, role, placed, vertical_ids, target_cells)
 		if aligned.is_empty() and occupied.is_empty():
 			aligned = {
 				"origin": Vector2i.ZERO,
@@ -307,10 +320,9 @@ func _place_one_room(
 			}
 		if aligned.is_empty():
 			return false
-		_commit_room(
-			placed, occupied, rid, _as_cells(aligned.get("cells", [])), deck, role,
-			_coerce_footprint(aligned.get("footprint", fp)))
-		return true
+		return _commit_room_with_docking_reservation(
+			placed, occupied, reserved, rid, _as_cells(aligned.get("cells", [])),
+			deck, role, _coerce_footprint(aligned.get("footprint", fp)))
 
 	var desired: Array[String] = _desired_anchors(
 		rid, zone_id, parent_zone_id, last_in_zone, graph, zone_rooms_map, placed)
@@ -320,43 +332,49 @@ func _place_one_room(
 	var vertical_ids: Array[String] = _filter_placed(desired, placed, deck, false)
 
 	var best: Dictionary = _best_rect_against_anchors(
-		fp, hint, occupied, role, placed, same_deck, vertical_ids, target_cells, true, true)
+		fp, hint, occupied, reserved, role, placed, same_deck, vertical_ids,
+		target_cells, true, true)
 	if best.is_empty():
 		best = _best_grown_against_anchors(
-			target_cells, hint, occupied, role, placed, same_deck, true, true)
+			target_cells, hint, occupied, reserved, role, placed, same_deck, true, true)
 	if best.is_empty():
 		best = _best_rect_against_anchors(
-			fp, hint, occupied, role, placed, same_deck, vertical_ids, target_cells, true, false)
+			fp, hint, occupied, reserved, role, placed, same_deck, vertical_ids,
+			target_cells, true, false)
 	if best.is_empty():
 		best = _best_rect_against_anchors(
-			fp, hint, occupied, role, placed, same_deck, vertical_ids, target_cells, false, false)
+			fp, hint, occupied, reserved, role, placed, same_deck, vertical_ids,
+			target_cells, false, false)
 	if best.is_empty():
 		best = _best_grown_against_anchors(
-			target_cells, hint, occupied, role, placed, same_deck, true, false)
+			target_cells, hint, occupied, reserved, role, placed, same_deck, true, false)
 	if best.is_empty():
 		best = _best_grown_against_anchors(
-			target_cells, hint, occupied, role, placed, same_deck, false, false)
+			target_cells, hint, occupied, reserved, role, placed, same_deck, false, false)
 	var all_deck: Array[String] = _placed_ids_on_deck(placed, deck)
 	if best.is_empty() and all_deck.size() > same_deck.size():
 		best = _best_rect_against_anchors(
-			fp, hint, occupied, role, placed, all_deck, vertical_ids, target_cells, true, true)
+			fp, hint, occupied, reserved, role, placed, all_deck, vertical_ids,
+			target_cells, true, true)
 	if best.is_empty() and all_deck.size() > same_deck.size():
 		best = _best_rect_against_anchors(
-			fp, hint, occupied, role, placed, all_deck, vertical_ids, target_cells, true, false)
+			fp, hint, occupied, reserved, role, placed, all_deck, vertical_ids,
+			target_cells, true, false)
 	if best.is_empty() and all_deck.size() > same_deck.size():
 		best = _best_rect_against_anchors(
-			fp, hint, occupied, role, placed, all_deck, vertical_ids, target_cells, false, false)
+			fp, hint, occupied, reserved, role, placed, all_deck, vertical_ids,
+			target_cells, false, false)
 	if best.is_empty() and all_deck.size() > same_deck.size():
 		best = _best_grown_against_anchors(
-			target_cells, hint, occupied, role, placed, all_deck, false, false)
+			target_cells, hint, occupied, reserved, role, placed, all_deck, false, false)
 	if best.is_empty() and not vertical_ids.is_empty():
-		best = _best_aligned_rect(fp, hint, occupied, role, placed, vertical_ids, target_cells)
+		best = _best_aligned_rect(
+			fp, hint, occupied, reserved, role, placed, vertical_ids, target_cells)
 	if best.is_empty():
 		return false
-	_commit_room(
-		placed, occupied, rid, _as_cells(best.get("cells", [])), deck, role,
-		_coerce_footprint(best.get("footprint", fp)))
-	return true
+	return _commit_room_with_docking_reservation(
+		placed, occupied, reserved, rid, _as_cells(best.get("cells", [])),
+		deck, role, _coerce_footprint(best.get("footprint", fp)))
 
 
 func _desired_anchors(
@@ -442,6 +460,7 @@ func _best_rect_against_anchors(
 		fp: Vector2i,
 		hint: String,
 		occupied: Dictionary,
+		reserved: Dictionary,
 		role: String,
 		placed: Dictionary,
 		anchors: Array[String],
@@ -455,7 +474,7 @@ func _best_rect_against_anchors(
 	if fp.x != fp.y:
 		fps.append(Vector2i(fp.y, fp.x))
 	var anchor_cells: Array[Vector2i] = _concat_room_cells(placed, anchors)
-	var seeds: Array[Vector2i] = _empty_seeds(anchor_cells, occupied)
+	var seeds: Array[Vector2i] = _empty_seeds(anchor_cells, occupied, reserved)
 	_sort_seeds(seeds, anchor_cells, hint)
 
 	var best: Dictionary = {}
@@ -468,7 +487,7 @@ func _best_rect_against_anchors(
 				if seen.has(key):
 					continue
 				seen[key] = true
-				if not _can_place(origin, try_fp, occupied):
+				if not _can_place(origin, try_fp, occupied, reserved):
 					continue
 				var cells: Array[Vector2i] = _compute_cells(origin, try_fp)
 				if require_compat and not _cells_compatible(cells, role, occupied, placed):
@@ -487,6 +506,7 @@ func _best_grown_against_anchors(
 		target_cells: int,
 		hint: String,
 		occupied: Dictionary,
+		reserved: Dictionary,
 		role: String,
 		placed: Dictionary,
 		anchors: Array[String],
@@ -495,13 +515,13 @@ func _best_grown_against_anchors(
 	if anchors.is_empty():
 		return {}
 	var anchor_cells: Array[Vector2i] = _concat_room_cells(placed, anchors)
-	var seeds: Array[Vector2i] = _empty_seeds(anchor_cells, occupied)
+	var seeds: Array[Vector2i] = _empty_seeds(anchor_cells, occupied, reserved)
 	_sort_seeds(seeds, anchor_cells, hint)
 	var best: Dictionary = {}
 	var best_score: int = -1
 	for seed in seeds:
 		var grown: Array[Vector2i] = _grow_from_seed(
-			seed, target_cells, occupied, role, placed, require_compat, hint)
+			seed, target_cells, occupied, reserved, role, placed, require_compat, hint)
 		if grown.is_empty():
 			continue
 		if require_touch and not _cell_sets_share_edge(_cell_set(grown), anchor_cells):
@@ -521,6 +541,7 @@ func _best_aligned_rect(
 		fp: Vector2i,
 		hint: String,
 		occupied: Dictionary,
+		reserved: Dictionary,
 		role: String,
 		placed: Dictionary,
 		vertical_ids: Array[String],
@@ -551,7 +572,7 @@ func _best_aligned_rect(
 				if seen.has(key):
 					continue
 				seen[key] = true
-				if not _can_place(origin, try_fp, occupied):
+				if not _can_place(origin, try_fp, occupied, reserved):
 					continue
 				var cells: Array[Vector2i] = _compute_cells(origin, try_fp)
 				if not _cells_compatible(cells, role, occupied, placed):
@@ -563,7 +584,7 @@ func _best_aligned_rect(
 		if not best.is_empty():
 			continue
 		var fallback_origin: Vector2i = seeds[0]
-		if _can_place(fallback_origin, try_fp, occupied):
+		if _can_place(fallback_origin, try_fp, occupied, reserved):
 			var cells: Array[Vector2i] = _compute_cells(fallback_origin, try_fp)
 			if _cells_compatible(cells, role, occupied, placed):
 				return {"origin": fallback_origin, "footprint": try_fp, "cells": cells}
@@ -621,13 +642,15 @@ func _concat_room_cells(placed: Dictionary, ids: Array[String]) -> Array[Vector2
 	return cells
 
 
-func _empty_seeds(anchor_cells: Array[Vector2i], occupied: Dictionary) -> Array[Vector2i]:
+func _empty_seeds(
+		anchor_cells: Array[Vector2i], occupied: Dictionary,
+		reserved: Dictionary) -> Array[Vector2i]:
 	var seeds: Array[Vector2i] = []
 	var seen: Dictionary = {}
 	for cell in anchor_cells:
 		for dir in ALL_DIRS:
 			var seed: Vector2i = Vector2i(cell.x + dir.x, cell.y + dir.y)
-			if occupied.has(seed) or seen.has(seed):
+			if occupied.has(seed) or reserved.has(seed) or seen.has(seed):
 				continue
 			seen[seed] = true
 			seeds.append(seed)
@@ -690,11 +713,12 @@ func _grow_from_seed(
 		seed: Vector2i,
 		target_cells: int,
 		occupied: Dictionary,
+		reserved: Dictionary,
 		role: String,
 		placed: Dictionary,
 		require_compat: bool,
 		hint: String) -> Array[Vector2i]:
-	if occupied.has(seed):
+	if occupied.has(seed) or reserved.has(seed):
 		return []
 	if require_compat and not _cell_compatible(seed, role, occupied, placed):
 		return []
@@ -707,7 +731,7 @@ func _grow_from_seed(
 		for cell in cells:
 			for dir in ALL_DIRS:
 				var nxt: Vector2i = Vector2i(cell.x + dir.x, cell.y + dir.y)
-				if in_set.has(nxt) or occupied.has(nxt):
+				if in_set.has(nxt) or occupied.has(nxt) or reserved.has(nxt):
 					continue
 				if require_compat and not _cell_compatible(nxt, role, occupied, placed):
 					continue
@@ -807,11 +831,63 @@ func _commit_room(
 	}
 
 
+func _commit_room_with_docking_reservation(
+		placed: Dictionary,
+		occupied: Dictionary,
+		reserved: Dictionary,
+		rid: String,
+		cells: Array[Vector2i],
+		deck: int,
+		role: String,
+		fp: Vector2i) -> bool:
+	if role == "airlock" or role == "dock":
+		var envelope: Array[Vector2i] = _west_docking_reservation(cells)
+		if envelope.is_empty():
+			last_failure_reason = "docking_reservation_invalid:%s" % rid
+			return false
+		for cell in envelope:
+			if occupied.has(cell):
+				last_failure_reason = "docking_reservation_occupied:%s:%d:%d:%d:%s" % [
+					rid, deck, cell.x, cell.y, str(occupied[cell])]
+				return false
+		for cell in envelope:
+			reserved[cell] = rid
+	_commit_room(placed, occupied, rid, cells, deck, role, fp)
+	return true
+
+
+func _reserved_cells_for_deck(deck: int) -> Dictionary:
+	if not _docking_reservations_per_deck.has(deck):
+		_docking_reservations_per_deck[deck] = {}
+	return _docking_reservations_per_deck[deck] as Dictionary
+
+
+func _west_docking_reservation(cells: Array[Vector2i]) -> Array[Vector2i]:
+	var envelope: Array[Vector2i] = []
+	if cells.is_empty():
+		return envelope
+	var west_x: int = cells[0].x
+	for cell in cells:
+		west_x = mini(west_x, cell.x)
+	var portal_z: int = 2147483647
+	for cell in cells:
+		if cell.x == west_x:
+			portal_z = mini(portal_z, cell.y)
+	for outward_depth in range(1, DOCKING_OUTWARD_CELLS + 1):
+		for tangent_offset in range(
+				-DOCKING_TANGENT_RADIUS_CELLS,
+				DOCKING_TANGENT_RADIUS_CELLS + 1):
+			envelope.append(Vector2i(
+				west_x - outward_depth, portal_z + tangent_offset))
+	return envelope
+
+
 func _realize_missing_connectors(
 		graph: Dictionary,
 		zone_rooms_map: Dictionary,
 		occupied_per_deck: Dictionary,
-		placed: Dictionary) -> void:
+		placed: Dictionary,
+		reserved_per_deck: Dictionary) -> void:
 	var neighbors: Dictionary = graph.get("neighbors", {})
 	var pending: Array = []
 	var seen_pairs: Dictionary = {}
@@ -825,7 +901,9 @@ func _realize_missing_connectors(
 			seen_pairs[key] = true
 			pending.append([str(rid), other])
 	for pair in pending:
-		_try_grow_pair(str(pair[0]), str(pair[1]), occupied_per_deck, placed)
+		_try_grow_pair(
+			str(pair[0]), str(pair[1]), occupied_per_deck, placed,
+			reserved_per_deck)
 
 	var zone_pairs: Array = graph.get("zone_pairs", [])
 	for pair_variant in zone_pairs:
@@ -840,11 +918,17 @@ func _realize_missing_connectors(
 		var b_ids: Array = zone_rooms_map.get(zone_b, [])
 		if a_ids.is_empty() or b_ids.is_empty():
 			continue
-		_try_grow_pair(str(a_ids[a_ids.size() - 1]), str(b_ids[0]), occupied_per_deck, placed)
+		_try_grow_pair(
+			str(a_ids[a_ids.size() - 1]), str(b_ids[0]),
+			occupied_per_deck, placed, reserved_per_deck)
 
 
 func _try_grow_pair(
-		a: String, b: String, occupied_per_deck: Dictionary, placed: Dictionary) -> void:
+		a: String,
+		b: String,
+		occupied_per_deck: Dictionary,
+		placed: Dictionary,
+		reserved_per_deck: Dictionary) -> void:
 	if not placed.has(a) or not placed.has(b):
 		return
 	var deck_a: int = int(placed[a].get("deck", 0))
@@ -854,9 +938,10 @@ func _try_grow_pair(
 	if _rooms_share_edge(placed, a, b):
 		return
 	var occupied: Dictionary = occupied_per_deck[deck_a]
-	if _grow_room_to_touch(b, a, occupied, placed):
+	var reserved: Dictionary = reserved_per_deck.get(deck_a, {}) as Dictionary
+	if _grow_room_to_touch(b, a, occupied, reserved, placed):
 		return
-	_grow_room_to_touch(a, b, occupied, placed)
+	_grow_room_to_touch(a, b, occupied, reserved, placed)
 
 
 func _zones_share_edge_or_vertical(
@@ -875,7 +960,14 @@ func _zones_share_edge_or_vertical(
 
 
 func _grow_room_to_touch(
-		from_id: String, to_id: String, occupied: Dictionary, placed: Dictionary) -> bool:
+		from_id: String,
+		to_id: String,
+		occupied: Dictionary,
+		reserved: Dictionary,
+		placed: Dictionary) -> bool:
+	var from_role: String = str(placed[from_id].get("role", ""))
+	if from_role == "airlock" or from_role == "dock":
+		return false
 	var from_cells: Array[Vector2i] = _as_cells(placed[from_id].get("cells", []))
 	var to_cells: Array[Vector2i] = _as_cells(placed[to_id].get("cells", []))
 	if from_cells.is_empty() or to_cells.is_empty():
@@ -900,6 +992,8 @@ func _grow_room_to_touch(
 				queue.clear()
 				break
 			if seen.has(nxt):
+				continue
+			if reserved.has(nxt):
 				continue
 			if occupied.has(nxt) and str(occupied[nxt]) != from_id:
 				continue
@@ -927,6 +1021,8 @@ func _grow_room_to_touch(
 	for cell in from_cells:
 		merged.append(cell)
 	for cell in path:
+		if reserved.has(cell):
+			return false
 		if occupied.has(cell) and str(occupied[cell]) != from_id:
 			return false
 		if from_set.has(cell):
@@ -941,10 +1037,13 @@ func _grow_room_to_touch(
 	return _rooms_share_edge(placed, from_id, to_id)
 
 
-func _can_place(origin: Vector2i, fp: Vector2i, occupied: Dictionary) -> bool:
+func _can_place(
+		origin: Vector2i, fp: Vector2i, occupied: Dictionary,
+		reserved: Dictionary) -> bool:
 	for dx in range(fp.x):
 		for dz in range(fp.y):
-			if occupied.has(Vector2i(origin.x + dx, origin.y + dz)):
+			var cell := Vector2i(origin.x + dx, origin.y + dz)
+			if occupied.has(cell) or reserved.has(cell):
 				return false
 	return true
 

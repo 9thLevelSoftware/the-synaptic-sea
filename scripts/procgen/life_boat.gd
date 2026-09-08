@@ -14,8 +14,6 @@ class_name LifeBoatBuilder
 # Geometry comes from StructuralEdgeCompiler, same contract as derelicts.
 
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
-const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
-const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
 
 const SCHEMA_VERSION: String = "1.2.0"
@@ -175,17 +173,13 @@ static func build_layout(biome: String = "") -> Dictionary:
 		},
 	}
 
-	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-	var structural_plan: Dictionary = compiler.compile(layout)
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		push_error("LifeBoatBuilder: structural plan validation failed: %s" % str(verdict.get("errors", [])))
-	layout["structural_plan"] = structural_plan
 	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
 		layout, true, _dock_collision_projection())
 	if not bool(endpoint_result.get("ok", false)):
-		push_error("LifeBoatBuilder: dock endpoint authoring failed: %s" % str(endpoint_result.get("reason", "")))
-	_apply_plan_to_rooms(layout, structural_plan, portals)
+		push_error("LifeBoatBuilder: dock endpoint authoring failed: %s" % JSON.stringify(endpoint_result))
+		return {}
+	var structural_plan: Dictionary = layout.get("structural_plan", {}) as Dictionary
+	_apply_plan_to_rooms(layout, structural_plan, layout.get("portals", []))
 	return layout
 
 
@@ -263,6 +257,7 @@ static func _apply_plan_to_rooms(layout: Dictionary, plan: Dictionary, portals: 
 			"position": pos if pos.size() >= 3 else cell_arr,
 			"world_position": pos,
 			"yaw_degrees": float(record.get("yaw_degrees", 0.0)),
+			"scale": _vec3_to_array(record.get("scale", Vector3.ONE)),
 		})
 	for portal_variant in portals:
 		if typeof(portal_variant) != TYPE_DICTIONARY:
@@ -300,6 +295,12 @@ static func _instance_plan_records(records_variant: Variant, module_to_scene: Di
 		var wrapper: Node3D = instance as Node3D
 		var world_pos: Vector3 = _as_vector3(record.get("position", Vector3.ZERO))
 		wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
+		var placement_scale: Vector3 = _as_vector3(record.get("scale", Vector3.ONE))
+		if not placement_scale.is_finite() or placement_scale.x <= 0.0 \
+				or placement_scale.y <= 0.0 or placement_scale.z <= 0.0:
+			wrapper.free()
+			return false
+		wrapper.scale = placement_scale
 		# Node names are placement identities; retain the compiled module and the
 		# resolved wrapper source as metadata for runtime inspection/validation.
 		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", module_id))))

@@ -67,6 +67,49 @@ func _initialize() -> void:
 				return
 			occupied[key] = rid
 
+	var airlock_id: String = ""
+	for room in room_plan:
+		var rid: String = str(room.get("id", ""))
+		if str(room.get("role", "")) == "airlock":
+			airlock_id = rid
+		if rooms.has(rid) and str(rooms[rid].get("role", "")) != str(room.get("role", "")):
+			push_error("CELL LAYOUT ENGINE FAIL role changed for %s" % rid)
+			quit(1)
+			return
+		if rooms.has(rid):
+			var footprint: Vector2i = room.get("footprint", Vector2i.ONE)
+			var authored_target: int = int(room.get(
+				"target_cells", maxi(footprint.x * footprint.y, 1)))
+			var actual_area: int = (rooms[rid].get("cells", []) as Array).size()
+			if actual_area < authored_target:
+				push_error("CELL LAYOUT ENGINE FAIL authored room area shrank for %s target=%d actual=%d" % [
+					rid, authored_target, actual_area])
+				quit(1)
+				return
+			if rooms[rid].get("footprint", Vector2i.ZERO) != _cell_bbox(
+					rooms[rid].get("cells", [])):
+				push_error("CELL LAYOUT ENGINE FAIL final footprint is not the exact cell bbox for %s" % rid)
+				quit(1)
+				return
+	if airlock_id.is_empty() or not rooms.has(airlock_id):
+		push_error("CELL LAYOUT ENGINE FAIL missing placed airlock")
+		quit(1)
+		return
+	var reservation: Array[Vector2i] = _expected_west_docking_reservation(
+		rooms[airlock_id].get("cells", []))
+	if reservation.size() != 10 or _axis_span(reservation, true) != 2 \
+			or _axis_span(reservation, false) != 5:
+		push_error("CELL LAYOUT ENGINE FAIL docking reservation is not a 2x5 cell envelope")
+		quit(1)
+		return
+	for cell in reservation:
+		var key: String = "%d_%d_%d" % [cell.x, cell.y, 0]
+		if occupied.has(key):
+			push_error("CELL LAYOUT ENGINE FAIL docking reservation occupied at %s by %s" % [
+				key, str(occupied[key])])
+			quit(1)
+			return
+
 	if adjacencies.is_empty():
 		push_error("CELL LAYOUT ENGINE FAIL no adjacencies found")
 		quit(1)
@@ -183,6 +226,16 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	if not _check_no_dock_control(engine):
+		quit(1)
+		return
+	if not _check_late_dock_fails_closed(engine):
+		quit(1)
+		return
+	if not _check_connector_growth_avoids_reservation(engine):
+		quit(1)
+		return
+
 	# --- Tranche 5 (2026-07-06 audit M+M, topology_template.gd:52 +
 	# stacked_v2.json:95): template.connections was parsed but consumed by
 	# nothing — the engine was purely attach_to-driven, so stacked_v2's
@@ -260,6 +313,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	print("CELL LAYOUT ENGINE RESERVATION PASS envelope=2x5 no_dock_control=true late_dock_fail_closed=true connector_growth_clear=true authored_area_preserved=true")
 	print("CELL LAYOUT ENGINE PASS rooms=%d adjacencies=%d no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true" % [rooms.size(), adjacencies.size()])
 	quit(0)
 
@@ -270,6 +324,182 @@ func _as_cell(raw: Variant) -> Vector2i:
 	if raw is Array and (raw as Array).size() >= 2:
 		return Vector2i(int((raw as Array)[0]), int((raw as Array)[1]))
 	return Vector2i.ZERO
+
+
+func _expected_west_docking_reservation(raw_cells: Array) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for raw in raw_cells:
+		cells.append(_as_cell(raw))
+	var west_x: int = cells[0].x
+	for cell in cells:
+		west_x = mini(west_x, cell.x)
+	var portal_z: int = 2147483647
+	for cell in cells:
+		if cell.x == west_x:
+			portal_z = mini(portal_z, cell.y)
+	var result: Array[Vector2i] = []
+	for outward_depth in range(1, 3):
+		for tangent_offset in range(-2, 3):
+			result.append(Vector2i(west_x - outward_depth, portal_z + tangent_offset))
+	return result
+
+
+func _axis_span(cells: Array[Vector2i], x_axis: bool) -> int:
+	var low: int = 2147483647
+	var high: int = -2147483648
+	for cell in cells:
+		var value: int = cell.x if x_axis else cell.y
+		low = mini(low, value)
+		high = maxi(high, value)
+	return high - low + 1
+
+
+func _check_no_dock_control(engine: CellLayoutEngineScript) -> bool:
+	var template: TopologyTemplateScript = TopologyTemplateScript.from_dict({
+		"id": "no_dock_control",
+		"description": "No docking role control",
+		"zones": [
+			{"id": "base", "role_pool": ["corridor"], "count": 1,
+			 "position_hint": "center", "deck": 0, "layout": "single", "attach_to": ""},
+			{"id": "attached", "role_pool": ["corridor"], "count": 1,
+			 "position_hint": "bow", "deck": 0, "layout": "single", "attach_to": "base"},
+		],
+		"connections": [
+			{"from": "base", "to": "attached", "distribution": "adjacent"},
+		],
+		"deck_config": {"max_decks": 1, "vertical_transition_probability": 0.0},
+	})
+	var plan: Array[Dictionary] = [
+		{"id": "base_01", "zone_id": "base", "role": "corridor", "deck": 0,
+		 "footprint": Vector2i.ONE, "target_cells": 1, "position_hint": "center"},
+		{"id": "attached_01", "zone_id": "attached", "role": "corridor", "deck": 0,
+		 "footprint": Vector2i.ONE, "target_cells": 1, "position_hint": "bow"},
+	]
+	var after_dock: Dictionary = engine.layout(plan, template, 91)
+	var fresh: Dictionary = CellLayoutEngineScript.new().layout(plan, template, 91)
+	if JSON.stringify(after_dock) != JSON.stringify(fresh):
+		push_error("CELL LAYOUT ENGINE FAIL docking reservations leaked into no-dock layout")
+		return false
+	var control_rooms: Dictionary = after_dock.get("rooms", {})
+	if _room_cells(control_rooms, "base_01") != [Vector2i.ZERO] \
+			or _room_cells(control_rooms, "attached_01") != [Vector2i(1, 0)]:
+		push_error("CELL LAYOUT ENGINE FAIL no-dock control topology changed: %s" %
+			JSON.stringify(after_dock))
+		return false
+	return true
+
+
+func _check_late_dock_fails_closed(engine: CellLayoutEngineScript) -> bool:
+	var template: TopologyTemplateScript = TopologyTemplateScript.from_dict({
+		"id": "late_dock_conflict",
+		"description": "Malformed late docking reservation",
+		"zones": [
+			{"id": "base", "role_pool": ["corridor"], "count": 1,
+			 "position_hint": "center", "deck": 0, "layout": "single", "attach_to": ""},
+			{"id": "dock", "role_pool": ["airlock"], "count": 1,
+			 "position_hint": "bow", "deck": 0, "layout": "single", "attach_to": "base"},
+		],
+		"connections": [
+			{"from": "base", "to": "dock", "distribution": "adjacent"},
+		],
+		"deck_config": {"max_decks": 1, "vertical_transition_probability": 0.0},
+	})
+	var plan: Array[Dictionary] = [
+		{"id": "base_01", "zone_id": "base", "role": "corridor", "deck": 0,
+		 "footprint": Vector2i.ONE, "target_cells": 1, "position_hint": "center"},
+		{"id": "dock_01", "zone_id": "dock", "role": "airlock", "deck": 0,
+		 "footprint": Vector2i.ONE, "target_cells": 1, "position_hint": "bow"},
+	]
+	var malformed: Dictionary = engine.layout(plan, template, 92)
+	if not malformed.is_empty():
+		push_error("CELL LAYOUT ENGINE FAIL late docking conflict returned usable partial layout")
+		return false
+	if not engine.last_failure_reason.begins_with("docking_reservation_occupied:dock_01:"):
+		push_error("CELL LAYOUT ENGINE FAIL late docking conflict has no precise reason: %s" %
+			engine.last_failure_reason)
+		return false
+	return true
+
+
+func _check_connector_growth_avoids_reservation(engine: CellLayoutEngineScript) -> bool:
+	var reserved_cells: Array[Vector2i] = _expected_west_docking_reservation(
+		[Vector2i.ZERO])
+	var reserved: Dictionary = {}
+	for cell in reserved_cells:
+		reserved[cell] = "dock_01"
+	var occupied: Dictionary = {
+		Vector2i(-3, 0): "corridor_01",
+		Vector2i.ZERO: "dock_01",
+	}
+	var placed: Dictionary = {
+		"corridor_01": {
+			"cells": [Vector2i(-3, 0)], "origin": Vector2i(-3, 0),
+			"footprint": Vector2i.ONE, "deck": 0, "role": "corridor",
+		},
+		"dock_01": {
+			"cells": [Vector2i.ZERO], "origin": Vector2i.ZERO,
+			"footprint": Vector2i.ONE, "deck": 0, "role": "dock",
+		},
+	}
+	var unreserved_occupied: Dictionary = occupied.duplicate(true)
+	var unreserved_placed: Dictionary = placed.duplicate(true)
+	if not engine._grow_room_to_touch(
+			"corridor_01", "dock_01", unreserved_occupied, {}, unreserved_placed):
+		push_error("CELL LAYOUT ENGINE FAIL unreserved connector control could not grow")
+		return false
+	var unreserved_crossed: bool = false
+	for cell in _room_cells(unreserved_placed, "corridor_01"):
+		if reserved.has(cell):
+			unreserved_crossed = true
+			break
+	if not unreserved_crossed:
+		push_error("CELL LAYOUT ENGINE FAIL connector control did not exercise reserved shortest path")
+		return false
+	if not engine._grow_room_to_touch(
+			"corridor_01", "dock_01", occupied, reserved, placed):
+		push_error("CELL LAYOUT ENGINE FAIL connector growth could not route around reservation")
+		return false
+	var grown_cells: Array[Vector2i] = _room_cells(placed, "corridor_01")
+	if grown_cells.size() <= 1:
+		push_error("CELL LAYOUT ENGINE FAIL connector growth fixture did not grow")
+		return false
+	for cell in grown_cells:
+		if reserved.has(cell):
+			push_error("CELL LAYOUT ENGINE FAIL connector growth entered reservation at %s" % cell)
+			return false
+	if placed["corridor_01"].get("footprint", Vector2i.ZERO) != _cell_bbox(grown_cells):
+		push_error("CELL LAYOUT ENGINE FAIL grown corridor footprint is not its exact final bbox")
+		return false
+	if not _rooms_share_edge(placed, "corridor_01", "dock_01"):
+		push_error("CELL LAYOUT ENGINE FAIL connector growth lost declared connectivity")
+		return false
+	return true
+
+
+func _room_cells(rooms: Dictionary, room_id: String) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if not rooms.has(room_id):
+		return result
+	for raw in rooms[room_id].get("cells", []):
+		result.append(_as_cell(raw))
+	return result
+
+
+func _cell_bbox(raw_cells: Array) -> Vector2i:
+	if raw_cells.is_empty():
+		return Vector2i.ZERO
+	var first: Vector2i = _as_cell(raw_cells[0])
+	var min_x: int = first.x
+	var min_y: int = first.y
+	var max_x: int = first.x
+	var max_y: int = first.y
+	for raw in raw_cells:
+		var cell: Vector2i = _as_cell(raw)
+		min_x = mini(min_x, cell.x)
+		min_y = mini(min_y, cell.y)
+		max_x = maxi(max_x, cell.x)
+		max_y = maxi(max_y, cell.y)
+	return Vector2i(max_x - min_x + 1, max_y - min_y + 1)
 
 
 func _room_has_cell(room_data: Dictionary, cell: Vector2i) -> bool:

@@ -13,8 +13,6 @@ const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_ge
 const DockEndpointAuthoringScript := preload("res://scripts/procgen/dock_endpoint_authoring.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
-const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
-const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const WallDoorResolverScript := preload("res://scripts/procgen/wall_door_resolver.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
@@ -404,21 +402,9 @@ func _has_loot_container_at(containers: Array, candidate: Dictionary) -> bool:
 
 func _prepare_layout_documents(layout_source: Dictionary) -> Dictionary:
 	var layout: Dictionary = layout_source.duplicate(true)
-	# Skip recompile when ShipLayoutGenerator already stamped a validated plan.
-	# Never restamp wreck here — module_damage keys would drift from the plan.
-	var plan_variant: Variant = layout.get("structural_plan", {})
-	var plan_ready: bool = plan_variant is Dictionary \
-		and not (plan_variant as Dictionary).is_empty() \
-		and bool(layout.get("structural_plan_validated", false))
-	if not plan_ready:
-		var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-		var structural_plan: Dictionary = compiler.compile(layout)
-		var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-		if not bool(verdict.get("ok", false)):
-			push_error("SHIP GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
-			return _documents_failure("structural_plan_validation_failed")
-		layout["structural_plan"] = structural_plan
-		layout["structural_plan_validated"] = true
+	# Endpoint authoring validates an existing authoritative round-trip or performs
+	# its detached discovery/final compilation transaction. The discovery plan is
+	# never published and cannot carry a validation flag.
 	var endpoint_result: Dictionary = DockEndpointAuthoringScript.author_layout(
 		layout, false, _load_worldgen_kit().get("dock_collision_projection_v1", {}),
 		LifeBoatBuilderScript.build_layout())

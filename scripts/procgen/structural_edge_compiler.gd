@@ -245,6 +245,7 @@ func compile(layout: Dictionary) -> Dictionary:
 				"wrapper_required": wrapper_required,
 			}
 			if portal_present:
+				edge_record["portal_id"] = str(portal.get("id", ""))
 				var logical_boundary: bool = bool(portal.get("logical_boundary", false))
 				edge_record["logical_boundary"] = logical_boundary
 				if logical_boundary:
@@ -252,39 +253,11 @@ func compile(layout: Dictionary) -> Dictionary:
 					edge_record["logical_to_cell"] = portal.get("logical_to_cell", portal.get("to_cell", null))
 			edge_map[edge_key_value] = edge_record
 
-	_apply_vertex_modules(
-		occupancy,
-		edge_map,
-		catalog,
-		inner_corner_module,
-		outer_corner_module,
-		t_junction_module,
-		wall_module
-	)
-
-	for occupancy_key in occupancy.keys():
-		var cell_record: Dictionary = occupancy[occupancy_key]
-		var deck: int = int(cell_record["deck"])
-		var cell: Vector2i = cell_record["cell"]
-		for direction in CARDINALS:
-			var edge_key_value: String = edge_key(deck, cell, direction)
-			if not edge_map.has(edge_key_value):
-				continue
-			var edge_record: Dictionary = edge_map[edge_key_value]
-			if str(edge_record.get("kind", "")) == "OPEN" or not bool(edge_record.get("wrapper_required", true)):
-				continue
-			var already: bool = false
-			for existing_variant in edge_placements:
-				if typeof(existing_variant) == TYPE_DICTIONARY and str((existing_variant as Dictionary).get("edge_key", "")) == edge_key_value:
-					already = true
-					break
-			if already:
-				continue
-			var placement: Dictionary = edge_record.duplicate(true)
-			placement["placement_id"] = "edge:%s" % edge_key_value
-			edge_placements.append(placement)
-
-	_refine_wall_modules(edge_map, edge_placements)
+	edge_placements = _emit_half_span_edge_placements(
+		occupancy, edge_map, catalog, inner_corner_module,
+		outer_corner_module, t_junction_module, wall_module, errors)
+	var dock_navigation_nodes: Array = _compile_dock_navigation_nodes(
+		layout, edge_map, edge_placements, floor_placements, errors)
 
 	var socket_bindings: Array = _emit_socket_bindings(
 		catalog,
@@ -303,6 +276,7 @@ func compile(layout: Dictionary) -> Dictionary:
 		"floor_placements": floor_placements,
 		"ceiling_placements": ceiling_placements,
 		"socket_bindings": socket_bindings,
+		"dock_navigation_nodes": dock_navigation_nodes,
 		"errors": errors,
 	}
 
@@ -342,6 +316,7 @@ func _empty_plan(errors: Array[String]) -> Dictionary:
 		"floor_placements": [],
 		"ceiling_placements": [],
 		"socket_bindings": [],
+		"dock_navigation_nodes": [],
 		"errors": errors,
 	}
 
@@ -372,78 +347,6 @@ func _vertical_opening_keys(layout: Dictionary, room_by_id: Dictionary) -> Dicti
 	return keys
 
 
-func _apply_vertex_modules(
-		occupancy: Dictionary,
-		edge_map: Dictionary,
-		catalog,
-		inner_corner_module: String,
-		outer_corner_module: String,
-		t_junction_module: String,
-		wall_module: String) -> void:
-	var seen_vertices: Dictionary = {}
-	for occupancy_key in occupancy.keys():
-		var cell_record: Dictionary = occupancy[occupancy_key]
-		var deck: int = int(cell_record["deck"])
-		var cell: Vector2i = cell_record["cell"]
-		for dx in range(2):
-			for dz in range(2):
-				var vx: int = cell.x + dx
-				var vz: int = cell.y + dz
-				var vertex_key: String = "%d|%d|%d" % [deck, vx, vz]
-				if seen_vertices.has(vertex_key):
-					continue
-				seen_vertices[vertex_key] = true
-				var solid_keys: Array[String] = []
-				var candidate_edges: Array[String] = [
-					edge_key(deck, Vector2i(vx - 1, vz - 1), "east"),
-					edge_key(deck, Vector2i(vx - 1, vz), "east"),
-					edge_key(deck, Vector2i(vx - 1, vz - 1), "south"),
-					edge_key(deck, Vector2i(vx, vz - 1), "south"),
-				]
-				for candidate in candidate_edges:
-					if candidate.is_empty() or not edge_map.has(candidate):
-						continue
-					var edge: Dictionary = edge_map[candidate]
-					var kind: String = str(edge.get("kind", ""))
-					if kind == "SOLID":
-						solid_keys.append(candidate)
-				if solid_keys.is_empty():
-					continue
-				var occupied_count: int = 0
-				for cell_offset in [Vector2i(vx - 1, vz - 1), Vector2i(vx, vz - 1), Vector2i(vx - 1, vz), Vector2i(vx, vz)]:
-					if occupancy.has(cell_key(deck, cell_offset)):
-						occupied_count += 1
-				var assigned_module: String = ""
-				if solid_keys.size() >= 3 and catalog.has_module(t_junction_module):
-					assigned_module = t_junction_module
-				elif occupied_count == 3 and solid_keys.size() >= 2 and catalog.has_module(inner_corner_module):
-					assigned_module = inner_corner_module
-				elif occupied_count == 1 and solid_keys.size() >= 2 and catalog.has_module(outer_corner_module):
-					assigned_module = outer_corner_module
-				if assigned_module.is_empty():
-					continue
-				var target_key: String = _first_replaceable_wall(edge_map, solid_keys, wall_module)
-				if target_key.is_empty():
-					continue
-				var target: Dictionary = edge_map[target_key]
-				target["module_id"] = assigned_module
-
-
-func _first_replaceable_wall(edge_map: Dictionary, solid_keys: Array[String], wall_module: String) -> String:
-	for edge_key_value in solid_keys:
-		var edge: Dictionary = edge_map[edge_key_value]
-		if bool(edge.get("portal", false)):
-			continue
-		var module_id: String = str(edge.get("module_id", ""))
-		if module_id == wall_module or module_id == WALL_MODULE:
-			return edge_key_value
-	for edge_key_value in solid_keys:
-		var edge: Dictionary = edge_map[edge_key_value]
-		if not bool(edge.get("portal", false)):
-			return edge_key_value
-	return ""
-
-
 func _emit_socket_bindings(
 		catalog,
 		floor_placements: Array,
@@ -461,6 +364,7 @@ func _emit_socket_bindings(
 		var module_a: String = str(record_a.get("module_id", ""))
 		var pos_a: Vector3 = _as_vector3(record_a.get("position", Vector3.ZERO))
 		var yaw_a: float = float(record_a.get("yaw_degrees", 0.0))
+		var scale_a: Vector3 = _as_vector3(record_a.get("scale", Vector3.ONE))
 		for j in range(i + 1, all_records.size()):
 			if typeof(all_records[j]) != TYPE_DICTIONARY:
 				continue
@@ -468,6 +372,7 @@ func _emit_socket_bindings(
 			var module_b: String = str(record_b.get("module_id", ""))
 			var pos_b: Vector3 = _as_vector3(record_b.get("position", Vector3.ZERO))
 			var yaw_b: float = float(record_b.get("yaw_degrees", 0.0))
+			var scale_b: Vector3 = _as_vector3(record_b.get("scale", Vector3.ONE))
 			if pos_a.distance_to(pos_b) > CELL_SIZE * 1.5:
 				continue
 			for socket_a_variant in catalog.sockets_of(module_a):
@@ -480,8 +385,10 @@ func _emit_socket_bindings(
 					var socket_b: Dictionary = socket_b_variant
 					if not _sockets_match(catalog, socket_a, socket_b):
 						continue
-					var world_a: Vector3 = catalog.world_socket_position(pos_a, yaw_a, catalog.socket_local_position(socket_a))
-					var world_b: Vector3 = catalog.world_socket_position(pos_b, yaw_b, catalog.socket_local_position(socket_b))
+					var world_a: Vector3 = catalog.world_socket_position(
+						pos_a, yaw_a, catalog.socket_local_position(socket_a), scale_a)
+					var world_b: Vector3 = catalog.world_socket_position(
+						pos_b, yaw_b, catalog.socket_local_position(socket_b), scale_b)
 					if not catalog.positions_agree(world_a, world_b):
 						continue
 					bindings.append(_binding_record(record_a, socket_a, record_b, socket_b))
@@ -552,29 +459,345 @@ func _as_vector3(value: Variant) -> Vector3:
 	return Vector3.ZERO
 
 
-func _refine_wall_modules(edge_map: Dictionary, edge_placements: Array) -> void:
-	## Post-pass: replace wall_straight_1x1 with corner/end-cap/t-junction
-	## based on neighboring SOLID edge topology at each endpoint.
-	for placement in edge_placements:
-		var kind: String = str(placement.get("kind", ""))
-		if kind != "SOLID":
+func _emit_half_span_edge_placements(
+		occupancy: Dictionary,
+		edge_map: Dictionary,
+		catalog,
+		inner_corner_module: String,
+		outer_corner_module: String,
+		t_junction_module: String,
+		wall_module: String,
+		errors: Array[String]) -> Array:
+	## Every SOLID 4 m edge owns two canonical 2 m spans. A vertex wrapper may
+	## claim the incident span from two or three edges only when its materialized
+	## collision projection maps exactly to those rays. Residual spans use scaled
+	## straight walls; no search or label-only substitution participates.
+	var placements: Array = []
+	var claimed_spans: Dictionary = {}
+	var vertices: Dictionary = {}
+	var edge_keys: Array = edge_map.keys()
+	edge_keys.sort()
+	for edge_key_variant in edge_keys:
+		var edge_key_value: String = str(edge_key_variant)
+		var edge: Dictionary = edge_map[edge_key_variant]
+		if str(edge.get("kind", "")) == "SOLID":
+			var vertex_keys: Array[String] = _edge_vertex_keys(edge_key_value)
+			if vertex_keys.size() != 2:
+				errors.append("solid edge has malformed canonical vertices: %s" % edge_key_value)
+				continue
+			var half_span_ids: Array[String] = [
+				_half_span_id(edge_key_value, 0),
+				_half_span_id(edge_key_value, 1),
+			]
+			edge["vertex_keys"] = vertex_keys.duplicate()
+			edge["half_span_ids"] = half_span_ids.duplicate()
+			edge["half_span_placement_ids"] = {}
+			edge["placement_ids"] = []
+			for vertex_key in vertex_keys:
+				vertices[vertex_key] = true
+		elif str(edge.get("kind", "")) != "OPEN" \
+				and bool(edge.get("wrapper_required", true)):
+			var placement: Dictionary = edge.duplicate(true)
+			var placement_id: String = "edge:%s" % edge_key_value
+			placement["id"] = placement_id
+			placement["placement_id"] = placement_id
+			placement["anchor_kind"] = "edge"
+			placement["edge_keys"] = [edge_key_value]
+			placement["covered_half_spans"] = []
+			placement["scale"] = Vector3.ONE
+			placements.append(placement)
+			edge["placement_ids"] = [placement_id]
+
+	var vertex_keys: Array = vertices.keys()
+	vertex_keys.sort()
+	for vertex_key_variant in vertex_keys:
+		var vertex_key: String = str(vertex_key_variant)
+		var vertex: Dictionary = _parse_vertex_key(vertex_key)
+		if not bool(vertex.get("ok", false)):
+			errors.append("solid edge has malformed vertex authority: %s" % vertex_key)
 			continue
-		var module_id: String = str(placement.get("module_id", ""))
-		if module_id != WALL_MODULE:
-			continue  # already a portal or special module
-		var ek: String = str(placement.get("edge_key", ""))
-		if ek.is_empty():
+		var deck: int = int(vertex["deck"])
+		var vx: int = int(vertex["x"])
+		var vz: int = int(vertex["z"])
+		var incident: Dictionary = _incident_solid_rays(edge_map, deck, vx, vz)
+		var directions: Array[String] = []
+		for direction in CARDINALS:
+			if incident.has(direction):
+				directions.append(direction)
+		var occupied_count: int = _vertex_occupied_count(occupancy, deck, vx, vz)
+		var module_id: String = ""
+		if directions.size() == 3 and catalog.has_module(t_junction_module):
+			module_id = t_junction_module
+		elif directions.size() == 2 and _directions_perpendicular(directions):
+			if occupied_count == 3 and catalog.has_module(inner_corner_module):
+				module_id = inner_corner_module
+			elif occupied_count == 1 and catalog.has_module(outer_corner_module):
+				module_id = outer_corner_module
+		if module_id.is_empty():
 			continue
-		var parsed: Dictionary = _parse_edge_key(ek)
-		if not bool(parsed.get("ok", false)):
+		var yaw_degrees: float = _matching_vertex_module_yaw(
+			catalog, module_id, directions)
+		if yaw_degrees < 0.0:
+			errors.append("vertex module projection does not match incident spans: %s module=%s" % [
+				vertex_key, module_id])
 			continue
-		var connections: int = _count_perpendicular_connections(edge_map, parsed)
-		var new_module: String = _wall_module_for_connections(connections, parsed, edge_map, placement)
-		if new_module != WALL_MODULE:
-			placement["module_id"] = new_module
-			# Also update the edge_map record
-			if edge_map.has(ek):
-				edge_map[ek]["module_id"] = new_module
+		var incident_edge_keys: Array[String] = []
+		var span_ids: Array[String] = []
+		for direction in directions:
+			var incident_edge_key: String = str(incident[direction])
+			var endpoint_index: int = _edge_vertex_keys(incident_edge_key).find(vertex_key)
+			if endpoint_index < 0:
+				errors.append("incident span endpoint mismatch: %s" % incident_edge_key)
+				continue
+			var span_id: String = _half_span_id(incident_edge_key, endpoint_index)
+			if claimed_spans.has(span_id):
+				errors.append("duplicate half-span claim: %s" % span_id)
+				continue
+			incident_edge_keys.append(incident_edge_key)
+			span_ids.append(span_id)
+		if span_ids.size() != directions.size():
+			continue
+		incident_edge_keys.sort()
+		span_ids.sort()
+		var primary_edge_key: String = incident_edge_keys[0]
+		var primary: Dictionary = edge_map[primary_edge_key]
+		var vertex_placement_id: String = "vertex:%s" % vertex_key
+		var vertex_placement: Dictionary = primary.duplicate(true)
+		vertex_placement["id"] = vertex_placement_id
+		vertex_placement["placement_id"] = vertex_placement_id
+		vertex_placement["module_id"] = module_id
+		vertex_placement["position"] = _vertex_world_position(deck, vx, vz)
+		vertex_placement["yaw_degrees"] = yaw_degrees
+		vertex_placement["scale"] = Vector3.ONE
+		vertex_placement["anchor_kind"] = "vertex"
+		vertex_placement["anchor_vertex"] = [vx, vz, deck]
+		vertex_placement["edge_key"] = primary_edge_key
+		vertex_placement["edge_keys"] = incident_edge_keys.duplicate()
+		vertex_placement["covered_half_spans"] = span_ids.duplicate()
+		vertex_placement["room_ids"] = _placement_room_ids(edge_map, incident_edge_keys)
+		placements.append(vertex_placement)
+		for span_id in span_ids:
+			claimed_spans[span_id] = vertex_placement_id
+			var span_edge_key: String = span_id.get_slice("@", 0)
+			var span_edge: Dictionary = edge_map[span_edge_key]
+			(span_edge["half_span_placement_ids"] as Dictionary)[span_id] = vertex_placement_id
+			if not (span_edge["placement_ids"] as Array).has(vertex_placement_id):
+				(span_edge["placement_ids"] as Array).append(vertex_placement_id)
+
+	for edge_key_variant in edge_keys:
+		var edge_key_value: String = str(edge_key_variant)
+		var edge: Dictionary = edge_map[edge_key_variant]
+		if str(edge.get("kind", "")) != "SOLID":
+			continue
+		var edge_vertices: Array[String] = edge.get("vertex_keys", []) as Array[String]
+		if edge_vertices.size() != 2:
+			continue
+		var residual_indices: Array[int] = []
+		for endpoint_index in range(2):
+			if not claimed_spans.has(_half_span_id(edge_key_value, endpoint_index)):
+				residual_indices.append(endpoint_index)
+		if residual_indices.is_empty():
+			continue
+		var residual: Dictionary = edge.duplicate(true)
+		var residual_spans: Array[String] = []
+		for endpoint_index in residual_indices:
+			residual_spans.append(_half_span_id(edge_key_value, endpoint_index))
+		var residual_id: String = "edge:%s" % edge_key_value
+		if residual_indices.size() == 1:
+			var endpoint_index: int = residual_indices[0]
+			residual_id = "span:%s" % residual_spans[0]
+			var vertex: Dictionary = _parse_vertex_key(edge_vertices[endpoint_index])
+			var vertex_position: Vector3 = _vertex_world_position(
+				int(vertex["deck"]), int(vertex["x"]), int(vertex["z"]))
+			residual["position"] = vertex_position.lerp(
+				_as_vector3(edge.get("position", Vector3.ZERO)), 0.5)
+			residual["scale"] = Vector3(0.5, 1.0, 1.0)
+			residual["anchor_kind"] = "half_span"
+			residual["anchor_vertex"] = [int(vertex["x"]), int(vertex["z"]), int(vertex["deck"])]
+		else:
+			residual["scale"] = Vector3.ONE
+			residual["anchor_kind"] = "edge"
+		residual["id"] = residual_id
+		residual["placement_id"] = residual_id
+		residual["module_id"] = wall_module
+		residual["edge_keys"] = [edge_key_value]
+		residual["covered_half_spans"] = residual_spans.duplicate()
+		placements.append(residual)
+		for span_id in residual_spans:
+			claimed_spans[span_id] = residual_id
+			(edge["half_span_placement_ids"] as Dictionary)[span_id] = residual_id
+		if not (edge["placement_ids"] as Array).has(residual_id):
+			(edge["placement_ids"] as Array).append(residual_id)
+
+	for edge_key_variant in edge_keys:
+		var edge: Dictionary = edge_map[edge_key_variant]
+		if str(edge.get("kind", "")) != "SOLID":
+			continue
+		for span_id_variant in edge.get("half_span_ids", []):
+			var span_id: String = str(span_id_variant)
+			if not claimed_spans.has(span_id):
+				errors.append("solid edge half-span has no placement: %s" % span_id)
+		(edge["placement_ids"] as Array).sort()
+	placements.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("placement_id", "")) < str(b.get("placement_id", "")))
+	return placements
+
+
+func _half_span_id(edge_key_value: String, endpoint_index: int) -> String:
+	return "%s@%s" % [edge_key_value, "a" if endpoint_index == 0 else "b"]
+
+
+func _parse_vertex_key(vertex_key: String) -> Dictionary:
+	var parts: PackedStringArray = vertex_key.split("|")
+	if parts.size() != 3 or not parts[0].is_valid_int() \
+			or not parts[1].is_valid_int() or not parts[2].is_valid_int():
+		return {"ok": false}
+	return {"ok": true, "deck": int(parts[0]), "x": int(parts[1]), "z": int(parts[2])}
+
+
+func _vertex_world_position(deck: int, vx: int, vz: int) -> Vector3:
+	return Vector3(float(vx) * CELL_SIZE - CELL_SIZE * 0.5,
+		float(deck) * DECK_HEIGHT, float(vz) * CELL_SIZE - CELL_SIZE * 0.5)
+
+
+func _edge_key_for_vertex_ray(deck: int, vx: int, vz: int, direction: String) -> String:
+	match direction:
+		"north":
+			return "%d|v|%d|%d" % [deck, vz - 1, vx - 1]
+		"east":
+			return "%d|h|%d|%d" % [deck, vz - 1, vx]
+		"south":
+			return "%d|v|%d|%d" % [deck, vz, vx - 1]
+		"west":
+			return "%d|h|%d|%d" % [deck, vz - 1, vx - 1]
+	return ""
+
+
+func _incident_solid_rays(edge_map: Dictionary, deck: int, vx: int, vz: int) -> Dictionary:
+	var incident: Dictionary = {}
+	for direction in CARDINALS:
+		var edge_key_value: String = _edge_key_for_vertex_ray(deck, vx, vz, direction)
+		var edge_variant: Variant = edge_map.get(edge_key_value, null)
+		if edge_variant is Dictionary and str((edge_variant as Dictionary).get("kind", "")) == "SOLID":
+			incident[direction] = edge_key_value
+	return incident
+
+
+func _vertex_occupied_count(occupancy: Dictionary, deck: int, vx: int, vz: int) -> int:
+	var count: int = 0
+	for cell in [Vector2i(vx - 1, vz - 1), Vector2i(vx, vz - 1),
+			Vector2i(vx - 1, vz), Vector2i(vx, vz)]:
+		if occupancy.has(cell_key(deck, cell)):
+			count += 1
+	return count
+
+
+func _directions_perpendicular(directions: Array[String]) -> bool:
+	if directions.size() != 2:
+		return false
+	var first: int = CARDINALS.find(directions[0])
+	var second: int = CARDINALS.find(directions[1])
+	return first >= 0 and second >= 0 and posmod(first - second, 2) == 1
+
+
+func _matching_vertex_module_yaw(catalog, module_id: String, desired: Array[String]) -> float:
+	var canonical: Array[String] = _projected_module_ray_directions(
+		catalog.collision_boxes_of(module_id))
+	if canonical.size() != desired.size():
+		return -1.0
+	for quarter_turns in range(4):
+		var rotated: Array[String] = []
+		for direction in canonical:
+			var direction_index: int = CARDINALS.find(direction)
+			if direction_index < 0:
+				return -1.0
+			rotated.append(CARDINALS[posmod(direction_index - quarter_turns, 4)])
+		var matches: bool = true
+		for direction in desired:
+			matches = matches and rotated.has(direction)
+		if matches:
+			return float(quarter_turns * 90)
+	return -1.0
+
+
+func _projected_module_ray_directions(boxes: Array) -> Array[String]:
+	var directions: Array[String] = []
+	for box_variant in boxes:
+		if not box_variant is Dictionary:
+			return []
+		var box: Dictionary = box_variant
+		var basis_values_variant: Variant = box.get("basis", null)
+		var dimensions_variant: Variant = box.get("dimensions", null)
+		if not basis_values_variant is Array or (basis_values_variant as Array).size() != 9 \
+				or not dimensions_variant is Array or (dimensions_variant as Array).size() != 3:
+			return []
+		var basis_values: Array = basis_values_variant
+		var dimensions: Vector3 = _as_vector3(dimensions_variant)
+		var origin: Vector3 = _as_vector3(box.get("origin", []))
+		var basis := Basis(
+			Vector3(float(basis_values[0]), float(basis_values[1]), float(basis_values[2])),
+			Vector3(float(basis_values[3]), float(basis_values[4]), float(basis_values[5])),
+			Vector3(float(basis_values[6]), float(basis_values[7]), float(basis_values[8])))
+		if not basis.is_finite() or not dimensions.is_finite() or not origin.is_finite():
+			return []
+		var projected := AABB(origin, Vector3.ZERO)
+		var first: bool = true
+		for x_sign in [-0.5, 0.5]:
+			for y_sign in [-0.5, 0.5]:
+				for z_sign in [-0.5, 0.5]:
+					var point: Vector3 = origin + basis * Vector3(
+						dimensions.x * x_sign, dimensions.y * y_sign,
+						dimensions.z * z_sign)
+					if first:
+						projected = AABB(point, Vector3.ZERO)
+						first = false
+					else:
+						projected = projected.expand(point)
+		if not is_equal_approx(projected.position.y, 0.0) \
+				or not is_equal_approx(projected.end.y, 3.0):
+			return []
+		var direction: String = ""
+		if is_equal_approx(projected.size.x, 2.0) and is_equal_approx(projected.size.z, 0.2):
+			if is_equal_approx(projected.position.x, 0.0) and is_equal_approx(projected.end.x, 2.0):
+				direction = "east"
+			elif is_equal_approx(projected.position.x, -2.0) and is_equal_approx(projected.end.x, 0.0):
+				direction = "west"
+		elif is_equal_approx(projected.size.z, 2.0) and is_equal_approx(projected.size.x, 0.2):
+			if is_equal_approx(projected.position.z, -2.0) and is_equal_approx(projected.end.z, 0.0):
+				direction = "north"
+			elif is_equal_approx(projected.position.z, 0.0) and is_equal_approx(projected.end.z, 2.0):
+				direction = "south"
+		if direction.is_empty() or directions.has(direction):
+			return []
+		directions.append(direction)
+	return directions
+
+
+func _placement_room_ids(edge_map: Dictionary, incident_edge_keys: Array[String]) -> Array:
+	var room_ids: Array = []
+	for edge_key_value in incident_edge_keys:
+		var edge: Dictionary = edge_map[edge_key_value]
+		for room_id_variant in edge.get("room_ids", []):
+			var room_id: String = str(room_id_variant)
+			if not room_id.is_empty() and not room_ids.has(room_id):
+				room_ids.append(room_id)
+	room_ids.sort()
+	return room_ids
+
+
+func _edge_vertex_keys(edge_key_value: String) -> Array[String]:
+	var parsed: Dictionary = _parse_edge_key(edge_key_value)
+	if not bool(parsed.get("ok", false)):
+		return []
+	var deck: int = int(parsed.get("deck", 0))
+	var axis: String = str(parsed.get("axis", ""))
+	var x: int = int(parsed.get("x", 0))
+	var y: int = int(parsed.get("y", 0))
+	if axis == "h":
+		return ["%d|%d|%d" % [deck, x, y + 1],
+			"%d|%d|%d" % [deck, x + 1, y + 1]]
+	return ["%d|%d|%d" % [deck, x + 1, y],
+		"%d|%d|%d" % [deck, x + 1, y + 1]]
 
 
 func _parse_edge_key(ek: String) -> Dictionary:
@@ -597,141 +820,6 @@ func _parse_edge_key(ek: String) -> Dictionary:
 	return {"ok": false}
 
 
-func _count_perpendicular_connections(edge_map: Dictionary, parsed: Dictionary) -> int:
-	## Count how many SOLID perpendicular edges connect at the endpoints
-	## of the given edge. Returns a bitmask:
-	##   bit 0 (1): connection at endpoint A, side 1
-	##   bit 1 (2): connection at endpoint A, side 2
-	##   bit 2 (4): connection at endpoint B, side 1
-	##   bit 3 (8): connection at endpoint B, side 2
-	##
-	## Edge key formats:
-	##   Horizontal h|Y|X: boundary between rows Y and Y+1, at column X.
-	##     Runs from grid-point (X, Y+1) to (X+1, Y+1).
-	##     West endpoint (X, Y+1): perpendicular = v|Y|X-1 (north), v|Y+1|X-1 (south)
-	##     East endpoint (X+1, Y+1): perpendicular = v|Y|X (north), v|Y+1|X (south)
-	##   Vertical v|Y|X: east boundary of cell (X, Y).
-	##     Runs from grid-point (X+1, Y) to (X+1, Y+1).
-	##     North endpoint (X+1, Y): perpendicular = h|Y-1|X (west), h|Y-1|X+1 (east)
-	##     South endpoint (X+1, Y+1): perpendicular = h|Y|X (west), h|Y|X+1 (east)
-	var axis: String = parsed["axis"]
-	var deck: int = parsed["deck"]
-	var x: int = parsed["x"]
-	var y: int = parsed["y"]
-	var mask: int = 0
-
-	if axis == "h":
-		# West endpoint (x, y+1): vertical edges at x-1
-		var vn_key: String = "%d|v|%d|%d" % [deck, y, x - 1]
-		var vs_key: String = "%d|v|%d|%d" % [deck, y + 1, x - 1]
-		if edge_map.has(vn_key) and str(edge_map[vn_key].get("kind", "")) == "SOLID":
-			mask |= 1
-		if edge_map.has(vs_key) and str(edge_map[vs_key].get("kind", "")) == "SOLID":
-			mask |= 2
-		# East endpoint (x+1, y+1): vertical edges at x
-		var ven_key: String = "%d|v|%d|%d" % [deck, y, x]
-		var ves_key: String = "%d|v|%d|%d" % [deck, y + 1, x]
-		if edge_map.has(ven_key) and str(edge_map[ven_key].get("kind", "")) == "SOLID":
-			mask |= 4
-		if edge_map.has(ves_key) and str(edge_map[ves_key].get("kind", "")) == "SOLID":
-			mask |= 8
-	else:
-		# North endpoint (x+1, y): horizontal edges at y-1
-		var hw_key: String = "%d|h|%d|%d" % [deck, y - 1, x]
-		var he_key: String = "%d|h|%d|%d" % [deck, y - 1, x + 1]
-		if edge_map.has(hw_key) and str(edge_map[hw_key].get("kind", "")) == "SOLID":
-			mask |= 1
-		if edge_map.has(he_key) and str(edge_map[he_key].get("kind", "")) == "SOLID":
-			mask |= 2
-		# South endpoint (x+1, y+1): horizontal edges at y
-		var hsw_key: String = "%d|h|%d|%d" % [deck, y, x]
-		var hse_key: String = "%d|h|%d|%d" % [deck, y, x + 1]
-		if edge_map.has(hsw_key) and str(edge_map[hsw_key].get("kind", "")) == "SOLID":
-			mask |= 4
-		if edge_map.has(hse_key) and str(edge_map[hse_key].get("kind", "")) == "SOLID":
-			mask |= 8
-
-	return mask
-
-
-func _wall_module_for_connections(mask: int, parsed: Dictionary, edge_map: Dictionary, placement: Dictionary) -> String:
-	## Select wall module based on connection bitmask.
-	## mask bits: 0-1 = endpoint A connections, 2-3 = endpoint B connections
-	## For horizontal edges: A=west, B=east; bits 0=north, 1=south
-	## For vertical edges: A=north, B=south; bits 0=west, 1=east
-	var count: int = 0
-	for i in range(4):
-		if mask & (1 << i):
-			count += 1
-
-	if count == 0:
-		# Isolated wall — end cap
-		return WALL_END_CAP_MODULE
-
-	if count == 1:
-		# One perpendicular connection at an endpoint — this is a corner
-		# (two walls meeting at a room corner each have count=1)
-		return _pick_corner_type(mask, parsed, edge_map, placement)
-
-	# Check if connections are at same endpoint or different
-	var a_connections: int = mask & 3   # bits 0-1 (endpoint A)
-	var b_connections: int = mask & 12  # bits 2-3 (endpoint B)
-	var a_count: int = 0
-	var b_count: int = 0
-	if a_connections & 1: a_count += 1
-	if a_connections & 2: a_count += 1
-	if b_connections & 4: b_count += 1
-	if b_connections & 8: b_count += 1
-
-	if count == 2:
-		if a_count == 2 or b_count == 2:
-			# Both connections at same endpoint — T-junction
-			return WALL_T_JUNCTION_MODULE
-		if a_count == 1 and b_count == 1:
-			# Connections at different endpoints
-			# Check if same side (straight) or different sides (corner)
-			var axis: String = parsed["axis"]
-			if axis == "h":
-				# Horizontal: bit 0=north, bit 1=south at A; bit 4=north, bit 8=south at B
-				var a_north: bool = (mask & 1) != 0
-				var b_north: bool = (mask & 4) != 0
-				if a_north == b_north:
-					return WALL_MODULE  # straight — same side
-				else:
-					return _pick_corner_type(mask, parsed, edge_map, placement)
-			else:
-				# Vertical: bit 0=west, bit 1=east at A; bit 4=west, bit 8=east at B
-				var a_west: bool = (mask & 1) != 0
-				var b_west: bool = (mask & 4) != 0
-				if a_west == b_west:
-					return WALL_MODULE  # straight — same side
-				else:
-					return _pick_corner_type(mask, parsed, edge_map, placement)
-
-	if count == 3:
-		# Three connections — T-junction
-		return WALL_T_JUNCTION_MODULE
-
-	# Four connections — cross (no cross module, use T-junction as best fit)
-	return WALL_T_JUNCTION_MODULE
-
-
-func _pick_corner_type(mask: int, parsed: Dictionary, edge_map: Dictionary, placement: Dictionary) -> String:
-	## Determine inner vs outer corner based on which side of the wall
-	## the room interior is on. The owner_room side is the interior.
-	## If the corner L opens toward the interior → inner corner
-	## If the corner L opens away from the interior → outer corner
-	var axis: String = parsed["axis"]
-	var owner_room: String = str(placement.get("owner_room", ""))
-	var other_room: String = str(placement.get("other_room", ""))
-
-	# For simplicity: if the edge is exterior (no other room), use outer corner.
-	# If it's between two rooms, use inner corner (the L opens into the owner room).
-	if other_room.is_empty():
-		return WALL_OUTER_CORNER_MODULE
-	return WALL_INNER_CORNER_MODULE
-
-
 func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Dictionary, errors: Array[String]) -> Dictionary:
 	var indexed: Dictionary = {}
 	var portals_variant: Variant = layout.get("portals", null)
@@ -745,6 +833,10 @@ func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Di
 		var portal: Dictionary = portal_variant
 		var from_room: String = str(portal.get("from_room", ""))
 		var to_room: String = str(portal.get("to_room", ""))
+		if bool(portal.get("exterior", false)):
+			_index_exterior_portal(portal, from_room, to_room, room_by_id,
+				room_by_cell, indexed, errors)
+			continue
 		if not room_by_id.has(from_room) or not room_by_id.has(to_room) or from_room == to_room:
 			errors.append("portal room endpoints are invalid: %s" % str(portal.get("id", "")))
 			continue
@@ -797,6 +889,121 @@ func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Di
 		indexed_portal["to_cell_key"] = to_key
 		indexed[key] = indexed_portal
 	return indexed
+
+
+func _index_exterior_portal(
+		portal: Dictionary, from_room: String, to_room: String,
+		room_by_id: Dictionary, room_by_cell: Dictionary,
+		indexed: Dictionary, errors: Array[String]) -> void:
+	var portal_id: String = str(portal.get("id", ""))
+	if portal_id.is_empty() or not room_by_id.has(from_room) or not to_room.is_empty():
+		errors.append("exterior portal endpoints are invalid: %s" % portal_id)
+		return
+	var from_deck: int = int((room_by_id[from_room] as Dictionary).get("deck", -1))
+	var from_info: Dictionary = _read_cell(portal.get("from_cell", null), from_deck)
+	var to_info: Dictionary = _read_cell(portal.get("to_cell", null), from_deck)
+	if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)) \
+			or int(from_info.get("deck", -1)) != from_deck \
+			or int(to_info.get("deck", -1)) != from_deck:
+		errors.append("exterior portal cells are malformed: %s" % portal_id)
+		return
+	var from_cell: Vector2i = from_info["cell"]
+	var to_cell: Vector2i = to_info["cell"]
+	var from_key: String = cell_key(from_deck, from_cell)
+	var to_key: String = cell_key(from_deck, to_cell)
+	if str(room_by_cell.get(from_key, "")) != from_room or room_by_cell.has(to_key):
+		errors.append("exterior portal cells are not owner/interior-to-empty: %s" % portal_id)
+		return
+	var direction: String = _direction_between(from_cell, to_cell)
+	if direction.is_empty() or str(portal.get("edge_direction", direction)) != direction:
+		errors.append("exterior portal cells are not cardinally adjacent: %s" % portal_id)
+		return
+	var key: String = edge_key(from_deck, from_cell, direction)
+	if indexed.has(key):
+		errors.append("duplicate portal edge: %s" % key)
+		return
+	var indexed_portal: Dictionary = portal.duplicate(true)
+	indexed_portal["edge_key"] = key
+	indexed_portal["direction"] = direction
+	indexed_portal["edge_cell"] = from_cell
+	indexed_portal["edge_other_room"] = ""
+	indexed_portal["logical_boundary"] = false
+	indexed_portal["from_cell_key"] = from_key
+	indexed_portal["to_cell_key"] = to_key
+	indexed[key] = indexed_portal
+
+
+func _compile_dock_navigation_nodes(
+		layout: Dictionary, edges: Dictionary, placements: Array,
+		floors: Array, errors: Array[String]) -> Array:
+	var source_variant: Variant = layout.get("dock_navigation_nodes_v1", [])
+	if not source_variant is Array:
+		errors.append("dock_navigation_nodes_v1 must be an array")
+		return []
+	var source: Array = source_variant
+	var exterior_edges: Array[Dictionary] = []
+	for edge_variant in edges.values():
+		if edge_variant is Dictionary and bool((edge_variant as Dictionary).get(
+				"exterior", false)) and bool((edge_variant as Dictionary).get(
+				"portal", false)):
+			exterior_edges.append(edge_variant as Dictionary)
+	if exterior_edges.is_empty() and source.is_empty():
+		return []
+	if exterior_edges.size() != 1 or source.size() != 2:
+		errors.append("exterior portal requires exactly two dock navigation nodes")
+		return []
+	var edge: Dictionary = exterior_edges[0]
+	var edge_key_value: String = str(edge.get("edge_key", ""))
+	var cell: Vector2i = edge.get("cell", Vector2i.ZERO) as Vector2i
+	var deck: int = int(edge.get("deck", -1))
+	var expected_placement_by_kind: Dictionary = {
+		"threshold": "edge:%s" % edge_key_value,
+		"interior": "floor:%s" % cell_key(deck, cell),
+	}
+	var placement_ids: Dictionary = {}
+	for placement_variant in placements + floors:
+		if placement_variant is Dictionary:
+			placement_ids[str((placement_variant as Dictionary).get(
+				"placement_id", ""))] = true
+	var seen_kinds: Dictionary = {}
+	var seen_ids: Dictionary = {}
+	var compiled: Array = []
+	var expected_keys: Array = ["node_id", "kind", "portal_id", "room_id",
+		"deck", "cell", "structural_placement_id", "local_position"]
+	for node_variant in source:
+		if not node_variant is Dictionary:
+			errors.append("dock navigation node must be an object")
+			continue
+		var node: Dictionary = node_variant
+		var fields_valid: bool = node.size() == expected_keys.size()
+		for field in expected_keys:
+			fields_valid = fields_valid and node.has(field)
+		var node_id: String = str(node.get("node_id", ""))
+		var kind: String = str(node.get("kind", ""))
+		var placement_id: String = str(node.get("structural_placement_id", ""))
+		var position: Dictionary = _read_position(node.get("local_position", null))
+		var node_cell: Dictionary = _read_cell(node.get("cell", null), deck)
+		if not fields_valid or node_id.is_empty() or seen_ids.has(node_id) \
+				or seen_kinds.has(kind) or not expected_placement_by_kind.has(kind) \
+				or placement_id != str(expected_placement_by_kind[kind]) \
+				or not placement_ids.has(placement_id) \
+				or str(node.get("portal_id", "")) != str(edge.get("portal_id", "")) \
+				or str(node.get("room_id", "")) != str(edge.get("owner_room", "")) \
+				or int(node.get("deck", -1)) != deck \
+				or not bool(node_cell.get("ok", false)) \
+				or node_cell.get("cell", Vector2i(-99999, -99999)) != cell \
+				or not bool(position.get("ok", false)) \
+				or not (position.get("value", Vector3.INF) as Vector3).is_finite():
+			errors.append("dock navigation node authority mismatch: %s" % node_id)
+			continue
+		seen_ids[node_id] = true
+		seen_kinds[kind] = true
+		compiled.append(node.duplicate(true))
+	if seen_kinds.size() != 2:
+		errors.append("dock navigation node kinds are incomplete")
+	compiled.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("kind", "")) > str(b.get("kind", "")))
+	return compiled
 
 
 func _direction_between(from_cell: Vector2i, to_cell: Vector2i) -> String:
@@ -889,6 +1096,19 @@ func _read_cell(value: Variant, default_deck: int) -> Dictionary:
 	return {"ok": true, "cell": Vector2i(int(values[0]), int(values[1])), "deck": deck}
 
 
+func _read_position(value: Variant) -> Dictionary:
+	if typeof(value) == TYPE_VECTOR3:
+		return {"ok": true, "value": value}
+	if typeof(value) != TYPE_ARRAY:
+		return {"ok": false}
+	var values: Array = value
+	if values.size() != 3 or not _is_number(values[0]) \
+			or not _is_number(values[1]) or not _is_number(values[2]):
+		return {"ok": false}
+	return {"ok": true, "value": Vector3(
+		float(values[0]), float(values[1]), float(values[2]))}
+
+
 func _parse_vector_string(value: String, expected: int) -> Array:
 	var text: String = value.strip_edges()
 	if text.begins_with("(") and text.ends_with(")"):
@@ -913,3 +1133,7 @@ func _is_integer(value: Variant) -> bool:
 	if typeof(value) == TYPE_STRING:
 		return str(value).is_valid_int()
 	return false
+
+
+func _is_number(value: Variant) -> bool:
+	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT

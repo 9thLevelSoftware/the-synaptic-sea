@@ -183,9 +183,9 @@ func _check_seed_17_structural_contract(layout: Dictionary, label: String) -> bo
 			push_error("STRESS FAIL %s seed=17 portal record is not a Dictionary" % label)
 			return false
 		var portal: Dictionary = portal_variant
-		var portal_edge_key: String = str(portal.get("edge_key", ""))
+		var portal_edge_key: String = _portal_structural_edge_key(portal)
 		if portal_edge_key.is_empty():
-			push_error("STRESS FAIL %s seed=17 portal has no edge_key" % label)
+			push_error("STRESS FAIL %s seed=17 portal has no cardinal structural edge" % label)
 			return false
 		portal_record_counts[portal_edge_key] = int(portal_record_counts.get(portal_edge_key, 0)) + 1
 
@@ -377,3 +377,33 @@ func _direction_between(from_cell: Vector2i, to_cell: Vector2i) -> String:
 		if StructuralEdgePlanScript.DIRECTIONS[direction] == delta:
 			return direction
 	return ""
+
+
+func _portal_structural_edge_key(portal: Dictionary) -> String:
+	var explicit: String = str(portal.get("edge_key", ""))
+	if not explicit.is_empty():
+		return explicit
+	var from_result: Dictionary = _portal_cell(portal.get("from_cell", null))
+	var to_result: Dictionary = _portal_cell(portal.get("to_cell", null))
+	if not bool(from_result.get("ok", false)) or not bool(to_result.get("ok", false)):
+		return ""
+	var direction: String = _direction_between(from_result["cell"], to_result["cell"])
+	if direction.is_empty():
+		return ""
+	var from_deck: int = int(from_result.get("deck", portal.get("deck", 0)))
+	var to_deck: int = int(to_result.get("deck", from_deck))
+	if from_deck != to_deck:
+		return ""
+	return StructuralEdgePlanScript.edge_key(from_deck, from_result["cell"], direction)
+
+
+func _portal_cell(raw_cell: Variant) -> Dictionary:
+	if raw_cell is Vector2i:
+		return {"ok": true, "cell": raw_cell, "deck": 0}
+	if raw_cell is Array and (raw_cell as Array).size() >= 2:
+		var values: Array = raw_cell
+		if typeof(values[0]) != TYPE_INT or typeof(values[1]) != TYPE_INT:
+			return {"ok": false}
+		var deck: int = int(values[2]) if values.size() >= 3 and typeof(values[2]) == TYPE_INT else 0
+		return {"ok": true, "cell": Vector2i(int(values[0]), int(values[1])), "deck": deck}
+	return {"ok": false}

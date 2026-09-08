@@ -16,9 +16,9 @@
     "local_max_m": [
       2.0,
       3.0,
-      2.0
+      0.0
     ],
-    "placement_origin": "edge-center",
+    "placement_origin": "vertex-center",
     "mesh_origin_offset_m": [
       0.0,
       0.0,
@@ -74,14 +74,15 @@
     "kind": "static-body-proxy",
     "nav_blocker": true,
     "proxy_shape": "box",
-    "notes": "authored simple proxy, never decorative collision"
+    "notes": "authored compound 2 m vertex rays, matching visible geometry"
   },
   "provenance": {
-    "source_platform": "self-authored",
+    "source_platform": "recovered-then-self-authored",
     "license_state": "self-authored",
-    "provenance_id": "ship_structural_v0:wall_t_junction"
+    "provenance_id": "ship_structural_v0:wall_t_junction",
+    "source_authority": "vertex-half-span-2026-09-08"
   },
-  "source_asset_path": "assets/_processed/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
+  "source_asset_path": "assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
   "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
   "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
   "inspection_path": null,
@@ -93,7 +94,7 @@
       "kit_id": "ship_structural_v0",
       "module_id": "wall_t_junction",
       "module_family": "junction",
-      "pivot_policy": "edge-center"
+      "pivot_policy": "vertex-center"
     },
     "bounds": {
       "local_min_m": [
@@ -104,9 +105,9 @@
       "local_max_m": [
         2.0,
         3.0,
-        2.0
+        0.0
       ],
-      "placement_origin": "edge-center",
+      "placement_origin": "vertex-center",
       "mesh_origin_offset_m": [
         0.0,
         0.0,
@@ -162,14 +163,15 @@
       "kind": "static-body-proxy",
       "nav_blocker": true,
       "proxy_shape": "box",
-      "notes": "authored simple proxy, never decorative collision"
+      "notes": "authored compound 2 m vertex rays, matching visible geometry"
     },
     "provenance": {
-      "source_platform": "self-authored",
+      "source_platform": "recovered-then-self-authored",
       "license_state": "self-authored",
-      "provenance_id": "ship_structural_v0:wall_t_junction"
+      "provenance_id": "ship_structural_v0:wall_t_junction",
+      "source_authority": "vertex-half-span-2026-09-08"
     },
-    "source_asset_path": "assets/_processed/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
+    "source_asset_path": "assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
     "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
     "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres"
   }

@@ -538,7 +538,9 @@ static func _collect_compiled_records(out: Array, records_v: Variant, layer: Str
 			continue
 		var key_part: String = ""
 		if layer == "edge":
-			key_part = str(rec.get("edge_key", rec.get("key", "")))
+			var edge_key_value: String = str(rec.get("edge_key", rec.get("key", "")))
+			var placement_id: String = str(rec.get("placement_id", rec.get("id", "")))
+			key_part = edge_key_value if placement_id == "edge:%s" % edge_key_value else placement_id
 		else:
 			key_part = str(rec.get("cell_key", ""))
 		if key_part.is_empty():
