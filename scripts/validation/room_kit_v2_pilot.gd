@@ -26,7 +26,19 @@ func _load_visual(path: String) -> Node3D:
 	var state := GLTFState.new()
 	if document.append_from_file(ProjectSettings.globalize_path(path), state) != OK:
 		return null
-	return document.generate_scene(state) as Node3D
+	var model: Node3D = document.generate_scene(state) as Node3D
+	if model != null and not _has_visual_mesh(model):
+		model.free()
+		return null
+	return model
+
+func _has_visual_mesh(node: Node) -> bool:
+	if node is MeshInstance3D and node.mesh != null and node.mesh.get_surface_count() > 0:
+		return true
+	for child in node.get_children():
+		if _has_visual_mesh(child):
+			return true
+	return false
 
 func build_preview(paths: Dictionary, baseline: bool = false) -> bool:
 	# Preflight every selected model before attaching anything to the scene.

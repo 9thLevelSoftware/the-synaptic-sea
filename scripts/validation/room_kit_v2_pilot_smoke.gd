@@ -25,6 +25,25 @@ func _run() -> void:
 	if mixed_paths["floor_1x1"] != "res://assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb" or mixed_paths["coolant_pump_skid_derelict_v1"] != "res://candidate-stage/props/coolant_pump_skid_derelict_v1.glb":
 		_fail(pilot, "baseline shell must never substitute candidate props")
 		return
+	# Valid GLB container with an empty node is not visual evidence.
+	var empty_path := "user://room_kit_v2_empty_payload_test.glb"
+	var document := JSON.stringify({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{}]}).to_utf8_buffer()
+	while document.size() % 4 != 0:
+		document.append(32)
+	var fixture := FileAccess.open(empty_path, FileAccess.WRITE)
+	fixture.store_buffer("glTF".to_utf8_buffer())
+	fixture.store_32(2)
+	fixture.store_32(20 + document.size())
+	fixture.store_32(document.size())
+	fixture.store_buffer("JSON".to_utf8_buffer())
+	fixture.store_buffer(document)
+	fixture.close()
+	var empty_visual: Node3D = pilot.call("_load_visual",empty_path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(empty_path))
+	if empty_visual != null:
+		empty_visual.free()
+		_fail(pilot,"semantically empty GLB accepted")
+		return
 	# Missing input must not create substitute geometry or partial composition.
 	var missing: Dictionary = {}
 	for asset_id in pilot.get("ASSET_IDS"):
