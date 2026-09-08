@@ -1,0 +1,2220 @@
+{
+  "schema": "world-v6-geometry-authority-1",
+  "source_commit": "c51bcacbcb5557fd54ccf5a3e2775f0e35c61bad",
+  "scope": "Historical world-6 room/cell ordering and attachment projection only; excludes structural/damage migration, world-save publication, live clearance, and current endpoint authoring.",
+  "rng_authority": {
+    "historical_engine": "Godot 4.7.1",
+    "algorithm": "RandomNumberGenerator seeded integer stream used by the pinned GDScript closure",
+    "compatibility_rule": "A newer engine is accepted only when focused comparison reproduces pinned historical outputs."
+  },
+  "source_blobs": {
+    "scripts/procgen/ship_generator.gd": "5b61d7f906d967975291de9c8605a316d1a7dc40",
+    "scripts/procgen/ship_blueprint.gd": "112458a7e9fa0b547c9b86b60f66897d43a5304b",
+    "scripts/procgen/template_selector.gd": "145a90a0f4e944a36b9b06829271b01704c753ea",
+    "scripts/procgen/topology_template.gd": "13623b059a96bd345f20b5801d5ba8cb42211267",
+    "scripts/procgen/room_assigner.gd": "c7738a8f47368d2de0518873456692ea0ecbada6",
+    "scripts/procgen/cell_layout_engine.gd": "cb742f3725b587e22e4bcb151560d86074a85ec2",
+    "scripts/procgen/ship_layout_generator.gd": "0799708c7a836634a8adfd0966ba2da92860c743",
+    "scripts/systems/dock_ports.gd": "195546f8855251163785f4a1d7e33fe2714886d9",
+    "scripts/systems/docking_manager.gd": "ec49a728e0d798f01d1e72b93bd94139149ec651",
+    "data/procgen/archetypes/derelict.json": "04024f7c6d3ca32b9bd0a5ed87d9a417c589ad6",
+    "data/procgen/golden/coherent_ship_001/layout.json": "8f96dfb451a5e36b55db4033cfffe1e918093dc1",
+    "scripts/procgen/life_boat.gd": "f7ff672933a6a5cb57e9c3a812dbd81b3efaa058",
+    "data/kits/ship_structural_v0.json": "473f688a078877e4db314cc074933dcc4a9ad3da"
+  },
+  "copied_algorithm_subset": {
+    "blueprint_fields": [
+      "size",
+      "condition",
+      "seed_value",
+      "room_count_range",
+      "generation_context_v1"
+    ],
+    "template_selection": "Legacy first-three pool without generation context; exact ordered fourteen-template pool when persisted difficulty is nonempty.",
+    "room_assignment": "Zone order, count RNG, normalized weighted role selection, duplicate cap, guarantees, and footprint RNG.",
+    "cell_layout": "Room placement, connector realization, discovered cardinal/vertical adjacency, and connectivity selection needed before attachment projection.",
+    "retry_policy": {
+      "attempts": 4,
+      "salt_expression": "base_seed ^ (attempt * 0x9E3779B9)",
+      "selection": "first connected candidate, otherwise final nonempty best effort"
+    },
+    "serialization_subset": "Placed room id, role, deck, and ordered cells mapped to [x*4.0, deck*4.0, z*4.0]."
+  },
+  "fixed": {
+    "home": {
+      "projection": {
+        "airlock": {
+          "position": [
+            2,
+            0,
+            2
+          ],
+          "facing": [
+            1,
+            0,
+            0
+          ],
+          "type": "airlock",
+          "size_class": 1,
+          "condition": "intact"
+        },
+        "hangar": {
+          "type": "hangar",
+          "slot_count": 2,
+          "slot_size_class": 2,
+          "slot_anchors": [
+            [
+              20,
+              4,
+              -4
+            ],
+            [
+              20,
+              4,
+              -8
+            ]
+          ]
+        }
+      }
+    },
+    "lifeboat": {
+      "projection": {
+        "airlock": {
+          "position": [
+            -2,
+            0,
+            0
+          ],
+          "facing": [
+            -1,
+            0,
+            0
+          ],
+          "type": "airlock",
+          "size_class": 1,
+          "condition": "intact"
+        },
+        "hangar": {}
+      }
+    },
+    "home_docked_lifeboat_root_transform": [
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      4,
+      0,
+      2
+    ]
+  },
+  "dock_constants": {
+    "cell_size": 4,
+    "deck_height": 4,
+    "half_cell": 2,
+    "airlock_size_class": 1,
+    "cells_per_hangar_slot": 2,
+    "hangar_big_cell_threshold": 4,
+    "floor_module_ids": [
+      "floor_1x1",
+      "corridor_floor_1x1"
+    ]
+  },
+  "native_v2": {
+    "generator_class": "DerelictGenerator",
+    "generator_version": 2,
+    "kit_id": "ship_structural_v0",
+    "size_to_archetype": {
+      "0": "shuttle",
+      "1": "corvette",
+      "2": "freighter"
+    },
+    "condition_to_intactness": {
+      "0": 9500,
+      "1": 6000,
+      "2": 2000
+    },
+    "platforms": {
+      "Windows": {
+        "path": "res://addons/derelict/bin/win64/derelict_godot.dll",
+        "git_blob": "b3e91392d04bfb0bedbddf2b12b6a1aced512650",
+        "sha256": "3279db6338e7af6b54cb4e8c8886d39bdffec73549a25149a05a87d9ebdb8798"
+      },
+      "macOS": {
+        "path": "res://addons/derelict/bin/macos/libderelict_godot.dylib",
+        "git_blob": "fb99158e86b0619de592353a517359682f029a50",
+        "sha256": "a17fbcaf4834d51ac8ddc05becbe0a762d07ab83e043f215532eccb40040cec1"
+      }
+    },
+    "unavailable_platforms": [
+      "Linux",
+      "Web"
+    ],
+    "rule": "Use only the already-registered class after exact platform binary hash and generator-version validation. Never install, copy, or load a duplicate extension."
+  },
+  "witness_schema": {
+    "exact_keys": [
+      "dock_edges",
+      "hangar_summary",
+      "room_cell_markers"
+    ],
+    "dock_edges": {
+      "source": "world-6 WorldSnapshot.dock_edges rows relevant to this owner",
+      "row_keys": [
+        "port_type",
+        "slot_index"
+      ],
+      "allowed_port_types": [
+        "airlock",
+        "hangar"
+      ]
+    },
+    "hangar_summary": {
+      "source": "world-6 ShipInstance.hangar",
+      "exact_keys": [
+        "slot_count",
+        "slot_size_class",
+        "slots"
+      ]
+    },
+    "room_cell_markers": {
+      "source": "closed world-6 combat/objective records whose schemas identify room_id and topology-local cell",
+      "row_keys": [
+        "room_id",
+        "cell"
+      ]
+    },
+    "excluded": "No route hint or corrected-current geometry may be inferred or supplied as a witness."
+  },
+  "fallback_archetype": {
+    "name": "Derelict",
+    "description": "Dead ship shell — randomized exploration space with dock for life boat attachment",
+    "type": "derelict",
+    "blueprint": {
+      "size": 1,
+      "condition": 2,
+      "seed_value": 0,
+      "room_count_range": {
+        "min": 5,
+        "max": 10
+      }
+    },
+    "role_weights": {
+      "cargo": 4,
+      "corridor": 3,
+      "bridge": 3,
+      "crew_quarters": 2,
+      "hangar": 2,
+      "engineering": 2,
+      "dock": 1
+    },
+    "guaranteed_roles": [
+      "dock"
+    ],
+    "max_duplicates": 3
+  },
+  "ordered_templates": [
+    {
+      "order": 0,
+      "id": "spine",
+      "git_blob": "435b727323eb400e1f2bc6ba281eba2986f4339d",
+      "data": {
+        "id": "spine",
+        "description": "Linear corridor backbone. Bridge forward, engineering aft, airlock lateral entry. Classic submarine layout.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "fore_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "fore_corridor"
+          },
+          {
+            "id": "crew_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "fore_corridor"
+          },
+          {
+            "id": "crew_wing",
+            "role_pool": [
+              "crew_quarters",
+              "medical",
+              "mess_hall"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "crew_corridor"
+          },
+          {
+            "id": "mid_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "crew_corridor"
+          },
+          {
+            "id": "cargo_wing",
+            "role_pool": [
+              "cargo",
+              "storage",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "mid_corridor"
+          },
+          {
+            "id": "aft_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "mid_corridor"
+          },
+          {
+            "id": "engine_room",
+            "role_pool": [
+              "engineering",
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "aft_corridor"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "fore_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "fore_corridor",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "fore_corridor",
+            "to": "crew_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "crew_corridor",
+            "to": "crew_wing",
+            "distribution": "spread"
+          },
+          {
+            "from": "crew_corridor",
+            "to": "mid_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "mid_corridor",
+            "to": "cargo_wing",
+            "distribution": "spread"
+          },
+          {
+            "from": "mid_corridor",
+            "to": "aft_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "aft_corridor",
+            "to": "engine_room",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 1,
+      "id": "bifurcated",
+      "git_blob": "42a0ff4b4b04640d11b85859a604e2959e45786a",
+      "data": {
+        "id": "bifurcated",
+        "description": "Y-fork: bridge forward, junction splits port (cargo/engineering) and starboard (crew/medical), engineering aft.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "fore_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "fore_corridor"
+          },
+          {
+            "id": "junction",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "fore_corridor"
+          },
+          {
+            "id": "port_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "junction"
+          },
+          {
+            "id": "port_room",
+            "role_pool": [
+              "crew_quarters",
+              "medical",
+              "mess_hall"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "port_corridor"
+          },
+          {
+            "id": "starboard_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "junction"
+          },
+          {
+            "id": "starboard_room",
+            "role_pool": [
+              "cargo",
+              "storage",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "starboard_corridor"
+          },
+          {
+            "id": "aft_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "junction"
+          },
+          {
+            "id": "engine_room",
+            "role_pool": [
+              "engineering",
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "aft_corridor"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "fore_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "fore_corridor",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "fore_corridor",
+            "to": "junction",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "junction",
+            "to": "port_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "port_corridor",
+            "to": "port_room",
+            "distribution": "spread"
+          },
+          {
+            "from": "junction",
+            "to": "starboard_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "starboard_corridor",
+            "to": "starboard_room",
+            "distribution": "spread"
+          },
+          {
+            "from": "junction",
+            "to": "aft_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "aft_corridor",
+            "to": "engine_room",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 2,
+      "id": "stacked",
+      "git_blob": "896b6fa47c53eb06f319cc916f0f57c8a6b26c04",
+      "data": {
+        "id": "stacked",
+        "description": "Two decks connected by ramp. Upper deck: bridge forward, crew areas. Lower deck: cargo, engineering aft, reactor.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "upper_fore_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "upper_fore_corridor"
+          },
+          {
+            "id": "upper_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "upper_fore_corridor"
+          },
+          {
+            "id": "crew_wing",
+            "role_pool": [
+              "crew_quarters",
+              "medical",
+              "mess_hall"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 1,
+            "layout": "clustered",
+            "attach_to": "upper_corridor"
+          },
+          {
+            "id": "ramp",
+            "role_pool": [
+              "ramp"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "upper_corridor"
+          },
+          {
+            "id": "lower_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "ramp"
+          },
+          {
+            "id": "cargo_bay",
+            "role_pool": [
+              "cargo",
+              "storage",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "lower_corridor"
+          },
+          {
+            "id": "lower_aft_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "lower_corridor"
+          },
+          {
+            "id": "engine_room",
+            "role_pool": [
+              "engineering",
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "lower_aft_corridor"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "upper_fore_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "upper_fore_corridor",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "upper_fore_corridor",
+            "to": "upper_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "upper_corridor",
+            "to": "crew_wing",
+            "distribution": "spread"
+          },
+          {
+            "from": "upper_corridor",
+            "to": "ramp",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ramp",
+            "to": "lower_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "lower_corridor",
+            "to": "cargo_bay",
+            "distribution": "spread"
+          },
+          {
+            "from": "lower_corridor",
+            "to": "lower_aft_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "lower_aft_corridor",
+            "to": "engine_room",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 2,
+          "vertical_transition_probability": 1
+        }
+      }
+    },
+    {
+      "order": 3,
+      "id": "stacked_v2",
+      "git_blob": "97e16735f6228cbf73177b32c7001b40ff764b00",
+      "data": {
+        "id": "stacked_v2",
+        "description": "Three-deck vertical with an auxiliary service deck between the main upper and lower decks. Bridge on top, service deck middle, reactor at the bottom. Tests multi-deck traversal and three vertical transitions.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "lower_hub",
+            "role_pool": [
+              "hub"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "ramp_1",
+            "role_pool": [
+              "ramp"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "lower_hub"
+          },
+          {
+            "id": "service_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "ramp_1"
+          },
+          {
+            "id": "service_room",
+            "role_pool": [
+              "maintenance",
+              "storage",
+              "tool_storage"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 1,
+            "layout": "clustered",
+            "attach_to": "service_corridor"
+          },
+          {
+            "id": "ramp_2",
+            "role_pool": [
+              "ramp"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "service_corridor"
+          },
+          {
+            "id": "elevator",
+            "role_pool": [
+              "elevator"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 1,
+            "layout": "single",
+            "attach_to": "service_corridor"
+          },
+          {
+            "id": "upper_hub",
+            "role_pool": [
+              "hub"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 2,
+            "layout": "single",
+            "attach_to": "ramp_2"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 2,
+            "layout": "single",
+            "attach_to": "upper_hub"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "lower_hub",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "lower_hub",
+            "to": "ramp_1",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ramp_1",
+            "to": "service_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "service_corridor",
+            "to": "service_room",
+            "distribution": "spread"
+          },
+          {
+            "from": "service_corridor",
+            "to": "ramp_2",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "service_corridor",
+            "to": "elevator",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ramp_2",
+            "to": "upper_hub",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "elevator",
+            "to": "upper_hub",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "upper_hub",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 3,
+          "vertical_transition_probability": 1
+        }
+      }
+    },
+    {
+      "order": 4,
+      "id": "compact",
+      "git_blob": "0abd9fea02cde84a06dc32d60d2fee76cab77a17",
+      "data": {
+        "id": "compact",
+        "description": "Single-deck minimal freighter with very tight corridors. Bridge forward, engineering aft, airlock lateral entry. Uses small role footprints; intended as the LIFE_BOAT-adjacent small variant.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "spine",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "side_a",
+            "role_pool": [
+              "cargo",
+              "maintenance"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spine"
+          },
+          {
+            "id": "side_b",
+            "role_pool": [
+              "medical",
+              "crew_quarters"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spine"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "engineering",
+              "reactor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spine"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "spine",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine",
+            "to": "side_a",
+            "distribution": "spread"
+          },
+          {
+            "from": "spine",
+            "to": "side_b",
+            "distribution": "spread"
+          },
+          {
+            "from": "spine",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 5,
+      "id": "dispersed",
+      "git_blob": "1807af5a2a7cd0cdd298110446a843825e9d8b07",
+      "data": {
+        "id": "dispersed",
+        "description": "Wide single-deck layout where rooms spread out laterally rather than along a spine. Bridge forward-center, cargo starboard, medical port, engineering aft. Tests lateral-spread topology.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "central_hub",
+            "role_pool": [
+              "hub"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "starboard_branch",
+            "role_pool": [
+              "cargo",
+              "engineering",
+              "maintenance"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "central_hub"
+          },
+          {
+            "id": "port_branch",
+            "role_pool": [
+              "medical",
+              "crew_quarters",
+              "mess_hall"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "central_hub"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "central_hub"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "central_hub",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "central_hub",
+            "to": "starboard_branch",
+            "distribution": "spread"
+          },
+          {
+            "from": "central_hub",
+            "to": "port_branch",
+            "distribution": "spread"
+          },
+          {
+            "from": "central_hub",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 6,
+      "id": "derelict_a",
+      "git_blob": "3c1c1327fe8a0c8286ef99d0830f6a9ad796d3f6",
+      "data": {
+        "id": "derelict_a",
+        "description": "Derelict variant A — dock + compartments with one biomatter blockage on a non-critical side link. Player enters via the dock and explores compartments.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "dock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "corridor_a",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "compartment_a",
+            "role_pool": [
+              "cargo",
+              "crew_quarters"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "corridor_a"
+          },
+          {
+            "id": "corridor_b",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "corridor_a"
+          },
+          {
+            "id": "compartment_b",
+            "role_pool": [
+              "cargo",
+              "hangar"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "corridor_b"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "corridor_b"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "corridor_a",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "corridor_a",
+            "to": "compartment_a",
+            "distribution": "spread"
+          },
+          {
+            "from": "corridor_a",
+            "to": "corridor_b",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "corridor_b",
+            "to": "compartment_b",
+            "distribution": "spread"
+          },
+          {
+            "from": "corridor_b",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 7,
+      "id": "derelict_b",
+      "git_blob": "8668ff62c3b27de67d0341cc4ec666b645561a8d",
+      "data": {
+        "id": "derelict_b",
+        "description": "Derelict variant B — dock + compartments + sealed forward chamber with a high-value cache. Sealed chamber is reachable but blocked by a biomatter blockage the player must clear.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "dock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "corridor_a",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "compartment_a",
+            "role_pool": [
+              "cargo",
+              "crew_quarters"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "corridor_a"
+          },
+          {
+            "id": "corridor_b",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "corridor_a"
+          },
+          {
+            "id": "sealed_chamber",
+            "role_pool": [
+              "cargo",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "corridor_b"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "corridor_b"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "corridor_a",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "corridor_a",
+            "to": "compartment_a",
+            "distribution": "spread"
+          },
+          {
+            "from": "corridor_a",
+            "to": "corridor_b",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "corridor_b",
+            "to": "sealed_chamber",
+            "distribution": "spread"
+          },
+          {
+            "from": "corridor_b",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 8,
+      "id": "ring",
+      "git_blob": "505d3c2e95ffb25995bbfb39c8bfa95fcf761203",
+      "data": {
+        "id": "ring",
+        "description": "Closed loop corridor with central core rooms. Player can circle the ship; critical path uses the ring then breaks into the core.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "ring_a",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 2,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "ring_b",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 2,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "ring_a"
+          },
+          {
+            "id": "ring_c",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 2,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "ring_b"
+          },
+          {
+            "id": "crew_pocket",
+            "role_pool": [
+              "crew_quarters",
+              "mess_hall",
+              "medical"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "ring_a"
+          },
+          {
+            "id": "cargo_pocket",
+            "role_pool": [
+              "cargo",
+              "storage"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "ring_b"
+          },
+          {
+            "id": "core",
+            "role_pool": [
+              "bridge",
+              "engineering"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "ring_c"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "core"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "ring_a",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ring_a",
+            "to": "ring_b",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ring_b",
+            "to": "ring_c",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ring_c",
+            "to": "ring_a",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "ring_a",
+            "to": "crew_pocket",
+            "distribution": "spread"
+          },
+          {
+            "from": "ring_b",
+            "to": "cargo_pocket",
+            "distribution": "spread"
+          },
+          {
+            "from": "ring_c",
+            "to": "core",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "core",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 9,
+      "id": "radial",
+      "git_blob": "1d758e0a2f53df6e39e60fb88d618a8d178ab323",
+      "data": {
+        "id": "radial",
+        "description": "Hub-and-spoke: central junction with 3–4 wings (bridge, cargo, medical, engineering). High branching variety.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "hub",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "entry"
+          },
+          {
+            "id": "spoke_bridge",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "hub"
+          },
+          {
+            "id": "spoke_cargo",
+            "role_pool": [
+              "cargo",
+              "storage",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "hub"
+          },
+          {
+            "id": "spoke_life",
+            "role_pool": [
+              "crew_quarters",
+              "medical",
+              "mess_hall"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "hub"
+          },
+          {
+            "id": "spoke_eng",
+            "role_pool": [
+              "engineering",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "hub"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "reactor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spoke_eng"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "hub",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "hub",
+            "to": "spoke_bridge",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "hub",
+            "to": "spoke_cargo",
+            "distribution": "spread"
+          },
+          {
+            "from": "hub",
+            "to": "spoke_life",
+            "distribution": "spread"
+          },
+          {
+            "from": "hub",
+            "to": "spoke_eng",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spoke_eng",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 10,
+      "id": "double_spine",
+      "git_blob": "16139a3b9627b957f1a2475af4e09d228a2f3a52",
+      "data": {
+        "id": "double_spine",
+        "description": "Two parallel corridor spines linked by cross-passages. Redundant routes for salvage under threat pressure.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "spine_port",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "spine_starboard",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "cross_fore",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spine_port"
+          },
+          {
+            "id": "cross_aft",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "spine_port"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "cross_fore"
+          },
+          {
+            "id": "crew_wing",
+            "role_pool": [
+              "crew_quarters",
+              "medical"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "spine_starboard"
+          },
+          {
+            "id": "engine_block",
+            "role_pool": [
+              "engineering",
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "cross_aft"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "spine_port",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "entry",
+            "to": "spine_starboard",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine_port",
+            "to": "cross_fore",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine_starboard",
+            "to": "cross_fore",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine_port",
+            "to": "cross_aft",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine_starboard",
+            "to": "cross_aft",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "cross_fore",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "spine_starboard",
+            "to": "crew_wing",
+            "distribution": "spread"
+          },
+          {
+            "from": "cross_aft",
+            "to": "engine_block",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 11,
+      "id": "hangar_wing",
+      "git_blob": "29cfdf7405a52f2e4ae603677ad1bf0dde5ede07",
+      "data": {
+        "id": "hangar_wing",
+        "description": "Forward hangar/dock volume with side maintenance and aft engineering. Emphasizes large cargo/dock rooms.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock",
+              "dock"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "hangar",
+            "role_pool": [
+              "cargo",
+              "dock"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "entry"
+          },
+          {
+            "id": "maint_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "hangar"
+          },
+          {
+            "id": "maint_bay",
+            "role_pool": [
+              "maintenance",
+              "storage",
+              "armory"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "maint_corridor"
+          },
+          {
+            "id": "aft_corridor",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "hangar"
+          },
+          {
+            "id": "crew_nook",
+            "role_pool": [
+              "crew_quarters",
+              "mess_hall"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "aft_corridor"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "engineering",
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "aft_corridor"
+          },
+          {
+            "id": "reactor_pocket",
+            "role_pool": [
+              "reactor",
+              "life_support"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "destination"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "hangar",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "hangar",
+            "to": "maint_corridor",
+            "distribution": "spread"
+          },
+          {
+            "from": "maint_corridor",
+            "to": "maint_bay",
+            "distribution": "spread"
+          },
+          {
+            "from": "hangar",
+            "to": "aft_corridor",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "aft_corridor",
+            "to": "crew_nook",
+            "distribution": "spread"
+          },
+          {
+            "from": "aft_corridor",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "destination",
+            "to": "reactor_pocket",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 12,
+      "id": "vault",
+      "git_blob": "c64c20e39aa2318e4c99f3d83f26c2584f783a4f",
+      "data": {
+        "id": "vault",
+        "description": "Deep-core vault: long choke corridor into nested secure compartments. High threat pressure on the approach.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "airlock"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "approach",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              2,
+              4
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "guard_wing",
+            "role_pool": [
+              "armory",
+              "security",
+              "storage"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "approach"
+          },
+          {
+            "id": "antechamber",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": 1,
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "approach"
+          },
+          {
+            "id": "vault_a",
+            "role_pool": [
+              "cargo",
+              "storage"
+            ],
+            "count": [
+              1,
+              2
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "antechamber"
+          },
+          {
+            "id": "vault_b",
+            "role_pool": [
+              "cargo",
+              "armory"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "vault_a"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge",
+              "engineering"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "vault_b"
+          },
+          {
+            "id": "life_support_nook",
+            "role_pool": [
+              "life_support",
+              "medical"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "antechamber"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "approach",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "approach",
+            "to": "guard_wing",
+            "distribution": "spread"
+          },
+          {
+            "from": "approach",
+            "to": "antechamber",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "antechamber",
+            "to": "vault_a",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "vault_a",
+            "to": "vault_b",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "vault_b",
+            "to": "destination",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "antechamber",
+            "to": "life_support_nook",
+            "distribution": "spread"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    },
+    {
+      "order": 13,
+      "id": "hive",
+      "git_blob": "fa23ac9cd98eb994d4fd1f57b52c2c1c6f24ad51",
+      "data": {
+        "id": "hive",
+        "description": "Hive cluster — short corridor core with clustered compartments, one lateral overgrown pocket, destination on the bow. Occupancy topology only; biomatter kit remaps existing stems.",
+        "zones": [
+          {
+            "id": "entry",
+            "role_pool": [
+              "dock"
+            ],
+            "count": 1,
+            "position_hint": "stern",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": ""
+          },
+          {
+            "id": "core",
+            "role_pool": [
+              "corridor"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "linear",
+            "attach_to": "entry"
+          },
+          {
+            "id": "cluster",
+            "role_pool": [
+              "cargo",
+              "crew_quarters"
+            ],
+            "count": [
+              2,
+              3
+            ],
+            "position_hint": "center",
+            "deck": 0,
+            "layout": "clustered",
+            "attach_to": "core"
+          },
+          {
+            "id": "overgrown",
+            "role_pool": [
+              "cargo",
+              "hangar"
+            ],
+            "count": 1,
+            "position_hint": "lateral",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "core"
+          },
+          {
+            "id": "destination",
+            "role_pool": [
+              "bridge"
+            ],
+            "count": 1,
+            "position_hint": "bow",
+            "deck": 0,
+            "layout": "single",
+            "attach_to": "core"
+          }
+        ],
+        "connections": [
+          {
+            "from": "entry",
+            "to": "core",
+            "distribution": "adjacent"
+          },
+          {
+            "from": "core",
+            "to": "cluster",
+            "distribution": "spread"
+          },
+          {
+            "from": "core",
+            "to": "overgrown",
+            "distribution": "spread"
+          },
+          {
+            "from": "core",
+            "to": "destination",
+            "distribution": "adjacent"
+          }
+        ],
+        "deck_config": {
+          "max_decks": 1,
+          "vertical_transition_probability": 0
+        }
+      }
+    }
+  ]
+}
