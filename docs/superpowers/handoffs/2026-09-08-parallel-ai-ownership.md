@@ -6,7 +6,7 @@ This is an ownership handoff, not a completion report. The full feature-completi
 
 - Worktree: D:/the-synaptic-sea-feature-completion
 - Branch: codex/feature-completion-resume
-- Committed base: f6250b4eae8dc3e85d7161e5efae9a9c96ee0886
+- Latest reviewed contract checkpoint: 76bbcc58 (the branch may advance; inspect current HEAD before integration).
 - Significant uncommitted R10 work is present. A checkout of this commit alone does not include those changes.
 - Original D:/the-synaptic-sea checkout is not this execution worktree.
 
@@ -27,6 +27,7 @@ This is an ownership handoff, not a completion report. The full feature-completi
 - tools/build_feature_acceptance.py, data/validation/feature_completion_cards.json, docs/game/inventory/feature_acceptance.json
 - docs/game/features/crafting_derelict_feature_completion.md, docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md, STATUS.md, docs/game/06_validation_plan.md
 - Current plan-local progress ledger and evidence packages
+- `tools/rebuild_vertex_span_modules.py`, the inner/outer corner and T-junction source/GLB/wrapper/contract families, their collision projection in `data/kits/ship_structural_v0.json`, and `assets/_source/recovered/ship_structural_v0/.gdignore`. These are being corrected to use vertex-owned rays and complete wall half-span coverage.
 
 ## Suitable independent assignments
 

@@ -7,9 +7,10 @@
 The checkpoint preserves integrated WIP and portable task evidence; it is not
 feature-complete or independently approved as a whole. R10-A's fresh combined
 baseline qualification passed all 15 cases with clean diagnostics and isolated
-profile probes. Independent review found that join-overlap containment derives
-its allowed region from the observed overlap itself; correction and requalification
-are required before paired run7/world7 migration. PR #548 was
+profile probes. Independent review identified four blocking gaps: post-validation
+plan mutation, ineffective join-overlap enforcement, incomplete endpoint/spawn
+identity validation, and an initial double placement of the player. Corrections
+and requalification are underway before paired run7/world7 migration. PR #548 was
 merged as `2f9c6913`; resumed work starts from that merged base on
 `codex/feature-completion-resume` in the existing isolated execution worktree.
 
