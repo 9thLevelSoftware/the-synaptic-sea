@@ -1,0 +1,166 @@
+{
+  "schema_version": "1.0.0",
+  "asset_pack": "room_kit_v2",
+  "assets": [
+    {
+      "asset_id": "fabrication_station_derelict_v1",
+      "new": false,
+      "max_size_m": [1.8, 1.85, 1.1],
+      "triangles_max": 5000,
+      "material_max": 4,
+      "roles": ["maintenance", "engineering", "machine_shop"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "medical_stasis_pod_derelict_v1",
+      "new": false,
+      "max_size_m": [2.2, 1.25, 1.1],
+      "triangles_max": 5000,
+      "material_max": 4,
+      "roles": ["medical", "medbay"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "power_cell_cradle_derelict_v1",
+      "new": false,
+      "max_size_m": [1.4, 1.8, 1.0],
+      "triangles_max": 4500,
+      "material_max": 4,
+      "roles": ["reactor", "power", "engineering_power"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "salvage_sorter_derelict_v1",
+      "new": false,
+      "max_size_m": [1.9, 1.5, 1.1],
+      "triangles_max": 5000,
+      "material_max": 4,
+      "roles": ["cargo", "storage", "tool_storage", "salvage"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "oxygen_manifold_derelict_v1",
+      "new": true,
+      "max_size_m": [1.5, 1.9, 0.9],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["life_support", "engineering", "compartment"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "coolant_pump_skid_derelict_v1",
+      "new": true,
+      "max_size_m": [1.8, 1.2, 1.1],
+      "triangles_max": 4500,
+      "material_max": 4,
+      "roles": ["engineering", "maintenance", "reactor"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "navigation_chart_table_derelict_v1",
+      "new": true,
+      "max_size_m": [1.8, 1.15, 1.1],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["bridge", "cockpit", "navigation"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "scanner_signal_cabinet_derelict_v1",
+      "new": true,
+      "max_size_m": [1.3, 2.0, 0.9],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["bridge", "engineering", "scanner"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "hydroponic_grow_tray_derelict_v1",
+      "new": true,
+      "max_size_m": [2.0, 1.4, 1.1],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["life_support", "hydroponics", "compartment"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "water_reclaimer_derelict_v1",
+      "new": true,
+      "max_size_m": [1.6, 1.7, 1.0],
+      "triangles_max": 4500,
+      "material_max": 4,
+      "roles": ["life_support", "hydroponics", "maintenance"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "galley_heater_derelict_v1",
+      "new": true,
+      "max_size_m": [1.5, 1.35, 1.0],
+      "triangles_max": 3500,
+      "material_max": 4,
+      "roles": ["mess_hall", "crew_quarters", "quarters"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "crew_bunk_derelict_v1",
+      "new": true,
+      "max_size_m": [2.2, 1.5, 1.1],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["crew_quarters", "quarters", "compartment"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "suit_service_stand_derelict_v1",
+      "new": true,
+      "max_size_m": [1.3, 1.9, 1.0],
+      "triangles_max": 3500,
+      "material_max": 4,
+      "roles": ["maintenance", "armory", "storage"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "sample_quarantine_cabinet_derelict_v1",
+      "new": true,
+      "max_size_m": [1.4, 1.75, 0.9],
+      "triangles_max": 4000,
+      "material_max": 4,
+      "roles": ["medical", "medbay", "life_support"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "gravity_coil_housing_derelict_v1",
+      "new": true,
+      "max_size_m": [1.8, 1.5, 1.1],
+      "triangles_max": 4500,
+      "material_max": 4,
+      "roles": ["engineering", "reactor", "compartment"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    },
+    {
+      "asset_id": "cargo_restraint_frame_derelict_v1",
+      "new": true,
+      "max_size_m": [2.2, 1.7, 1.1],
+      "triangles_max": 3500,
+      "material_max": 4,
+      "roles": ["cargo", "storage", "bay", "hangar", "tool_storage"],
+      "footprint_cells": [1, 1],
+      "behavior": "static_dressing"
+    }
+  ]
+}
