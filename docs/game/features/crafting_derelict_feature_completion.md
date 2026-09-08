@@ -380,6 +380,13 @@ migrated identities against registered loader descriptors and apply migrated hea
 before scene-state recapture or publication. Acceptance must distinguish absent,
 empty, and explicitly repaired summaries on damaged historical ships.
 
+The migration prerequisite exposes the existing compiled-placement identity rule
+as one public typed function in `ModuleIntegrityConsequences`; compiled seeding
+must use that same function. Preserve existing full-edge, half-span, vertex,
+floor, and ceiling identities exactly. Focused acceptance compares the public
+function's result with actual seeded module IDs for those placement kinds;
+this prerequisite does not itself migrate saves or change health semantics.
+
 The run-7 model owns neither player pose nor a transient hallucination episode.
 Reject the presence of either legacy key, even with an empty value, and emit 31
 summary fields. Validate historical run-6 data with its version-pinned contract

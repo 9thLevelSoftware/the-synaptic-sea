@@ -175,7 +175,7 @@ static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, l
 			continue
 		var rec: Dictionary = rec_v
 		var kind: String = str(rec.get("module_id", rec.get("module", "")))
-		var mid: String = _compiled_module_id(rec, layer)
+		var mid: String = compiled_module_id(rec, layer)
 		if mid.is_empty():
 			continue
 		var owners: PackedStringArray = PackedStringArray()
@@ -199,7 +199,7 @@ static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, l
 ## Compiler full-edge records keep their historical edge/<edge_key> identity.
 ## Corner and span records can share that primary edge while representing distinct
 ## physical geometry, so their canonical placement id is the integrity identity.
-static func _compiled_module_id(rec: Dictionary, layer: String) -> String:
+static func compiled_module_id(rec: Dictionary, layer: String) -> String:
 	var key_part: String = str(rec.get("edge_key", rec.get("key", ""))) if layer == "edge" else str(rec.get("cell_key", ""))
 	if key_part.is_empty():
 		return ""

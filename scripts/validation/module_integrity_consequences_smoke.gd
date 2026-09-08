@@ -203,6 +203,53 @@ func _initialize() -> void:
 		return
 	var vertex_id: String = "edge/%s" % str(vertex_record.get("placement_id", ""))
 	var span_id: String = "edge/%s" % str(span_record.get("placement_id", ""))
+	var floor_record: Dictionary = _record_for_cell_key(
+		physical_plan.get("floor_placements", []) as Array, "0|0|0")
+	var ceiling_record: Dictionary = _record_for_cell_key(
+		physical_plan.get("ceiling_placements", []) as Array, "0|0|0")
+	if floor_record.is_empty() or ceiling_record.is_empty():
+		_fail("physical compiler fixture should produce floor and ceiling records for 0|0|0")
+		return
+	var floor_id: String = "floor/0|0|0"
+	var ceiling_id: String = "ceiling/0|0|0"
+	var physical_identity_cases: Array[Dictionary] = [
+		{
+			"label": "vertex-owned half-span",
+			"record": vertex_record,
+			"layer": "edge",
+			"expected": vertex_id,
+		},
+		{
+			"label": "residual half-span",
+			"record": span_record,
+			"layer": "edge",
+			"expected": span_id,
+		},
+		{
+			"label": "floor",
+			"record": floor_record,
+			"layer": "floor",
+			"expected": floor_id,
+		},
+		{
+			"label": "ceiling",
+			"record": ceiling_record,
+			"layer": "ceiling",
+			"expected": ceiling_id,
+		},
+	]
+	for identity_case_v in physical_identity_cases:
+		var identity_case: Dictionary = identity_case_v
+		var identity_label: String = str(identity_case.get("label", ""))
+		var identity_record: Dictionary = identity_case.get("record", {}) as Dictionary
+		var identity_layer: String = str(identity_case.get("layer", ""))
+		var expected_identity: String = str(identity_case.get("expected", ""))
+		var public_identity: String = ModuleIntegrityConsequencesScript.compiled_module_id(
+			identity_record, identity_layer)
+		if public_identity != expected_identity or not physical_map.has_module(public_identity):
+			_fail("public compiled identity should seed %s as %s, got %s" % [
+				identity_label, expected_identity, public_identity])
+			return
 	if vertex_id == span_id or not physical_map.has_module(vertex_id) or not physical_map.has_module(span_id):
 		_fail("physical placement seed lost distinct canonical identities")
 		return
@@ -300,6 +347,11 @@ func _initialize() -> void:
 	if not canonical_map.has_module(canonical_id) or canonical_map.has_module("edge/%s" % str(canonical_record.get("placement_id", ""))):
 		_fail("canonical full edge should retain edge/<edge_key> identity")
 		return
+	var canonical_public_id: String = ModuleIntegrityConsequencesScript.compiled_module_id(canonical_record, "edge")
+	if canonical_public_id != canonical_id or not canonical_map.has_module(canonical_public_id):
+		_fail("public compiled identity should seed full edge as %s, got %s" % [
+			canonical_id, canonical_public_id])
+		return
 	var breaches: int = ModuleIntegrityConsequencesScript.derived_breach_count(map)
 	if breaches < 1 and st != ModuleIntegrityStateScript.STATE_DAMAGED:
 		# damaged only is ok short-term; force more damage
@@ -394,3 +446,10 @@ func _has_exact_compiler_owners(module: RefCounted, record: Dictionary) -> bool:
 			if not room_id.is_empty() and not actual.has(room_id):
 				actual.append(room_id)
 	return actual.size() == expected.size() and actual == expected
+
+
+func _record_for_cell_key(records: Array, expected_cell_key: String) -> Dictionary:
+	for record_v in records:
+		if record_v is Dictionary and str((record_v as Dictionary).get("cell_key", "")) == expected_cell_key:
+			return record_v as Dictionary
+	return {}
