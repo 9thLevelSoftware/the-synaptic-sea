@@ -38,8 +38,16 @@ baseline. Current-geometry compiler, loader, and golden-parity checks now pass.
 The fresh combined baseline qualification passes all 15 cases with exact markers,
 clean output, contained user-data probes, and stable source hashes across 56 files
 (`artifacts/feature-completion/R10-A-fix1-final-qualification-02/summary.json`).
-The immutable package and final consequential review remain pending before
-save-transition implementation.
+The geometry/docking baseline is accepted after the additional three-file loader
+and parsing fix. Independent review approves both closed findings with no new
+issues. Fresh final qualification passes all 15 cases with clean logs; 22 public
+loader rejection cases pass on the same frozen sources with only their exact
+expected diagnostics. Rejection leaves no published layout, ship signal, or roots.
+Evidence: `R10-A-fix2-final-qualification-01/summary.json` and
+`R10-A-fix2-public-loader-negative-qualified-01/summary.json` under
+`artifacts/feature-completion/`. Run7/world7 implementation is now released,
+beginning with the version-pinned world-v5-to-v6 migration chain. This bounded
+baseline acceptance does not complete R10 persistence or the full program.
 
 ## Current feature-completion program
 
