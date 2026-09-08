@@ -705,6 +705,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/systems/world_v6_layout_projection.gd",
         "data/migrations/world_v6_geometry_authority_v1.json",
         f"{VALIDATION}r10a_world6_layout_projection_smoke.gd",
+        "scripts/systems/world_v6_integrity_projection.gd",
+        f"{VALIDATION}r10a_world6_integrity_projection_smoke.gd",
         f"{VALIDATION}save_load_service_smoke.gd",
         f"{VALIDATION}ship_mod_run_snapshot_smoke.gd",
         f"{VALIDATION}pillar_persistence_smoke.gd",

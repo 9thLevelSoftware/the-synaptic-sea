@@ -3833,8 +3833,8 @@
         },
         {
           "path": "scripts/validation/r10a_integrity_admission_smoke.gd",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "scripts/systems/module_integrity_consequences.gd",
@@ -4405,6 +4405,16 @@
           "path": "scripts/validation/r10a_world6_layout_projection_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
+        },
+        {
+          "path": "scripts/systems/world_v6_integrity_projection.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/r10a_world6_integrity_projection_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
         },
         {
           "path": "scripts/validation/save_load_service_smoke.gd",

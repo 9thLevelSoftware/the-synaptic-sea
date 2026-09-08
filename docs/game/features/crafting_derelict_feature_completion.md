@@ -394,6 +394,23 @@ migrated identities against registered loader descriptors and apply migrated hea
 before scene-state recapture or publication. Acceptance must distinguish absent,
 empty, and explicitly repaired summaries on damaged historical ships.
 
+The bounded historical integrity reconstruction prerequisite owns
+`scripts/systems/world_v6_integrity_projection.gd`, its focused
+`r10a_world6_integrity_projection_smoke.gd`, and additive frozen-layout/authority
+support in the two historical projection files above. Reconstruct the actual c51
+structural pipeline, retaining source and ordered catalog-contract provenance.
+The layout seam must establish complete authenticated routes internally and
+require agreement on all consumed rooms/cells, not merely attachment positions.
+The adapter derives summary presence from the raw owner's key membership:
+missing or `{}` reconstructs; present null or a non-Dictionary rejects. Validate
+nonempty summaries against the historical emitted shape and registered IDs;
+return exact complete old health and descriptor coverage without touching live
+state. Focused acceptance must compare complete plans, generated damage,
+registered IDs, and sparse summaries against independent historical captures;
+prove repair suppression, malformed-input rejection, route ambiguity, and input
+immutability. This prerequisite does not map current vertices/half-spans or wire
+save migration. Its implementation follows acceptance of attachment projection.
+
 The migration prerequisite exposes the existing compiled-placement identity rule
 as one public typed function in `ModuleIntegrityConsequences`; compiled seeding
 must use that same function. Preserve existing full-edge, half-span, vertex,
