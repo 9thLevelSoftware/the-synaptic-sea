@@ -383,7 +383,11 @@ reserve two outward columns by five tangent rows at the preferred west boundary
 cell (minimum X, then minimum Z), on that deck. Keep this exclusion separate from
 real occupancy; it must never become a room, wall, or serialized occupant. Preserve
 room areas and roles, declared connections, seed determinism, and stacked vertical
-links. A late dock whose required space is already occupied rejects the layout
+links. Every planned room must remain present with its assigned role and at least
+its target cell count; connector growth may add cells. Its final footprint must
+match its final cell bounding box. Exercise a connector that must route around the
+reserved space, asserting connectivity and no ownership of reserved cells.
+A late dock whose required space is already occupied rejects the layout
 without returning a usable partial layout, relocation, or salted retry. Verify the
 reservation against the actual paired collision geometry, all 60 stress cases,
 and a no-dock control that retains its prior deterministic layout.

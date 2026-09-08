@@ -30,6 +30,17 @@ attempt 12. These focused results do not close R10-A: its remaining affected
 regressions, final combined qualification, and consequential review are pending.
 Historical damage migration is being assessed before run7/world7 implementation.
 
+The docking-space layout correction has also passed independent review. Its
+focused tests verify connector routing around reserved space, planned room area,
+and rejection of conflicting late docks; all 60 layout stress cases pass with
+clean output. This accepts the bounded layout correction, not the complete R10-A
+baseline. Current-geometry compiler, loader, and golden-parity checks now pass.
+The fresh combined baseline qualification passes all 15 cases with exact markers,
+clean output, contained user-data probes, and stable source hashes across 56 files
+(`artifacts/feature-completion/R10-A-fix1-final-qualification-02/summary.json`).
+The immutable package and final consequential review remain pending before
+save-transition implementation.
+
 ## Current feature-completion program
 
 The approved feature-completion program is active. Its scope is the
