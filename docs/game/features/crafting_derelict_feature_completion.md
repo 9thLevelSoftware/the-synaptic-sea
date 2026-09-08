@@ -351,3 +351,8 @@ planning-only proposal outside this frozen crafting/derelict program. Its actual
 status must remain Proposed for review and Planning only; a status change, a
 missing catalogued source, or another feature source remains a fail-closed scope
 review condition. This ruling creates no acceptance leaves.
+
+### R10 physical placement integrity identity
+
+The half-span compiler keeps one integrity state per physical placement. Canonical full-edge and portal placements retain `edge/<primary-edge>` identities; vertex and residual-span placements use `edge/<placement-id>`, matching loader and mutator authority. Covered secondary edges resolve to the same physical target and do not create extra health records. The seeder must preserve every placement and its room ownership, including two placements whose primary edge is identical. Focused acceptance exercises distinct damage states, sparse-delta round trips, and secondary-edge target resolution. Historical geometry migration remains an explicit R10 save-transition obligation; this correction does not authorize dropping or guessing legacy damage records.
+

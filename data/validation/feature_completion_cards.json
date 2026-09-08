@@ -3827,6 +3827,16 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/systems/module_integrity_consequences.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/module_integrity_consequences_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/systems/runtime_physical_volume_catalog.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -4038,38 +4048,43 @@
         },
         {
           "path": "tools/rebuild_vertex_span_modules.py",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/.gdignore",
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.blend",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.source.json",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.blend",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.source.json",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.blend",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.source.json",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "assets/imported/structural/ship_structural_v0/wall_inner_corner/wall_inner_corner.glb",
