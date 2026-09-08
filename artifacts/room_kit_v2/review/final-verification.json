@@ -1,0 +1,36 @@
+{
+  "status": "PARTIAL_IMPLEMENTATION_STRUCTURAL_HOLD",
+  "verified_at": "2026-09-08T13:43:21.150864-04:00",
+  "tested_code_commit": "b57f0e7eb24a1b3ee3f5cae879766409eb8d6d90",
+  "pytest_passed": 97,
+  "pytest_subtests_passed": 44,
+  "staged_glb_tests_passed": 3,
+  "godot_rules": "pass",
+  "godot_manual_pilot_smoke": "pass",
+  "godot_captures": 8,
+  "godot_capture_revision": "b2968278",
+  "blender_six_view_images": 36,
+  "protected_files_checked": 2792,
+  "protected_files_changed": [],
+  "original_checkouts": {
+    "main": {
+      "head_unchanged": true,
+      "porcelain_unchanged": true
+    },
+    "base": {
+      "head_unchanged": true,
+      "porcelain_unchanged": true
+    }
+  },
+  "capture_hash_mismatches": [],
+  "completed_assets": 3,
+  "remaining_assets": 28,
+  "runtime_promotion": false,
+  "procgen_integration": false,
+  "full_pilot_approved": false,
+  "reviews": {
+    "spec": "conditional pass for implemented slice; structural/art release remains held",
+    "quality": "found substring success-marker bug; reproduced RED then corrected and parent verified with sixteen runner tests; no independent post-fix approval claimed"
+  },
+  "structural_followup": "synaptic-sea-stage-gate/t_5dbc3f3a"
+}

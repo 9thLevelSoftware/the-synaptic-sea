@@ -25,6 +25,11 @@ Implemented and exercised
   Real-GLB manual diagnostic pilot scene and actual Godot viewport captures.
 
 Parent execution evidence
+  Final combined focused suite: review/focused-tests.log — 97 passed,
+    44 subtests passed. Real staged-asset subset: review/staged-assets.log —
+    three passed. Independent quality review found substring-marker acceptance;
+    reproduced RED, fixed with line-anchored escaped matching, sixteen runner
+    tests green. No independent post-fix release approval is claimed.
   baseline/python-focused.log: 54 passed, 44 subtests passed.
   baseline/new-tooling-parent.log: 34 passed.
   baseline/pilot-artifacts-green.log: three pilot assets passed; fifteen
