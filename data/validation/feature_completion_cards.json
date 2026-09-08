@@ -3987,6 +3987,16 @@
           "scope_state": "present"
         },
         {
+          "path": "data/procgen/golden/compact_seed17_halfspan/edge_map.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "data/procgen/golden/compact_seed17_halfspan/provenance.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
           "path": "data/construction/structural_rebuild_catalog.json",
           "source_exists": true,
           "scope_state": "present"

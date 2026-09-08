@@ -632,6 +632,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/systems/hallucination_director.gd",
         "scripts/systems/hallucination_manager.gd",
         "scripts/systems/threat_save_contract.gd", "scripts/systems/threat_manager.gd",
+        "data/procgen/golden/compact_seed17_halfspan/edge_map.json",
+        "data/procgen/golden/compact_seed17_halfspan/provenance.json",
         "data/construction/structural_rebuild_catalog.json", "data/tools/tool_definitions.json",
         "data/items/item_definitions.json", "data/physics/runtime_physical_volume_profiles.json",
         "data/procgen/golden/coherent_ship_001/layout.json",

@@ -356,3 +356,24 @@ review condition. This ruling creates no acceptance leaves.
 
 The half-span compiler keeps one integrity state per physical placement. Canonical full-edge and portal placements retain `edge/<primary-edge>` identities; vertex and residual-span placements use `edge/<placement-id>`, matching loader and mutator authority. Covered secondary edges resolve to the same physical target and do not create extra health records. The seeder must preserve every placement and its room ownership, including two placements whose primary edge is identical. Focused acceptance exercises distinct damage states, sparse-delta round trips, and secondary-edge target resolution. Historical geometry migration remains an explicit R10 save-transition obligation; this correction does not authorize dropping or guessing legacy damage records.
 
+For the world-6 to world-7 migration, interpret historical edge health as uniform
+over that authenticated edge's extent. Preserve its exact integrity, base-integrity,
+and state tuple on each current physical claimant; do not divide, sum, or round it.
+Derive claims from validated half-span coverage, never spatial proximity. Every
+source contributing to a shared vertex, including omitted pristine records, must
+have an identical tuple. Conflicting health, incomplete coverage, or ambiguous
+mounted/material/tool payload rejects the entire detached candidate with a
+recoverable reason and leaves source saves and live state unchanged. Retained
+one-to-one identities preserve their validated payload. Migration acceptance must
+cover consistent split/shared mappings, conflicting incident damage, missing or
+duplicate coverage, payload ambiguity, and exact recapture after reload/revisit.
+
+Current procedural-generation regression fixtures must validate unique physical
+placement identities and exact half-span coverage rather than unique primary edge
+keys. Preserve the historical `compact_seed17_current` fixture unchanged; record
+the corrected current geometry under `compact_seed17_halfspan` with generation
+inputs and source provenance. Loader regression fixtures enter through the same
+layout preparation used by production. Stress coverage must retain every original
+seed/template case and distinguish rejected candidates from a failed final layout;
+fixture updates cannot waive dockability or diagnostics requirements.
+

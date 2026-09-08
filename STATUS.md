@@ -21,6 +21,15 @@ manifest repair preserves all 652 commands, fixes the static marker/count contra
 and checks the runtime count before PASS (31 focused tests pass; commit `3a24cde9`).
 These tooling results do not constitute a fresh full canonical regression run.
 
+R10-A correction checkpoint: the physical-placement integrity seeder has passed
+independent review and a fresh isolated runtime check (`R10-A-fix1-integrity-seed-attempt-03`).
+Vertex and residual half-span placements retain separate health, room ownership,
+and damage records; canonical full-edge placements retain their existing identity.
+The loader/controller identity and scaled-wall checks also pass in endpoint
+attempt 12. These focused results do not close R10-A: its remaining affected
+regressions, final combined qualification, and consequential review are pending.
+Historical damage migration is being assessed before run7/world7 implementation.
+
 ## Current feature-completion program
 
 The approved feature-completion program is active. Its scope is the
