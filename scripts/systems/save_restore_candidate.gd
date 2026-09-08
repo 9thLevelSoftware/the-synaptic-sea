@@ -15,6 +15,11 @@ const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ThreatSaveContractScript := preload("res://scripts/systems/threat_save_contract.gd")
 const LEGACY_LOCAL_ACCESS_ID: String = "player_local"
+# DockEndpointAuthoring.validate_layout() requires exactly one
+# boarding_endpoints_v1 row for every accepted production layout. World 7 pins
+# that current production invariant; a later multi-endpoint layout needs a new
+# persistence schema instead of silently broadening this state map.
+const CURRENT_BOARDING_ENDPOINTS_PER_OWNER: int = 1
 
 var world_snapshot = null
 var run_snapshot = null
@@ -65,7 +70,7 @@ func _materialize() -> String:
 	if str(world_snapshot.run_id) != effective_run_id:
 		return "run_id_mismatch"
 	run_snapshot = RunSnapshotScript.from_dict(
-		world_snapshot.home_ship, "gate2-current-run-6", str(world_snapshot.godot_version))
+		world_snapshot.home_ship, "gate2-current-run-7", str(world_snapshot.godot_version))
 	if run_snapshot == null:
 		return "invalid_home_run"
 	if not str(run_snapshot.run_id).is_empty() and str(run_snapshot.run_id) != effective_run_id:
@@ -150,7 +155,8 @@ func _materialize() -> String:
 		if not ship.apply_summary(raw) or str(ship.marker_id) != marker_id \
 				or str(ship.ship_id).is_empty() or visited_ships.has(marker_id):
 			return "invalid_visited_ship"
-		if str(ship.ship_id) == "ship_start" or _ship_id_exists(str(ship.ship_id)):
+		if str(ship.ship_id) in ["ship_start", "lifeboat"] \
+				or _ship_id_exists(str(ship.ship_id)):
 			return "duplicate_ship_id"
 		visited_ships[marker_id] = ship
 		var component_v: Variant = (raw as Dictionary).get("component_placement", null)
@@ -163,6 +169,17 @@ func _materialize() -> String:
 	var station_identity_reason: String = _validate_station_position_closure()
 	if not station_identity_reason.is_empty():
 		return station_identity_reason
+	var known_owner_markers: Dictionary = {
+		"ship_start": "",
+		"lifeboat": "",
+	}
+	for ship in visited_ships.values():
+		known_owner_markers[str((ship as RefCounted).get("ship_id"))] = str(
+			(ship as RefCounted).get("marker_id"))
+	var authority_reason: String = validate_world_authority_graph(
+		world_snapshot, known_owner_markers)
+	if not authority_reason.is_empty():
+		return authority_reason
 
 	if not world_snapshot.player_equipment.is_empty():
 		player_equipment = EquipmentStateScript.create()
@@ -175,6 +192,201 @@ func _materialize() -> String:
 	_normalize_migrated_authority(
 		home_threat_summary, combat_hotbar_present, combat_hotbar_text)
 	return ""
+
+
+## Pure detached closure for the world-7 owner graph. Registered endpoint
+## geometry is validated during staging; this model proves that every decoded
+## owner has one root authority and one durable boarding-endpoint state, and
+## that every persisted relationship resolves without inventing an owner.
+static func validate_world_authority_graph(world, known_owner_markers: Dictionary) -> String:
+	if world == null or known_owner_markers.is_empty() \
+			or not known_owner_markers.has("ship_start") \
+			or not known_owner_markers.has("lifeboat"):
+		return "invalid_known_owner_set"
+	for owner_v in known_owner_markers:
+		if not owner_v is String or (owner_v as String).is_empty() \
+				or not known_owner_markers[owner_v] is String:
+			return "invalid_known_owner_set"
+	var marker_owners: Dictionary = {}
+	for owner_v in known_owner_markers:
+		var owner_id: String = owner_v as String
+		var marker_id: String = known_owner_markers[owner_v] as String
+		if marker_id.is_empty():
+			if owner_id not in ["ship_start", "lifeboat"]:
+				return "invalid_known_owner_set"
+			continue
+		if marker_owners.has(marker_id):
+			return "duplicate_known_owner_marker"
+		marker_owners[marker_id] = owner_id
+
+	var connections_by_id: Dictionary = {}
+	var mobile_parents: Dictionary = {}
+	for row_v in world.dock_connections_v1:
+		var row: Dictionary = row_v as Dictionary
+		var connection_id: String = row.connection_id as String
+		var host: Dictionary = row.host as Dictionary
+		var mobile: Dictionary = row.mobile as Dictionary
+		var host_id: String = host.ship_id as String
+		var mobile_id: String = mobile.ship_id as String
+		if not known_owner_markers.has(host_id) or not known_owner_markers.has(mobile_id):
+			return "connection_foreign_owner"
+		if mobile_parents.has(mobile_id):
+			return "connection_multiple_parent"
+		connections_by_id[connection_id] = row
+		mobile_parents[mobile_id] = connection_id
+
+	var roots_by_ship: Dictionary = {}
+	for row_v in world.ship_root_authorities_v1:
+		var row: Dictionary = row_v as Dictionary
+		var ship_id: String = row.ship_id as String
+		if not known_owner_markers.has(ship_id):
+			return "root_authority_foreign_owner"
+		roots_by_ship[ship_id] = row
+	if not _same_identity_set(roots_by_ship, known_owner_markers):
+		return "root_authority_coverage_mismatch"
+	# The home frame is the root of world-7 authority, never a movable child.
+	# Enforce this before generic traversal so an otherwise acyclic connection
+	# or free chain cannot reinterpret ship_start through a visited anchor.
+	var home_root: Dictionary = roots_by_ship["ship_start"]
+	if str(home_root.authority_kind) != "world_anchor" \
+			or str(home_root.location_id) != "home" \
+			or str(home_root.anchor_id) != "home-origin-v1":
+		return "invalid_home_world_anchor"
+	var current_location: String = str(world.current_location)
+	if not current_location.is_empty():
+		if not marker_owners.has(current_location):
+			return "current_location_owner_missing"
+		var current_owner_id: String = marker_owners[current_location] as String
+		var current_root: Dictionary = roots_by_ship[current_owner_id]
+		if str(current_root.authority_kind) != "world_anchor" \
+				or str(current_root.location_id) != current_location \
+				or str(current_root.anchor_id) != "visited-host-v1":
+			return "current_location_anchor_mismatch"
+
+	for ship_id_v in roots_by_ship:
+		var ship_id: String = ship_id_v as String
+		var root: Dictionary = roots_by_ship[ship_id]
+		match root.authority_kind:
+			"world_anchor":
+				if mobile_parents.has(ship_id):
+					return "connection_mobile_has_second_root_authority"
+				var location_id: String = root.location_id as String
+				var anchor_id: String = root.anchor_id as String
+				if ship_id == "ship_start":
+					if location_id != "home" or anchor_id != "home-origin-v1":
+						return "invalid_home_world_anchor"
+				else:
+					var marker_id: String = known_owner_markers[ship_id] as String
+					if marker_id.is_empty() or location_id != marker_id \
+							or anchor_id != "visited-host-v1":
+						return "invalid_visited_world_anchor"
+			"connection":
+				var connection_id: String = root.connection_id as String
+				if not connections_by_id.has(connection_id):
+					return "root_connection_missing"
+				var connection: Dictionary = connections_by_id[connection_id]
+				if str((connection.mobile as Dictionary).ship_id) != ship_id \
+						or str(mobile_parents.get(ship_id, "")) != connection_id:
+					return "root_connection_mobile_mismatch"
+			"free":
+				if mobile_parents.has(ship_id):
+					return "connection_mobile_has_second_root_authority"
+				var frame_ship_id: String = root.frame_ship_id as String
+				if not roots_by_ship.has(frame_ship_id) \
+						or str((roots_by_ship[frame_ship_id] as Dictionary).authority_kind) != "world_anchor":
+					return "free_root_frame_not_world_anchor"
+			_:
+				return "invalid_root_authority_kind"
+
+	for mobile_id_v in mobile_parents:
+		var mobile_id: String = mobile_id_v as String
+		if str((roots_by_ship[mobile_id] as Dictionary).authority_kind) != "connection":
+			return "connection_mobile_root_mismatch"
+	for ship_id_v in roots_by_ship:
+		var chain_reason: String = _validate_root_chain(
+			ship_id_v as String, roots_by_ship, connections_by_id)
+		if not chain_reason.is_empty():
+			return chain_reason
+
+	var states_by_ship: Dictionary = {}
+	for row_v in world.boarding_port_states_v1:
+		var row: Dictionary = row_v as Dictionary
+		var ship_id: String = row.ship_id as String
+		if not known_owner_markers.has(ship_id):
+			return "boarding_state_foreign_owner"
+		if states_by_ship.has(ship_id):
+			# WorldSnapshot rejects duplicate owner/endpoint identity. The current
+			# production manifest owns one boarding endpoint per ship, so a second
+			# endpoint is also an unsupported coverage shape.
+			return "boarding_state_multiple_endpoints"
+		states_by_ship[ship_id] = row
+	if world.boarding_port_states_v1.size() \
+			!= known_owner_markers.size() * CURRENT_BOARDING_ENDPOINTS_PER_OWNER:
+		return "boarding_state_coverage_mismatch"
+	if not _same_identity_set(states_by_ship, known_owner_markers):
+		return "boarding_state_coverage_mismatch"
+	for connection_v in connections_by_id.values():
+		var connection: Dictionary = connection_v as Dictionary
+		if str(connection.port_type) != "airlock":
+			continue
+		for side_name in ["host", "mobile"]:
+			var side: Dictionary = connection[side_name] as Dictionary
+			var state: Dictionary = states_by_ship[side.ship_id]
+			if str(state.endpoint_id) != str(side.endpoint_id):
+				return "boarding_state_connection_endpoint_mismatch"
+
+	var pose: Dictionary = world.player_owner_pose_v1
+	var pose_owner: String = pose.owner_ship_id as String
+	if not known_owner_markers.has(pose_owner):
+		return "player_pose_foreign_owner"
+	if str(pose.location_kind) == "dock_threshold":
+		var connection_id: String = pose.connection_id as String
+		if not connections_by_id.has(connection_id):
+			return "player_threshold_connection_missing"
+		var connection: Dictionary = connections_by_id[connection_id]
+		var mobile: Dictionary = connection.mobile as Dictionary
+		if str(connection.port_type) != "airlock" \
+				or str(mobile.ship_id) != pose_owner \
+				or str(mobile.endpoint_id) != str(pose.endpoint_id):
+			return "player_threshold_mobile_endpoint_mismatch"
+	return ""
+
+
+static func _validate_root_chain(
+		start_ship_id: String,
+		roots_by_ship: Dictionary,
+		connections_by_id: Dictionary) -> String:
+	var seen: Dictionary = {}
+	var ship_id: String = start_ship_id
+	while true:
+		if seen.has(ship_id):
+			return "root_authority_cycle"
+		seen[ship_id] = true
+		if not roots_by_ship.has(ship_id):
+			return "root_authority_chain_missing_owner"
+		var root: Dictionary = roots_by_ship[ship_id]
+		match root.authority_kind:
+			"world_anchor":
+				return ""
+			"connection":
+				var connection_id: String = root.connection_id as String
+				if not connections_by_id.has(connection_id):
+					return "root_connection_missing"
+				ship_id = str(((connections_by_id[connection_id] as Dictionary).host as Dictionary).ship_id)
+			"free":
+				ship_id = root.frame_ship_id as String
+			_:
+				return "invalid_root_authority_kind"
+	return "root_authority_chain_unresolved"
+
+
+static func _same_identity_set(left: Dictionary, right: Dictionary) -> bool:
+	if left.size() != right.size():
+		return false
+	for identity in left:
+		if not right.has(identity):
+			return false
+	return true
 
 
 func _normalize_migrated_authority(
