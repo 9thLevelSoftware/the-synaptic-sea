@@ -18,7 +18,15 @@ from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar, writ
 
 PROP_GROUPS = ("components", "dressing", "objectives")
 EXPECTED_ASSET_COUNTS = {"component": 11, "dressing": 11, "objective": 4}
-OPTIONAL_DRESSING_ASSETS = frozenset({"loot_container_derelict_v1"})
+OPTIONAL_DRESSING_ASSETS = frozenset(
+    {
+        "loot_container_derelict_v1",
+        "fabrication_station_derelict_v1",
+        "medical_stasis_pod_derelict_v1",
+        "power_cell_cradle_derelict_v1",
+        "salvage_sorter_derelict_v1",
+    }
+)
 DRESSING_SURFACES = {
     "cable_tray": "wall",
     "emergency_wall": "wall",
@@ -32,6 +40,10 @@ DRESSING_SURFACES = {
     "salvage_cart": "floor",
     "service_rack": "floor",
     "loot_container_derelict_v1": "floor",
+    "fabrication_station_derelict_v1": "floor",
+    "medical_stasis_pod_derelict_v1": "floor",
+    "power_cell_cradle_derelict_v1": "floor",
+    "salvage_sorter_derelict_v1": "floor",
 }
 OBJECTIVE_IDS = {
     "medbay_terminal": ["medbay_terminal"],

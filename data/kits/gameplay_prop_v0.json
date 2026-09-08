@@ -42,6 +42,38 @@
       "scale": 1.0,
       "height_hint": 1.1
     },
+    "fabrication_station_derelict_v1": {
+      "mesh_path": "res://assets/imported/props/dressing/fabrication_station_derelict_v1.glb",
+      "primitive": "box",
+      "albedo": "#49616d",
+      "y_offset": 0.41,
+      "scale": 1.0,
+      "height_hint": 1.8
+    },
+    "medical_stasis_pod_derelict_v1": {
+      "mesh_path": "res://assets/imported/props/dressing/medical_stasis_pod_derelict_v1.glb",
+      "primitive": "box",
+      "albedo": "#4f7f87",
+      "y_offset": 0.28,
+      "scale": 1.0,
+      "height_hint": 1.5
+    },
+    "power_cell_cradle_derelict_v1": {
+      "mesh_path": "res://assets/imported/props/dressing/power_cell_cradle_derelict_v1.glb",
+      "primitive": "box",
+      "albedo": "#394c58",
+      "y_offset": 0.71,
+      "scale": 1.0,
+      "height_hint": 1.8
+    },
+    "salvage_sorter_derelict_v1": {
+      "mesh_path": "res://assets/imported/props/dressing/salvage_sorter_derelict_v1.glb",
+      "primitive": "box",
+      "albedo": "#80612b",
+      "y_offset": 0.34,
+      "scale": 1.0,
+      "height_hint": 1.4
+    },
     "corpse_bag": {
       "mesh_path": "",
       "primitive": "capsule",
