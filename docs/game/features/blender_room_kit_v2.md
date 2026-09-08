@@ -1,5 +1,7 @@
 # Blender room kit v2
 
+> **Supersession notice — 2026-09-08:** The shared modular-fit policy and authoring/runbook in [`modular_structural_fit.md`](modular_structural_fit.md) is canonical for structural visual dimensions. It supersedes this mirrored plan's old zero-depth visual paragraph and blanket bevel guidance. Preserve this feature's roster, budgets, source-recovery scope, and acceptance tables, but use the canonical policy for visual joins, floor/door constraints, profile status, and implemented-gate claims. Runtime placement contracts, helpers, wrappers, collision/nav, sockets, source authority, and promotion remain separate authorities. The seven auto-supported profiles are `floor_1x1`, `floor_2x1`, `corridor_floor_1x1`, `corridor_floor_1x2`, `wall_straight_1x1`, `doorway_frame_open_1x1`, and `pillar_support_1x1`; all other IDs require reviewed profiles. This document does not claim that old baselines all pass, and this documentation update authored or approved no assets.
+
 Status: implementation in progress; no production promotion approved.
 
 Source: `.hermes/plans/2026-09-08_113552-blender-room-kit-v2.md`, approved for implementation by Christopher.
@@ -21,7 +23,7 @@ Build readable mid-detail, stylized hard-surface assets—not photorealistic noi
 - Primary silhouette: recognizable as a working object even in flat gray. Each prop must have a distinctive negative space or profile, not merely a different colored rectangular box.
 - Secondary form: one believable mechanical story per asset—service access, fluid path, mounting, restraint, heat exchange, or operator controls.
 - Tertiary detail: restrained fastening/wear; subordinate to silhouette. Detail that only appears in a close-up does not justify repeated runtime geometry.
-- Shared construction: planar alloy panels with selective 0.01–0.03 m bevels; large structural edge bevels at most 0.04 m, only inside the frozen contract envelope. Two bevel segments, not subdivision everywhere.
+- Shared construction: planar alloy panels with selective bevels only outside protected mating interfaces. The entire edge visual envelope is `0.20` m deep, normal `[-0.10,+0.10]`; retain the `0.20` m tangent terminal bands at their full height/depth. No additional outer envelope is allowed. Two bevel segments are not a license to round away a shared edge. See `modular_structural_fit.md`.
 - Small fasteners: at most eight visible bolts per small prop; represent additional screws through texture/normal detail only if later needed. No screws smaller than 0.015 m as separate meshes.
 - Cylinders: 16 sides for small hoses/caps, 24 for visible tanks/rollers; no 64-sided hidden cylinders.
 - Hose routing: both ends terminate in visible fittings; no unattached rings or hoses passing through unrelated housings.
@@ -33,7 +35,7 @@ Build readable mid-detail, stylized hard-surface assets—not photorealistic noi
 
 Canonical existing library: `/Volumes/Untitled/SynapticSeaAssets/meshes/source/materials/salvage_industrial.blend`.
 
-Reuse exact existing datablocks `MAT_PaintedAlloyGray`, `MAT_WarningStripe`, `MAT_ReactorGlow`, `MAT_Biomatter`, `MAT_Conduit`. Do not silently accept `.001` duplicates. A library material with procedural nodes is authoring data, not proof those nodes survive glTF: approved export uses Principled values and real baked textures when needed. In this first batch, model hazard bands as a few contrasting faces; do not depend on an unbaked shader stripe.
+Reuse exact existing datablocks `MAT_PaintedAlloyGray`, `MAT_WarningStripe`, `MAT_ReactorGlow`, `MAT_Biomatter`, `MAT_Conduit`. A library material with procedural nodes is authoring data, not proof those nodes survive glTF: approved export uses Principled values and real baked textures when needed. In this first batch, model hazard bands as a few contrasting faces; do not depend on an unbaked shader stripe. Material naming cleanup is outside the modular-fit dimensions scope.
 
 For static props, use a named local, non-emissive display material `MAT_RoomKitDisplayOff` with base color `(0.035,0.075,0.085,1)`, metallic `0.0`, roughness `0.28`, emission `0`. Add it through the new feature's material specification and record it as an intentional new material, not as a renamed library material. Do not modify the shared external library just to add it. The only other permitted addition is `MAT_ExposedSteelV2` as explicitly specified in Appendix M; both additions are candidate-local and remain inside the four-material-per-export limit.
 
@@ -103,7 +105,11 @@ No command in this plan runs until execution is authorized. All expected output 
 
 Do not change IDs, footprint, floor height, sockets, doorway aperture, wrapper collision, connector compatibility, or compiler placement IDs. Load numbers from the per-ID contract; never infer wall thickness from old visual AABBs. The standing contract in `scripts/procgen/walkability_contract.gd` includes 4 m grid, 0.20 m wall slabs, 1.20 m door opening, 0.35 m player radius, 1.60 m height, and 0.10 m clearance margin.
 
-The detailed surface stays inside the current allowed envelope. A zero-depth wall contract is not permission to inflate collision to match decorative art; preserve its explicit wrapper slabs. If visual envelope and contract disagree, hold that module for review rather than silently widening the contract.
+The shared visual policy is not derived from legacy local bounds. A zero-depth legacy wall record is not visual geometry-dimensions authority and is not permission to flatten the new shell. Preserve the explicit wrapper slabs and helpers; author the copied visual mesh to the shared art envelope, with identity export transforms. Never auto-scale a legacy shell from its bounds or invent a larger allowance. Hold unresolved source-authority conflicts rather than silently editing runtime contracts.
+
+The canonical art values come only from `data/art/structural_visual_dimensions.v1.json`: 4 m lattice; floor top `Y=0`, underside `Y=-0.25`, positive relief `0`, recess max `0.02` m; wall/top `3.2` m; total visual depth `0.20` m normal `[-0.10,+0.10]`; terminal mating band `0.20` m along the tangent; and open-door clear prism X `[-0.6,+0.6]`, Y `[0,2.2]`, Z `[-0.1,+0.1]` with no raised threshold. The pillar reserves one grid-cell footprint with centered floor/top contacts; cosmetic body width is not separately prescribed.
+
+These values adapt the local research ledger at `artifacts/room_kit_v2/research/2026-09-08_154121-modular-fit/research-brief.txt`: thickness belongs below the shared walking datum, joins need reserved space, and loopback/rotation/stack tests belong in the target renderer. The standing runtime authority remains `scripts/procgen/walkability_contract.gd` and its placement/wrapper consumers; orthographic projection does not repair a real floor step.
 
 | ID | Required primary/secondary modeling changes | Intact triangulated ceiling | States |
 |---|---|---:|---|
@@ -112,9 +118,9 @@ The detailed surface stays inside the current allowed envelope. A zero-depth wal
 | `corridor_floor_1x1` | Central readable walking strip, two edge cable trough lids, restrained transverse anti-slip faces | 1,200 | trio |
 | `corridor_floor_1x2` | Longitudinal continuation of corridor pattern; one inset maintenance cover off the center line | 2,000 | trio |
 | `wall_straight_1x1` | Large upper/lower plate hierarchy, inset service panel, one vertical conduit route with two brackets; no bulge into door lane | 2,400 | trio |
-| `doorway_frame_open_1x1` | Layered jambs, recessed gasket, overhead actuator cover, flush threshold cue; keep 1.20 × 2.20 m clear opening | 3,000 | trio |
+| `doorway_frame_open_1x1` | Layered jambs, recessed gasket, overhead actuator cover, no raised threshold; keep 1.20 × 2.20 m clear opening | 3,000 | trio |
 | `pillar_support_1x1` | Four load ribs, base/ceiling bearing plates, service recess, two clamped cable segments | 2,000 | trio |
-| `ramp_up_1x2` | Continuous tread plane, recessed side tracks, directional threshold panels; no raised ribs that snag the capsule | 2,400 | trio |
+| `ramp_up_1x2` | **HOLD:** endpoint transform is not authorized; do not author or release under this core policy | 2,400 | trio |
 | `bulkhead_portal_2x1` | Substantial frame, joined service trim, hinge/track covers attached to frame; preserve existing HATCH proxy exactly | 3,500 | intact only |
 | `ceiling_cap_1x1` | Recessed tray underside, two vent grille strips, service hatches; no permanent hanging prop below allowed clearance | 2,000 | intact only |
 | `doorway_frame_blocked_1x1` | Solid retained closure plate, gasket framing, mechanically believable lock bar; do not pretend it is traversable | 2,800 | intact only |
@@ -170,7 +176,7 @@ Each action below is a separate 2–5 minute work item. Execute the entire seque
 7. **Preview/review:** Save a front, side, and locked-isometric viewport capture using the same framing per asset; compare flat-gray silhouette before beauty lighting. Reviewer checks every table feature and rejects rectangular-box substitutions. Record revisions in `authoring.json`.
 8. **Export/prove/commit:** Execute the static-export recipe and artifact/runtime gates below. Back up the master. Commit only this asset's approved runtime pair plus its metadata updates after the staging gate; do not batch-stage unrelated assets.
 
-Structural modeling uses the same primary/secondary/tertiary discipline, but starts by copying the per-module recovered master (never File → New), locks all helpers, and edits only visual collections. For each structural row, split the work into: open/copy; major panels; service layer; materials; source validation; state derivation (if specified); export; seams/walkability review. Do not change helpers to make a failed visual fit.
+Structural modeling uses the same primary/secondary/tertiary discipline, but starts by copying the per-module recovered master (never File → New), locks all helpers, and edits only visual collections. Keep details recessed away from mating faces; use textures, normals, and trim sheets for small detail and actual geometry only for readable large features. Widen or scale the visual shell to preserve the helper/placement contract rather than editing helpers or runtime contracts. For each structural row, split the work into: open/copy; major panels; service layer; materials; source validation; state derivation (if specified); export; seams/walkability review. Do not change helpers to make a failed visual fit. Preserve helper mapping `[x, y, z] → [x, z, y]`; physical Blender geometry uses glTF axes `[x, z, -y]` and must not be remapped through the helper convention.
 
 
 | Gate | Required evidence | Reject when |
@@ -184,6 +190,10 @@ Structural modeling uses the same primary/secondary/tertiary discipline, but sta
 | Visual | Pilot plus six production-case images, native game-size readability, signed per-family review | A box with a different color, floating hardware, noisy surfaces, faux powered machines, empty/synthetic captures |
 | Performance | Same-scene before/after measurements and per-asset budgets | Budget changed after failure, improvement asserted without measurement |
 | Release | Fresh full gates on integration commit and per-ID target manifest | Staging called shipped, main checkout implicitly overwritten, unreviewed promotion |
+
+### Shared modular-fit review boundary
+
+The pure/module preflight is not the full acceptance gate. Review must still cover four allowed rotations; straight floor/wall joins; door corners; inner/outer corners; T-junctions; a mixed-length 2×2 floor patch; a closed room-to-corridor loopback; a mixed-length vertical stack with intentional gap/overlap negatives; and clay plus material evidence from the actual production camera. These are full-assembly review gates, not automatic coverage claimed by the new core preflight. A geometric PASS is not promotion approval: source authority, wrappers, collision/nav, Godot import, variant parity, and human review remain separate.
 
 Visual rubric, 0–2 per item: silhouette recognizability; convincing assembly; material/value hierarchy; purposeful wear; route/interaction readability. Pass requires at least 8/10, no zero, and no hard blocker (collision/clearance/provenance/state/geometry error). Reviewer identifies the entry, threshold and intended apparatus in the unlabelled pilot capture before reading the asset list. This is an approval method, not an automated promise of human recognition speed.
 
@@ -200,6 +210,6 @@ Visual rubric, 0–2 per item: silhouette recognizability; convincing assembly; 
 
 ## Execution boundaries
 
-Pilot: four structural masters (floor_1x1, wall_straight_1x1, doorway_frame_open_1x1, pillar_support_1x1) and three props (fabrication_station_derelict_v1, coolant_pump_skid_derelict_v1, suit_service_stand_derelict_v1). Only pilot geometry is authorized before a recorded scored visual review. Tooling may proceed independently. Original structural baseline failures hold affected promotion; no wrapper/contract repairs are implicit.
+Pilot: four structural masters (`floor_1x1`, `wall_straight_1x1`, `doorway_frame_open_1x1`, `pillar_support_1x1`) and three props (`fabrication_station_derelict_v1`, `coolant_pump_skid_derelict_v1`, `suit_service_stand_derelict_v1`). Only pilot geometry is authorized before a recorded scored visual review. Tooling may proceed independently. Original structural baseline failures hold affected promotion; no wrapper/contract repairs are implicit. A/B source authority and `ramp_up_1x2` remain HOLD.
 
-Execution path corrections: STAGE is `assets/_staging/room_kit_v2`; prop staging is `STAGE/props/<id>.glb`; evidence is `artifacts/room_kit_v2`. Static export API is `--source <blend> --output <glb>`. Blender commands use `--python-exit-code 1`. These replace inconsistent example aliases in the plan without changing asset scope.
+Execution path corrections: STAGE is `assets/_staging/room_kit_v2`; prop staging is `STAGE/props/<id>.glb`; evidence is `artifacts/room_kit_v2`. Static prop export (`tools/export_static_room_prop.py`) uses `--source <blend> --output <glb>`. Structural export (`tools/export_structural_glb.py`) uses `--blend-path <blend> --staging-dir <directory> --module <id>`; it also accepts `--project-root` and `--dimensions`. Do not interchange these two CLIs. Blender commands use `--python-exit-code 1`. These replace inconsistent example aliases in the plan without changing asset scope.

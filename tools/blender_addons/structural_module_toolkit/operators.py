@@ -75,6 +75,25 @@ def _configured_source_root(context: Any) -> Path | None:
     return Path(str(configured)).expanduser()
 
 
+def _configured_project_root(context: Any) -> Path:
+    """Resolve the explicit policy root without adding new preferences."""
+
+    preferences = _addon_preferences(context)
+    configured = getattr(preferences, "project_root", "") if preferences else ""
+    if configured:
+        return Path(str(configured)).expanduser()
+
+    scene = getattr(context, "scene", None)
+    scene_root = scene.get("structural_project_root", "") if scene is not None else ""
+    if scene_root:
+        return Path(str(scene_root)).expanduser()
+
+    # The existing source-root preference is the project root in the current
+    # checkout workflow.  Installed add-ons still need that preference (or the
+    # checkout fallback); no second configuration system is introduced here.
+    return _configured_source_root(context) or _repository_root()
+
+
 def _contract_path(root: Path, module_id: str) -> Path:
     return root / _CONTRACT_RELATIVE / f"{module_id}_contract.json"
 
@@ -439,7 +458,12 @@ class STRUCTURAL_OT_export_glb(bpy.types.Operator):
             _set_status(context, message)
             return {"CANCELLED"}
         try:
-            exported = export_scene_to_staging(bpy, staging_root, module_id or None)
+            exported = export_scene_to_staging(
+                bpy,
+                staging_root,
+                module_id or None,
+                project_root=_configured_project_root(context),
+            )
         except (FileNotFoundError, OSError, RuntimeError, ValueError) as exc:
             self.report({"ERROR"}, str(exc))
             _set_status(context, f"Export error: {exc}")

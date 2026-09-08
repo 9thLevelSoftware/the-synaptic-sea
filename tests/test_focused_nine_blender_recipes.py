@@ -1234,12 +1234,42 @@ print('PRESSURE_ROLE_PROOF '+json.dumps(roles, sort_keys=True))
     assert PRESSURE_GLB_FIXTURE.read_bytes() == pressure_glb_bytes
     assert MATERIAL_FIXTURE.read_bytes() == material_fixture_bytes
 
-    exported = _export_structural_variants_for_evidence(
-        source=source_blend,
-        asset_id="pressure_door_1x1",
-        destination=tmp_path / "exports",
+    # Characterize source membership without treating the pressure door as an
+    # approved visual-fit profile. Its old export-success expectation is obsolete.
+    inventory_expr = f"""
+import bpy, json
+bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r})
+inventories = {{
+    role: [obj.name for obj in bpy.data.collections['Export_' + role].all_objects if obj.type == 'MESH']
+    for role in ('intact', 'damaged', 'breached')
+}}
+print('PRESSURE_SOURCE_INVENTORIES ' + json.dumps(inventories, sort_keys=True))
+"""
+    inspected = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-exit-code", "1", "--python-expr", inventory_expr],
+        capture_output=True, text=True, check=False, timeout=60,
     )
-    inventories = {role: _glb_node_inventory(path) for role, path in exported.items()}
+    assert inspected.returncode == 0, inspected.stdout + inspected.stderr
+    prefix = "PRESSURE_SOURCE_INVENTORIES "
+    proof_lines = [line[len(prefix):] for line in inspected.stdout.splitlines() if line.startswith(prefix)]
+    assert len(proof_lines) == 1
+    inventories = {role: set(names) for role, names in json.loads(proof_lines[0]).items()}
+
+    staging = tmp_path / "exports"
+    staging.mkdir()
+    previous = {}
+    for role in ("intact", "damaged", "breached"):
+        suffix = "" if role == "intact" else f"_{role}"
+        path = staging / f"pressure_door_1x1{suffix}.glb"
+        path.write_bytes(pressure_glb_bytes)
+        previous[path.name] = path.read_bytes()
+    authored_source = source_blend.read_bytes()
+    with pytest.raises(AssertionError, match="unsupported geometry profile: pressure_door_1x1"):
+        _export_structural_variants_for_evidence(
+            source=source_blend, asset_id="pressure_door_1x1", destination=staging,
+        )
+    assert {path.name: path.read_bytes() for path in staging.iterdir()} == previous
+    assert source_blend.read_bytes() == authored_source
     assert all(
         not any("FocusedNine_doorway_frame_open_1x1_" in name for name in names)
         for names in inventories.values()

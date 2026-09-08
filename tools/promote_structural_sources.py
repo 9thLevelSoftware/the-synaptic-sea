@@ -28,6 +28,10 @@ try:
         load_source_spec,
         source_output_paths,
     )
+    from tools.structural_stage_publication import (
+        StagePublicationError,
+        publish_staged_files,
+    )
 except ModuleNotFoundError:
     # Allow ``python tools/promote_structural_sources.py`` from a checkout.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -40,6 +44,10 @@ except ModuleNotFoundError:
         load_source_spec,
         source_output_paths,
     )
+    from tools.structural_stage_publication import (
+        StagePublicationError,
+        publish_staged_files,
+    )
 
 
 _RUNTIME_ROOT = Path("assets/imported/structural/ship_structural_v0")
@@ -50,6 +58,14 @@ _VARIANT_SUFFIXES: tuple[tuple[str, str], ...] = (
 )
 _VARIANT_NAMES = frozenset(variant for variant, _ in _VARIANT_SUFFIXES)
 _EXPORT_SCRIPT = Path(__file__).resolve().with_name("export_structural_glb.py")
+_DIMENSIONS_RELATIVE = Path("data/art/structural_visual_dimensions.v1.json")
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+try:
+    sys.path.remove(str(_REPOSITORY_ROOT))
+except ValueError:
+    pass
+sys.path.insert(0, str(_REPOSITORY_ROOT))
 
 
 class PromotionError(RuntimeError):
@@ -98,6 +114,58 @@ def _blender_executable() -> str:
     return os.environ.get("BLENDER", "blender")
 
 
+def _dimensions_policy_path(project_root: Path) -> Path:
+    return Path(project_root).expanduser().resolve() / _DIMENSIONS_RELATIVE
+
+
+def _status_is_resolved(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+    if any(token in normalized for token in ("hold", "pending", "required", "unresolved", "unknown", "blocked")):
+        return False
+    return normalized in {
+        "approved",
+        "approved_for_release",
+        "pass",
+        "passed",
+        "verified",
+        "complete",
+        "completed",
+        "resolved",
+        "ready",
+        "ok",
+    }
+
+
+def _source_authority_hold_reason(project_root: Path) -> str | None:
+    """Return a fail-closed reason until dimensions and source authority resolve."""
+
+    try:
+        try:
+            from tools.structural_visual_contract import load_dimensions
+        except ModuleNotFoundError:  # pragma: no cover - script-directory fallback
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            from tools.structural_visual_contract import load_dimensions
+        document = load_dimensions(_dimensions_policy_path(project_root))
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        return f"cannot resolve source authority policy: {exc}"
+
+    if not isinstance(document, dict):
+        return "source authority policy is not an object"
+    root_status = document.get("status")
+    if not _status_is_resolved(root_status):
+        return f"source authority status is unresolved: {root_status!r}"
+
+    authority = document.get("authority")
+    if not isinstance(authority, dict):
+        return "source authority metadata is missing"
+    for key in ("integration_baseline_status", "source_attestation_status"):
+        if not _status_is_resolved(authority.get(key)):
+            return f"source authority {key} is unresolved: {authority.get(key)!r}"
+    return None
+
+
 def _clean_staging_glbs(staging_dir: Path) -> None:
     """Remove only prior GLB exports, preserving other staging metadata."""
 
@@ -105,6 +173,43 @@ def _clean_staging_glbs(staging_dir: Path) -> None:
     for path in staging_dir.glob("*.glb"):
         if path.is_file() or path.is_symlink():
             path.unlink()
+
+
+def _replace_staging_outputs(
+    staging_dir: Path,
+    module_id: str,
+    exported: Mapping[str, Path],
+) -> dict[str, Path]:
+    """Publish a module's complete variant set transactionally."""
+
+    _validate_module_id(module_id)
+    staging_dir = Path(staging_dir).expanduser().resolve()
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    replacements: list[tuple[Path, Path]] = []
+    targets: set[Path] = set()
+    for variant, source in sorted(
+        exported.items(), key=lambda item: dict(_VARIANT_SUFFIXES).get(item[0], item[0])
+    ):
+        if variant not in _VARIANT_NAMES:
+            raise ValueError(f"unsupported structural source variant: {variant!r}")
+        source_path = Path(source).expanduser().resolve()
+        target = _variant_glb_path(staging_dir, module_id, variant)
+        replacements.append((source_path, target))
+        targets.add(target)
+    if not replacements:
+        raise PromotionError(f"Blender exported no GLBs for {module_id}")
+
+    obsolete = [
+        candidate
+        for variant, _suffix in _VARIANT_SUFFIXES
+        for candidate in (_variant_glb_path(staging_dir, module_id, variant),)
+        if candidate not in targets and (candidate.is_file() or candidate.is_symlink())
+    ]
+    publish_staged_files(replacements, obsolete=obsolete)
+    return {
+        variant: _variant_glb_path(staging_dir, module_id, variant)
+        for variant in exported
+    }
 
 
 def export_module_to_staging(
@@ -142,6 +247,8 @@ def export_module_to_staging(
             str(blend_path),
             "--staging-dir",
             str(export_dir),
+            "--project-root",
+            str(project_root),
             "--module",
             module_id,
         ]
@@ -174,13 +281,12 @@ def export_module_to_staging(
 
         # Commit only validated outputs.  Metadata and non-GLB files in the
         # final staging directory remain untouched.
-        _clean_staging_glbs(staging_dir)
-        committed: dict[str, Path] = {}
-        for variant, source in exported.items():
-            destination = _variant_glb_path(staging_dir, module_id, variant)
-            shutil.move(str(source), destination)
-            committed[variant] = destination
-        return committed
+        try:
+            return _replace_staging_outputs(staging_dir, module_id, exported)
+        except StagePublicationError as exc:
+            raise PromotionError(
+                f"staging publication failed for {module_id}: {exc}"
+            ) from exc
 
 
 def _copy_atomic(source: Path, destination: Path) -> None:
@@ -211,6 +317,17 @@ def promote_module(
 
     _validate_module_id(module_id)
     project_root = Path(project_root).expanduser().resolve()
+    hold_reason = _source_authority_hold_reason(project_root)
+    if hold_reason is not None:
+        if dry_run:
+            print(
+                "STRUCTURAL_PROMOTION_HOLD "
+                f"module={module_id} reason={hold_reason}"
+            )
+            return []
+        raise PromotionError(
+            f"refusing runtime promotion for {module_id}: {hold_reason}"
+        )
     staging_module = Path(staging_root).expanduser().resolve() / module_id
     promoted: list[str] = []
 
@@ -306,6 +423,12 @@ def _dry_run_module(
         f"module={module_id} blend={blend_path} "
         f"source_spec=loaded staging={staging_dir} glbs={planned_glbs}"
     )
+    hold_reason = _source_authority_hold_reason(project_root)
+    if hold_reason is not None:
+        print(
+            "STRUCTURAL_PROMOTION_HOLD "
+            f"module={module_id} reason={hold_reason}"
+        )
 
 
 def promote_all(
@@ -330,6 +453,11 @@ def promote_all(
     project_root = Path(project_root).expanduser().resolve()
     errors: list[str] = []
     all_promoted: list[str] = []
+
+    if not dry_run:
+        hold_reason = _source_authority_hold_reason(project_root)
+        if hold_reason is not None:
+            raise PromotionError(f"runtime promotion is held: {hold_reason}")
 
     if backup:
         if backup_target is None or not str(backup_target).strip():
@@ -493,7 +621,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             backup=args.backup,
             backup_target=args.backup_target,
         )
-    except PromotionError:
+    except PromotionError as exc:
+        message = str(exc)
+        marker = (
+            "STRUCTURAL_PROMOTION_HOLD"
+            if any(token in message.lower() for token in ("hold", "authority"))
+            else "STRUCTURAL_PROMOTION_ERROR"
+        )
+        print(f"{marker} reason={message}", file=sys.stderr)
         return 1
     print(
         f"STRUCTURAL_PROMOTION_SUMMARY modules={len(_selected_module_ids(args))} "

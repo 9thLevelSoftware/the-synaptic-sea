@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "structural_visual_dimensions",
+  "status": "approved_dimensions_pending_source_authority",
+  "kit_id": "ship_structural_v0",
+  "authority": {
+    "integration_baseline_commit": "5841392c2add35896e18408eb8783bb3f991d081",
+    "integration_baseline_status": "operator_approval_required",
+    "source_attestation_schema": "root-relative-hash-bound-v2",
+    "source_attestation_status": "operator_approval_required"
+  },
+  "coordinate_system": {
+    "runtime": "Godot Y-up",
+    "edge_local_axes": {
+      "tangent": "+X",
+      "up": "+Y",
+      "normal": "+Z"
+    },
+    "floor_local_axes": {
+      "width": "+X",
+      "up": "+Y",
+      "depth": "+Z"
+    },
+    "blender_conversion": "runtime/contract [x,y,z] -> Blender [x,z,y], matching the reviewed structural recovery pipeline",
+    "allowed_yaw_degrees": [0.0, 90.0, 180.0, 270.0]
+  },
+  "global": {
+    "grid_step_m": 4.0,
+    "deck_height_m": 4.0,
+    "walking_datum_y_m": 0.0,
+    "float_roundtrip_epsilon_m": 0.0001,
+    "required_object_scale": [1.0, 1.0, 1.0],
+    "required_mesh_origin_offset_m": [0.0, 0.0, 0.0],
+    "per_asset_dimension_overrides_allowed": false
+  },
+  "floor_interface": {
+    "cell_span_m": 4.0,
+    "slab_thickness_m": 0.25,
+    "top_y_m": 0.0,
+    "underside_y_m": -0.25,
+    "max_positive_relief_m": 0.0,
+    "max_recess_depth_m": 0.02,
+    "footprint_rule": "exactly [cells_x*4.0, cells_z*4.0] centered on the placement origin",
+    "mating_edge_rule": "the full boundary terminates exactly at each footprint plane; adjacent modules butt without gap, overlap, scale, or offset"
+  },
+  "edge_interface": {
+    "edge_plane_normal_m": 0.0,
+    "visual_total_depth_m": 0.2,
+    "visual_normal_min_m": -0.1,
+    "visual_normal_max_m": 0.1,
+    "one_cell_tangent_min_m": -2.0,
+    "one_cell_tangent_max_m": 2.0,
+    "two_cell_tangent_min_m": -4.0,
+    "two_cell_tangent_max_m": 4.0,
+    "base_y_m": 0.0,
+    "shared_visual_top_y_m": 3.2,
+    "terminal_mating_height_m": 3.2,
+    "terminal_mating_band_m": 0.2,
+    "rule": "wall, doorway, end-cap, corner, junction, blocked-frame and portal visual wings use this one section; silhouette variation is allowed only outside terminal mating bands"
+  },
+  "doorway_open_interface": {
+    "clear_prism": {
+      "tangent_min_m": -0.6,
+      "tangent_max_m": 0.6,
+      "bottom_y_m": 0.0,
+      "top_y_m": 2.2,
+      "normal_min_m": -0.1,
+      "normal_max_m": 0.1
+    },
+    "threshold_max_y_m": 0.0,
+    "threshold_must_not_reduce_clear_prism": true,
+    "state_parity": "intact, damaged and breached keep the same clear prism and mating interfaces"
+  },
+  "wall_family_interface": {
+    "straight_wing_span_m": 4.0,
+    "corner_and_junction_rule": "each occupied wing is the exact rotation of the shared 4.0 x 3.2 x 0.2 edge section; internal geometry is a manifold union, never stacked coplanar wings",
+    "end_plane_rule": "every wall_end or portal_edge mate is exactly at tangent +/-2.0 m (or +/-4.0 m for a two-cell module) with identity pivot and no socket offset"
+  },
+  "pillar_interface": {
+    "base_contact_y_m": 0.0,
+    "top_contact_y_m": 3.2,
+    "contact_centers_xz_m": [0.0, 0.0],
+    "rule": "bearing faces contact the floor and shared structural top exactly; cosmetic damage may not move either contact plane or the placement pivot"
+  },
+  "ramp_interface": {
+    "footprint_cells": [1, 2],
+    "width_m": 4.0,
+    "run_m": 8.0,
+    "run_min_z_m": -4.0,
+    "run_max_z_m": 4.0,
+    "lower_endpoint_y_m": 0.0,
+    "upper_endpoint_y_m": 0.55,
+    "rise_m": 0.55,
+    "slope_degrees": 3.932896272184,
+    "endpoint_rule": "the center walking surface is exactly y=0.0 at z=-4.0 and y=0.55 at z=+4.0; both endpoint strips are flat and flush with their adjoining floor datum",
+    "runtime_status": "hold authoring and release until canonical procgen emits or explicitly consumes the +0.55 m endpoint transform; current deck placement is in 4.0 m increments"
+  },
+  "transform_contract": {
+    "cell_world_position": "[cell_x*4.0, deck*4.0, cell_z*4.0]",
+    "edge_world_position": "cell_world_position + direction*[2.0,0.0,2.0] on the selected cardinal axis",
+    "yaw_by_direction": {
+      "south": 0.0,
+      "west": 90.0,
+      "north": 180.0,
+      "east": 270.0
+    },
+    "additional_translation_rotation_scale_allowed": false
+  },
+  "variants": {
+    "interface_parity_required": true,
+    "allowed_difference": "authored damage only away from mating bands, clear prisms, floor/ramp endpoint strips, pivots and sockets",
+    "intact_aliasing_allowed": false
+  },
+  "ownership": {
+    "visual_contract_consumers": [
+      "Blender authoring recipes",
+      "structural source inspection",
+      "GLB export validation",
+      "exported/reimported assembly validation"
+    ],
+    "forbidden_consumers": [
+      "procgen topology",
+      "collision generation",
+      "navigation generation",
+      "wrapper socket placement"
+    ]
+  }
+}

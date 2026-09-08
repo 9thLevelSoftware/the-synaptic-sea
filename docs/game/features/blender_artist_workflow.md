@@ -1,143 +1,110 @@
-# Blender Artist Workflow for Structural Sources
+# Blender artist workflow for structural sources
 
-This workflow covers editable structural `.blend` sources for the Synaptic Sea
-salvage-industrial kit. JSON placement contracts remain authoritative for module
-IDs, bounds, sockets, footprint, collision intent, and placement origin. The
-`.blend` file is the editable visual source; runtime GLBs are produced only by
-the staged export and validation pipeline.
+This workflow covers editable structural `.blend` sources for the Synaptic Sea salvage-industrial kit. The canonical visual policy is [`modular_structural_fit.md`](modular_structural_fit.md). JSON placement contracts remain authoritative for module IDs, bounds, sockets, footprint, collision intent, navigation intent, and placement origin. A `.blend` is the editable visual source; runtime GLBs are produced only through staged export and validation.
 
-## Opening Source Files
+## Authority boundary
 
-Structural source files live outside the Git checkout so that large editable
-Blender files can be backed up independently:
+Use each authority only for the question it owns:
+
+- `data/art/structural_visual_dimensions.v1.json` and the canonical runbook own the shared visual shell and fit policy.
+- `data/kits/ship_structural_v0.json`, `data/placement/contracts/structural/ship_structural_v0/*.json`, matching `.tres` files, and Godot wrappers own placement, sockets, collision, and navigation intent.
+- `tools/structural_source_contract.py` and `tools/validate_structural_sources.py` validate source/helper structure. They do **not** prove visual fit, readability, transformed imported geometry, or assembly seams.
+- `tools/structural_visual_contract.py` plus `tools/validate_structural_visual_fit.py` validate visual/interface geometry. They do **not** prove whole-kit assembly, renderer quality, collision/nav correctness, or human art approval.
+- `scripts/procgen/walkability_contract.gd` and its compiler/placement consumers are root-code authority for runtime behavior.
+
+The visual policy is art-only. Do not migrate source attestation, edit placement JSON, enlarge collision, rewrite navigation, change socket coordinates, or replace wrapper helpers while modeling. A legacy local bounds record with zero thickness is not visual geometry-dimensions authority. Widen or scale the visual shell to preserve the existing helper/placement contract; do not shrink or rewrite the contract to fit decoration.
+
+## Opening and preserving a source
+
+Structural sources live outside the checkout:
 
 ```text
 /Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/<module_id>/<module_id>.blend
+/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/<module_id>/<module_id>.source.json
 ```
 
-1. Open Blender 4.x.
-2. Choose **File → Open** and browse to the external source root above.
-3. Select a module directory and open its `<module_id>.blend` file.
-4. Keep the source file open while iterating. Do not edit the runtime files under
-   `assets/imported/structural/` directly.
-5. Save the `.blend` in its existing module directory. Keep the matching
-   `<module_id>.source.json` record beside it; update source metadata only through
-the approved source-authoring tools.
+1. Open Blender 4.x and open the existing module `.blend`; do not start a replacement scene.
+2. Keep the matching `.source.json` beside the source and update metadata only through approved source-authoring tools.
+3. Never edit `assets/imported/structural/` directly.
+4. Preserve `ModuleRoot_<module_id>`, `Geometry`, `AuthoringHelpers`, `Origin`, `Anchor_FloorCenter`, every `Anchor_SOCK_<socket_id>`, and the source-only `CollisionProxy`.
+5. Keep helper transforms and socket positions unchanged while editing visual collections.
 
-The external root can also be opened from a terminal with:
+Required source collections and helpers:
+
+- `Geometry`: visual meshes only.
+- `AuthoringHelpers`: source-only helpers.
+- `Origin` and `Anchor_FloorCenter`: unchanged placement anchors.
+- `Anchor_SOCK_<socket_id>`: one empty per contract socket.
+- `CollisionProxy`: non-rendering wireframe helper derived from the contract, never from decorative geometry.
+
+## Shared fit policy
+
+All values are metres in runtime/Godot Y-up coordinates:
+
+- Use a 4 m lattice. The finished walking datum is `Y=0`; floor underside is `Y=-0.25`.
+- Positive relief above the shared walkable shell is `0`. Recesses are at most `0.02` m and only outside protected walking/clearance guards.
+- Shared wall/top height is `3.2` m.
+- The complete edge visual envelope is `0.20` m deep, normal `[-0.10,+0.10]`. There is no additional outward decoration allowance: recess detail or use materials inside that same envelope.
+- `terminal_mating_band_m` = `0.20` m along the edge tangent at each terminal. Preserve its full `3.2` m height and `0.20` m depth, including planar end faces and continuous band surfaces. No bevel, trim, greeble or damage may consume it.
+- `doorway_frame_open_1x1` has a `1.2 × 2.2` m clear opening: X `[-0.6,+0.6]`, Y `[0,2.2]`, Z `[-0.1,+0.1]`. It has no raised threshold.
+- The pillar `footprint_cells` is `[1,1]` on the `4.0` m lattice, with centered X/Z contacts and Y contacts at `0` and `3.2`. The policy reserves that cell footprint; it does not prescribe a separate cosmetic body width or a filled-cell cube.
+- These seven profiles are auto-supported: `floor_1x1`, `floor_2x1`, `corridor_floor_1x1`, `corridor_floor_1x2`, `wall_straight_1x1`, `doorway_frame_open_1x1`, and `pillar_support_1x1`. Every other ID requires a reviewed profile and fails closed as `hold`; `ramp_up_1x2` remains HOLD.
+
+Use textures, normals, and trim sheets for paint wear, labels, hazard stripes, small grooves, fasteners, and shallow seams. Use actual geometry for readable large features, silhouette changes, deep recesses, braces, service pipes, and broken forms. Use cool salvaged steel, dark service cavities, and safety amber for practical maintenance cues. Static derelict dressing is not permanently emissive.
+
+Godot Compatibility does not provide the Forward+ Decal path. Prefer baked material detail. If an overlay is unavoidable, use a tightly bound non-colliding `Sprite3D` or overlay mesh with deliberate depth sorting and a documented depth decision. Do not apply a blanket offset to every overlay.
+
+## Coordinates and export axes
+
+Preserve the legacy helper mapping exactly:
+
+```text
+contract/helper [x, y, z] -> Blender [x, z, y]
+```
+
+This mapping applies to contract-derived helpers, sockets, bounds, and source inspection. Physical Blender geometry is Z-up and uses native glTF/runtime conversion `[x, z, -y]`; do not remap imported geometry through the helper mapping or convert it twice.
+
+For export collections, put runtime visual geometry in `Export_*` collections and set `variant_role` to `intact`, `damaged`, or `breached`. If no tagged collection exists, the exporter uses `Geometry` as the intact fallback. Helpers, cameras, lights, rigs, and authoring meshes must not enter a runtime GLB.
+
+## Validation and publication
+
+The source/helper validator and visual-fit gate are different checks:
+
+1. Run source inspection/validation to prove required helpers, sockets, origin, collision proxy, source record, and variant inventory.
+2. Export each requested variant to a private temporary GLB.
+3. Fresh-import each actual temporary GLB in Blender, evaluate transformed triangles, reject helper/light/camera/rig leakage and unbaked transforms, then run the pure visual contract.
+4. Preserve previous staging if any variant fails, is empty, or is cancelled.
+5. Run the Godot import smoke and record diagnostics.
+6. Keep runtime promotion closed while source authority is unresolved, even when visual geometry returns PASS.
+
+The implemented CLI is:
 
 ```bash
-/opt/homebrew/bin/blender \
-  /Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/<module_id>/<module_id>.blend
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/validate_structural_visual_fit.py -- \
+  --project-root ROOT --module ID --glb PATH --report PATH
 ```
 
-## Material Library
+The exporter does fresh validation for each temporary variant before replacing staged output. The promoter checks source-authority HOLD before backup/copy, including force and skip-Godot paths; this gate does not approve an asset.
 
-The shared library is:
+Full assembly review is still required: four rotations; floor/wall joins, door corners, inner/outer corners, and T-junctions; a mixed-length 2×2 floor patch; closed loopback; mixed-length stack with gap/overlap negatives; and clay/material evidence from the actual production camera. These are not automatic coverage of the core preflight.
 
-```text
-/Volumes/Untitled/SynapticSeaAssets/meshes/source/materials/salvage_industrial.blend
-```
+## Research basis and review record
 
-Its materials are:
+The policy adapts, rather than overclaims, the local research brief:
 
-- `MAT_PaintedAlloyGray` — gray painted alloy, medium metallic response.
-- `MAT_WarningStripe` — procedural yellow/black hazard bands.
-- `MAT_ReactorGlow` — blue-green emission for reactor and energized details.
-- `MAT_Biomatter` — dark red organic surface with subsurface response.
-- `MAT_Conduit` — dark, high-roughness rubber for cables and conduits.
+`artifacts/room_kit_v2/research/2026-09-08_154121-modular-fit/research-brief.txt`
 
-To append a material into the open source file:
+That ledger cites:
 
-1. Choose **File → Append**.
-2. Browse to `meshes/source/materials/salvage_industrial.blend`.
-3. Open the `Material` directory.
-4. Select the material by its exact `MAT_*` name and click **Append**.
-5. Assign it from the Material Properties panel or the material dropdown.
+- https://book.leveldesignbook.com/process/blockout/metrics/modular
+- https://docs.godotengine.org/en/stable/classes/class_gridmap.html
+- https://docs.godotengine.org/en/stable/classes/class_camera3d.html
+- https://docs.godotengine.org/en/stable/tutorials/3d/standard_material_3d.html
+- https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html
+- https://dev.epicgames.com/documentation/en-us/unreal-engine/fbx-static-mesh-pipeline-in-unreal-engine
+- http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html
+- https://wiki.frozenbyte.com/index.php/3D_Asset_Workflow:_Tile_Textures_and_Trimsheets
+- https://www.exp-points.com/vuk-single-material-modular-kit-environment-ue4
 
-Append only the material datablock needed by the module. Do not link the
-library file into runtime scenes, rename the canonical material names, or bake
-source-only helpers into exported geometry.
-
-## Export Process
-
-1. **Open source:** open the module `.blend` from the external source root.
-2. **Edit geometry:** modify visual meshes under `Geometry` while preserving the
-   module ID, origin, contract bounds, socket empties, and collision helper.
-3. **Tag export collections:** put runtime visual geometry in collections named
-   `Export_*`. Set each collection's `variant_role` custom property to one of
-   `intact`, `damaged`, or `breached`. If no tagged collection is present, the
-   exporter uses `Geometry` as the intact fallback.
-4. **Run the add-on export:** use the structural module add-on's **Export GLB**
-   button. The operator writes staged GLBs and exports only the selected tagged
-   visual collections; authoring helpers are not runtime geometry.
-5. **Validate:** run the source/GLB validation gates and the Godot import smoke.
-   Fix every unexpected `ERROR:`, `WARNING:`, or structural contract mismatch.
-6. **Promote:** after validation and review, run the promotion command to copy
-   the staged GLB into `assets/imported/structural/`. Use `--backup
-   --backup-target <url>` when the external source should be backed up before
-   promotion.
-
-Example command-line promotion for one module:
-
-```bash
-/opt/homebrew/bin/python3.11 tools/promote_structural_sources.py \
-  --project-root /Volumes/Untitled/SynapticSeaAssets/worktrees/the-synaptic-sea-asset-metadata-retrofit \
-  --source-root /Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0 \
-  --staging-root /private/tmp/synaptic-promote \
-  --module floor_1x1 \
-  --backup --backup-target s3://bucket/synaptic-sea/structural-sources
-```
-
-## Validation
-
-Validation checks the machine-readable source contract and the authored source,
-not just whether Blender can save a file. The focused source validator checks
-that:
-
-- the `.blend` exists and can be opened by Blender;
-- the module ID and source record match the contract;
-- `ModuleRoot_<module_id>`, `Geometry`, `AuthoringHelpers`, `Origin`, and the
-  required `Anchor_SOCK_<socket_id>` empties are present;
-- socket positions use the contract-to-Blender coordinate conversion;
-- `CollisionProxy` preserves the contract bounds and remains a source-only
-  wireframe helper;
-- export collections have valid, non-duplicated variant roles;
-- staged GLBs are non-empty, have valid GLB data, and re-import in Blender;
-- Godot imports the staged GLBs without unexpected errors or warnings before
-  promotion.
-
-Common failures and fixes:
-
-| Failure | Fix |
-|---|---|
-| Missing `Anchor_SOCK_*` | Restore the socket empty from the contract; do not hand-tune its contract position. |
-| Socket appears in the wrong place | Reapply `[x, y, z] → [x, z, y]`; Blender is Z-up while the placement contract is Y-up. |
-| Missing or changed `CollisionProxy` | Recreate the wireframe box from contract bounds; do not derive it from decorative geometry. |
-| No GLB exported | Add a tagged `Export_*` collection with a valid `variant_role`, or keep a `Geometry` intact fallback. |
-| Duplicate/invalid variant | Use one collection per role and set the role to `intact`, `damaged`, or `breached`. |
-| Empty/invalid GLB | Check that runtime mesh objects are selected and rerun the add-on export into a clean staging directory. |
-| Godot import warning/error | Inspect the first reported asset path, repair missing materials/textures or invalid mesh data, then rerun the import smoke. |
-| Runtime file changed without review | Restore the staged/runtime boundary and repeat export → validation → promotion; never edit `assets/imported` directly. |
-
-A clean Blender save or a non-empty file is not sufficient evidence for
-promotion. Record the command and fresh validator output with the asset review.
-
-## Coordinate Reference
-
-The placement contract uses **Y-up** coordinates. Blender uses **Z-up**. Convert
-contract positions and bounds with this exact component mapping:
-
-```text
-contract [x, y, z] → Blender [x, z, y]
-```
-
-For example:
-
-```text
-contract [1.0, 2.0, 0.5] → Blender [1.0, 0.5, 2.0]
-```
-
-Apply the mapping consistently to socket locations, bounds, origins, and any
-other contract-derived helper. Do not rotate or reinterpret coordinates a
-second time during export.
+Record module ID, source path, policy hash, transformed measurements, protected-strip/doorway checks, variant, validator reports, camera evidence, and whether the result is source-validated, visual-fit-passed, assembly-reviewed, or merely staged. This documentation update authored no assets, approved no assets, and does not claim old baselines all pass.
