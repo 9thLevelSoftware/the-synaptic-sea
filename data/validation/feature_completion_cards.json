@@ -4373,6 +4373,11 @@
         },
         {
           "path": "scripts/validation/r10a_run7_save_transition_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/r10a_world7_snapshot_smoke.gd",
           "source_exists": false,
           "scope_state": "planned_missing"
         },
@@ -4418,8 +4423,8 @@
         },
         {
           "path": "tests/fixtures/feature_completion/p10_run_v8_future.json",
-          "source_exists": false,
-          "scope_state": "planned_missing"
+          "source_exists": true,
+          "scope_state": "present"
         },
         {
           "path": "tests/fixtures/feature_completion/p10_world_v8_future.json",

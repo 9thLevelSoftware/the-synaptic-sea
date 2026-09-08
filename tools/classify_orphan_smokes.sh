@@ -41,7 +41,9 @@ classify() {
     fc_p05_smoke|fc_p06_smoke|fc_p07_smoke|fc_p08_smoke|fc_p09_smoke|fc_p09_natural_route_smoke|\
     combat_persistence_smoke|fc_p10_smoke|fc_p10_process_smoke|fc_p11_live_smoke|fc_p11_smoke|fc_p12_smoke|fc_p13_smoke|\
     fc_p16_smoke|runtime_physical_volume_smoke|structural_rebuild_collision_query_smoke|\
-    structural_rebuild_candidate_nav_smoke|structural_rebuild_policy_smoke)
+    structural_rebuild_candidate_nav_smoke|structural_rebuild_policy_smoke|\
+    r10a_run7_save_transition_smoke|r10a_ceiling_clearance_smoke|\
+    r10a_dock_endpoint_contract_smoke|r10a_dock_traversal_smoke)
       echo "standalone-feature-completion" ;;
     # -- cannot run headless (extend Node3D, no _initialize) ------------------
     locked_iso_readability_harness|m7_web_breached_encounter_proof|top_down_readability_harness)

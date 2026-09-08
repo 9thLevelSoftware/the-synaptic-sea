@@ -391,6 +391,17 @@ sentinel. Focused acceptance uses `r10a_run7_save_transition_smoke.gd` plus migr
 service, save/load service, ship-mod snapshot and pillar-persistence smokes.
 This staged run-model slice does not establish world-7 or full save integration.
 
+The independently implementable world-7 model slice owns `world_snapshot.gd`,
+`save_restore_candidate.gd`, and `r10a_world7_snapshot_smoke.gd`. Use the exact
+`dock_connections_v1`, `player_owner_pose_v1`, `boarding_port_states_v1`, and
+`ship_root_authorities_v1` contracts in the accepted R10 brief and free-root
+addendum. Pure validation rejects legacy key presence, duplicate or foreign
+identities, owner/aboard disagreement, invalid connection/root graphs, incomplete
+state coverage and unsupported free transforms, while retaining exact accepted
+arrays and inactive-owner authority. Nest strict run 7. Keep validators within the
+existing pure models; historical migration, live placement and capture remain
+separate integration work. Verify exact round trips and targeted negative cases.
+
 Current procedural-generation regression fixtures must validate unique physical
 placement identities and exact half-span coverage rather than unique primary edge
 keys. Preserve the historical `compact_seed17_current` fixture unchanged; record

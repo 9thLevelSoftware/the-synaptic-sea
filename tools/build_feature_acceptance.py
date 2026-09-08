@@ -696,6 +696,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         f"{VALIDATION}save_migration_world_smoke.gd",
         f"{VALIDATION}save_migration_service_smoke.gd",
         f"{VALIDATION}r10a_run7_save_transition_smoke.gd",
+        f"{VALIDATION}r10a_world7_snapshot_smoke.gd",
         f"{VALIDATION}save_load_service_smoke.gd",
         f"{VALIDATION}ship_mod_run_snapshot_smoke.gd",
         f"{VALIDATION}pillar_persistence_smoke.gd",
