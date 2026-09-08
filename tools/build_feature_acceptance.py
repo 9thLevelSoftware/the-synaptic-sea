@@ -622,6 +622,8 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/procgen/structural_plan_validator.gd",
         "scripts/procgen/layout_serializer.gd",
         "scripts/procgen/ship_layout_generator.gd", "scripts/procgen/ship_generator.gd",
+        "scripts/procgen/cell_layout_engine.gd",
+        "scripts/validation/cell_layout_engine_smoke.gd",
         "scripts/procgen/life_boat.gd", "scripts/procgen/generated_ship_loader.gd",
         "scripts/procgen/modular_socket_catalog.gd", "scripts/systems/dock_ports.gd",
         "scripts/systems/docking_manager.gd", "scripts/systems/ship_instance.gd",

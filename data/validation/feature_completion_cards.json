@@ -3897,6 +3897,16 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/procgen/cell_layout_engine.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/cell_layout_engine_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/procgen/life_boat.gd",
           "source_exists": true,
           "scope_state": "present"

@@ -377,3 +377,14 @@ layout preparation used by production. Stress coverage must retain every origina
 seed/template case and distinguish rejected candidates from a failed final layout;
 fixture updates cannot waive dockability or diagnostics requirements.
 
+Cell layout must reserve the assigned dock/airlock's outward boarding space before
+later rooms or connector growth can occupy it. For the current fixed lifeboat,
+reserve two outward columns by five tangent rows at the preferred west boundary
+cell (minimum X, then minimum Z), on that deck. Keep this exclusion separate from
+real occupancy; it must never become a room, wall, or serialized occupant. Preserve
+room areas and roles, declared connections, seed determinism, and stacked vertical
+links. A late dock whose required space is already occupied rejects the layout
+without returning a usable partial layout, relocation, or salted retry. Verify the
+reservation against the actual paired collision geometry, all 60 stress cases,
+and a no-dock control that retains its prior deterministic layout.
+
