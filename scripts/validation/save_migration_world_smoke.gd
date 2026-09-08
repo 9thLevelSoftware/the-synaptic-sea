@@ -111,6 +111,22 @@ func _initialize() -> void:
 			_fail("world-5 accepted impossible pair or lost exact reason: %s" % str(rejected_pair))
 			return
 
+	# The world-5 step is a historical boundary. It must continue to emit an
+	# embedded run-6 snapshot after the service target advances beyond run 6.
+	var chained_world5: Dictionary = historical_world4.duplicate(true)
+	chained_world5["slice_version"] = "world-5"
+	chained_world5.home_ship["slice_version"] = "gate2-current-run-5"
+	chained_world5.home_ship["crafting_summary"] = {}
+	chained_world5["visited_ships"] = {}
+	var chained_result: Dictionary = svc._migrate_world_v5_to_v6_result(chained_world5)
+	var chained_out: Variant = chained_result.get("dict", null)
+	if not chained_out is Dictionary \
+			or not (chained_out as Dictionary).get("home_ship", null) is Dictionary \
+			or str(((chained_out as Dictionary).home_ship as Dictionary).get(
+				"slice_version", "")) != "gate2-current-run-6":
+		_fail("world-5 step did not pin embedded run-6: %s" % str(chained_result))
+		return
+
 	print("SAVE MIGRATION WORLD PASS unknown_version_passthrough=%s legacy_home_ship_migrated=true current_world_home_ship_migrated=true" % str(passthrough_ok).to_lower())
 	quit(0)
 

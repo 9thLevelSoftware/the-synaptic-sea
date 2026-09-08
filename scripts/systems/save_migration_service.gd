@@ -799,7 +799,7 @@ func _migrate_world_v5_to_v6(dict: Dictionary) -> Dictionary:
 
 
 func _migrate_world_v5_to_v6_result(dict: Dictionary) -> Dictionary:
-	var inner: Dictionary = _migrate_world_home_ship(dict, TARGET_VERSION)
+	var inner: Dictionary = _migrate_world_home_ship(dict, "gate2-current-run-6")
 	if inner.get("dict", null) == null:
 		return {"ok": false, "reason": str(inner.get("reason", "malformed_home_run"))}
 	var out: Dictionary = (inner.dict as Dictionary).duplicate(true)
