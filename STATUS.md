@@ -1,14 +1,15 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-09-06
+**Last updated:** 2026-09-07
 
-**Execution paused at the user's request.** Resume from the
+**Execution resumed at the user's explicit request on 2026-09-07.** Continue from the
 [2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md).
 The checkpoint preserves integrated WIP and portable task evidence; it is not
 feature-complete or independently approved as a whole. R10-A's latest focused
 home/away production traversal checks pass, but its final combined qualification,
-paired run7/world7 migration and independent review remain pending. Continue
-only after the user explicitly resumes.
+paired run7/world7 migration and independent review remain pending. PR #548 was
+merged as `2f9c6913`; resumed work starts from that merged base on
+`codex/feature-completion-resume` in the existing isolated execution worktree.
 
 ## Current feature-completion program
 

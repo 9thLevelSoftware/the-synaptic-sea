@@ -13,7 +13,7 @@
 ## Global constraints
 
 - This is the remaining-work execution addendum, written 2026-09-05 against execution HEAD `792642db` plus existing uncommitted work. It does not replace frozen requirements, rewrite historical evidence, or assert that WIP is committed.
-- Execute in `D:/the-synaptic-sea-feature-completion`, branch `codex/feature-completion`. Preserve the original `D:/the-synaptic-sea` user checkout and all existing WIP.
+- Execute in `D:/the-synaptic-sea-feature-completion`. The original branch `codex/feature-completion` was checkpointed at `0d4518a0` and merged through PR #548. The user's 2026-09-07 resume continues on `codex/feature-completion-resume` from merged base `2f9c6913`. Preserve the original `D:/the-synaptic-sea` user checkout and all existing WIP.
 - Keep the original P00–P24 identifiers. R01–R19 below are dependency-aware closure packages under those cards, not additional acceptance criteria.
 - Freeze remains 668 source rows, 657 active rows, 11 explicit deferrals, and 622 distinct active criteria after reviewed aliases. Fingerprint: `8041e481680152f85fe2d3617491880a5268d89dcb63a59608590711edef48d0`.
 - Keep exact item/recipe/ship/module/slot IDs, lot quantity/quality/condition/origin, per-item stack ceilings, soft player encumbrance, cargo limits, and native generation contracts.
