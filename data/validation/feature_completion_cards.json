@@ -4382,6 +4382,21 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/systems/world_v6_layout_projection.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "data/migrations/world_v6_geometry_authority_v1.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/r10a_world6_layout_projection_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
           "path": "scripts/validation/save_load_service_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
@@ -4440,6 +4455,7 @@
         "At home and away, the real PlayerController remains grounded through ordinary input in both directions when open and is physically denied when closed. Overlapping room AABBs resolve only through the authenticated connection plane; exact tie is mobile, and closing behind a player does not rewrite the cleared-side owner.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
         "Historical integrity migration reuses one public typed compiled-placement identity function in ModuleIntegrityConsequences; compiled seeding calls the same function, and focused tests compare exact full-edge, half-span, vertex, floor, and ceiling IDs against registered modules without changing health semantics.",
+        "World-6 attachment projection pins the minimal c51 historical generation/data closure and exact native-v2 hash/version; incomplete route sets and differing surviving transforms reject explicitly. Its focused smoke proves exact historical descriptors without current-generation substitution, save publication, or health migration.",
         "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both.",
         "R10 vertex-half-span correction preserves the three real corner/T module IDs: vertex-owned 2 m by 3 m by 0.2 m rays claim exact incident SOLID half spans; residual half straights use scale (0.5, 1, 1), and every 4 m SOLID edge resolves end-to-end without missing, extra, or duplicate centerline span. Changed geometry-dependent acceptance evidence requires fresh requalification."
       ],

@@ -368,6 +368,20 @@ one-to-one identities preserve their validated payload. Migration acceptance mus
 cover consistent split/shared mappings, conflicting incident damage, missing or
 duplicate coverage, payload ambiguity, and exact recapture after reload/revisit.
 
+The historical attachment projection is a separate pure prerequisite. Pin the
+minimal room/cell ordering and attachment math to commit
+`c51bcacbcb5557fd54ccf5a3e2775f0e35c61bad`, with source/data provenance in
+`data/migrations/world_v6_geometry_authority_v1.json` and implementation in
+`scripts/systems/world_v6_layout_projection.gd`. Reproduce fixed home/lifeboat
+and procedural airlock/hangar descriptors without calling mutable current
+generation or endpoint resolution. Authenticate native-v2 binary hash/version
+before use; an unavailable possible route makes the candidate set incomplete,
+and differing surviving attachment transforms are ambiguous. Neither case may
+silently select fallback. Focused projection acceptance compares exact outputs
+with the pinned historical implementation and proves malformed/unavailable/
+ambiguous cases reject without input mutation. This prerequisite does not
+publish world saves, migrate damage, or replace staged live clearance proof.
+
 Historical integrity initialization must preserve the frozen restore semantics:
 an absent or empty summary regenerates the historical condition's `module_damage`;
 a valid nonempty summary with `deltas: []` explicitly records full repair and
