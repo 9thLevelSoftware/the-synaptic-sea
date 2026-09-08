@@ -1,0 +1,54 @@
+Room-kit-v2 delayed spec review reconciliation
+
+Incoming review: deleg_a8a29bb2, summary subagent-summary-0-20260908_133020_717287.txt.
+Reviewed baseline commit: 6df75a7f32fadd46719e15476dbdbc4b2d208f66.
+Disposition: scoped findings reconciled; structural/art/runtime release HOLD unchanged.
+
+1. Underside occlusion
+The review described superseded render evidence. Current six-view contact-sheet
+undersides show authored geometry rather than the former blank helper slab.
+Parent inspected the current image again. The render-only helper override and
+frozen-master caveat remain documented in README.txt. This is NOT artist acceptance
+of the full pilot and does not authorize promotion.
+
+2. Malformed export-proof.json
+Already corrected before this review was delivered. The current test writer uses
+a real newline. Parent reran the real Blender positive export/reimport test:
+  python3 -m pytest -q tests/test_export_static_room_prop.py::test_transformed_master_exports_y_up_identity_and_preserves_source
+Result: 1 passed. json.loads() parsed the regenerated receipt successfully and
+source_unchanged, helpers_excluded, identity_nodes were all true.
+
+3. Numeric type suggestion: rejected as written; actual tolerance bug fixed
+A live Godot probe confirmed JSON.parse_string('{"budget":10000}') produces a
+TYPE_FLOAT value. Requiring TYPE_INT would reject the canonical live catalog.
+Godot's decoded numeric representation is therefore deliberately distinct from
+the stricter lexical integer rule in the Python authoring validator. The Python
+validator and frozen catalog remain unchanged. Integral floats remain accepted at
+the Godot decoded-data boundary; lexical int-versus-float equivalence across both
+parsers is NOT claimed.
+
+However, the former is_equal_approx() check accepted fractional 9999.999 as an
+integer. Replaced it with exact numeric == roundf(numeric), retaining finite and
+range checks. Test-first reproduction is recorded in integer-reconciliation/red.log;
+it fails on fractional triangles_max 9999.999. The corrected gate succeeds in
+green.log. Parent added full parse_rows fixtures using actual JSON-decoded
+fractional triangle/material budgets, then independently ran parent-green.log.
+Tests also cover exact JSON integer acceptance, booleans, strings, infinity, NaN,
+range limits, and fractional footprint rejection.
+
+Fresh verification
+  Python tooling: 41 passed across roster, exporter and diagnostic-runner tests.
+  A final default-temp rerun failed during Blender fixture setup with ENOSPC;
+  no production change was made for that failure. The same suite then passed
+  with TMPDIR set to the external-drive integer-reconciliation/tmp directory.
+  Machine-readable results: integer-reconciliation/python-results.xml.
+  Parent rules gate: ROOM_KIT_V2_RULES_PASS; no engine diagnostics.
+  Parent manual pilot gate: ROOM_KIT_PILOT_TEST_PASS; no engine diagnostics.
+  Frozen source/GLB hashes: 6 files unchanged.
+  Protected files: 2,792 checked, none changed.
+  git diff --check: clean.
+
+Evidence paths are relative to artifacts/room_kit_v2/review/ unless noted above.
+No structural reconciliation, builder/loader integration, asset re-authoring,
+runtime promotion, merge, full-project green result, or independent post-fix
+release approval is claimed. Existing decision card t_5dbc3f3a remains blocked.

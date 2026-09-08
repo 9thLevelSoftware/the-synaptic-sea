@@ -206,7 +206,8 @@ static func _valid_integer(value: Variant, minimum: int, maximum: int) -> bool:
 	if not _valid_number(value):
 		return false
 	var numeric: float = float(value)
-	return is_equal_approx(numeric, roundf(numeric)) and numeric >= minimum and numeric <= maximum
+	# Godot JSON numbers are finite floats; accept only exact integral values, not epsilon-near fractions.
+	return numeric == roundf(numeric) and numeric >= minimum and numeric <= maximum
 
 
 static func _valid_asset_id(asset_id: String) -> bool:

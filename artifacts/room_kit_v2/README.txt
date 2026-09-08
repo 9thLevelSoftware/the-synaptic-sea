@@ -97,4 +97,9 @@ Repeat focused checks (from execution checkout)
     --rendering-method gl_compatibility --rendering-driver opengl3 \
     --script scripts/validation/room_kit_v2_rules_smoke.gd
 
+Subsequent review reconciliation
+  review/spec-review-reconciliation.txt records the delayed spec review and
+  exact-integer validation correction. Its focused checks supplement, rather
+  than replace, the historical implementation evidence above.
+
 Do not promote this staged partial pack or call the approved full plan complete.

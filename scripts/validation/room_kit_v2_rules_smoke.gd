@@ -132,6 +132,47 @@ func _run() -> void:
 	if not _require(Rules.selected("room_kit_unknown", 3, 2).is_empty(), "unknown role selected a value"):
 		return
 
+	var exact_integer_json: Variant = JSON.parse_string("{\"triangles_max\":10000,\"material_max\":4,\"footprint_cells\":[1,1]}")
+	if not _require(exact_integer_json is Dictionary, "JSON integer fixture did not parse as a dictionary"):
+		return
+	var parsed_integer_values: Dictionary = exact_integer_json
+	if not _require(typeof(parsed_integer_values["triangles_max"]) == TYPE_FLOAT, "JSON integer fixture did not exercise Godot's float numeric type"):
+		return
+	if not _require(Rules._valid_integer(parsed_integer_values["triangles_max"], 1, 10000), "exact JSON integer triangles_max was rejected"):
+		return
+	if not _require(Rules._valid_integer(parsed_integer_values["material_max"], 1, 4), "exact JSON integer material_max was rejected"):
+		return
+	var integer_validation_cases: Array = [
+		[9999.999, 1, 10000, false, "fractional triangles_max 9999.999"],
+		[3.000001, 1, 4, false, "fractional material_max 3.000001"],
+		[true, 1, 10000, false, "boolean integer"],
+		["3", 1, 4, false, "string integer"],
+		[INF, 1, 10000, false, "infinite integer"],
+		[-INF, 1, 10000, false, "negative infinite integer"],
+		[NAN, 1, 10000, false, "NaN integer"],
+		[0, 1, 10000, false, "below-range integer"],
+		[10001, 1, 10000, false, "above-range integer"],
+		[1.0, 1, 10000, true, "exact integral float"],
+	]
+	for validation_case in integer_validation_cases:
+		var actual_valid: bool = Rules._valid_integer(validation_case[0], validation_case[1], validation_case[2])
+		if not _require(actual_valid == validation_case[3], "integer validation mismatch: %s" % validation_case[4]):
+			return
+
+	var fractional_json: Dictionary = JSON.parse_string("{\"triangles_max\":9999.999,\"material_max\":3.000001}")
+	for field in fractional_json:
+		var fractional_budget_rows: Array = rows.duplicate(true)
+		fractional_budget_rows[0][field] = fractional_json[field]
+		if not _require(Rules.parse_rows(_catalog(fractional_budget_rows)).is_empty(), "fractional catalog budget accepted: %s" % field):
+			return
+
+	var fractional_footprint_rows: Array = rows.duplicate(true)
+	var fractional_footprint_row: Dictionary = (fractional_footprint_rows[0] as Dictionary).duplicate(true)
+	fractional_footprint_row["footprint_cells"] = [1.5, 1]
+	fractional_footprint_rows[0] = fractional_footprint_row
+	if not _require(Rules.parse_rows(_catalog(fractional_footprint_rows)).is_empty(), "fractional footprint cell was accepted"):
+		return
+
 	var coverage_roles: Array[String] = [
 		"maintenance", "engineering", "machine_shop", "medical", "medbay",
 		"reactor", "power", "engineering_power", "cargo", "storage", "salvage",
