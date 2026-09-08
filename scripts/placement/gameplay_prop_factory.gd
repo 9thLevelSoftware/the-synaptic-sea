@@ -33,28 +33,25 @@ static func build(prop_id: String, world_position: Vector3 = Vector3.ZERO) -> No
 	node.name = "GameplayProp_%s" % prop_id
 	node.position = world_position + Vector3.UP * float(prop.get("y_offset", 0.0))
 	node.set_meta("gameplay_prop_id", prop_id)
-
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = "Mesh"
-	var mesh_resource: Resource = _load_mesh_resource(prop)
-	if mesh_resource is Mesh:
-		mesh_instance.mesh = mesh_resource as Mesh
-	else:
-		mesh_instance.mesh = _primitive_mesh(str(prop.get("primitive", "box")), float(prop.get("height_hint", 1.0)))
 	var scale_value: float = float(prop.get("scale", 1.0))
 	mesh_instance.scale = Vector3.ONE * scale_value
-	var material := StandardMaterial3D.new()
-	material.albedo_color = _catalog_color(prop)
-	mesh_instance.material_override = material
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	node.add_child(mesh_instance)
-
+	var mesh_resource: Resource = _load_mesh_resource(prop)
 	if mesh_resource is PackedScene:
 		var packed_instance := (mesh_resource as PackedScene).instantiate()
 		packed_instance.name = "CatalogMesh"
-		if packed_instance is Node3D:
-			(packed_instance as Node3D).scale = Vector3.ONE * scale_value
-		node.add_child(packed_instance)
+		mesh_instance.add_child(packed_instance)
+	else:
+		if mesh_resource is Mesh:
+			mesh_instance.mesh = mesh_resource as Mesh
+		else:
+			mesh_instance.mesh = _primitive_mesh(str(prop.get("primitive", "box")), float(prop.get("height_hint", 1.0)))
+		var material := StandardMaterial3D.new()
+		material.albedo_color = _catalog_color(prop)
+		mesh_instance.material_override = material
 	return node
 
 static func build_from_catalog(prop_id: String, world_position: Vector3 = Vector3.ZERO) -> Node3D:
