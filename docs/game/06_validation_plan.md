@@ -1579,6 +1579,7 @@ membership changes).
 | `r10a_run7_save_transition_smoke` | standalone-feature-completion |
 | `r10a_world7_snapshot_smoke` | standalone-feature-completion |
 | `r10a_world6_layout_projection_smoke` | standalone-feature-completion |
+| `r10a_integrity_admission_smoke` | standalone-feature-completion |
 | `r10a_ceiling_clearance_smoke` | standalone-feature-completion |
 | `r10a_dock_endpoint_contract_smoke` | standalone-feature-completion |
 | `r10a_dock_traversal_smoke` | standalone-feature-completion |

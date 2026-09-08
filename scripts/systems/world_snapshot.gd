@@ -6,6 +6,7 @@ const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
 const RecipeKnowledgeStateScript := preload("res://scripts/systems/recipe_knowledge_state.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
+const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
@@ -136,6 +137,9 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		return null
 	if not validate_world7_authority_fields(dict):
 		return null
+	if expected_world_version == WORLD_SLICE_VERSION \
+			and not _validate_raw_current_integrity(dict):
+		return null
 	# Construct via load() self-reference rather than WorldSnapshot.new():
 	# under --headless --script Godot does not rebuild the global class
 	# registry, so a freshly added class_name is not resolvable on a fresh
@@ -197,6 +201,34 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	if not _validate_detached_nested_state(ws, expected_godot_version):
 		return null
 	return ws
+
+
+## Validate current integrity payloads while they are still raw Variants. The
+## established RunSnapshot/ShipInstance decoders intentionally remain permissive
+## for their version-pinned historical callers.
+static func _validate_raw_current_integrity(dict: Dictionary) -> bool:
+	var home_v: Variant = dict.get("home_ship", null)
+	if not home_v is Dictionary:
+		return false
+	var home: Dictionary = home_v as Dictionary
+	if home.has("module_integrity_summary"):
+		var home_result: Dictionary = ModuleIntegrityMapScript.validate_current_summary(
+			home.module_integrity_summary)
+		if not bool(home_result.get("ok", false)):
+			return false
+	var visited_v: Variant = dict.get("visited_ships", {})
+	if not visited_v is Dictionary:
+		return false
+	for ship_v in (visited_v as Dictionary).values():
+		if not ship_v is Dictionary:
+			return false
+		var ship: Dictionary = ship_v as Dictionary
+		if ship.has("module_integrity"):
+			var visited_result: Dictionary = ModuleIntegrityMapScript \
+				.validate_current_summary(ship.module_integrity)
+			if not bool(visited_result.get("ok", false)):
+				return false
+	return true
 
 
 ## Validates only the world-7-owned syntax. Detached owner/endpoint/parent

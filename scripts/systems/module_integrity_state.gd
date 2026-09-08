@@ -12,6 +12,11 @@ const THRESHOLD_DAMAGED: float = 0.75
 const THRESHOLD_BREACHED: float = 0.40
 const THRESHOLD_DESTROYED: float = 0.05
 
+const CURRENT_SUMMARY_KEYS: Array[String] = [
+	"module_id", "kind", "room_id", "integrity", "base_integrity", "state",
+	"material_composition", "mounted_components", "tool_class",
+]
+
 var module_id: String = ""
 var kind: String = ""
 var integrity: float = 1.0
@@ -84,15 +89,7 @@ func apply_authored_state(authored_state: String, authored_integrity: float = -1
 
 
 func _recompute_state() -> String:
-	var ratio: float = integrity / base_integrity if base_integrity > 0.0 else 0.0
-	if ratio <= THRESHOLD_DESTROYED:
-		state = STATE_DESTROYED
-	elif ratio <= THRESHOLD_BREACHED:
-		state = STATE_BREACHED
-	elif ratio <= THRESHOLD_DAMAGED:
-		state = STATE_DAMAGED
-	else:
-		state = STATE_INTACT
+	state = state_for_health(integrity, base_integrity)
 	return state
 
 
@@ -126,3 +123,55 @@ func apply_summary(summary: Dictionary) -> bool:
 		return false
 	configure(summary)
 	return true
+
+
+## Current saves reach this only after ModuleIntegrityMap's public admission
+## validator. Keep the checks local as a fail-closed guard for direct callers,
+## then assign the admitted health tuple without configure()'s historical
+## coercion, clamping, or state recomputation.
+func apply_current_summary(summary: Dictionary) -> bool:
+	if summary.size() != CURRENT_SUMMARY_KEYS.size():
+		return false
+	for key in CURRENT_SUMMARY_KEYS:
+		if not summary.has(key):
+			return false
+	for key in ["module_id", "kind", "room_id", "state", "tool_class"]:
+		if typeof(summary.get(key, null)) != TYPE_STRING:
+			return false
+	if (summary.module_id as String).is_empty() \
+			or not summary.material_composition is Dictionary \
+			or not summary.mounted_components is Array:
+		return false
+	var integrity_value: Variant = summary.integrity
+	var base_value: Variant = summary.base_integrity
+	if (typeof(integrity_value) != TYPE_INT and typeof(integrity_value) != TYPE_FLOAT) \
+			or (typeof(base_value) != TYPE_INT and typeof(base_value) != TYPE_FLOAT):
+		return false
+	var admitted_integrity: float = float(integrity_value)
+	var admitted_base: float = float(base_value)
+	if not is_finite(admitted_integrity) or not is_finite(admitted_base) \
+			or admitted_base <= 0.0 or admitted_integrity < 0.0 \
+			or admitted_integrity > admitted_base \
+			or summary.state != state_for_health(admitted_integrity, admitted_base):
+		return false
+	module_id = summary.module_id as String
+	kind = summary.kind as String
+	room_id = summary.room_id as String
+	integrity = admitted_integrity
+	base_integrity = admitted_base
+	state = summary.state as String
+	material_composition = (summary.material_composition as Dictionary).duplicate(true)
+	mounted_components = (summary.mounted_components as Array).duplicate(true)
+	tool_class_required = summary.tool_class as String
+	return true
+
+
+static func state_for_health(integrity_value: float, base_value: float) -> String:
+	var ratio: float = integrity_value / base_value if base_value > 0.0 else 0.0
+	if ratio <= THRESHOLD_DESTROYED:
+		return STATE_DESTROYED
+	if ratio <= THRESHOLD_BREACHED:
+		return STATE_BREACHED
+	if ratio <= THRESHOLD_DAMAGED:
+		return STATE_DAMAGED
+	return STATE_INTACT

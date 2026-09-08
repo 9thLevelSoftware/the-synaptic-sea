@@ -3,6 +3,7 @@ class_name RunSnapshot
 
 const QualityTierResolverScript := preload("res://scripts/systems/quality_tier_resolver.gd")
 const ThreatSaveContractScript := preload("res://scripts/systems/threat_save_contract.gd")
+const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
 
 ## REQ-012 current-run save snapshot.
@@ -249,6 +250,12 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	if expected_slice_version == "gate2-current-run-7" \
 			and (dict.has("player_position") or dict.has("hallucination_summary")):
 		return null
+	if expected_slice_version == "gate2-current-run-7" \
+			and dict.has("module_integrity_summary"):
+		var integrity_admission: Dictionary = ModuleIntegrityMapScript \
+			.validate_current_summary(dict.module_integrity_summary)
+		if not bool(integrity_admission.get("ok", false)):
+			return null
 	if expected_slice_version in [
 		"gate2-current-run-5", "gate2-current-run-6", "gate2-current-run-7",
 	]:
