@@ -42,7 +42,7 @@ classify() {
     combat_persistence_smoke|fc_p10_smoke|fc_p10_process_smoke|fc_p11_live_smoke|fc_p11_smoke|fc_p12_smoke|fc_p13_smoke|\
     fc_p16_smoke|runtime_physical_volume_smoke|structural_rebuild_collision_query_smoke|\
     structural_rebuild_candidate_nav_smoke|structural_rebuild_policy_smoke|\
-    r10a_run7_save_transition_smoke|r10a_ceiling_clearance_smoke|\
+    r10a_run7_save_transition_smoke|r10a_world7_snapshot_smoke|r10a_ceiling_clearance_smoke|\
     r10a_dock_endpoint_contract_smoke|r10a_dock_traversal_smoke)
       echo "standalone-feature-completion" ;;
     # -- cannot run headless (extend Node3D, no _initialize) ------------------

@@ -6,14 +6,14 @@ This is an ownership handoff, not a completion report. The full feature-completi
 
 - Worktree: D:/the-synaptic-sea-feature-completion
 - Branch: codex/feature-completion-resume
-- Latest reviewed contract checkpoint: 76bbcc58 (the branch may advance; inspect current HEAD before integration).
+- Latest coordinator checkpoint: 586a46b4 (the branch may advance; inspect current HEAD before integration).
 - Significant uncommitted R10 work is present. A checkout of this commit alone does not include those changes.
 - Original D:/the-synaptic-sea checkout is not this execution worktree.
 
 ## Reserved to the current AI
 
-1. R10 physical docking: explicit exterior portal compilation; strict endpoint, placement, navigation and spawn identity; reject every positive cross-hull intersection; single validated fresh-player placement; focused runtime tests and independent review. Current diagnostic separates supporting-plane rejection from authoritative compiler rejection.
-2. Run-7/world-7 transition: exact owner-local player pose; docking and hangar attachment records; persistent active/inactive door states; historical world-6 geometry/combat migration; hallucination reset; explicit launched free-root authority. Preparation only until docking review passes.
+1. R10 physical docking: explicit exterior portal compilation; strict endpoint, placement, navigation and spawn identity; reject every positive cross-hull intersection; single validated fresh-player placement; focused runtime tests and independent review. The docking baseline is now reviewed, validated, and committed; retain ownership for dependent integration fixes.
+2. Run-7/world-7 transition: exact owner-local player pose; docking and hangar attachment records; persistent active/inactive door states; historical world-6 geometry/combat migration; hallucination reset; explicit launched free-root authority. Actively implementing run-7 migration/save models and the world-7 snapshot/restore-candidate model in two disjoint workers. Historical migration and live capture/restore integration follow.
 3. Following that dependency chain: R04/R05 natural crafting/economy proof, R07 machinery condition, R08 paid repair, R09–R16 rebuild safety/timing/replacement/persistence/claim/pilot/travel/player journey. These are reserved, not all currently executing.
 4. Shared acceptance registry, generated Kanban cards, central feature-completion specification/ADR, canonical regression integration, commits and integration for this branch.
 
@@ -49,7 +49,7 @@ Independently investigate and repair the established weighted-path/FIFO concern 
 
 ## Collaboration and verification rules
 
-Use a separate branch/worktree for the other AI. Do not reset, clean, commit, or overwrite this execution worktree. Do not merge or push the coordinator branch. Current Godot execution in this worktree is reserved to the docking worker; another worktree may run tests only with its own isolated user-data roots and retained probe evidence. Never use the real/default save profile.
+Use a separate branch/worktree for the other AI. Do not reset, clean, commit, or overwrite this execution worktree. Do not merge or push the coordinator branch. Current Godot execution in this worktree is reserved to the run-7 save-transition worker, who coordinates world-7 tests; another worktree may run tests only with its own isolated user-data roots and retained probe evidence. Never use the real/default save profile.
 
 Follow repository Stage-Gate rules in the separate branch: feature/requirement/acceptance updates precede implementation. Return central registry/card/canonical-list changes as a separate proposed patch for integration, not edits to the live coordinator checkout. Preserve the frozen requirement scope; the newer proposed UI presentation program is not automatically admitted.
 
