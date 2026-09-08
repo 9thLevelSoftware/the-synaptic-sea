@@ -15,6 +15,13 @@ RUNNER = ROOT / "tools/run_room_kit_gate.py"
     "program,marker,timeout,expected",
     [
         ('print("REAL")', "REAL", 10, 0),
+        ('print("unrelated REAL text")', "REAL", 10, 1),
+        ('print("REAL_IMPOSTOR")', "REAL", 10, 1),
+        ('print("REALISTIC")', "REAL", 10, 1),
+        ('print("xREAL")', "REAL", 10, 1),
+        ('print("REAL rows=16")', "REAL", 10, 0),
+        ('print("REAL[42]")', "REAL[42]", 10, 0),
+        ('print("REAL4")', "REAL[42]", 10, 1),
         ('print("REAL")', "", 10, 1),
         ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
         ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),

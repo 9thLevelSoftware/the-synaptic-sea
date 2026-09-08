@@ -84,7 +84,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.log.write_text(text, encoding="utf-8")
 
     diagnostic = _BAD_DIAGNOSTICS.search(text)
-    marker_ok = bool(args.marker) and args.marker in text
+    # A referenced or longer lookalike token is not a success marker. Real
+    # producers may append space-separated diagnostic fields after the token.
+    marker_ok = bool(args.marker) and re.search(
+        rf"^{re.escape(args.marker)}(?:[ \t]|$)", text, re.MULTILINE
+    ) is not None
     good = code == 0 and diagnostic is None and marker_ok
     print(("GATE_PASS " if good else "GATE_FAIL ") + str(args.log))
     return 0 if good else 1
