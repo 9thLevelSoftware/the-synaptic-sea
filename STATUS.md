@@ -1,15 +1,24 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-08
 
 **Execution resumed at the user's explicit request on 2026-09-07.** Continue from the
 [2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md).
 The checkpoint preserves integrated WIP and portable task evidence; it is not
-feature-complete or independently approved as a whole. R10-A's latest focused
-home/away production traversal checks pass, but its final combined qualification,
-paired run7/world7 migration and independent review remain pending. PR #548 was
+feature-complete or independently approved as a whole. R10-A's fresh combined
+baseline qualification passed all 15 cases with clean diagnostics and isolated
+profile probes. Independent review found that join-overlap containment derives
+its allowed region from the observed overlap itself; correction and requalification
+are required before paired run7/world7 migration. PR #548 was
 merged as `2f9c6913`; resumed work starts from that merged base on
 `codex/feature-completion-resume` in the existing isolated execution worktree.
+
+Resume validation tooling: the reviewed registry repair keeps the planning-only
+UI proposal visible outside the frozen program, preserving all 668 rows and the
+622-criterion denominator. Its 25 focused tests pass. The reviewed canonical
+manifest repair preserves all 652 commands, fixes the static marker/count contract,
+and checks the runtime count before PASS (31 focused tests pass; commit `3a24cde9`).
+These tooling results do not constitute a fresh full canonical regression run.
 
 ## Current feature-completion program
 

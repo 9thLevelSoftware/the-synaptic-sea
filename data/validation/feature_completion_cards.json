@@ -4205,14 +4205,15 @@
       "scope_decisions_pending": [
         "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
         "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
-        "Docking derives the mobile transform from opposing authenticated descriptors and rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope; the mobile owner instantiates one separate barrier, capsule passage remains independent, and moved-owner combat positions receive the same root delta.",
-        "The fixed lifeboat owns one authored clear initial interior spawn; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
+        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
+        "The fixed lifeboat owns one authored clear initial interior spawn, distinct from the threshold but permitted to reuse its interior clearance anchor; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
+        "At home and away, the real PlayerController remains grounded through ordinary input in both directions when open and is physically denied when closed. Overlapping room AABBs resolve only through the authenticated connection plane; exact tie is mobile, and closing behind a player does not rewrite the cleared-side owner.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
         "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both."
       ],
       "non_goals": "Claiming FC-19 from the R10-A baseline prerequisite; placement outside the original footprint; preserving room-center or diagnostic-coordinate docking; nearest-room, center-snap, silent alternate-layout, collision-disable, or invented-spawn recovery; arbitrary reinterpretation of world-6 transforms/global pose; or unreviewed cart push physics.",
       "contract": {
-        "r10a_status": "governance_accepted_run7_world7_allocated_runtime_pending_accepted_r06_rereview_handoff",
+        "r10a_status": "baseline_component_candidate_frozen_independent_review_pending_run7_world7_not_started",
         "r10a_prerequisites": [
           "P01/R01 governance",
           "P03/R03 persistence governance",
@@ -4268,9 +4269,13 @@
           "box_fields": [
             "shape_path",
             "basis",
+            "basis_f32_bits",
             "origin",
-            "dimensions"
+            "origin_f32_bits",
+            "dimensions",
+            "dimensions_f32_bits"
           ],
+          "numeric_encoding": "Readable numeric components are binary32-normalized and must reproduce their paired exact IEEE-754 bit strings; either representation rejects when they disagree.",
           "policy": "Generated deterministically from current selected BoxShape3D wrappers while recording any finite non-singular composed basis exactly; source-byte hashes are build provenance; pure authorizer consumes a validated immutable projection; exported live loader requires exact materialized path/shape/transform/dimension and normalized-content fingerprint agreement; no missing-source bypass, GLB sidecar substitution, or hardcoded doorway half-depth."
         },
         "initial_player_spawn_v1_exact_fields": [
@@ -4280,8 +4285,11 @@
           "nav_node_id",
           "local_position"
         ],
-        "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point, applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery.",
+        "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point distinct from the threshold and permitted to reuse its capsule-clear interior clearance anchor; applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery. Later separation requires a new authored spawn and complete opening requalification.",
         "seam_overlap_policy": "Only authenticated open-frame and directly incident floor/corridor-floor join boxes may intersect, and their exact intersection AABB must lie wholly inside the finite envelope formed by clipping contract-selected canonical wrapper boxes to both outward half-spaces. Non-join/opaque/dynamic overlap rejects; no epsilon or global margin; full capsule clearance is independent.",
+        "pair_predicate_policy": "Author-time compatible-pair selection and live preflight call the same pure projected cross-hull predicate. R10-A freezes canonical fixed-lifeboat pairing for production home, fallback and native hosts; arbitrary claimed-ship pairing remains R14.",
+        "occupancy_overlap_policy": "Merged room AABB overlap resolves only through the authenticated current connection, barrier and both endpoint IDs, then the registered connection plane; the exact tie belongs to mobile, and closing behind a player who cleared either side does not rewrite ownership.",
+        "production_traversal_policy": "Real PlayerController inputs and move_and_slide remain grounded across the open seam in both directions at home and away; the closed barrier denies each crossing.",
         "dock_connections_v1_exact_fields": [
           "connection_id",
           "port_type",
@@ -5162,9 +5170,37 @@
           "path": "data/validation/feature_completion_cards.json",
           "source_exists": true,
           "scope_state": "present"
+        },
+        {
+          "path": "docs/game/06_validation_plan.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/run_canonical_regression.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tests/test_run_canonical_regression.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "tools/synaptic_sea_gate4_regression.sh",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/adr/0060-meshy-offline-evidence-rebind.md",
+          "source_exists": true,
+          "scope_state": "present"
         }
       ],
-      "scope_decisions_pending": [],
+      "scope_decisions_pending": [
+        "The reviewed planning-only proposal docs/game/features/ui_presentation_program.md is catalogued outside the frozen crafting/derelict acceptance program only while its status remains Proposed for review and Planning only; status drift, a missing catalogued source, or any unexpected feature source fails closed during scope review.",
+        "Canonical-regression reconciliation records the observed 652 calls against a strict numeric final marker with a runtime count guard, and records Meshy ADR-0068 identity while preserving the historical ADR-0060 filename."
+      ],
       "non_goals": "Completion claims for uninspected domains.",
       "verification": [
         {

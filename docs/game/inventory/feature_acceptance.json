@@ -70,6 +70,15 @@
       }
     }
   ],
+  "reviewed_out_of_scope_proposals": [
+    {
+      "path": "docs/game/features/ui_presentation_program.md",
+      "disposition": "excluded_reviewed_planning_proposal",
+      "actual_status": "Proposed for review, 2026-09-05. Planning only; no UI implementation or visual acceptance is claimed.",
+      "reason": "Planning-only UI presentation proposal is outside the frozen crafting/derelict completion program.",
+      "extracted_leaf_count": 21
+    }
+  ],
   "accounting": {
     "denominator_status": "frozen",
     "recorded": 668,
@@ -1232,157 +1241,157 @@
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1690",
+      "anchor": "docs/game/05_requirements.md:1692",
       "criterion_ids": [
         "REQ-AIAP-001::acceptance-6a7fa47a81b3"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1692",
+      "anchor": "docs/game/05_requirements.md:1694",
       "criterion_ids": [
         "REQ-AIAP-001::acceptance-cfc91bd8425c"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1695",
+      "anchor": "docs/game/05_requirements.md:1697",
       "criterion_ids": [
         "REQ-AIAP-001::acceptance-9490f232307a"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1697",
+      "anchor": "docs/game/05_requirements.md:1699",
       "criterion_ids": [
         "REQ-AIAP-001::acceptance-0c53a5e41d8b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1699",
+      "anchor": "docs/game/05_requirements.md:1701",
       "criterion_ids": [
         "REQ-AIAP-001::acceptance-e84f98dfe107"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1712",
+      "anchor": "docs/game/05_requirements.md:1714",
       "criterion_ids": [
         "REQ-AIAP-002::acceptance-4992da6b979e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1714",
+      "anchor": "docs/game/05_requirements.md:1716",
       "criterion_ids": [
         "REQ-AIAP-002::acceptance-cad59bb5299c"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1715",
+      "anchor": "docs/game/05_requirements.md:1717",
       "criterion_ids": [
         "REQ-AIAP-002::acceptance-628f80266cf2"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1728",
+      "anchor": "docs/game/05_requirements.md:1731",
       "criterion_ids": [
         "REQ-AIAP-003::acceptance-f2e892c8802d"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1730",
+      "anchor": "docs/game/05_requirements.md:1733",
       "criterion_ids": [
         "REQ-AIAP-003::acceptance-f55e39010009"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1732",
+      "anchor": "docs/game/05_requirements.md:1735",
       "criterion_ids": [
         "REQ-AIAP-003::acceptance-48d0a041273c"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1734",
+      "anchor": "docs/game/05_requirements.md:1737",
       "criterion_ids": [
         "REQ-AIAP-003::acceptance-86d7eacc2d21"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1748",
+      "anchor": "docs/game/05_requirements.md:1751",
       "criterion_ids": [
         "REQ-AIAP-004::acceptance-871bd55de1d3"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1749",
+      "anchor": "docs/game/05_requirements.md:1752",
       "criterion_ids": [
         "REQ-AIAP-004::acceptance-b8837a8c3182"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1752",
+      "anchor": "docs/game/05_requirements.md:1755",
       "criterion_ids": [
         "REQ-AIAP-004::acceptance-45e9755be1b6"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1753",
+      "anchor": "docs/game/05_requirements.md:1756",
       "criterion_ids": [
         "REQ-AIAP-004::acceptance-998448fcdb67"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1764",
+      "anchor": "docs/game/05_requirements.md:1767",
       "criterion_ids": [
         "REQ-AIAP-005::acceptance-43179270c334"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1766",
+      "anchor": "docs/game/05_requirements.md:1769",
       "criterion_ids": [
         "REQ-AIAP-005::acceptance-b54ab1c0e058"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1768",
+      "anchor": "docs/game/05_requirements.md:1771",
       "criterion_ids": [
         "REQ-AIAP-005::acceptance-b4cf84bdcccc"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1770",
+      "anchor": "docs/game/05_requirements.md:1773",
       "criterion_ids": [
         "REQ-AIAP-005::acceptance-5bfe096e4b4d"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1784",
+      "anchor": "docs/game/05_requirements.md:1787",
       "criterion_ids": [
         "REQ-AIAP-006::acceptance-91d7810a975e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1787",
+      "anchor": "docs/game/05_requirements.md:1790",
       "criterion_ids": [
         "REQ-AIAP-006::acceptance-cb1d24970a02"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1790",
+      "anchor": "docs/game/05_requirements.md:1793",
       "criterion_ids": [
         "REQ-AIAP-006::acceptance-e28d00f7d28e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1803",
+      "anchor": "docs/game/05_requirements.md:1807",
       "criterion_ids": [
         "REQ-AIAP-007::acceptance-2f22ef9e868b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1806",
+      "anchor": "docs/game/05_requirements.md:1810",
       "criterion_ids": [
         "REQ-AIAP-007::acceptance-75eba121631c"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1808",
+      "anchor": "docs/game/05_requirements.md:1812",
       "criterion_ids": [
         "REQ-AIAP-007::acceptance-3766c18231e2"
       ]
@@ -1394,21 +1403,15 @@
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1822",
+      "anchor": "docs/game/05_requirements.md:1827",
       "criterion_ids": [
         "REQ-AIAP-008::acceptance-0adf26f3e58b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1824",
+      "anchor": "docs/game/05_requirements.md:1829",
       "criterion_ids": [
         "REQ-AIAP-008::acceptance-55ce8125629b"
-      ]
-    },
-    {
-      "anchor": "docs/game/05_requirements.md:1826",
-      "criterion_ids": [
-        "REQ-AIAP-008::acceptance-eef1565e5421"
       ]
     },
     {
@@ -1418,25 +1421,31 @@
       ]
     },
     {
+      "anchor": "docs/game/05_requirements.md:1831",
+      "criterion_ids": [
+        "REQ-AIAP-008::acceptance-eef1565e5421"
+      ]
+    },
+    {
       "anchor": "docs/game/05_requirements.md:184",
       "criterion_ids": [
         "REQ-008::acceptance-f4c5d4920817"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1840",
+      "anchor": "docs/game/05_requirements.md:1845",
       "criterion_ids": [
         "REQ-AIAP-009::acceptance-26fc3970ac7a"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1843",
+      "anchor": "docs/game/05_requirements.md:1848",
       "criterion_ids": [
         "REQ-AIAP-009::acceptance-b3a4e26e4a3e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1844",
+      "anchor": "docs/game/05_requirements.md:1849",
       "criterion_ids": [
         "REQ-AIAP-009::acceptance-0787411452ce"
       ]
@@ -1448,175 +1457,175 @@
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1857",
+      "anchor": "docs/game/05_requirements.md:1862",
       "criterion_ids": [
         "REQ-AIAP-010::acceptance-1050a2994735"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1860",
+      "anchor": "docs/game/05_requirements.md:1865",
       "criterion_ids": [
         "REQ-AIAP-010::acceptance-0e1d773d7ff8"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1862",
+      "anchor": "docs/game/05_requirements.md:1867",
       "criterion_ids": [
         "REQ-AIAP-010::acceptance-9d4e15042349"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1878",
+      "anchor": "docs/game/05_requirements.md:1883",
       "criterion_ids": [
         "REQ-ENC-001::acceptance-1e4fddecc61e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1879",
+      "anchor": "docs/game/05_requirements.md:1884",
       "criterion_ids": [
         "REQ-ENC-001::acceptance-4ffa0b5ebe6b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1880",
+      "anchor": "docs/game/05_requirements.md:1885",
       "criterion_ids": [
         "REQ-ENC-001::acceptance-7312666ee245"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1881",
+      "anchor": "docs/game/05_requirements.md:1886",
       "criterion_ids": [
         "REQ-ENC-001::acceptance-b0e21d188f38"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1894",
+      "anchor": "docs/game/05_requirements.md:1899",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-5bd2ebbd4f1e"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1895",
+      "anchor": "docs/game/05_requirements.md:1900",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-a41b8b3dcc91"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1896",
+      "anchor": "docs/game/05_requirements.md:1901",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-355d5e79ea8a"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1897",
+      "anchor": "docs/game/05_requirements.md:1902",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-2c33d94d4db9"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1898",
+      "anchor": "docs/game/05_requirements.md:1903",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-4391f6e631cf"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1899",
+      "anchor": "docs/game/05_requirements.md:1904",
       "criterion_ids": [
         "REQ-ENC-002::acceptance-8a6a2f377a6b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1913",
+      "anchor": "docs/game/05_requirements.md:1918",
       "criterion_ids": [
         "REQ-ENC-003::acceptance-8790cc5effa0"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1914",
+      "anchor": "docs/game/05_requirements.md:1919",
       "criterion_ids": [
         "REQ-ENC-003::acceptance-f57615b5b76d"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1915",
+      "anchor": "docs/game/05_requirements.md:1920",
       "criterion_ids": [
         "REQ-ENC-003::acceptance-1db947f6dbf8"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1928",
+      "anchor": "docs/game/05_requirements.md:1933",
       "criterion_ids": [
         "REQ-ENC-004::acceptance-f7eb7a80329d"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1929",
+      "anchor": "docs/game/05_requirements.md:1934",
       "criterion_ids": [
         "REQ-ENC-004::acceptance-ade9bfe58154"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1930",
+      "anchor": "docs/game/05_requirements.md:1935",
       "criterion_ids": [
         "REQ-ENC-004::acceptance-8344c31c47cf"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1947",
+      "anchor": "docs/game/05_requirements.md:1952",
       "criterion_ids": [
         "REQ-FILL-001::acceptance-5aed81494b69"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1948",
+      "anchor": "docs/game/05_requirements.md:1953",
       "criterion_ids": [
         "REQ-FILL-001::acceptance-6e862f98f7c6"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1949",
+      "anchor": "docs/game/05_requirements.md:1954",
       "criterion_ids": [
         "REQ-FILL-001::acceptance-4ada15544623"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1950",
+      "anchor": "docs/game/05_requirements.md:1955",
       "criterion_ids": [
         "REQ-FILL-001::acceptance-1c5ef3d7e230"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1967",
+      "anchor": "docs/game/05_requirements.md:1972",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-bb27d12723cd"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1968",
+      "anchor": "docs/game/05_requirements.md:1973",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-638c921f61c9"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1969",
+      "anchor": "docs/game/05_requirements.md:1974",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-ab88686318e0"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1970",
+      "anchor": "docs/game/05_requirements.md:1975",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-8d11a5c35bf2"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1971",
+      "anchor": "docs/game/05_requirements.md:1976",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-c144312d927b"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1972",
+      "anchor": "docs/game/05_requirements.md:1977",
       "criterion_ids": [
         "REQ-HIVE-001::acceptance-6627b5a18815"
       ]
@@ -1628,25 +1637,25 @@
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1990",
+      "anchor": "docs/game/05_requirements.md:1995",
       "criterion_ids": [
         "REQ-SLICE-001::acceptance-0ef19f5f35fb"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1991",
+      "anchor": "docs/game/05_requirements.md:1996",
       "criterion_ids": [
         "REQ-SLICE-001::acceptance-fe3277c44dd4"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1992",
+      "anchor": "docs/game/05_requirements.md:1997",
       "criterion_ids": [
         "REQ-SLICE-001::acceptance-d799d8e4ce36"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:1993",
+      "anchor": "docs/game/05_requirements.md:1998",
       "criterion_ids": [
         "REQ-SLICE-001::acceptance-036fc9802414"
       ]
@@ -1658,25 +1667,25 @@
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:2009",
-      "criterion_ids": [
-        "REQ-PCG-BUILDER-001::acceptance-95d08cc4c837"
-      ]
-    },
-    {
       "anchor": "docs/game/05_requirements.md:201",
       "criterion_ids": [
         "REQ-009::acceptance-f8d3f986c854"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:2010",
+      "anchor": "docs/game/05_requirements.md:2014",
+      "criterion_ids": [
+        "REQ-PCG-BUILDER-001::acceptance-95d08cc4c837"
+      ]
+    },
+    {
+      "anchor": "docs/game/05_requirements.md:2015",
       "criterion_ids": [
         "REQ-PCG-BUILDER-001::acceptance-6c9a71f6e76f"
       ]
     },
     {
-      "anchor": "docs/game/05_requirements.md:2011",
+      "anchor": "docs/game/05_requirements.md:2016",
       "criterion_ids": [
         "REQ-PCG-BUILDER-001::acceptance-f678f21e2921"
       ]
@@ -2330,73 +2339,73 @@
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:268",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:278",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::ddeda97279d3"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:270",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:280",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::cfcdc39b309f"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:272",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:282",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::2d9329e5ddb3"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:274",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:284",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::f4a18dfe0f87"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:276",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:286",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::8037820f9c3d"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:277",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:287",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::590a029b5f47"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:281",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:291",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::d2045fb5f632"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:282",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:292",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::47825cc8d1be"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:284",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:294",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::3bb40dc08930"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:285",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:295",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::77925b6351ce"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:287",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:297",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::671f9e61573e"
       ]
     },
     {
-      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:289",
+      "anchor": "docs/game/features/ai_candidate_asset_pipeline.md:299",
       "criterion_ids": [
         "FEATURE::docs/game/features/ai_candidate_asset_pipeline.md::4d531482e8cc"
       ]
@@ -2930,145 +2939,145 @@
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:259",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:268",
       "criterion_ids": [
         "FC-01"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:260",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:269",
       "criterion_ids": [
         "FC-02"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:261",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:270",
       "criterion_ids": [
         "FC-03"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:262",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:271",
       "criterion_ids": [
         "FC-04"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:263",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:272",
       "criterion_ids": [
         "FC-05"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:264",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:273",
       "criterion_ids": [
         "FC-06"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:265",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:274",
       "criterion_ids": [
         "FC-07"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:266",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:275",
       "criterion_ids": [
         "FC-08"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:267",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:276",
       "criterion_ids": [
         "FC-09"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:268",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:277",
       "criterion_ids": [
         "FC-10"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:269",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:278",
       "criterion_ids": [
         "FC-11"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:270",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:279",
       "criterion_ids": [
         "FC-12"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:271",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:280",
       "criterion_ids": [
         "FC-13"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:272",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:281",
       "criterion_ids": [
         "FC-14"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:273",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:282",
       "criterion_ids": [
         "FC-15"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:274",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:283",
       "criterion_ids": [
         "FC-16"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:275",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:284",
       "criterion_ids": [
         "FC-17"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:276",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:285",
       "criterion_ids": [
         "FC-18"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:277",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:286",
       "criterion_ids": [
         "FC-19"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:278",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:287",
       "criterion_ids": [
         "FC-20"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:279",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:288",
       "criterion_ids": [
         "FC-21"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:280",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:289",
       "criterion_ids": [
         "FC-22"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:281",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:290",
       "criterion_ids": [
         "FC-23"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:282",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:291",
       "criterion_ids": [
         "FC-24"
       ]
@@ -4878,7 +4887,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 268
+        "line": 278
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -4908,7 +4917,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 270
+        "line": 280
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -4938,7 +4947,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 272
+        "line": 282
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -4968,7 +4977,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 274
+        "line": 284
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -4998,7 +5007,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 276
+        "line": 286
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5028,7 +5037,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 277
+        "line": 287
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5058,7 +5067,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 281
+        "line": 291
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5088,7 +5097,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 282
+        "line": 292
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5118,7 +5127,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 284
+        "line": 294
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5148,7 +5157,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 285
+        "line": 295
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5178,7 +5187,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 287
+        "line": 297
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -5208,7 +5217,7 @@
       "source": {
         "path": "docs/game/features/ai_candidate_asset_pipeline.md",
         "heading": "Acceptance criteria",
-        "line": 289
+        "line": 299
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -7878,7 +7887,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 259
+        "line": 268
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7908,7 +7917,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 260
+        "line": 269
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7938,7 +7947,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 261
+        "line": 270
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7968,7 +7977,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 262
+        "line": 271
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7998,7 +8007,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 263
+        "line": 272
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8028,7 +8037,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 264
+        "line": 273
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8058,7 +8067,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 265
+        "line": 274
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8088,7 +8097,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 266
+        "line": 275
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8118,7 +8127,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 267
+        "line": 276
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8148,7 +8157,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 268
+        "line": 277
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8178,7 +8187,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 269
+        "line": 278
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8208,7 +8217,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 270
+        "line": 279
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8238,7 +8247,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 271
+        "line": 280
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8268,7 +8277,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 272
+        "line": 281
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8298,7 +8307,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 273
+        "line": 282
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8328,7 +8337,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 274
+        "line": 283
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8358,7 +8367,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 275
+        "line": 284
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8388,7 +8397,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 276
+        "line": 285
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8418,7 +8427,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 277
+        "line": 286
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8448,7 +8457,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 278
+        "line": 287
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8478,7 +8487,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 279
+        "line": 288
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8508,7 +8517,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 280
+        "line": 289
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8538,7 +8547,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 281
+        "line": 290
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8568,7 +8577,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 282
+        "line": 291
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -23820,7 +23829,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-001",
-        "line": 1690
+        "line": 1692
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`",
@@ -23854,7 +23863,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-001",
-        "line": 1692
+        "line": 1694
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`",
@@ -23888,7 +23897,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-001",
-        "line": 1695
+        "line": 1697
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`",
@@ -23922,7 +23931,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-001",
-        "line": 1697
+        "line": 1699
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`",
@@ -23956,7 +23965,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-001",
-        "line": 1699
+        "line": 1701
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_asset_contract.py validate data/asset_generation/contracts/*.json`",
@@ -23990,10 +23999,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-002",
-        "line": 1712
+        "line": 1714
       },
       "verification_source": [
-        "Focused Meshy contract/staging/provenance tests pass; real rights-cleared pilot files are intentionally absent until the post-PR live pilot."
+        "Focused Meshy contract/staging/provenance tests pass; the integrated loot-container pilot uses tracked rights-cleared reference files. Other pilot reference files remain absent until their post-PR live pilots."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24023,10 +24032,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-002",
-        "line": 1714
+        "line": 1716
       },
       "verification_source": [
-        "Focused Meshy contract/staging/provenance tests pass; real rights-cleared pilot files are intentionally absent until the post-PR live pilot."
+        "Focused Meshy contract/staging/provenance tests pass; the integrated loot-container pilot uses tracked rights-cleared reference files. Other pilot reference files remain absent until their post-PR live pilots."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24056,10 +24065,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-002",
-        "line": 1715
+        "line": 1717
       },
       "verification_source": [
-        "Focused Meshy contract/staging/provenance tests pass; real rights-cleared pilot files are intentionally absent until the post-PR live pilot."
+        "Focused Meshy contract/staging/provenance tests pass; the integrated loot-container pilot uses tracked rights-cleared reference files. Other pilot reference files remain absent until their post-PR live pilots."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24089,7 +24098,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-003",
-        "line": 1728
+        "line": 1731
       },
       "verification_source": [
         "Focused staging and request-integrity tests pass; the plan command is read-only and makes no provider call."
@@ -24122,7 +24131,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-003",
-        "line": 1730
+        "line": 1733
       },
       "verification_source": [
         "Focused staging and request-integrity tests pass; the plan command is read-only and makes no provider call."
@@ -24155,7 +24164,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-003",
-        "line": 1732
+        "line": 1735
       },
       "verification_source": [
         "Focused staging and request-integrity tests pass; the plan command is read-only and makes no provider call."
@@ -24188,7 +24197,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-003",
-        "line": 1734
+        "line": 1737
       },
       "verification_source": [
         "Focused staging and request-integrity tests pass; the plan command is read-only and makes no provider call."
@@ -24221,7 +24230,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-004",
-        "line": 1748
+        "line": 1751
       },
       "verification_source": [
         "Focused staging/provenance tests and protected-path tests pass."
@@ -24254,7 +24263,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-004",
-        "line": 1749
+        "line": 1752
       },
       "verification_source": [
         "Focused staging/provenance tests and protected-path tests pass."
@@ -24287,7 +24296,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-004",
-        "line": 1752
+        "line": 1755
       },
       "verification_source": [
         "Focused staging/provenance tests and protected-path tests pass."
@@ -24320,7 +24329,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-004",
-        "line": 1753
+        "line": 1756
       },
       "verification_source": [
         "Focused staging/provenance tests and protected-path tests pass."
@@ -24353,7 +24362,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-005",
-        "line": 1764
+        "line": 1767
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_blender_master.py ...`",
@@ -24388,7 +24397,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-005",
-        "line": 1766
+        "line": 1769
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_blender_master.py ...`",
@@ -24423,7 +24432,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-005",
-        "line": 1768
+        "line": 1771
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_blender_master.py ...`",
@@ -24458,7 +24467,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-005",
-        "line": 1770
+        "line": 1773
       },
       "verification_source": [
         "`/usr/bin/python3 tools/meshy_blender_master.py ...`",
@@ -24493,10 +24502,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-006",
-        "line": 1784
+        "line": 1787
       },
       "verification_source": [
-        "Host Blender re-import/publication tests pass; a real external pilot GLB is not available until the post-PR live pilot."
+        "Host Blender re-import/publication tests pass; the integrated loot-container pilot has tracked task-local raw/cleaned GLBs and Blender validation evidence. Other pilot GLBs remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24526,10 +24535,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-006",
-        "line": 1787
+        "line": 1790
       },
       "verification_source": [
-        "Host Blender re-import/publication tests pass; a real external pilot GLB is not available until the post-PR live pilot."
+        "Host Blender re-import/publication tests pass; the integrated loot-container pilot has tracked task-local raw/cleaned GLBs and Blender validation evidence. Other pilot GLBs remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24559,10 +24568,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-006",
-        "line": 1790
+        "line": 1793
       },
       "verification_source": [
-        "Host Blender re-import/publication tests pass; a real external pilot GLB is not available until the post-PR live pilot."
+        "Host Blender re-import/publication tests pass; the integrated loot-container pilot has tracked task-local raw/cleaned GLBs and Blender validation evidence. Other pilot GLBs remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24592,10 +24601,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-007",
-        "line": 1803
+        "line": 1807
       },
       "verification_source": [
-        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; candidate runtime evidence is supplied by the post-PR live pilot."
+        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; the integrated loot-container pilot supplies current D6 six-case runtime evidence, while other candidate runtime evidence remains post-PR live-pilot work."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058, ADR-0052",
@@ -24625,10 +24634,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-007",
-        "line": 1806
+        "line": 1810
       },
       "verification_source": [
-        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; candidate runtime evidence is supplied by the post-PR live pilot."
+        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; the integrated loot-container pilot supplies current D6 six-case runtime evidence, while other candidate runtime evidence remains post-PR live-pilot work."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058, ADR-0052",
@@ -24658,10 +24667,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-007",
-        "line": 1808
+        "line": 1812
       },
       "verification_source": [
-        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; candidate runtime evidence is supplied by the post-PR live pilot."
+        "Existing Godot visual/catalog, structural-loader, and generated-seed smokes remain the regression path; the integrated loot-container pilot supplies current D6 six-case runtime evidence, while other candidate runtime evidence remains post-PR live-pilot work."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058, ADR-0052",
@@ -24691,10 +24700,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-008",
-        "line": 1822
+        "line": 1827
       },
       "verification_source": [
-        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; six real candidate captures remain post-PR pilot evidence."
+        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; the integrated loot-container pilot has a tracked six-case runtime report, while other candidate captures remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24724,10 +24733,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-008",
-        "line": 1824
+        "line": 1829
       },
       "verification_source": [
-        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; six real candidate captures remain post-PR pilot evidence."
+        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; the integrated loot-container pilot has a tracked six-case runtime report, while other candidate captures remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24757,10 +24766,10 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-008",
-        "line": 1826
+        "line": 1831
       },
       "verification_source": [
-        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; six real candidate captures remain post-PR pilot evidence."
+        "`/usr/bin/python3 tools/meshy_runtime_review.py ...` and the existing Godot smoke commands in `docs/game/06_validation_plan.md`; the integrated loot-container pilot has a tracked six-case runtime report, while other candidate captures remain post-PR live-pilot evidence."
       ],
       "domain": "aiap",
       "feature": "`features/ai_candidate_asset_pipeline.md`, ADR-0058",
@@ -24790,7 +24799,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-009",
-        "line": 1840
+        "line": 1845
       },
       "verification_source": [
         "Protected-path and no-promotion tests pass; no live catalog, index, wrapper, or imported asset is produced by this documentation phase."
@@ -24823,7 +24832,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-009",
-        "line": 1843
+        "line": 1848
       },
       "verification_source": [
         "Protected-path and no-promotion tests pass; no live catalog, index, wrapper, or imported asset is produced by this documentation phase."
@@ -24856,7 +24865,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-009",
-        "line": 1844
+        "line": 1849
       },
       "verification_source": [
         "Protected-path and no-promotion tests pass; no live catalog, index, wrapper, or imported asset is produced by this documentation phase."
@@ -24889,7 +24898,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-010",
-        "line": 1857
+        "line": 1862
       },
       "verification_source": [
         "`docs/superpowers/proofs/meshy-skill-pressure-tests.md` and its focused scenarios."
@@ -24922,7 +24931,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-010",
-        "line": 1860
+        "line": 1865
       },
       "verification_source": [
         "`docs/superpowers/proofs/meshy-skill-pressure-tests.md` and its focused scenarios."
@@ -24955,7 +24964,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-AIAP-010",
-        "line": 1862
+        "line": 1867
       },
       "verification_source": [
         "`docs/superpowers/proofs/meshy-skill-pressure-tests.md` and its focused scenarios."
@@ -24988,7 +24997,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-001",
-        "line": 1878
+        "line": 1883
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`no_room_gap=true` when GREEN)",
@@ -25022,7 +25031,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-001",
-        "line": 1879
+        "line": 1884
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`no_room_gap=true` when GREEN)",
@@ -25056,7 +25065,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-001",
-        "line": 1880
+        "line": 1885
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`no_room_gap=true` when GREEN)",
@@ -25090,7 +25099,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-001",
-        "line": 1881
+        "line": 1886
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`no_room_gap=true` when GREEN)",
@@ -25124,7 +25133,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1894
+        "line": 1899
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25159,7 +25168,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1895
+        "line": 1900
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25194,7 +25203,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1896
+        "line": 1901
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25229,7 +25238,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1897
+        "line": 1902
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25264,7 +25273,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1898
+        "line": 1903
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25299,7 +25308,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-002",
-        "line": 1899
+        "line": 1904
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)",
@@ -25334,7 +25343,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-003",
-        "line": 1913
+        "line": 1918
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`hub_plan=true`, `no_floor_only=true` when GREEN)",
@@ -25368,7 +25377,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-003",
-        "line": 1914
+        "line": 1919
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`hub_plan=true`, `no_floor_only=true` when GREEN)",
@@ -25402,7 +25411,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-003",
-        "line": 1915
+        "line": 1920
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd` (`hub_plan=true`, `no_floor_only=true` when GREEN)",
@@ -25436,7 +25445,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-004",
-        "line": 1928
+        "line": 1933
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd`",
@@ -25470,7 +25479,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-004",
-        "line": 1929
+        "line": 1934
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd`",
@@ -25504,7 +25513,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-ENC-004",
-        "line": 1930
+        "line": 1935
       },
       "verification_source": [
         "`socketed_enclosure_smoke.gd`",
@@ -25538,7 +25547,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-FILL-001",
-        "line": 1947
+        "line": 1952
       },
       "verification_source": [
         "`scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`",
@@ -25572,7 +25581,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-FILL-001",
-        "line": 1948
+        "line": 1953
       },
       "verification_source": [
         "`scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`",
@@ -25606,7 +25615,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-FILL-001",
-        "line": 1949
+        "line": 1954
       },
       "verification_source": [
         "`scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`",
@@ -25640,7 +25649,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-FILL-001",
-        "line": 1950
+        "line": 1955
       },
       "verification_source": [
         "`scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`",
@@ -25674,7 +25683,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1967
+        "line": 1972
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25709,7 +25718,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1968
+        "line": 1973
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25744,7 +25753,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1969
+        "line": 1974
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25779,7 +25788,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1970
+        "line": 1975
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25814,7 +25823,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1971
+        "line": 1976
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25849,7 +25858,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-HIVE-001",
-        "line": 1972
+        "line": 1977
       },
       "verification_source": [
         "`hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)",
@@ -25884,7 +25893,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-SLICE-001",
-        "line": 1990
+        "line": 1995
       },
       "verification_source": [
         "`scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN"
@@ -25917,7 +25926,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-SLICE-001",
-        "line": 1991
+        "line": 1996
       },
       "verification_source": [
         "`scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN"
@@ -25950,7 +25959,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-SLICE-001",
-        "line": 1992
+        "line": 1997
       },
       "verification_source": [
         "`scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN"
@@ -25983,7 +25992,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-SLICE-001",
-        "line": 1993
+        "line": 1998
       },
       "verification_source": [
         "`scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN"
@@ -26016,7 +26025,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-PCG-BUILDER-001",
-        "line": 2009
+        "line": 2014
       },
       "verification_source": [
         "Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`."
@@ -26049,7 +26058,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-PCG-BUILDER-001",
-        "line": 2010
+        "line": 2015
       },
       "verification_source": [
         "Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`."
@@ -26082,7 +26091,7 @@
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-PCG-BUILDER-001",
-        "line": 2011
+        "line": 2016
       },
       "verification_source": [
         "Dedicated local preview smoke emits `DERELICT BUILDER PREVIEW PASS collision=true navigation=true verticals=true objectives=true props=true loot=true fire=true arc=true breach=true radiation=true atmosphere=true`."

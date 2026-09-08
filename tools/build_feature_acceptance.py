@@ -67,6 +67,17 @@ FROZEN_SCOPE_CONTRACT: dict[str, str] = {
     "reviewer": "root_coordinator",
     "review_disposition": "approved_source_leaves_and_reviewed_equivalence_map",
 }
+
+# This is a reviewed, document-specific scope ruling.  It is deliberately not a
+# status-based filter: every other feature document remains source-accounted.
+REVIEWED_OUT_OF_SCOPE_PROPOSALS: dict[str, dict[str, str | int]] = {
+    "docs/game/features/ui_presentation_program.md": {
+        "disposition": "excluded_reviewed_planning_proposal",
+        "reason": "Planning-only UI presentation proposal is outside the frozen crafting/derelict completion program.",
+        "required_status": "Proposed for review, 2026-09-05. Planning only; no UI implementation or visual acceptance is claimed.",
+        "expected_leaf_count": 21,
+    },
+}
 _DEFAULT_FREEZE = object()
 
 FC_OWNERS = {
@@ -171,10 +182,15 @@ CARD_SCOPE_DECISIONS = {
     "P17": [
         "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
         "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
-        "Docking derives the mobile transform from opposing authenticated descriptors and rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope; the mobile owner instantiates one separate barrier, capsule passage remains independent, and moved-owner combat positions receive the same root delta.",
-        "The fixed lifeboat owns one authored clear initial interior spawn; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
+        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
+        "The fixed lifeboat owns one authored clear initial interior spawn, distinct from the threshold but permitted to reuse its interior clearance anchor; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
+        "At home and away, the real PlayerController remains grounded through ordinary input in both directions when open and is physically denied when closed. Overlapping room AABBs resolve only through the authenticated connection plane; exact tie is mobile, and closing behind a player does not rewrite the cleared-side owner.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
         "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both.",
+    ],
+    "P23": [
+        "The reviewed planning-only proposal docs/game/features/ui_presentation_program.md is catalogued outside the frozen crafting/derelict acceptance program only while its status remains Proposed for review and Planning only; status drift, a missing catalogued source, or any unexpected feature source fails closed during scope review.",
+        "Canonical-regression reconciliation records the observed 652 calls against a strict numeric final marker with a runtime count guard, and records Meshy ADR-0068 identity while preserving the historical ADR-0060 filename.",
     ],
 }
 
@@ -217,7 +233,7 @@ CARD_CONTRACTS = {
         "authority": "ADR-0059 decisions 33-39",
     },
     "P17": {
-        "r10a_status": "governance_accepted_run7_world7_allocated_runtime_pending_accepted_r06_rereview_handoff",
+        "r10a_status": "baseline_component_candidate_frozen_independent_review_pending_run7_world7_not_started",
         "r10a_prerequisites": ["P01/R01 governance", "P03/R03 persistence governance", "accepted R06 fix re-review handoff"],
         "r10b_prerequisites": ["R09 live blocker binding", "R10-A accepted baseline"],
         "full_p17_acceptance_prerequisites": ["P09", "P12", "P13", "P16", "R10-A", "R09", "R10-B"],
@@ -236,14 +252,18 @@ CARD_CONTRACTS = {
             "owner": "data/kits/ship_structural_v0.json",
             "source": "contract-selected canonical wrapper trees",
             "module_fields": ["module_id", "wrapper_scene", "wrapper_sha256", "content_sha256", "boxes"],
-            "box_fields": ["shape_path", "basis", "origin", "dimensions"],
+            "box_fields": ["shape_path", "basis", "basis_f32_bits", "origin", "origin_f32_bits", "dimensions", "dimensions_f32_bits"],
+            "numeric_encoding": "Readable numeric components are binary32-normalized and must reproduce their paired exact IEEE-754 bit strings; either representation rejects when they disagree.",
             "policy": "Generated deterministically from current selected BoxShape3D wrappers while recording any finite non-singular composed basis exactly; source-byte hashes are build provenance; pure authorizer consumes a validated immutable projection; exported live loader requires exact materialized path/shape/transform/dimension and normalized-content fingerprint agreement; no missing-source bypass, GLB sidecar substitution, or hardcoded doorway half-depth.",
         },
         "initial_player_spawn_v1_exact_fields": [
             "spawn_id", "owner_ship_id", "room_id", "nav_node_id", "local_position",
         ],
-        "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point, applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery.",
+        "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point distinct from the threshold and permitted to reuse its capsule-clear interior clearance anchor; applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery. Later separation requires a new authored spawn and complete opening requalification.",
         "seam_overlap_policy": "Only authenticated open-frame and directly incident floor/corridor-floor join boxes may intersect, and their exact intersection AABB must lie wholly inside the finite envelope formed by clipping contract-selected canonical wrapper boxes to both outward half-spaces. Non-join/opaque/dynamic overlap rejects; no epsilon or global margin; full capsule clearance is independent.",
+        "pair_predicate_policy": "Author-time compatible-pair selection and live preflight call the same pure projected cross-hull predicate. R10-A freezes canonical fixed-lifeboat pairing for production home, fallback and native hosts; arbitrary claimed-ship pairing remains R14.",
+        "occupancy_overlap_policy": "Merged room AABB overlap resolves only through the authenticated current connection, barrier and both endpoint IDs, then the registered connection plane; the exact tie belongs to mobile, and closing behind a player who cleared either side does not rewrite ownership.",
+        "production_traversal_policy": "Real PlayerController inputs and move_and_slide remain grounded across the open seam in both directions at home and away; the closed barrier denies each crossing.",
         "dock_connections_v1_exact_fields": [
             "connection_id", "port_type", "slot_index", "host", "mobile",
         ],
@@ -676,6 +696,11 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
             "systems-map-task-graph-update",
         ), 1)],
         str(CARDS_REL).replace("\\", "/"),
+        "docs/game/06_validation_plan.md",
+        "tools/run_canonical_regression.py",
+        "tests/test_run_canonical_regression.py",
+        "tools/synaptic_sea_gate4_regression.sh",
+        "docs/game/adr/0060-meshy-offline-evidence-rebind.md",
     ],
     "P24": [
         "export_presets.cfg", "tools/check_export_pipeline.py", "scripts/export/build_release.sh",
@@ -1160,6 +1185,21 @@ def _document_status(lines: list[str]) -> str:
     return "unassessed feature-spec leaf"
 
 
+def _document_status_declarations(lines: list[str]) -> list[str]:
+    declarations: list[str] = []
+    for line in lines:
+        match = re.match(r"^(?:-\s+)?(?:\*\*)?Status:(?:\*\*)?\s*(.+)$", line)
+        if match:
+            declarations.append(re.sub(r"\*", "", match.group(1)).strip())
+    for index, line in enumerate(lines):
+        if re.match(r"^#{1,6}\s+Status\s*$", line, re.IGNORECASE):
+            for value in lines[index + 1:]:
+                if value.strip():
+                    declarations.append(re.sub(r"^[*-]\s+|\*", "", value).strip())
+                    break
+    return declarations
+
+
 def _acceptance_sections(lines: list[str]) -> list[tuple[int, int, str]]:
     headings: list[tuple[int, int, str]] = []
     for index, line in enumerate(lines):
@@ -1185,43 +1225,85 @@ def _acceptance_sections(lines: list[str]) -> list[tuple[int, int, str]]:
     return sections
 
 
-def _extract_feature_sources(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+def _feature_raw_leaves(lines: list[str]) -> list[tuple[int, str, str, str | None]]:
+    sections = _acceptance_sections(lines)
+    inline = [index for index, line in enumerate(lines) if re.match(r"^\s*- Acceptance criteria:\s*$", line)]
+    raw_leaves: list[tuple[int, str, str, str | None]] = []
+    for start, end, heading in sections:
+        for index in range(start, end):
+            table = re.match(r"^\|\s*(FC-\d{2})\s*\|\s*(.+?)\s*\|", lines[index])
+            if table and table.group(1) != "FC-ID":
+                raw_leaves.append((index, table.group(2), heading, table.group(1)))
+        raw_leaves.extend((index, text, heading, None) for index, text in _leaf_list_items(lines, start, end, -1))
+    for acceptance in inline:
+        base_item = _list_item(lines[acceptance])
+        assert base_item is not None
+        base_indent = base_item[0]
+        end = next(
+            (index for index in range(acceptance + 1, len(lines))
+             if _list_item(lines[index]) is not None and _list_item(lines[index])[0] <= base_indent),
+            len(lines),
+        )
+        raw_leaves.extend(
+            (index, text, "Acceptance criteria", None)
+            for index, text in _leaf_list_items(lines, acceptance + 1, end, base_indent)
+        )
+    unique_by_anchor: dict[int, tuple[int, str, str, str | None]] = {}
+    for leaf in raw_leaves:
+        unique_by_anchor.setdefault(leaf[0], leaf)
+    return [unique_by_anchor[index] for index in sorted(unique_by_anchor)]
+
+
+def _reviewed_out_of_scope_proposals(root: Path) -> list[dict[str, Any]]:
+    catalog: list[dict[str, Any]] = []
+    for relative, review in REVIEWED_OUT_OF_SCOPE_PROPOSALS.items():
+        path = root / relative
+        assert path.is_file(), f"catalogued out-of-scope proposal is missing: {relative}"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        status_declarations = _document_status_declarations(lines)
+        assert len(status_declarations) == 1, (
+            f"catalogued out-of-scope proposal status declarations must be singular: {relative}"
+        )
+        status = status_declarations[0]
+        assert status == review["required_status"], (
+            f"catalogued out-of-scope proposal status is not reviewable planning-only: {relative}"
+        )
+        leaves = _feature_raw_leaves(lines)
+        expected_count = review["expected_leaf_count"]
+        assert len(leaves) == expected_count, (
+            f"catalogued out-of-scope proposal leaf count drift: {relative} "
+            f"expected {expected_count}, found {len(leaves)}"
+        )
+        catalog.append({
+            "path": relative,
+            "disposition": review["disposition"],
+            "actual_status": status,
+            "reason": review["reason"],
+            "extracted_leaf_count": len(leaves),
+        })
+    return catalog
+
+
+def _extract_feature_sources(
+    root: Path,
+    excluded_proposal_paths: set[str] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    excluded_proposal_paths = excluded_proposal_paths or set()
     criteria: list[dict[str, Any]] = []
     sources: list[dict[str, Any]] = []
     coverage: list[dict[str, Any]] = []
     blockers: list[str] = []
     for path in sorted((root / FEATURES_REL).glob("*.md")):
         relative = path.relative_to(root).as_posix()
+        if relative in excluded_proposal_paths:
+            continue
         lines = path.read_text(encoding="utf-8").splitlines()
         if path.name == "feature_spec_template.md":
             sources.append({"path": relative, "kind": "template", "assessment": "excluded_template", "acceptance_leaf_count": 0})
             continue
         sections = _acceptance_sections(lines)
         inline = [index for index, line in enumerate(lines) if re.match(r"^\s*- Acceptance criteria:\s*$", line)]
-        raw_leaves: list[tuple[int, str, str, str | None]] = []
-        for start, end, heading in sections:
-            for index in range(start, end):
-                table = re.match(r"^\|\s*(FC-\d{2})\s*\|\s*(.+?)\s*\|", lines[index])
-                if table and table.group(1) != "FC-ID":
-                    raw_leaves.append((index, table.group(2), heading, table.group(1)))
-            raw_leaves.extend((index, text, heading, None) for index, text in _leaf_list_items(lines, start, end, -1))
-        for acceptance in inline:
-            base_item = _list_item(lines[acceptance])
-            assert base_item is not None
-            base_indent = base_item[0]
-            end = next(
-                (index for index in range(acceptance + 1, len(lines))
-                 if _list_item(lines[index]) is not None and _list_item(lines[index])[0] <= base_indent),
-                len(lines),
-            )
-            raw_leaves.extend(
-                (index, text, "Acceptance criteria", None)
-                for index, text in _leaf_list_items(lines, acceptance + 1, end, base_indent)
-            )
-        unique_by_anchor: dict[int, tuple[int, str, str, str | None]] = {}
-        for leaf in raw_leaves:
-            unique_by_anchor.setdefault(leaf[0], leaf)
-        raw_leaves = [unique_by_anchor[index] for index in sorted(unique_by_anchor)]
+        raw_leaves = _feature_raw_leaves(lines)
         mapped_ids: list[str] = []
         for start, end, _ in sections:
             body = " ".join(lines[start:end])
@@ -1414,7 +1496,9 @@ def build(
     supersession_set_fingerprint = _supersession_set_fingerprint(supersessions)
     requirements, requirement_source, requirement_coverage, requirement_blockers = _extract_requirements(root)
     _apply_reviewed_supersessions(requirements, requirement_coverage, supersessions)
-    features, feature_sources, feature_coverage, feature_blockers = _extract_feature_sources(root)
+    out_of_scope_proposals = _reviewed_out_of_scope_proposals(root)
+    excluded_proposal_paths = {entry["path"] for entry in out_of_scope_proposals}
+    features, feature_sources, feature_coverage, feature_blockers = _extract_feature_sources(root, excluded_proposal_paths)
     known_requirement_ids = {entry["requirement_id"] for entry in requirements}
     for source in feature_sources:
         mapped = source.get("mapped_requirement_ids", [])
@@ -1555,6 +1639,7 @@ def build(
             "reviewed_mapping_fingerprint": supersession_set_fingerprint,
         },
         "criterion_supersession_review": supersessions,
+        "reviewed_out_of_scope_proposals": out_of_scope_proposals,
         "accounting": {
             "denominator_status": (
                 "incomplete_unassessed_sources"
@@ -1862,6 +1947,7 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
     root = Path(root)
     supersession_document = _load_reviewed_supersessions(root)
     supersessions = supersession_document["reviewed_supersessions"]
+    out_of_scope_proposals = _reviewed_out_of_scope_proposals(root)
     assert registry["schema_version"] == "feature-acceptance-v5", "unexpected acceptance schema"
     identifiers = [entry["id"] for entry in registry["criteria"]]
     assert len(identifiers) == len(set(identifiers)), "duplicate criterion IDs"
@@ -1880,12 +1966,20 @@ def validate(registry: dict[str, Any], cards: dict[str, Any] | None = None, root
     assert registry.get("criterion_supersession_review") == supersessions, (
         "reviewed supersession history mismatch"
     )
+    excluded_proposal_paths = {entry["path"] for entry in out_of_scope_proposals}
+    assert registry.get("reviewed_out_of_scope_proposals") == out_of_scope_proposals, (
+        "reviewed out-of-scope proposal catalog mismatch"
+    )
     expected_source_paths = {REQUIREMENTS_REL.as_posix()} | {
         path.relative_to(root).as_posix() for path in (root / FEATURES_REL).glob("*.md")
+        if path.relative_to(root).as_posix() not in excluded_proposal_paths
     }
     actual_source_paths = [entry["path"] for entry in registry["source_documents"]]
     assert len(actual_source_paths) == len(set(actual_source_paths)), "duplicate source document accounting"
     assert set(actual_source_paths) == expected_source_paths, "source document inventory is incomplete or stale"
+    assert not any(entry["source"]["path"] in excluded_proposal_paths for entry in registry["criteria"]), (
+        "catalogued out-of-scope proposal emitted acceptance criteria"
+    )
     expected_blockers: list[str] = []
     for source in registry["source_documents"]:
         if source["kind"] == "requirement_register":

@@ -116,6 +116,15 @@ Mapped 1:1 to REQ-TEST-001..003 in `docs/game/05_requirements.md`.
 """,
             encoding="utf-8",
         )
+        self.ui_proposal = self.features / "ui_presentation_program.md"
+        self.ui_proposal.write_text(
+            "# UI presentation proposal\n\n"
+            "**Status:** Proposed for review, 2026-09-05. Planning only; no UI implementation or visual acceptance is claimed.\n\n"
+            "## Acceptance criteria\n\n"
+            + "\n".join(f"- Proposed UI leaf {number:02d}." for number in range(1, 22))
+            + "\n",
+            encoding="utf-8",
+        )
 
     def reviewed_supersession(
         self,
@@ -416,6 +425,68 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             {"implemented": None, "validated": None, "accepted": None},
             registry["accounting"]["percentages"],
         )
+
+    def test_reviewed_planning_proposal_is_catalogued_without_scope_rows(self):
+        registry = build(self.root)
+        proposal = registry["reviewed_out_of_scope_proposals"]
+        self.assertEqual(1, len(proposal))
+        self.assertEqual(
+            {
+                "path": "docs/game/features/ui_presentation_program.md",
+                "disposition": "excluded_reviewed_planning_proposal",
+                "actual_status": "Proposed for review, 2026-09-05. Planning only; no UI implementation or visual acceptance is claimed.",
+                "reason": "Planning-only UI presentation proposal is outside the frozen crafting/derelict completion program.",
+                "extracted_leaf_count": 21,
+            },
+            proposal[0],
+        )
+        self.assertFalse(any(
+            entry["source"]["path"] == proposal[0]["path"]
+            for entry in registry["criteria"]
+        ))
+        self.assertFalse(any(
+            entry["path"] == proposal[0]["path"]
+            for entry in registry["source_documents"]
+        ))
+        self.assertTrue(any(
+            entry["source"]["path"] == "docs/game/features/example.md"
+            for entry in registry["criteria"]
+        ))
+
+    def test_reviewed_planning_proposal_rejects_status_drift_or_missing_source(self):
+        exact_status = "Proposed for review, 2026-09-05. Planning only; no UI implementation or visual acceptance is claimed."
+        for label, contents in (
+            ("accepted", "# UI\n\n**Status:** Accepted.\n"),
+            ("ambiguous", "# UI\n\n**Status:** Proposed for review.\n"),
+            ("accepted_with_old_phrases", "# UI\n\n**Status:** Accepted; formerly Proposed for review. Planning only previously.\n"),
+            ("initial_then_accepted", f"# UI\n\n**Status:** {exact_status}\n\n**Status:** Accepted.\n"),
+            ("duplicate_initial", f"# UI\n\n**Status:** {exact_status}\n\n**Status:** {exact_status}\n"),
+        ):
+            with self.subTest(label=label):
+                self.sources.ui_proposal.write_text(contents, encoding="utf-8")
+                with self.assertRaisesRegex(AssertionError, "catalogued out-of-scope proposal status"):
+                    build(self.root)
+        self.sources.ui_proposal.unlink()
+        with self.assertRaisesRegex(AssertionError, "catalogued out-of-scope proposal is missing"):
+            build(self.root)
+
+    def test_unexpected_feature_source_still_rejects_frozen_scope(self):
+        (self.sources.features / "missing_acceptance.md").unlink()
+        initial = write_registry(self.root)
+        frozen = {
+            "frozen_on": "2026-09-05",
+            "source_leaf_set_fingerprint": initial["scope_freeze_candidate"]["source_leaf_set_fingerprint"],
+        }
+        (self.sources.features / "unexpected.md").write_text(
+            "# Unexpected feature\n\n## Acceptance criteria\n\n- New source leaf.\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(AssertionError, "frozen scope drift"):
+            write_registry(self.root, frozen_scope_contract=frozen)
+        (self.sources.features / "unexpected.md").unlink()
+        (self.sources.features / "example.md").unlink()
+        with self.assertRaisesRegex(AssertionError, "frozen scope drift"):
+            write_registry(self.root, frozen_scope_contract=frozen)
 
     def test_only_genuine_acceptance_leaves_are_registered_once(self):
         registry = build(self.root)

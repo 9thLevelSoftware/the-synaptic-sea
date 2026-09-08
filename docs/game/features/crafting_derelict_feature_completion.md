@@ -210,8 +210,15 @@ save/load or repeated callbacks.
   wrapper boxes to both outward half-spaces. Non-join, opaque or dynamic overlap
   rejects without an epsilon/global margin. A closed connection has one separate
   mobile-owned barrier; an open one
-  proves ordinary capsule travel in both directions. The mobile endpoint owns
-  the shared threshold identity. Missing authoring, ambiguous identity, concave
+  proves ordinary grounded travel in both directions through production
+  `PlayerController` input. Author-time pair selection and live preflight use the
+  same pure projected cross-hull predicate. The mobile endpoint owns the exact
+  shared-plane tie. When merged room AABBs overlap, occupancy requires the live
+  connection, barrier and both endpoint identities before plane classification;
+  closing behind a player who cleared the plane does not rewrite their owner.
+  R10-A freezes canonical fixed-lifeboat pairing for production home, fallback
+  and native hosts; claimed-ship pairing remains R14. Missing authoring,
+  ambiguous identity, concave
   non-supporting edges, hull overlap or blocked clearance fail closed without a
   nearest-room, center-snap, silent alternate layout or collision-disable path.
 - The canonical opening owns one fixed-lifeboat
@@ -219,7 +226,9 @@ save/load or repeated callbacks.
   pair and closed barrier first, then places the player once and publishes only
   when the live capsule is clear, occupancy resolves to the lifeboat and the
   barrier excludes home. This authored opening point is unavailable to save/load
-  or migration recovery.
+  or migration recovery. It remains distinct from the threshold but may reuse
+  the capsule-clear interior clearance anchor; any later separation requires a
+  newly authored point and opening requalification.
 - The same baseline correction retains floor-origin ceiling wrappers while
   moving `ceiling_cap_1x1` structural collision to Y 3.8..4.0: a 4x0.2x4 proxy
   centered at `(0, 3.9, 0)`. Physical collision bounds and transformed visual
@@ -333,3 +342,9 @@ not fresh FC evidence. At scope freeze, all FC evidence states are
 `not_verified`; implementation and acceptance counts are therefore zero for this
 program. Existing deferred and expected-unbuilt design scope remains in the
 whole-game register and is assigned to FC-23/P23 rather than excluded.
+
+P23 scope governance records `ui_presentation_program.md` as the single reviewed
+planning-only proposal outside this frozen crafting/derelict program. Its actual
+status must remain Proposed for review and Planning only; a status change, a
+missing catalogued source, or another feature source remains a fail-closed scope
+review condition. This ruling creates no acceptance leaves.

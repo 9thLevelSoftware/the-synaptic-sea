@@ -272,9 +272,10 @@ sweep. No candidate-only result may be described as full path clearance.
 
 ### 4. Docking and registered exits
 
-The R10-A baseline correction in this section is accepted governance. Runtime
-evidence remains pending. The existing candidate-result safety obligations
-remain accepted and cannot be weakened by its implementation.
+The R10-A baseline correction in this section is accepted governance. The
+baseline implementation and fresh qualification remain subject to an independent
+component review before run-7/world-7 work begins. The existing candidate-result
+safety obligations remain accepted and cannot be weakened by its implementation.
 
 Every boarding/docking port used by production receives stable authored identity:
 
@@ -303,7 +304,11 @@ The authorizer receives an immutable normalized collision-box projection rather
 than loading wrapper nodes. The existing kit stores this additive versioned
 derivative for each contract-selected canonical wrapper. Every module projection
 records its wrapper identity, wrapper/content SHA-256 values, and each box's
-stable node path, exact composed local basis/origin, and dimensions. A
+stable node path, binary32-normalized readable `basis`, `origin`, and
+`dimensions` arrays together with exact `basis_f32_bits`, `origin_f32_bits`, and
+`dimensions_f32_bits` arrays. Validation requires every readable component to
+round to its paired bit string and rejects either representation when they
+disagree. A
 deterministic pipeline step rejects missing or duplicate paths, unsupported
 shapes/resources or transform syntax, malformed or singular transforms, absent
 wrappers, and stale hashes. The current contract-selected wrappers contain
@@ -340,6 +345,11 @@ fixed half-cell offset.
 
 `DockingManager` selects a deterministic compatible endpoint pair and derives the
 mobile root transform solely from the two registered poses and opposing normals.
+Author-time selection and live preflight both call the same pure projected
+cross-hull pair predicate, so their join admission and positive-volume rejection
+rules cannot diverge. R10-A freezes deterministic compatibility for the canonical
+fixed lifeboat paired with production home, fallback and native hosts; arbitrary
+claimed-ship pairing remains an R14 closure obligation.
 Before changing either root or connection state it tests the complete transformed
 host and mobile hulls against a finite constructed seam envelope. Join IDs may
 name only each endpoint's exact open doorway-frame placement and directly
@@ -388,15 +398,22 @@ denied. Replacement never auto-undocks a ship.
 
 A closed production connection owns a real physical/occupancy barrier at the
 shared threshold; an open connection removes that obstruction and must permit
-full capsule travel in both directions between the two distinct interior
-clearance points. The mobile endpoint owns the shared threshold node, so graph,
-barrier and persisted threshold-pose identity cannot disagree about ownership.
+the real `PlayerController`, through ordinary input and `move_and_slide`, to stay
+grounded while travelling in both directions between the two distinct interior
+clearance points. Merged room AABBs may overlap around a flush dock, so occupancy
+uses the authenticated current connection, barrier, and both endpoint IDs before
+classifying the player against the registered connection plane. The mobile
+endpoint owns the exact plane tie. Closing the barrier behind a player who has
+already cleared onto either side does not change the geometrically resolved
+owner.
 
 The fixed lifeboat layout separately owns the canonical opening's strict
 `initial_player_spawn_v1` row (`spawn_id`, `owner_ship_id`, `room_id`,
 `nav_node_id`, `local_position`). It names the lifeboat as owner and lies at a
-capsule-clear interior point distinct from the threshold and both clearance
-anchors. New Game first constructs and validates the corrected pair and closed
+capsule-clear interior point distinct from the threshold. It may reuse the
+lifeboat's interior clearance anchor; separating it later requires a new authored
+spawn plus complete opening requalification. New Game first constructs and
+validates the corrected pair and closed
 home barrier, then resolves and applies that owner-local spawn once before
 publishing occupancy. Occupancy must identify the lifeboat and the closed
 barrier must deny home ownership. Failure aborts publication; the row is never a
