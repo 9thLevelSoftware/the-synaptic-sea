@@ -162,4 +162,4 @@ def test_real_canonical_document_has_consistent_count():
     script = extract_bundle(document_text)
 
     assert script == expected
-    assert sum(line.lstrip().startswith("run_clean ") for line in script.splitlines()) == 651
+    assert sum(line.lstrip().startswith("run_clean ") for line in script.splitlines()) == 652

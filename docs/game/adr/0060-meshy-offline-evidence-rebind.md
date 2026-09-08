@@ -1,4 +1,4 @@
-# ADR-0060: Offline Meshy Evidence Rebinding
+# ADR-0068: Offline Meshy Evidence Rebinding
 
 ## Status
 
