@@ -199,16 +199,19 @@ save/load or repeated callbacks.
   layout precompiles stable boarding endpoint/port/portal identity from actual
   occupied cells. The port must be an explicit one-sided exterior portal on a
   supporting hull plane, with every non-join shape behind that plane and separate
-  threshold/interior capsule-clear points. Only authenticated portions of the
-  endpoint's named join boxes may protrude into its exact bounded seam clips. The fixed lifeboat's west airlock edge
+  threshold/interior capsule-clear points. Named join boxes authenticate the
+  doorway-frame and directly incident floor identities; they grant no overlap
+  exception. The authoritative structural plan gives every `SOLID` edge two
+  exact half spans. Vertex-owned corner/T wrappers cover only their projected
+  incident 2 m rays; ordinary full or scaled half-straights cover the residuals,
+  so the complete 4 m boundary is closed without a phantom portal wing. The fixed lifeboat's west airlock edge
   is an internal engine-room seam, so the authorizer chooses a valid unoccupied
   north/south edge rather than preserving a diagnostic coordinate.
 - Docking derives its pose from opposing registered descriptors and checks both
-  complete transformed hulls before mutation. Only exact endpoint-owned open-
-  frame/directly-incident-floor join boxes may intersect, and only inside the
-  finite seam envelope derived by clipping their contract-selected canonical
-  wrapper boxes to both outward half-spaces. Non-join, opaque or dynamic overlap
-  rejects without an epsilon/global margin. A closed connection has one separate
+  complete transformed hulls before mutation. Every positive-volume cross-hull
+  intersection rejects, including one between authenticated endpoint-owned
+  doorway/floor join identities. Exact zero-volume contact is allowed without an
+  epsilon, slab, seam exception, or global margin. A closed connection has one separate
   mobile-owned barrier; an open one
   proves ordinary grounded travel in both directions through production
   `PlayerController` input. Author-time pair selection and live preflight use the

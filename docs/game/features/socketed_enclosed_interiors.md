@@ -92,11 +92,12 @@ Keep the `structural_plan` keys the loader already consumes
 - Place one floor per occupied cell by matching `floor_edge` sockets.
 - Place one ceiling per occupied cell (`ceiling_cap_1x1` or kit remap)
   unless the cell is an authored vertical opening.
-- Place wall, portal, or OPEN on each canonical shared edge by matching
-  `wall_end` / `portal_edge` / `wall_base` sockets — not a hardcoded
-  `WALL_MODULE`.
-- Place inner/outer corner (and T-junction) modules at vertices where
-  those contracts match.
+- Cover each canonical shared edge as wall, portal, or OPEN by matching
+  `wall_end` / `portal_edge` / `wall_base` sockets. Each `SOLID` edge has two
+  exact half spans; the compiler may combine two residual halves into one full
+  straight-wall placement.
+- Place inner/outer corner (and T-junction) modules at vertices only when their
+  projected 2 m rays map one-to-one to the exact incident `SOLID` half spans.
 - Record `socket_bindings` on every placement: local socket id, neighbor
   placement id, neighbor socket id, `kind`.
 - `WallDoorResolver` stays a compatibility adapter to the legacy

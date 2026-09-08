@@ -2,7 +2,7 @@
 
 ## Status
 
-Validated
+In Progress
 
 ## Design pillar alignment
 
@@ -15,7 +15,7 @@ A suited body stops at a bulkhead plate. An open frame lets you through at stand
 
 ## Gameplay problem
 
-`ship_structural_v0` wall and doorway wrappers still used `BoxShape3D(1, 1, 1)`. Contract Z thickness is 0, so “match the contract AABB” is not a single box, and Godot cannot cut a hole in one box. Corner/T modules occupy a 4×4 footprint with two or three SOLID wings. Walkability Stage A extrudes per-edge 0.20 m slabs; live collision did not.
+`ship_structural_v0` wall and doorway wrappers originally used `BoxShape3D(1, 1, 1)`. Contract Z thickness is 0, so “match the contract AABB” is not a single box, and Godot cannot cut a hole in one box. The first corner/T retune used full 4 m wings from edge-center placement records; those wings did not map to the intended vertex topology and could create phantom walls. Vertex-owned 2 m rays keep the live proxy aligned with exact half-span authority.
 
 ## Core behavior
 
@@ -24,8 +24,8 @@ Per-wrapper collision proxies, numbers from `walkability_contract.gd`:
 | Wrapper | Collision |
 |---|---|
 | `wall_straight_1x1`, `wall_end_cap` | one `BoxShape3D(4.0, 3.0, 0.2)` at edge-center |
-| `wall_inner_corner`, `wall_outer_corner` | two `BoxShape3D(4.0, 3.0, 0.2)` slabs, north and east SOLID wings |
-| `wall_t_junction` | three `BoxShape3D(4.0, 3.0, 0.2)` slabs, north/east/west SOLID wings |
+| `wall_inner_corner`, `wall_outer_corner` | two `BoxShape3D(2.0, 3.0, 0.2)` rays from the vertex, north and east in canonical orientation |
+| `wall_t_junction` | three `BoxShape3D(2.0, 3.0, 0.2)` rays from the vertex, north/east/west in canonical orientation |
 | `doorway_frame_blocked_1x1` | one `BoxShape3D(4.0, 3.2, 0.2)` full slab |
 | `doorway_frame_open_1x1` | two posts `BoxShape3D(1.4, 3.2, 0.2)` at local X ±1.3 m, plus header `BoxShape3D(4.0, 1.0, 0.2)` with bottom at Y=2.2 m |
 
@@ -43,15 +43,15 @@ Open-doorway aperture is ~1.2 × 2.2 m. Standing capsule 0.80 × 1.70 must pass.
 
 ## Rules
 
-1. Per wrapper, not “every SOLID.” Compiler still emits `wall_straight_1x1` per edge; corner/T proxies exist for those modules.
-2. Prefer compound wing slabs over a 4×3×4 AABB so each SOLID wing is a 0.20 m plate.
+1. The compiler owns two canonical half spans per `SOLID` edge. A vertex module owns exactly the incident half spans its projected rays match; two residual halves collapse to one full `wall_straight_1x1`, while one residual half uses that same wrapper with explicit scale `(0.5, 1, 1)`.
+2. Corner/T wrappers use compound vertex rays. Their exact centerline span mapping must cover the intended half spans without an extra or duplicate span; same-owner perpendicular rays may meet inside their common junction thickness.
 3. Doorway opening is posts + header; do not fake an opening with one box.
 4. Hatch 2×1 stays out of this card.
 
 ## Non-goals
 
 - Layout mutators / live LOCKED stamping
-- GLB authoring or unique meshes
+- Unrelated GLB, texture, material, or mesh redesign
 - `bulkhead_portal_2x1.tscn` / HATCH collision retune
 - ithappy wrapper kit
 - Crouch as a smaller live capsule
@@ -66,8 +66,8 @@ Open-doorway aperture is ~1.2 × 2.2 m. Standing capsule 0.80 × 1.70 must pass.
 ## Acceptance criteria
 
 - Given `wall_straight_1x1` / `wall_end_cap`, when the wrapper instantiates, then it has one `BoxShape3D(4, 3, 0.2)` at edge-center.
-- Given inner/outer corner wrappers, when they instantiate, then each has two wing slabs of `(4, 3, 0.2)` on north and east socket axes.
-- Given `wall_t_junction`, when it instantiates, then it has three wing slabs on north/east/west socket axes.
+- Given inner/outer corner wrappers, when they instantiate at a vertex, then each has two visible and collidable rays of `(2, 3, 0.2)` on north and east socket axes.
+- Given `wall_t_junction`, when it instantiates at a vertex, then it has three visible and collidable `(2, 3, 0.2)` rays on north/east/west socket axes.
 - Given `doorway_frame_open_1x1`, when it instantiates, then posts sit at X ±1.3 m, header bottom is Y=2.2 m, and a 0.80×1.70 standing opening is clear.
 - Given `doorway_frame_blocked_1x1`, when it instantiates, then it is a full `BoxShape3D(4, 3.2, 0.2)` slab.
 - Given `bulkhead_portal_2x1`, when the smoke runs, then its proxy is unchanged.

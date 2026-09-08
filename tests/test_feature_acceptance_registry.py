@@ -9,6 +9,7 @@ from tools.build_feature_acceptance import (
     PLAN_REL,
     SUPERSESSIONS_REL,
     _digest,
+    _natural_feature_criterion_id,
     _natural_requirement_criterion_id,
     _supersession_set_fingerprint,
     build,
@@ -164,6 +165,40 @@ Mapped 1:1 to REQ-TEST-001..003 in `docs/game/05_requirements.md`.
                 "deferred": False,
                 "counts_toward_proposed_denominator": True,
                 "representative_id": stable_id,
+                "denominator_delta": 0,
+            },
+        }
+
+    def reviewed_feature_supersession(self, original: str, replacement: str) -> dict:
+        source_path = "docs/game/features/structural_wrapper_collision.md"
+        heading = "Acceptance criteria"
+        original_id = _natural_feature_criterion_id(source_path, heading, original)
+        replacement_id = _natural_feature_criterion_id(source_path, heading, replacement)
+        return {
+            "stable_criterion_id": original_id,
+            "source": {"path": source_path, "heading": heading},
+            "original": {
+                "criterion": original,
+                "natural_id": original_id,
+                "criterion_fingerprint": _digest(source_path, heading, original),
+            },
+            "replacement": {
+                "criterion": replacement,
+                "natural_id": replacement_id,
+                "criterion_fingerprint": _digest(source_path, heading, replacement),
+            },
+            "review": {
+                "status": "accepted",
+                "adr": "docs/game/adr/0066-test-feature-supersession.md",
+                "reviewer": "root_coordinator",
+                "reviewed_on": "2026-09-08",
+            },
+            "accounting": {
+                "metric_disposition": "one_for_one_active_leaf",
+                "acceptance_kind": "feature",
+                "deferred": False,
+                "counts_toward_proposed_denominator": True,
+                "representative_id": original_id,
                 "denominator_delta": 0,
             },
         }
@@ -326,6 +361,76 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             write_registry(self.root)
         self.assertEqual(before, self.sources.registry.read_bytes())
         self.assertTrue(initial["criteria"])
+
+    def test_reviewed_feature_supersession_preserves_scope_and_resets_only_changed_evidence(self):
+        original = "A feature-owned frozen geometry leaf."
+        replacement = "A feature-owned reviewed geometry leaf."
+        (self.sources.features / "missing_acceptance.md").unlink()
+        feature_source = self.sources.features / "structural_wrapper_collision.md"
+        feature_source.write_text(
+            "# Structural wrapper collision\n\n## Acceptance criteria\n\n"
+            f"- {original}\n",
+            encoding="utf-8",
+        )
+        adr = self.root / "docs/game/adr/0066-test-feature-supersession.md"
+        adr.parent.mkdir(parents=True, exist_ok=True)
+        adr.write_text("# Test feature supersession authority\n", encoding="utf-8")
+        initial = write_registry(self.root)
+        original_entry = self._criterion(initial, original)
+        original_entry["evidence"] = {
+            "implemented": True,
+            "production_reachable": True,
+            "fresh_validation": True,
+            "player_accepted": True,
+            "state": "accepted",
+            "refs": ["artifacts/accepted-feature.log"],
+        }
+        unchanged = self._criterion(initial, "A second feature leaf.")
+        unchanged["evidence"] = {
+            "implemented": True,
+            "production_reachable": True,
+            "fresh_validation": True,
+            "player_accepted": False,
+            "state": "verified_scene",
+            "refs": ["artifacts/unchanged-feature.log"],
+        }
+        self.sources.registry.write_text(json.dumps(initial, indent=2) + "\n", encoding="utf-8")
+        mapping = self.sources.reviewed_feature_supersession(original, replacement)
+        self.sources.write_supersessions([mapping])
+        feature_source.write_text(
+            feature_source.read_text(encoding="utf-8").replace(original, replacement),
+            encoding="utf-8",
+        )
+        frozen = {
+            "frozen_on": "2026-09-05",
+            "source_leaf_set_fingerprint": initial["scope_freeze_candidate"]["source_leaf_set_fingerprint"],
+            "reviewed_supersession_set_fingerprint": _supersession_set_fingerprint([mapping]),
+        }
+
+        changed = write_registry(self.root, frozen_scope_contract=frozen)
+        replacement_entry = self._criterion(changed, replacement)
+        self.assertEqual(original_entry["id"], replacement_entry["id"])
+        self.assertEqual("not_verified", replacement_entry["evidence"]["state"])
+        self.assertEqual([], replacement_entry["evidence"]["refs"])
+        self.assertEqual(
+            "verified_scene",
+            self._criterion(changed, "A second feature leaf.")["evidence"]["state"],
+        )
+        self.assertEqual(
+            initial["scope_freeze_candidate"]["source_leaf_set_fingerprint"],
+            changed["scope_freeze_candidate"]["source_leaf_set_fingerprint"],
+        )
+        self.assertEqual([mapping], changed["criterion_supersession_review"])
+
+    def test_reviewed_feature_supersession_rejects_unknown_feature_source(self):
+        mapping = self.sources.reviewed_feature_supersession(
+            "A feature-owned frozen geometry leaf.",
+            "Reviewed replacement.",
+        )
+        mapping["source"]["path"] = "docs/game/features/mapped.md"
+        with self.assertRaisesRegex(AssertionError, "not an approved supersession source"):
+            self.sources.write_supersessions([mapping])
+            build(self.root)
 
     def test_reviewed_supersession_rejects_missing_target_before_write(self):
         original_text = "Alpha remains observable."
@@ -592,7 +697,7 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         self.assertEqual("2026-09-05", registry["scope_frozen"]["frozen_on"])
         self.assertEqual("root_coordinator", registry["scope_frozen"]["reviewer"])
         self.assertEqual(
-            "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
+            "54f7c6f782eac4ca7e4a589304b9a74fc754ab3f3384bdf0d5ee3121ec482a8f",
             registry["scope_frozen"]["reviewed_supersession_set_fingerprint"],
         )
         self.assertEqual(
@@ -647,7 +752,7 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
         )
         self.assertEqual("not_verified", superseded["evidence"]["state"])
         self.assertEqual([], superseded["evidence"]["refs"])
-        self.assertEqual(1, registry["criterion_supersession_source"]["reviewed_mapping_count"])
+        self.assertEqual(4, registry["criterion_supersession_source"]["reviewed_mapping_count"])
         self.assertEqual(
             "ca2c7292b2639e65d66a3ccb3f6dfeda65a924a1b16c6f411f33b4b6454996cc",
             registry["criterion_supersession_review"][0]["original"]["criterion_fingerprint"],
@@ -896,6 +1001,18 @@ class FeatureAcceptanceRegistryTests(unittest.TestCase):
             "scripts/procgen/playable_generated_ship.gd",
             [entry["path"] for entry in p16["allowlist"]],
         )
+        p17 = next(card for card in manifest["cards"] if card["id"] == "P17")
+        for expected_path in (
+            "docs/game/features/structural_wrapper_collision.md",
+            "docs/game/05_requirements.md",
+            "scripts/procgen/layout_serializer.gd",
+            "tools/rebuild_vertex_span_modules.py",
+            "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+            "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+            "scripts/validation/structural_rebuild_collision_query_smoke.gd",
+        ):
+            self.assertIn(expected_path, [entry["path"] for entry in p17["allowlist"]])
+        self.assertTrue(any("vertex-owned 2 m by 3 m by 0.2 m rays" in decision for decision in p17["scope_decisions_pending"]))
 
 
 if __name__ == "__main__":

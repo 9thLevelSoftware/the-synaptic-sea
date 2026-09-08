@@ -1629,11 +1629,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `features/structural_wrapper_collision.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Validated
+- Status: In Progress
 - Rationale: Live wall/door proxies must be 0.20 m slabs and a posts+header opening, not 1×1×1 cubes, so the player capsule matches Stage A walkability numbers.
 - Acceptance criteria:
   - `wall_straight_1x1` / `wall_end_cap` one `BoxShape3D(4, 3, 0.2)`.
-  - Inner/outer corner two wing slabs (not a 4×3×4 AABB); T-junction three wing slabs.
+  - Inner/outer corners use two vertex-owned `BoxShape3D(2, 3, 0.2)` rays; T-junctions use three. Together with straight-wall full or half spans, each 4 m `SOLID` edge has exact end-to-end coverage with no missing, extra, or duplicate centerline span.
   - `doorway_frame_open_1x1` posts at X ±1.3 m plus header bottom at Y=2.2 m; standing 0.80×1.70 opening is clear.
   - `doorway_frame_blocked_1x1` full `BoxShape3D(4, 3.2, 0.2)` slab.
   - `bulkhead_portal_2x1` unchanged.

@@ -300,6 +300,41 @@ and distinct threshold/interior navigation nodes plus clearance points. The
 compiler accepts this deliberately exterior portal form while continuing to
 reject accidental one-room internal portals.
 
+Candidate selection may run one pure compilation over a detached copy of solved
+topology to discover exterior boundary geometry. That discovery result has no
+publication or validation authority: it cannot set `structural_plan_validated`,
+cannot be reused as the endpoint plan, and never mutates the caller's topology.
+Only a second compile from the detached topology after the explicit exterior
+portal and navigation-node rows are authored may become the validated structural
+plan and supply endpoint/navigation authority.
+
+That authoritative compile also owns exact wall-span topology. Every `SOLID`
+edge is divided into two canonical 2 m half spans. A vertex-owned inner/outer
+corner has two visible and collidable 2 x 3 x 0.2 m rays, and a T-junction has
+three; cardinal yaw is accepted only when the wrapper projection maps one-to-one
+to the incident `SOLID` half spans. Two residual halves on one edge collapse to
+one ordinary 4 m `wall_straight_1x1`; one residual half uses the same wrapper at
+scale `(0.5, 1, 1)`. This local construction is deterministic and linear. The
+compiled plan records each physical placement's covered half spans and each
+edge's two placement identities. The loader applies scale to the complete visual
+and collision wrapper, includes it in structural identity, and exposes all edge
+and half-span bindings while retaining a deterministic primary edge binding.
+
+The validator independently projects the wrapper boxes and requires exact
+centerline coverage of both halves of every `SOLID` edge, with no missing,
+duplicate or extra span. The thickness intersection between perpendicular rays
+inside one corner/T placement is its intended same-owner junction. It grants no
+cross-hull overlap permission. Because an exterior portal edge is not `SOLID`,
+no corner/T ray can occupy its aperture; the unchanged supporting-plane and
+strict cross-hull predicates still decide endpoint eligibility.
+
+The three corner/T visual GLBs, wrapper collisions, JSON/TRES contracts and
+normalized projection are regenerated together from an owned recovered/new
+source authority. Their module IDs and material-cost rows remain stable; the
+unavailable historical Mac source is never represented as the new authority.
+Changed collision acceptance leaves return to unverified until fresh wrapper,
+compiler, loader and docking evidence is captured.
+
 The authorizer receives an immutable normalized collision-box projection rather
 than loading wrapper nodes. The existing kit stores this additive versioned
 derivative for each contract-selected canonical wrapper. Every module projection
@@ -330,9 +365,9 @@ collision shape whose tangent/up projection has positive area inside the finite
 aperture envelope, the complete shape is in the inward half-space, and the
 threshold/clearance envelope lies outside. Shapes outside that finite projection
 are irrelevant to this support predicate but remain in the strict cross-ship
-pair inventory. Only the separately authenticated
-portions of that endpoint's named join boxes may cross the plane, and only into
-the bounded half-space clips used to construct the seam envelope below. This
+pair inventory. The endpoint's named join boxes authenticate the connector and
+incident floor identities, but do not grant either hull permission to cross the
+connection plane or overlap its mate. This
 excludes concave boundary edges that would still dock through another room
 without making an outward-protruding wall, ceiling, interior or unrelated floor
 eligible. The fixed lifeboat authoring derives
@@ -351,7 +386,7 @@ rules cannot diverge. R10-A freezes deterministic compatibility for the canonica
 fixed lifeboat paired with production home, fallback and native hosts; arbitrary
 claimed-ship pairing remains an R14 closure obligation.
 Before changing either root or connection state it tests the complete transformed
-host and mobile hulls against a finite constructed seam envelope. Join IDs may
+host and mobile hulls for exact positive-volume intersection. Join IDs may
 name only each endpoint's exact open doorway-frame placement and directly
 incident floor/corridor-floor placements. Walls, ceilings, blocked/solid portals,
 room-interior shapes, unrelated floors and dynamic bodies are never join pieces.
@@ -359,27 +394,19 @@ The live loader resolves those IDs to contract-selected canonical wrapper boxes
 and requires exact agreement with the precompiled collision fingerprint.
 The build pipeline validates projection source hashes. At runtime the loader
 independently normalizes the materialized collision boxes and compares their
-content fingerprint before endpoint fingerprint comparison. All supporting-plane
-and seam extents are derived from projected boxes. Doorway depth and its
-half-depth are not hardcoded runtime tolerances.
+content fingerprint before endpoint fingerprint comparison. Supporting-plane
+extent is derived from projected boxes. Doorway depth and its half-depth are not
+hardcoded runtime tolerances.
 
-In threshold coordinates, the constructor clips each authenticated join box to
-its outward half-space and unions the exact clipped AABBs from both mated sides.
-Endpoint transforms are cardinal; non-box/non-cardinal join geometry is
-unsupported. With the current canonical wrapper, the two doorway posts and header
-are 0.2 m deep and produce a 0.1 m slab on each side; the 4x0.25x4 floor reaches
-the plane. These actual extents explain why zero-volume logical-cell contact is
-not a valid universal rule. Existing Blender collision-proxy sidecars disagree
-with the runtime wrapper shapes and cannot authorize the seam.
-
-Every cross-ship shape pair is checked. An intersection involving any non-join
-shape rejects. Two authenticated join boxes may intersect only when their exact
-box-intersection AABB lies wholly inside the constructed envelope. There is no
-epsilon or global overlap allowance. The mobile threshold owner instantiates the
+Every cross-ship shape pair is checked. Any positive-volume intersection rejects,
+including a pair whose placement IDs are authenticated join identities. Exact
+zero-volume plane contact is allowed; there is no epsilon, slab, seam exception,
+or global overlap allowance. The mobile threshold owner instantiates the
 separate closed-state barrier exactly once, and an independent full-capsule sweep
 between both interior clearance points must pass with that barrier open.
 The aperture-scoped supporting-plane predicate and strict all-pairs test together
-admit only the canonical connector/floor contact needed by real wrappers. The diagnostic
+admit only the canonical zero-volume connector/floor contact proved by the
+hardened canonical, rotated, far-origin, native-42, and native-777 diagnostic. The diagnostic
 `(-2, 0, 0)` mobile port and `(-4, 0, 0)` root pose remain evidence examples,
 never authored constants.
 

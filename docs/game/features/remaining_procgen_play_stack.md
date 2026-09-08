@@ -103,7 +103,7 @@ This is why a NavigationAgent walking floor polygons can PASS while a `Character
 4. **`LOCKED` is present in `_base_edges` at `BLOCKED_COST`.** Omitting it would drop the edge entirely. This stack does **not** unlock doors and does **not** add `unlock_edge`. `ThreatManager.update_nav_dynamic_costs` always calls `nav_graph.reset_dynamic_costs()` (copies `_base_edges` onto `edges`) then reapplies fire/bulkheads. Writing 1.0 onto `edges` re-locks on the next tick; `set_edge_blocked(a, b, false)` restores `_base_edges` and would also re-lock. A later door-hack card may add an `_unlocked` overlay that those two functions re-apply after the copy.
 5. **`BREACH` is `BLOCKED_COST` on the production (standing) graph.** `crouch_cost_for_kind` exists for tests only (BREACH 1.75, LOCKED blocked). Live crouch does not shrink the capsule, so this stack does not claim a player can crawl a breach. ADR-0051 `crawl_passable` remains an integrity tag for a later crouch-collision card.
 6. **Walkability Stage A is a cell-center → neighbor-center capsule sweep against an extruded contract slab, not an AABB-at-cell-center vs zero-thickness bounds.** Contract Z is 0 (`placement_origin: edge-center`). Extrude ±0.10 m (total thickness 0.20 m) into both cells. `no_wall_through` means a SOLID sweep **must hit** that slab. `DOOR`/`HATCH` sweeps **must pass** a named 0.80 × 1.70 opening. NavigationAgent stays debug-only and is not the PASS contract.
-7. **Collision retune is PR 2b, not bundled with mutator wiring.** PR 1 ships graph + per-edge extruded-slab sweeps (contracts). PR 2a wires decay + quiet imports. PR 2b authors collision **per wrapper family**: straight 1×1 plates get one 4×3×0.2 slab; corners/T get one slab per SOLID wing (or the 4×3×4 contract AABB); open 1×1 doorways get posts+header. Not a single slab on every SOLID module. WP5 depends on 2b. `bulkhead_portal_2x1` is out of 2b.
+7. **Collision retune is PR 2b, not bundled with mutator wiring.** PR 1 ships graph + per-edge extruded-slab sweeps (contracts). PR 2a wires decay + quiet imports. PR 2b authors collision **per wrapper family**: straight 1×1 plates get one 4×3×0.2 slab; vertex-owned corners/T get one 2×3×0.2 ray per incident `SOLID` half span; open 1×1 doorways get posts+header. Exact half-span coverage, including scaled half-straight residuals, replaces overlapping full-edge corner wings. WP5 depends on 2b. `bulkhead_portal_2x1` is out of 2b.
 8. **Mutators are overlays. They do not delete `room_links`.** Live `apply_branch_mutators` must keep logical topology: copy blocked hops into `blocked_links` and set matching `portals[].state = LOCKED`, leave `room_links` intact. `_layout_is_connected` stays room-link BFS (every room id reachable). `MAX_CONNECTIVITY_ATTEMPTS` is not the wreck lever. Quality-gate seeds stay `Condition.DAMAGED` (`ShipBlueprint.new(1, 1, …)`); after PR 2a the gate asserts wreck stamps **and** room-link connectivity **and** standing start→goal.
 9. **BREACH rewrite is existing-DOOR only.** Never insert a portal-like edge, never add occupancy, never ask the loader to choose LOCKED vs DOOR vs BREACH. Exterior hull holes are a later card.
 10. **Wreck damage stamps in `ShipLayoutGenerator._generate_once` immediately after `_stamp_structural_plan`, keyed by loader `module_key`.** `procgen_quality_gate_smoke.gd` calls `generate_with_options` and never `ShipGenerator._load_layout_as_scene`; stamping only on the loader path makes the quality-gate `wreck_applied` assertion dead. `ShipGenerator._load_layout_as_scene` skips recompile when a validated plan exists and **must not stamp a second time**. Visual authority is `IntegrityVisualResolver` show/hide of Intact/Damaged/Breached children — not `ModuleIntegrityConsequences.apply_to_node` albedo tint. `_find_structural_module_node` scans wrapper meta, not `room_id_placement_name`.
@@ -341,18 +341,18 @@ Mitigation (fail-closed, this PR):
 
 Contract Z thickness is 0, so “match contracts” is not a `BoxShape3D` size. Godot cannot cut a hole in one box.
 
-Named proxy sizes (must match `walkability_contract.gd` `SLAB_THICKNESS_M` / `DOOR_OPENING_WIDTH_M`). **Per wrapper, not “every SOLID.”** Corner/T contracts are `local_min_m [-2,0,-2]` / `local_max_m [2,3,2]` (`footprint_cells [1,1]`), not zero-thickness plates. Live `wall_inner_corner.tscn` is still `BoxShape3D(1,1,1)`.
+Named proxy sizes (must match `walkability_contract.gd` `SLAB_THICKNESS_M` / `DOOR_OPENING_WIDTH_M`). **Per wrapper, not “every SOLID.”** Corner/T contracts use `vertex-center` placement and 2 m cardinal rays (`footprint_cells [1,1]`). The compiler validates exact projected half-span coverage; conceptual contract planes remain zero-thickness while live proxies are 0.2 m thick.
 
 | Wrapper | Collision | Pose |
 |---|---|---|
 | `wall_straight_1x1.tscn`, `wall_end_cap.tscn` | one `BoxShape3D(4.0, 3.0, 0.2)` | edge-center, compiler yaw |
-| `wall_inner_corner.tscn`, `wall_outer_corner.tscn` | **compound:** two `BoxShape3D(4.0, 3.0, 0.2)` slabs, one per SOLID wing, local axes matching the two wall sockets | **or** one `BoxShape3D(4.0, 3.0, 4.0)` matching the contract AABB. Prefer compound slabs so Stage A per-edge extrusion still hits each wing. |
-| `wall_t_junction.tscn` | **compound:** three `BoxShape3D(4.0, 3.0, 0.2)` slabs, one per SOLID wing | same as corners |
+| `wall_inner_corner.tscn`, `wall_outer_corner.tscn` | **compound:** two `BoxShape3D(2.0, 3.0, 0.2)` rays, one per incident `SOLID` half span, local axes matching the two wall sockets | vertex-center, canonical north/east rays, compiler cardinal yaw |
+| `wall_t_junction.tscn` | **compound:** three `BoxShape3D(2.0, 3.0, 0.2)` rays, one per incident `SOLID` half span | vertex-center, canonical north/east/west rays, compiler cardinal yaw |
 | `doorway_frame_blocked_1x1.tscn` | one `BoxShape3D(4.0, 3.2, 0.2)` | full slab, no opening |
 | `doorway_frame_open_1x1.tscn` | **compound:** two posts `BoxShape3D(1.4, 3.2, 0.2)` at local X = ±1.3 m, plus header `BoxShape3D(4.0, 1.0, 0.2)` with bottom at Y = 2.2 m | ~1.2 × 2.2 opening; standing capsule 0.80 × 1.70 must pass |
 | `bulkhead_portal_2x1.tscn` | **out of PR 2b** | Compiler `HATCH_MODULE` is this 2×1 (`local_min_m` X −4..4). This stack never emits `state = HATCH`. Leave the 1×1 placeholder. HATCH standing cost stays 1.15 with no collision retune until a later card actually stamps HATCH. |
 
-Stage A stays per-edge extrusion of **that edge’s** module bounds, so a corner SOLID edge still must hit even if PR 2b uses compound wings.
+Stage A verifies the union of **that edge's two authenticated half spans**. A corner/T ray must hit its owned half, a residual half-straight must hit its owned half, and their centerlines must cover the complete 4 m edge exactly. Same-placement perpendicular ray thickness may meet at the vertex; duplicate or extra centerline span fails.
 
 New `scripts/validation/structural_wrapper_collision_footprint_smoke.gd` analogous to `floor_wrapper_collision_footprint_smoke.gd`. Marker:
 
@@ -937,7 +937,7 @@ Independently reviewable, mergeable in this order: **1 → 2a → 2b → 3 → 4
   - `docs/game/05_requirements.md` (REQ-DECAY-002)
   - `docs/game/06_validation_plan.md` (register after GREEN in this PR)
 - **Depends on:** PR 1 constants. Independent of 2a.
-- **Changes:** Straight 1×1 plates one slab; corners two wing slabs; T three wing slabs; open doorway posts+header; blocked frame full slab. **Non-goals:** `bulkhead_portal_2x1.tscn`, mutators, GLB authoring, unique meshes. WP5 depends on this PR.
+- **Changes:** Straight 1×1 plates one full or scaled half slab; vertex-centered corners two 2 m rays; T three 2 m rays; open doorway posts+header; blocked frame full slab. The corner/T GLBs, wrappers and contracts provide matching authored visual geometry and collision boundaries. **Non-goals:** `bulkhead_portal_2x1.tscn`, mutators outside the placement-ID compatibility seam, unrelated unique meshes. WP5 depends on this PR.
 
 ### PR 3 — Slot-native loot, components, and dressing
 

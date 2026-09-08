@@ -32,6 +32,99 @@
         "representative_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
         "denominator_delta": 0
       }
+    },
+    {
+      "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+      "source": {
+        "path": "docs/game/features/structural_wrapper_collision.md",
+        "heading": "Acceptance criteria"
+      },
+      "original": {
+        "criterion": "Given inner/outer corner wrappers, when they instantiate, then each has two wing slabs of `(4, 3, 0.2)` on north and east socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+        "criterion_fingerprint": "77be1df64944335b37ab9851c410c8918c6f9d65f866a5306e032f84fdaffbf4"
+      },
+      "replacement": {
+        "criterion": "Given inner/outer corner wrappers, when they instantiate at a vertex, then each has two visible and collidable rays of `(2, 3, 0.2)` on north and east socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::cbd31fe20bec",
+        "criterion_fingerprint": "cbd31fe20bec533a990cce018f70e05410d42a11d9abf0d7f5b2c5d1cab2b035"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "feature",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+        "denominator_delta": 0
+      }
+    },
+    {
+      "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+      "source": {
+        "path": "docs/game/features/structural_wrapper_collision.md",
+        "heading": "Acceptance criteria"
+      },
+      "original": {
+        "criterion": "Given `wall_t_junction`, when it instantiates, then it has three wing slabs on north/east/west socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+        "criterion_fingerprint": "3a8fddf3798bfb5801f177ee9863d92adf6f4f19b64b66917457227ad31b59bc"
+      },
+      "replacement": {
+        "criterion": "Given `wall_t_junction`, when it instantiates at a vertex, then it has three visible and collidable `(2, 3, 0.2)` rays on north/east/west socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::a1d74b54c62f",
+        "criterion_fingerprint": "a1d74b54c62f7811d253f53a9a12da75cd8b5edf531feaddbe54f008daa6f25d"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "feature",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+        "denominator_delta": 0
+      }
+    },
+    {
+      "stable_criterion_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+      "source": {
+        "path": "docs/game/05_requirements.md",
+        "heading": "REQ-DECAY-002"
+      },
+      "original": {
+        "criterion": "Inner/outer corner two wing slabs (not a 4\u00d73\u00d74 AABB); T-junction three wing slabs.",
+        "natural_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+        "criterion_fingerprint": "1d53a65e3349c1ce72afcabcc0c90ad25df472f6a0a069a34cd749a7d952e0db"
+      },
+      "replacement": {
+        "criterion": "Inner/outer corners use two vertex-owned `BoxShape3D(2, 3, 0.2)` rays; T-junctions use three. Together with straight-wall full or half spans, each 4 m `SOLID` edge has exact end-to-end coverage with no missing, extra, or duplicate centerline span.",
+        "natural_id": "REQ-DECAY-002::acceptance-3c2770736202",
+        "criterion_fingerprint": "37239ecbf32292c04206bad3b446d8dc0917e9fd8865e72316510f3eeeb17cb4"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "requirement",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+        "denominator_delta": 0
+      }
     }
   ]
 }

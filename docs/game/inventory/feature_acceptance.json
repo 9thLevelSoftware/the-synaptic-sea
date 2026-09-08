@@ -4,7 +4,7 @@
   "scope_frozen": {
     "frozen_on": "2026-09-05",
     "source_leaf_set_fingerprint": "8041e481680152f85fe2d3617491880a5268d89dcb63a59608590711edef48d0",
-    "reviewed_supersession_set_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
+    "reviewed_supersession_set_fingerprint": "54f7c6f782eac4ca7e4a589304b9a74fc754ab3f3384bdf0d5ee3121ec482a8f",
     "reviewer": "root_coordinator",
     "review_disposition": "approved_source_leaves_and_reviewed_equivalence_map"
   },
@@ -34,8 +34,8 @@
     "path": "data/validation/reviewed_criterion_supersessions_v1.json",
     "schema_version": "reviewed-criterion-supersessions-v1",
     "source_present": true,
-    "reviewed_mapping_count": 1,
-    "reviewed_mapping_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df"
+    "reviewed_mapping_count": 4,
+    "reviewed_mapping_fingerprint": "54f7c6f782eac4ca7e4a589304b9a74fc754ab3f3384bdf0d5ee3121ec482a8f"
   },
   "criterion_supersession_review": [
     {
@@ -66,6 +66,99 @@
         "deferred": false,
         "counts_toward_proposed_denominator": true,
         "representative_id": "REQ-SMOD-001::acceptance-cc93b99b2016",
+        "denominator_delta": 0
+      }
+    },
+    {
+      "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+      "source": {
+        "path": "docs/game/features/structural_wrapper_collision.md",
+        "heading": "Acceptance criteria"
+      },
+      "original": {
+        "criterion": "Given inner/outer corner wrappers, when they instantiate, then each has two wing slabs of `(4, 3, 0.2)` on north and east socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+        "criterion_fingerprint": "77be1df64944335b37ab9851c410c8918c6f9d65f866a5306e032f84fdaffbf4"
+      },
+      "replacement": {
+        "criterion": "Given inner/outer corner wrappers, when they instantiate at a vertex, then each has two visible and collidable rays of `(2, 3, 0.2)` on north and east socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::cbd31fe20bec",
+        "criterion_fingerprint": "cbd31fe20bec533a990cce018f70e05410d42a11d9abf0d7f5b2c5d1cab2b035"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "feature",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+        "denominator_delta": 0
+      }
+    },
+    {
+      "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+      "source": {
+        "path": "docs/game/features/structural_wrapper_collision.md",
+        "heading": "Acceptance criteria"
+      },
+      "original": {
+        "criterion": "Given `wall_t_junction`, when it instantiates, then it has three wing slabs on north/east/west socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+        "criterion_fingerprint": "3a8fddf3798bfb5801f177ee9863d92adf6f4f19b64b66917457227ad31b59bc"
+      },
+      "replacement": {
+        "criterion": "Given `wall_t_junction`, when it instantiates at a vertex, then it has three visible and collidable `(2, 3, 0.2)` rays on north/east/west socket axes.",
+        "natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::a1d74b54c62f",
+        "criterion_fingerprint": "a1d74b54c62f7811d253f53a9a12da75cd8b5edf531feaddbe54f008daa6f25d"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "feature",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+        "denominator_delta": 0
+      }
+    },
+    {
+      "stable_criterion_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+      "source": {
+        "path": "docs/game/05_requirements.md",
+        "heading": "REQ-DECAY-002"
+      },
+      "original": {
+        "criterion": "Inner/outer corner two wing slabs (not a 4×3×4 AABB); T-junction three wing slabs.",
+        "natural_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+        "criterion_fingerprint": "1d53a65e3349c1ce72afcabcc0c90ad25df472f6a0a069a34cd749a7d952e0db"
+      },
+      "replacement": {
+        "criterion": "Inner/outer corners use two vertex-owned `BoxShape3D(2, 3, 0.2)` rays; T-junctions use three. Together with straight-wall full or half spans, each 4 m `SOLID` edge has exact end-to-end coverage with no missing, extra, or duplicate centerline span.",
+        "natural_id": "REQ-DECAY-002::acceptance-3c2770736202",
+        "criterion_fingerprint": "37239ecbf32292c04206bad3b446d8dc0917e9fd8865e72316510f3eeeb17cb4"
+      },
+      "review": {
+        "status": "accepted",
+        "adr": "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
+        "reviewer": "root_coordinator",
+        "reviewed_on": "2026-09-08"
+      },
+      "accounting": {
+        "metric_disposition": "one_for_one_active_leaf",
+        "acceptance_kind": "requirement",
+        "deferred": false,
+        "counts_toward_proposed_denominator": true,
+        "representative_id": "REQ-DECAY-002::acceptance-95a1331257bc",
         "denominator_delta": 0
       }
     }
@@ -2939,145 +3032,145 @@
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:268",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:271",
       "criterion_ids": [
         "FC-01"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:269",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:272",
       "criterion_ids": [
         "FC-02"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:270",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:273",
       "criterion_ids": [
         "FC-03"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:271",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:274",
       "criterion_ids": [
         "FC-04"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:272",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:275",
       "criterion_ids": [
         "FC-05"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:273",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:276",
       "criterion_ids": [
         "FC-06"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:274",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:277",
       "criterion_ids": [
         "FC-07"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:275",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:278",
       "criterion_ids": [
         "FC-08"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:276",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:279",
       "criterion_ids": [
         "FC-09"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:277",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:280",
       "criterion_ids": [
         "FC-10"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:278",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:281",
       "criterion_ids": [
         "FC-11"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:279",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:282",
       "criterion_ids": [
         "FC-12"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:280",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:283",
       "criterion_ids": [
         "FC-13"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:281",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:284",
       "criterion_ids": [
         "FC-14"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:282",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:285",
       "criterion_ids": [
         "FC-15"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:283",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:286",
       "criterion_ids": [
         "FC-16"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:284",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:287",
       "criterion_ids": [
         "FC-17"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:285",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:288",
       "criterion_ids": [
         "FC-18"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:286",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:289",
       "criterion_ids": [
         "FC-19"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:287",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:290",
       "criterion_ids": [
         "FC-20"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:288",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:291",
       "criterion_ids": [
         "FC-21"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:289",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:292",
       "criterion_ids": [
         "FC-22"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:290",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:293",
       "criterion_ids": [
         "FC-23"
       ]
     },
     {
-      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:291",
+      "anchor": "docs/game/features/crafting_derelict_feature_completion.md:294",
       "criterion_ids": [
         "FC-24"
       ]
@@ -4175,49 +4268,49 @@
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:242",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:243",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::3e45aedc4dd5"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:245",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:246",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::f031bde69238"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:247",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:248",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::ee3c48274a91"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:249",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:250",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::632793e92d6e"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:252",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:253",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::8b3198fe01db"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:255",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:256",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::5630fa11e48c"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:257",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:258",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::a125cf56e522"
       ]
     },
     {
-      "anchor": "docs/game/features/socketed_enclosed_interiors.md:260",
+      "anchor": "docs/game/features/socketed_enclosed_interiors.md:261",
       "criterion_ids": [
         "FEATURE::docs/game/features/socketed_enclosed_interiors.md::44e6e936e7ee"
       ]
@@ -7887,7 +7980,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 268
+        "line": 271
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7917,7 +8010,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 269
+        "line": 272
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7947,7 +8040,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 270
+        "line": 273
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -7977,7 +8070,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 271
+        "line": 274
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8007,7 +8100,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 272
+        "line": 275
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8037,7 +8130,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 273
+        "line": 276
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8067,7 +8160,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 274
+        "line": 277
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8097,7 +8190,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 275
+        "line": 278
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8127,7 +8220,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 276
+        "line": 279
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8157,7 +8250,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 277
+        "line": 280
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8187,7 +8280,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 278
+        "line": 281
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8217,7 +8310,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 279
+        "line": 282
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8247,7 +8340,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 280
+        "line": 283
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8277,7 +8370,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 281
+        "line": 284
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8307,7 +8400,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 282
+        "line": 285
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8337,7 +8430,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 283
+        "line": 286
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8367,7 +8460,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 284
+        "line": 287
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8397,7 +8490,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 285
+        "line": 288
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8427,7 +8520,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 286
+        "line": 289
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8457,7 +8550,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 287
+        "line": 290
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8487,7 +8580,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 288
+        "line": 291
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8517,7 +8610,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 289
+        "line": 292
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8547,7 +8640,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 290
+        "line": 293
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -8577,7 +8670,7 @@
       "source": {
         "path": "docs/game/features/crafting_derelict_feature_completion.md",
         "heading": "Acceptance register",
-        "line": 291
+        "line": 294
       },
       "verification_source": [],
       "domain": "crafting_derelict",
@@ -14067,7 +14160,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 242
+        "line": 243
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14097,7 +14190,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 245
+        "line": 246
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14127,7 +14220,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 247
+        "line": 248
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14157,7 +14250,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 249
+        "line": 250
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14187,7 +14280,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 252
+        "line": 253
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14217,7 +14310,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 255
+        "line": 256
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14247,7 +14340,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 257
+        "line": 258
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14277,7 +14370,7 @@
       "source": {
         "path": "docs/game/features/socketed_enclosed_interiors.md",
         "heading": "Acceptance criteria",
-        "line": 260
+        "line": 261
       },
       "verification_source": [],
       "domain": "feature_spec",
@@ -14313,7 +14406,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -14332,8 +14425,8 @@
     },
     {
       "id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
-      "criterion": "Given inner/outer corner wrappers, when they instantiate, then each has two wing slabs of `(4, 3, 0.2)` on north and east socket axes.",
-      "criterion_fingerprint": "77be1df64944335b37ab9851c410c8918c6f9d65f866a5306e032f84fdaffbf4",
+      "criterion": "Given inner/outer corner wrappers, when they instantiate at a vertex, then each has two visible and collidable rays of `(2, 3, 0.2)` on north and east socket axes.",
+      "criterion_fingerprint": "cbd31fe20bec533a990cce018f70e05410d42a11d9abf0d7f5b2c5d1cab2b035",
       "source": {
         "path": "docs/game/features/structural_wrapper_collision.md",
         "heading": "Acceptance criteria",
@@ -14343,7 +14436,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -14353,6 +14446,11 @@
         "player_accepted": false,
         "state": "not_verified",
         "refs": []
+      },
+      "criterion_supersession": {
+        "mapping_path": "data/validation/reviewed_criterion_supersessions_v1.json",
+        "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::77be1df64944",
+        "replacement_natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::cbd31fe20bec"
       },
       "metric_equivalence": {
         "group_id": "distinct-3dc7203f1d9a",
@@ -14362,8 +14460,8 @@
     },
     {
       "id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
-      "criterion": "Given `wall_t_junction`, when it instantiates, then it has three wing slabs on north/east/west socket axes.",
-      "criterion_fingerprint": "3a8fddf3798bfb5801f177ee9863d92adf6f4f19b64b66917457227ad31b59bc",
+      "criterion": "Given `wall_t_junction`, when it instantiates at a vertex, then it has three visible and collidable `(2, 3, 0.2)` rays on north/east/west socket axes.",
+      "criterion_fingerprint": "a1d74b54c62f7811d253f53a9a12da75cd8b5edf531feaddbe54f008daa6f25d",
       "source": {
         "path": "docs/game/features/structural_wrapper_collision.md",
         "heading": "Acceptance criteria",
@@ -14373,7 +14471,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -14383,6 +14481,11 @@
         "player_accepted": false,
         "state": "not_verified",
         "refs": []
+      },
+      "criterion_supersession": {
+        "mapping_path": "data/validation/reviewed_criterion_supersessions_v1.json",
+        "stable_criterion_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::3a8fddf3798b",
+        "replacement_natural_id": "FEATURE::docs/game/features/structural_wrapper_collision.md::a1d74b54c62f"
       },
       "metric_equivalence": {
         "group_id": "distinct-bb5e867efa11",
@@ -14403,7 +14506,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -14433,7 +14536,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -14463,7 +14566,7 @@
       "domain": "feature_spec",
       "feature": "structural_wrapper_collision",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "feature",
       "deferred": false,
       "evidence": {
@@ -23503,7 +23606,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {
@@ -23523,8 +23626,8 @@
     {
       "id": "REQ-DECAY-002::acceptance-95a1331257bc",
       "requirement_id": "REQ-DECAY-002",
-      "criterion": "Inner/outer corner two wing slabs (not a 4×3×4 AABB); T-junction three wing slabs.",
-      "criterion_fingerprint": "1d53a65e3349c1ce72afcabcc0c90ad25df472f6a0a069a34cd749a7d952e0db",
+      "criterion": "Inner/outer corners use two vertex-owned `BoxShape3D(2, 3, 0.2)` rays; T-junctions use three. Together with straight-wall full or half spans, each 4 m `SOLID` edge has exact end-to-end coverage with no missing, extra, or duplicate centerline span.",
+      "criterion_fingerprint": "37239ecbf32292c04206bad3b446d8dc0917e9fd8865e72316510f3eeeb17cb4",
       "source": {
         "path": "docs/game/05_requirements.md",
         "heading": "REQ-DECAY-002",
@@ -23536,7 +23639,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {
@@ -23546,6 +23649,11 @@
         "player_accepted": false,
         "state": "not_verified",
         "refs": []
+      },
+      "criterion_supersession": {
+        "mapping_path": "data/validation/reviewed_criterion_supersessions_v1.json",
+        "stable_criterion_id": "REQ-DECAY-002::acceptance-95a1331257bc",
+        "replacement_natural_id": "REQ-DECAY-002::acceptance-3c2770736202"
       },
       "metric_equivalence": {
         "group_id": "distinct-3b8baeafc5b3",
@@ -23569,7 +23677,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {
@@ -23602,7 +23710,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {
@@ -23635,7 +23743,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {
@@ -23668,7 +23776,7 @@
       "domain": "decay",
       "feature": "`features/structural_wrapper_collision.md`",
       "owner_card": "P23",
-      "declared_status": "Validated",
+      "declared_status": "In Progress",
       "acceptance_kind": "requirement",
       "deferred": false,
       "evidence": {

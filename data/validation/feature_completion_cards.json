@@ -3752,6 +3752,21 @@
           "scope_state": "present"
         },
         {
+          "path": "docs/game/features/structural_wrapper_collision.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/remaining_procgen_play_stack.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "docs/game/features/socketed_enclosed_interiors.md",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "docs/game/05_requirements.md",
           "source_exists": true,
           "scope_state": "present"
@@ -3762,12 +3777,32 @@
           "scope_state": "present"
         },
         {
+          "path": "tests/test_feature_acceptance_registry.py",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/validation/reviewed_criterion_supersessions_v1.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "data/validation/feature_completion_cards.json",
           "source_exists": true,
           "scope_state": "present"
         },
         {
           "path": "docs/game/inventory/feature_acceptance.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-work-evidence/fix-round-01-source-contract-proposal-02/source_change_spec.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-work-evidence/fix-round-01-source-contract-proposal-02/criterion_text_mapping.json",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -3833,6 +3868,11 @@
         },
         {
           "path": "scripts/procgen/structural_plan_validator.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/procgen/layout_serializer.gd",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -3997,6 +4037,131 @@
           "scope_state": "present"
         },
         {
+          "path": "tools/rebuild_vertex_span_modules.py",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.blend",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.source.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.blend",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.source.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.blend",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.source.json",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "assets/imported/structural/ship_structural_v0/wall_inner_corner/wall_inner_corner.glb",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "assets/imported/structural/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.input.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.input.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.input.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.manifest.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.json",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "tools/build_dock_collision_projection.py",
           "source_exists": true,
           "scope_state": "present"
@@ -4088,6 +4253,11 @@
         },
         {
           "path": "scripts/validation/structural_rebuild_candidate_nav_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/structural_wrapper_collision_footprint_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
         },
@@ -4205,11 +4375,12 @@
       "scope_decisions_pending": [
         "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
         "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
-        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
+        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every positive-volume cross-ship intersection, including authenticated join identities, while permitting exact zero-volume contact without epsilon. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
         "The fixed lifeboat owns one authored clear initial interior spawn, distinct from the threshold but permitted to reuse its interior clearance anchor; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
         "At home and away, the real PlayerController remains grounded through ordinary input in both directions when open and is physically denied when closed. Overlapping room AABBs resolve only through the authenticated connection plane; exact tie is mobile, and closing behind a player does not rewrite the cleared-side owner.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
-        "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both."
+        "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both.",
+        "R10 vertex-half-span correction preserves the three real corner/T module IDs: vertex-owned 2 m by 3 m by 0.2 m rays claim exact incident SOLID half spans; residual half straights use scale (0.5, 1, 1), and every 4 m SOLID edge resolves end-to-end without missing, extra, or duplicate centerline span. Changed geometry-dependent acceptance evidence requires fresh requalification."
       ],
       "non_goals": "Claiming FC-19 from the R10-A baseline prerequisite; placement outside the original footprint; preserving room-center or diagnostic-coordinate docking; nearest-room, center-snap, silent alternate-layout, collision-disable, or invented-spawn recovery; arbitrary reinterpretation of world-6 transforms/global pose; or unreviewed cart push physics.",
       "contract": {
@@ -4286,7 +4457,7 @@
           "local_position"
         ],
         "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point distinct from the threshold and permitted to reuse its capsule-clear interior clearance anchor; applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery. Later separation requires a new authored spawn and complete opening requalification.",
-        "seam_overlap_policy": "Only authenticated open-frame and directly incident floor/corridor-floor join boxes may intersect, and their exact intersection AABB must lie wholly inside the finite envelope formed by clipping contract-selected canonical wrapper boxes to both outward half-spaces. Non-join/opaque/dynamic overlap rejects; no epsilon or global margin; full capsule clearance is independent.",
+        "seam_overlap_policy": "Every positive-volume cross-hull intersection rejects, including authenticated open-frame and directly incident floor/corridor-floor join identities. Exact zero-volume contact is allowed without epsilon, slab, seam exception, or global margin; join IDs authenticate placement/connection identity only; full capsule clearance is independent.",
         "pair_predicate_policy": "Author-time compatible-pair selection and live preflight call the same pure projected cross-hull predicate. R10-A freezes canonical fixed-lifeboat pairing for production home, fallback and native hosts; arbitrary claimed-ship pairing remains R14.",
         "occupancy_overlap_policy": "Merged room AABB overlap resolves only through the authenticated current connection, barrier and both endpoint IDs, then the registered connection plane; the exact tie belongs to mobile, and closing behind a player who cleared either side does not rewrite ownership.",
         "production_traversal_policy": "Real PlayerController inputs and move_and_slide remain grounded across the open seam in both directions at home and away; the closed barrier denies each crossing.",

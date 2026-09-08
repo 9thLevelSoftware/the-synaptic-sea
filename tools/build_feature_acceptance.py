@@ -28,6 +28,9 @@ REGISTRY = ROOT / REGISTRY_REL
 CARDS = ROOT / CARDS_REL
 PLAN = ROOT / PLAN_REL
 SUPERSESSIONS_SCHEMA = "reviewed-criterion-supersessions-v1"
+REVIEWED_FEATURE_SUPERSESSION_SOURCES: dict[str, set[str]] = {
+    "docs/game/features/structural_wrapper_collision.md": {"Acceptance criteria"},
+}
 
 EVIDENCE_STATES = {
     "not_verified",
@@ -63,7 +66,7 @@ REVIEWED_EQUIVALENT_PACKAGE_CRITERIA = {
 FROZEN_SCOPE_CONTRACT: dict[str, str] = {
     "frozen_on": "2026-09-05",
     "source_leaf_set_fingerprint": "8041e481680152f85fe2d3617491880a5268d89dcb63a59608590711edef48d0",
-    "reviewed_supersession_set_fingerprint": "ffe325ef281156711db10d85eb896a4781804ec976944aef4a948bdbe12ad0df",
+    "reviewed_supersession_set_fingerprint": "54f7c6f782eac4ca7e4a589304b9a74fc754ab3f3384bdf0d5ee3121ec482a8f",
     "reviewer": "root_coordinator",
     "review_disposition": "approved_source_leaves_and_reviewed_equivalence_map",
 }
@@ -182,11 +185,12 @@ CARD_SCOPE_DECISIONS = {
     "P17": [
         "R10-A precedes R04 natural-route runtime and R09 live-scene acceptance; it restores registered production docking, ordinary seam traversal, the ceiling proxy, and strict persistence without emitting FC P17 PASS.",
         "Every production endpoint comes from actual occupancy and an explicit one-sided exterior portal whose plane is the projected doorway frame's outer collision face; each non-join shape intersecting the finite aperture projection remains wholly inward, while every shape still participates in strict cross-ship pair checks.",
-        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every cross-ship intersection except exact authenticated join-box overlap contained in a finite contract-selected-wrapper seam envelope. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
+        "Docking derives the mobile transform from opposing authenticated descriptors; author-time selection and live preflight use one pure projected pair predicate that rejects every positive-volume cross-ship intersection, including authenticated join identities, while permitting exact zero-volume contact without epsilon. R10-A freezes canonical fixed-lifeboat pairing for production hosts while claimed-ship pairing remains R14.",
         "The fixed lifeboat owns one authored clear initial interior spawn, distinct from the threshold but permitted to reuse its interior clearance anchor; New Game applies it only after pair/barrier construction and publishes only when occupancy is the lifeboat and the closed barrier excludes home.",
         "At home and away, the real PlayerController remains grounded through ordinary input in both directions when open and is physically denied when closed. Overlapping room AABBs resolve only through the authenticated connection plane; exact tie is mobile, and closing behind a player does not rewrite the cleared-side owner.",
         "Governance allocates gate2-current-run-7/world-7; RunSnapshot drops its global pose and WorldSnapshot owns the sole owner-local pose, while raw standalone run6 remains unclosed_owner_graph and world6 migration handles at-home duplicate versus away obsolete home-departure data explicitly.",
         "Corrected ceiling physical bounds are Y 3.8..4.0 while transform-aware visual bounds independently retain decorative underside; source regeneration and validation must prove both.",
+        "R10 vertex-half-span correction preserves the three real corner/T module IDs: vertex-owned 2 m by 3 m by 0.2 m rays claim exact incident SOLID half spans; residual half straights use scale (0.5, 1, 1), and every 4 m SOLID edge resolves end-to-end without missing, extra, or duplicate centerline span. Changed geometry-dependent acceptance evidence requires fresh requalification.",
     ],
     "P23": [
         "The reviewed planning-only proposal docs/game/features/ui_presentation_program.md is catalogued outside the frozen crafting/derelict acceptance program only while its status remains Proposed for review and Planning only; status drift, a missing catalogued source, or any unexpected feature source fails closed during scope review.",
@@ -260,7 +264,7 @@ CARD_CONTRACTS = {
             "spawn_id", "owner_ship_id", "room_id", "nav_node_id", "local_position",
         ],
         "fresh_spawn_policy": "Fixed-lifeboat authored clear interior point distinct from the threshold and permitted to reuse its capsule-clear interior clearance anchor; applied once after corrected pair/closed-barrier construction; publish only when occupancy is lifeboat and barrier excludes home; never save/load or migration recovery. Later separation requires a new authored spawn and complete opening requalification.",
-        "seam_overlap_policy": "Only authenticated open-frame and directly incident floor/corridor-floor join boxes may intersect, and their exact intersection AABB must lie wholly inside the finite envelope formed by clipping contract-selected canonical wrapper boxes to both outward half-spaces. Non-join/opaque/dynamic overlap rejects; no epsilon or global margin; full capsule clearance is independent.",
+        "seam_overlap_policy": "Every positive-volume cross-hull intersection rejects, including authenticated open-frame and directly incident floor/corridor-floor join identities. Exact zero-volume contact is allowed without epsilon, slab, seam exception, or global margin; join IDs authenticate placement/connection identity only; full capsule clearance is independent.",
         "pair_predicate_policy": "Author-time compatible-pair selection and live preflight call the same pure projected cross-hull predicate. R10-A freezes canonical fixed-lifeboat pairing for production home, fallback and native hosts; arbitrary claimed-ship pairing remains R14.",
         "occupancy_overlap_policy": "Merged room AABB overlap resolves only through the authenticated current connection, barrier and both endpoint IDs, then the registered connection plane; the exact tie belongs to mobile, and closing behind a player who cleared either side does not rewrite ownership.",
         "production_traversal_policy": "Real PlayerController inputs and move_and_slide remain grounded across the open seam in both directions at home and away; the closed barrier denies each crossing.",
@@ -594,9 +598,16 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "docs/game/adr/0059-crafting-and-derelict-restoration-transactions.md",
         "docs/game/adr/0065-structural-replacement-safety-and-scene-commit.md",
         "docs/game/features/crafting_derelict_feature_completion.md",
+        "docs/game/features/structural_wrapper_collision.md",
+        "docs/game/features/remaining_procgen_play_stack.md",
+        "docs/game/features/socketed_enclosed_interiors.md",
         "docs/game/05_requirements.md", "tools/build_feature_acceptance.py",
+        "tests/test_feature_acceptance_registry.py",
+        "data/validation/reviewed_criterion_supersessions_v1.json",
         "data/validation/feature_completion_cards.json",
         "docs/game/inventory/feature_acceptance.json",
+        ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-work-evidence/fix-round-01-source-contract-proposal-02/source_change_spec.json",
+        ".superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-work-evidence/fix-round-01-source-contract-proposal-02/criterion_text_mapping.json",
         "scripts/systems/structural_rebuild_state.gd", "scripts/systems/ship_work_transaction.gd",
         "scripts/systems/module_integrity_map.gd", "scripts/systems/structural_rebuild_catalog.gd",
         "scripts/systems/runtime_physical_volume_catalog.gd",
@@ -607,6 +618,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scripts/procgen/dock_endpoint_authoring.gd",
         "scripts/procgen/structural_edge_compiler.gd",
         "scripts/procgen/structural_plan_validator.gd",
+        "scripts/procgen/layout_serializer.gd",
         "scripts/procgen/ship_layout_generator.gd", "scripts/procgen/ship_generator.gd",
         "scripts/procgen/life_boat.gd", "scripts/procgen/generated_ship_loader.gd",
         "scripts/procgen/modular_socket_catalog.gd", "scripts/systems/dock_ports.gd",
@@ -627,6 +639,31 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.input.json",
         "scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.manifest.json",
         "data/kits/ship_structural_v0.json", "tools/focused_nine_blender_recipes.py",
+        "tools/rebuild_vertex_span_modules.py",
+        "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.blend",
+        "assets/_source/recovered/ship_structural_v0/wall_inner_corner/wall_inner_corner.source.json",
+        "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.blend",
+        "assets/_source/recovered/ship_structural_v0/wall_outer_corner/wall_outer_corner.source.json",
+        "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.blend",
+        "assets/_source/recovered/ship_structural_v0/wall_t_junction/wall_t_junction.source.json",
+        "assets/imported/structural/ship_structural_v0/wall_inner_corner/wall_inner_corner.glb",
+        "assets/imported/structural/ship_structural_v0/wall_outer_corner/wall_outer_corner.glb",
+        "assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb",
+        "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+        "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+        "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+        "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.input.json",
+        "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.input.json",
+        "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.input.json",
+        "scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.manifest.json",
+        "scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.manifest.json",
+        "scenes/wrappers/structural/ship_structural_v0/wall_t_junction.manifest.json",
+        "data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.json",
+        "data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
+        "data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.json",
+        "data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
+        "data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.json",
+        "data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
         "tools/build_dock_collision_projection.py", "tests/test_dock_collision_projection.py",
         "tools/prop_visual_metadata.py", "tests/test_focused_nine_blender_recipes.py",
         "tests/test_prop_visual_metadata.py", "scripts/placement/validate_wrapper_scenes.gd",
@@ -639,6 +676,7 @@ CARD_ALLOWLISTS: dict[str, list[str]] = {
         f"{VALIDATION}runtime_physical_volume_smoke.gd",
         f"{VALIDATION}structural_rebuild_collision_query_smoke.gd",
         f"{VALIDATION}structural_rebuild_candidate_nav_smoke.gd",
+        f"{VALIDATION}structural_wrapper_collision_footprint_smoke.gd",
         "tools/run_r10a_docking_smokes.py", "tests/test_r10a_docking_runner.py",
         f"{VALIDATION}r10a_dock_endpoint_contract_smoke.gd",
         f"{VALIDATION}r10a_dock_traversal_smoke.gd",
@@ -819,6 +857,10 @@ def _natural_requirement_criterion_id(requirement_id: str, criterion: str) -> st
     return f"{requirement_id}::acceptance-{_digest(requirement_id, criterion)[:12]}"
 
 
+def _natural_feature_criterion_id(source_path: str, heading: str, criterion: str) -> str:
+    return f"FEATURE::{source_path}::{_digest(source_path, heading, criterion)[:12]}"
+
+
 def _load_reviewed_supersessions(root: Path) -> dict[str, Any]:
     path = root / SUPERSESSIONS_REL
     if not path.exists():
@@ -883,15 +925,27 @@ def _load_reviewed_supersessions(root: Path) -> dict[str, Any]:
         assert all(isinstance(value, str) and value for value in (stable_id, source_path, heading)), (
             f"{label} identity fields must be nonempty strings"
         )
-        assert source_path == REQUIREMENTS_REL.as_posix(), f"{label} source path is outside the requirement register"
-        assert re.fullmatch(r"REQ-[A-Z0-9-]+", heading), f"{label} source heading is not a requirement ID"
-        assert stable_id.startswith(f"{heading}::acceptance-"), f"{label} stable ID crosses requirement scope"
+        is_requirement = source_path == REQUIREMENTS_REL.as_posix()
+        is_allowlisted_feature = heading in REVIEWED_FEATURE_SUPERSESSION_SOURCES.get(source_path, set())
+        assert is_requirement or is_allowlisted_feature, (
+            f"{label} source path/heading is not an approved supersession source"
+        )
+        if is_requirement:
+            assert re.fullmatch(r"REQ-[A-Z0-9-]+", heading), f"{label} source heading is not a requirement ID"
+            assert stable_id.startswith(f"{heading}::acceptance-"), f"{label} stable ID crosses requirement scope"
+        else:
+            assert stable_id.startswith(f"FEATURE::{source_path}::"), f"{label} stable ID crosses feature scope"
         for side_name, side in (("original", original), ("replacement", replacement)):
             assert all(isinstance(side[key], str) and side[key] for key in side), (
                 f"{label} {side_name} fields must be nonempty strings"
             )
-            expected_id = _natural_requirement_criterion_id(heading, _clean_markdown(side["criterion"]))
-            expected_fingerprint = _digest(source_path, heading, _clean_markdown(side["criterion"]))
+            normalized_criterion = _clean_markdown(side["criterion"]) if is_requirement else side["criterion"]
+            expected_id = (
+                _natural_requirement_criterion_id(heading, normalized_criterion)
+                if is_requirement
+                else _natural_feature_criterion_id(source_path, heading, normalized_criterion)
+            )
+            expected_fingerprint = _digest(source_path, heading, normalized_criterion)
             assert side["natural_id"] == expected_id, f"{label} {side_name} natural ID mismatch"
             assert side["criterion_fingerprint"] == expected_fingerprint, (
                 f"{label} {side_name} criterion fingerprint mismatch"
@@ -907,7 +961,9 @@ def _load_reviewed_supersessions(root: Path) -> dict[str, Any]:
         assert accounting["metric_disposition"] == "one_for_one_active_leaf", (
             f"{label} has unsupported metric disposition"
         )
-        assert accounting["acceptance_kind"] == "requirement", f"{label} changes acceptance kind"
+        assert accounting["acceptance_kind"] == ("requirement" if is_requirement else "feature"), (
+            f"{label} changes acceptance kind"
+        )
         assert accounting["deferred"] is False, f"{label} changes deferred accounting"
         assert accounting["counts_toward_proposed_denominator"] is True, (
             f"{label} excludes the replacement from the denominator"
@@ -1495,10 +1551,19 @@ def build(
         assert supersession_document["source_present"], "reviewed supersession registry is missing"
     supersession_set_fingerprint = _supersession_set_fingerprint(supersessions)
     requirements, requirement_source, requirement_coverage, requirement_blockers = _extract_requirements(root)
-    _apply_reviewed_supersessions(requirements, requirement_coverage, supersessions)
+    requirement_supersessions = [
+        mapping for mapping in supersessions
+        if mapping["source"]["path"] == REQUIREMENTS_REL.as_posix()
+    ]
+    feature_supersessions = [
+        mapping for mapping in supersessions
+        if mapping["source"]["path"] != REQUIREMENTS_REL.as_posix()
+    ]
+    _apply_reviewed_supersessions(requirements, requirement_coverage, requirement_supersessions)
     out_of_scope_proposals = _reviewed_out_of_scope_proposals(root)
     excluded_proposal_paths = {entry["path"] for entry in out_of_scope_proposals}
     features, feature_sources, feature_coverage, feature_blockers = _extract_feature_sources(root, excluded_proposal_paths)
+    _apply_reviewed_supersessions(features, feature_coverage, feature_supersessions)
     known_requirement_ids = {entry["requirement_id"] for entry in requirements}
     for source in feature_sources:
         mapped = source.get("mapped_requirement_ids", [])
