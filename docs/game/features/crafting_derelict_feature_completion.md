@@ -380,6 +380,17 @@ migrated identities against registered loader descriptors and apply migrated hea
 before scene-state recapture or publication. Acceptance must distinguish absent,
 empty, and explicitly repaired summaries on damaged historical ships.
 
+The run-7 model owns neither player pose nor a transient hallucination episode.
+Reject the presence of either legacy key, even with an empty value, and emit 31
+summary fields. Validate historical run-6 data with its version-pinned contract
+before removing those keys in the explicit 6-to-7 step. Standalone run-6 saves
+remain rejected as `unclosed_owner_graph`; preserve the admitted pre-v6 adapter
+route by constructing its historical world envelope before removing pose authority.
+Preserve the existing run-v7 future fixture bytes and add a distinct run-v8 future
+sentinel. Focused acceptance uses `r10a_run7_save_transition_smoke.gd` plus migration
+service, save/load service, ship-mod snapshot and pillar-persistence smokes.
+This staged run-model slice does not establish world-7 or full save integration.
+
 Current procedural-generation regression fixtures must validate unique physical
 placement identities and exact half-span coverage rather than unique primary edge
 keys. Preserve the historical `compact_seed17_current` fixture unchanged; record

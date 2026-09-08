@@ -4372,6 +4372,26 @@
           "scope_state": "present"
         },
         {
+          "path": "scripts/validation/r10a_run7_save_transition_smoke.gd",
+          "source_exists": false,
+          "scope_state": "planned_missing"
+        },
+        {
+          "path": "scripts/validation/save_load_service_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/ship_mod_run_snapshot_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
+          "path": "scripts/validation/pillar_persistence_smoke.gd",
+          "source_exists": true,
+          "scope_state": "present"
+        },
+        {
           "path": "scripts/validation/world_snapshot_smoke.gd",
           "source_exists": true,
           "scope_state": "present"
