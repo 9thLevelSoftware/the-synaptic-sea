@@ -73,6 +73,8 @@ func build(layout: Dictionary) -> Dictionary:
 
 	var occupied: Dictionary = {}
 	var boarding: Dictionary = _boarding_info(rooms, start_room)
+	var placed_props: Array = _build_additional_dressing_props(
+		rooms, start_room, goal_room, occupied, boarding, seed_value)
 
 	var objectives: Array = []
 	var sequence: int = 1
@@ -166,6 +168,7 @@ func build(layout: Dictionary) -> Dictionary:
 		"goal_room": goal_room,
 		"objectives": objectives,
 		"loot_containers": loot_containers,
+		"placed_props": placed_props,
 		"fire_zones": [],
 		"arc_zones": _build_arc_zones(layout, start_room, goal_room, objectives),
 		"breach_zones": [],
@@ -217,6 +220,59 @@ func _build_arc_zones(layout: Dictionary, start_room: String, goal_room: String,
 			entry["to_cell"] = link["to_cell"]
 		return [entry]
 	return []
+
+
+func _build_additional_dressing_props(
+		rooms: Array,
+		start_room: String,
+		goal_room: String,
+		occupied: Dictionary,
+		boarding: Dictionary,
+		seed_value: int) -> Array:
+	var placed: Array = []
+	var room_index: int = 0
+	for room in rooms:
+		var rid: String = str(room.get("id", ""))
+		var role: String = str(room.get("room_role", ""))
+		if rid == start_room or rid == goal_room or role in CONNECTIVE_ROLES:
+			room_index += 1
+			continue
+		var visual_id: String = _additional_dressing_for_role(role)
+		if visual_id.is_empty():
+			room_index += 1
+			continue
+		var pick: Dictionary = _pick_slot_cell(
+			room, "loot", occupied, boarding, seed_value, room_index + 1000)
+		var cell: Array = pick.get("cell", []) as Array
+		if cell.is_empty():
+			room_index += 1
+			continue
+		var rotation_rng: RandomNumberGenerator = _rng_for_slot(seed_value, room_index + 2000)
+		placed.append({
+			"id": "dressing_%s_%s" % [visual_id, rid],
+			"kind": "Dressing",
+			"visual_id": visual_id,
+			"room_id": rid,
+			"cell": cell,
+			"rotation": rotation_rng.randi_range(0, 3),
+			"room_role": role,
+		})
+		room_index += 1
+	return placed
+
+
+func _additional_dressing_for_role(role: String) -> String:
+	match role:
+		"maintenance", "engineering", "machine_shop":
+			return "fabrication_station_derelict_v1"
+		"medical", "medbay":
+			return "medical_stasis_pod_derelict_v1"
+		"reactor", "power", "engineering_power":
+			return "power_cell_cradle_derelict_v1"
+		"cargo", "storage", "tool_storage", "salvage":
+			return "salvage_sorter_derelict_v1"
+		_:
+			return ""
 
 
 func _find_room(rooms: Array, room_id: String) -> Dictionary:
