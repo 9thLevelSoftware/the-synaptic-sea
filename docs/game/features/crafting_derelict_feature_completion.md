@@ -401,6 +401,23 @@ floor, and ceiling identities exactly. Focused acceptance compares the public
 function's result with actual seeded module IDs for those placement kinds;
 this prerequisite does not itself migrate saves or change health semantics.
 
+Current run-7/world-7 integrity admission must reject malformed data before any
+decoder can turn it into an empty summary. Absent and empty summaries remain
+uninitialized. Nonempty summaries use exactly `schema`, `deltas`, and `registered`,
+with schema `module_integrity_map_v1`, a nonnegative integral JSON-safe registered
+count, and unique module rows with the nine fields emitted by
+`ModuleIntegrityState.get_summary()`. Health numbers are finite, non-Boolean,
+within `0 <= integrity <= base_integrity`, with positive base and an exact
+threshold-consistent state. Preserve accepted values without clamping or coercion.
+A valid nonempty envelope with no deltas remains explicitly initialized/repaired.
+When original descriptors are available, current application must authenticate
+count, module IDs, kind, and room against them and reject atomically before
+changing modules or rebuild state. Pure detached admission proves syntax only;
+descriptor matching remains required at staged restore. Historical decoders keep
+their version-specific semantics until the explicit migration adapter validates
+and converts them. Tests must exercise both home and visited current saves and
+verify unchanged source/live state on rejected application.
+
 The run-7 model owns neither player pose nor a transient hallucination episode.
 Reject the presence of either legacy key, even with an empty value, and emit 31
 summary fields. Validate historical run-6 data with its version-pinned contract
