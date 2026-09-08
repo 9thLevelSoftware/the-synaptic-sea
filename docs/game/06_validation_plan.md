@@ -4,6 +4,16 @@
 
 No completion claim without fresh validation evidence.
 
+## Blender room kit v2 — implementation in progress, no release claim
+
+Feature: `features/blender_room_kit_v2.md`; ADR-0061; REQ-ROOMART-001–008.
+Evidence root: `artifacts/room_kit_v2/`. Preserve raw outputs and classify diagnostics; exit zero alone does not pass Godot or Blender. Pilot/bulk geometry, preview overlay and runtime promotion are separate states.
+
+Required sequence: fresh baseline -> catalog/strict exporter TDD -> three-prop/four-module pilot -> scored visual review -> remaining family authoring -> exact metadata/occupancy integration -> real two-route geometry plus spec-to-node identity corruption checks -> 30 boarded cases (seeds17/42/91/137/777, sizes1/2, conditions0/1/2) -> six real game screenshots -> matched performance -> full regression -> reviewed promotion/backup/rollback manifest.
+
+Use `/opt/homebrew/bin/python3.11`, `/opt/homebrew/bin/blender --python-exit-code 1`, and `/opt/homebrew/bin/godot --rendering-method gl_compatibility --rendering-driver opengl3` in the isolated execution root. Source validation is not staged GLB validation. `tools/run_canonical_regression.py --check` is not a regression execution. Run actual tests and canonical commands per the approved plan before claiming final acceptance. No test count from previous sessions is evidence for this feature.
+
+
 ## Meshy-to-Blender candidate asset pipeline (ADR-0058) — IMPLEMENTED; integrated loot-container evidence present; promotion remains proposal-only
 
 Feature: `docs/game/features/ai_candidate_asset_pipeline.md`.

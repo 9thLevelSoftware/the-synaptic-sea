@@ -2,6 +2,66 @@
 
 Requirements must be granular, testable, and linked to feature specs or ADRs.
 
+## Blender room kit v2 requirements (ADR-0061)
+
+### REQ-ROOMART-001: Editable sources and backed-up authoring provenance
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: All 31 base masters retain subassemblies, helpers and original input hashes; separate-volume backups verify exact source bytes.
+- Verification: source inventory and backup manifest.
+
+### REQ-ROOMART-002: Salvage-industrial visual readability
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Pilot and each family score at least 8/10 with no zero or hard blocker at actual game camera; twelve IDs are genuinely additional.
+- Verification: scored pilot/family visual review.
+
+### REQ-ROOMART-003: Normalized static prop geometry
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: All sixteen scoped props are Y-up, floor-centered, +Z front, identity export nodes; actual assembled bounds and triangle/material budgets pass.
+- Verification: exporter negative fixtures, artifact tests, two-route geometry smoke.
+
+### REQ-ROOMART-004: Structural invariance
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Fifteen module contracts/helpers and wrapper physics remain unchanged; eight state trios visibly differ without changing topology.
+- Verification: source and binding validators plus actual state/collision/structural snapshot gates.
+
+### REQ-ROOMART-005: Room-aware occupancy-safe selection
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Essentials allocate first; optional dressing uses actual safe interior slots; deterministic identities/poses and real component/ambient occupancy remain disjoint.
+- Verification: rules/coverage/identity-corruption smoke and 30 boarded seed cases.
+
+### REQ-ROOMART-006: Exact metadata and provenance
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Runtime index derives from exact adjacent GLB/sidecar pairs; all unrelated assets and rights remain unchanged.
+- Verification: roster/set inventory and sidecar freshness checks.
+
+### REQ-ROOMART-007: Measured runtime performance
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Same-scene median/P95 frame times regress at most15% and rendering memory at most20%; per-asset budgets hold.
+- Verification: matched baseline/candidate performance report.
+
+### REQ-ROOMART-008: Reviewed promotion and rollback
+
+- Source: `features/blender_room_kit_v2.md`
+- Status: Approved (not yet validated)
+- Acceptance: Only approved byte-bound assets are promoted by existing tools into the isolated branch, with current regression logs and source backups; no implicit main merge.
+- Verification: per-ID promotion manifest, regression output and review.
+
+
+
 ## Status legend
 
 - Proposed
