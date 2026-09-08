@@ -2,6 +2,7 @@ extends RefCounted
 class_name SaveMigrationService
 
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
+const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const ThreatSaveContractScript := preload("res://scripts/systems/threat_save_contract.gd")
 
 ## Save migration service (ADR-0032).
@@ -26,10 +27,11 @@ const KNOWN_VERSIONS: Array = [
 	"gate2-current-run-4",  # added play_time_seconds / current_location / world_seed (ADR-0046)
 	"gate2-current-run-5",  # complete crafting transaction + recipe knowledge boundary (ADR-0059/P10)
 	"gate2-current-run-6",  # versioned combat authority + structure damage (ADR-0059/R02)
+	"gate2-current-run-7",  # world-owned pose; hallucination episodes are transient (R10-A)
 ]
 
 const WORLD_KNOWN_VERSIONS: Array = ["world-1", "world-2", "world-3", "world-4", "world-5", "world-6"]
-const TARGET_VERSION: String = "gate2-current-run-6"
+const TARGET_VERSION: String = "gate2-current-run-7"
 const WORLD_TARGET_VERSION: String = "world-6"
 const WORLD_HOME_RUN_PAIRS: Dictionary = {
 	"world-1": ["gate2-current-run-1"],
@@ -49,6 +51,10 @@ const CURRENT_FIELD_PENDING_SCHEMA: String = "field-pending-2"
 
 func migrate_run(parsed: Variant) -> Dictionary:
 	return _migrate_run_to(parsed, TARGET_VERSION)
+
+
+func migrate_run_to_closed_run6(source: Dictionary) -> Dictionary:
+	return _migrate_run_to(source, "gate2-current-run-6")
 
 
 func _migrate_run_to(parsed: Variant, target_version: String) -> Dictionary:
@@ -179,12 +185,16 @@ func _step(from_version: String) -> Callable:
 			return _migrate_v4_to_v5
 		"gate2-current-run-5":
 			return _migrate_v5_to_v6
+		"gate2-current-run-6":
+			return _migrate_v6_to_v7
 	return Callable()
 
 
 func _run_step_result(from_version: String, working: Dictionary) -> Dictionary:
 	if from_version == "gate2-current-run-5":
 		return _migrate_v5_to_v6_result(working)
+	if from_version == "gate2-current-run-6":
+		return _migrate_v6_to_v7_result(working)
 	var step: Callable = _step(from_version)
 	if not step.is_valid():
 		return {"ok": false, "reason": "missing_run_migration_step"}
@@ -400,6 +410,138 @@ func _migrate_v5_to_v6_result(dict: Dictionary) -> Dictionary:
 			inventory["threat_summary"] = combat_result.summary
 	out["inventory_summary"] = inventory
 	return {"ok": true, "reason": "", "dict": out}
+
+
+func _migrate_v6_to_v7(dict: Dictionary) -> Dictionary:
+	var result: Dictionary = _migrate_v6_to_v7_result(dict)
+	return result.get("dict", {}) as Dictionary
+
+
+func _migrate_v6_to_v7_result(dict: Dictionary) -> Dictionary:
+	var validation: Dictionary = _validate_legacy_run6(dict)
+	if not bool(validation.get("ok", false)):
+		return validation
+	var out: Dictionary = dict.duplicate(true)
+	out.erase("hallucination_summary")
+	out.erase("player_position")
+	return {"ok": true, "reason": "", "dict": out}
+
+
+func _validate_legacy_run6(dict: Dictionary) -> Dictionary:
+	if typeof(dict.get("slice_version", null)) != TYPE_STRING \
+			or str(dict.slice_version) != "gate2-current-run-6":
+		return {"ok": false, "reason": "legacy_run6_version_mismatch"}
+	if typeof(dict.get("godot_version", null)) != TYPE_STRING \
+			or RunSnapshotScript.from_dict(
+				dict, "gate2-current-run-6", dict.godot_version as String) == null:
+		return {"ok": false, "reason": "legacy_run6_snapshot_invalid"}
+	if not _valid_finite_array(dict.get("player_position", null), 3):
+		return {"ok": false, "reason": "legacy_run6_invalid_player_position"}
+	if not dict.has("hallucination_summary"):
+		return {"ok": true, "reason": ""}
+	var hallucination: Variant = dict.hallucination_summary
+	if not hallucination is Dictionary:
+		return {"ok": false, "reason": "legacy_hallucination_not_dictionary"}
+	var hallucination_reason: String = _validate_legacy_hallucination(
+		hallucination as Dictionary)
+	if not hallucination_reason.is_empty():
+		return {"ok": false, "reason": hallucination_reason}
+	return {"ok": true, "reason": ""}
+
+
+func _validate_legacy_hallucination(summary: Dictionary) -> String:
+	if summary.is_empty():
+		return ""
+	var base_keys: Array[String] = [
+		"seed", "step", "health_drain_per_second", "stamina_recovery_mult",
+		"active_events", "current_tier",
+	]
+	var timer_keys: Array[String] = base_keys.duplicate()
+	timer_keys.append("spawn_timers")
+	var current_keys: Array[String] = timer_keys.duplicate()
+	current_keys.append("pool_loaded")
+	if not (_has_exact_keys(summary, base_keys) \
+			or _has_exact_keys(summary, timer_keys) \
+			or _has_exact_keys(summary, current_keys)):
+		return "legacy_hallucination_invalid_shape"
+	if not _valid_integer_number(summary.seed) \
+			or not _valid_integer_number(summary.step) \
+			or int(summary.step) < 0 \
+			or not _finite_number(summary.health_drain_per_second) \
+			or float(summary.health_drain_per_second) < 0.0 \
+			or not _finite_number(summary.stamina_recovery_mult) \
+			or float(summary.stamina_recovery_mult) < 0.0 \
+			or float(summary.stamina_recovery_mult) > 1.0 \
+			or not _valid_integer_number(summary.current_tier) \
+			or int(summary.current_tier) < 0 or int(summary.current_tier) > 3 \
+			or not summary.active_events is Array:
+		return "legacy_hallucination_invalid_shape"
+	if summary.has("pool_loaded") and typeof(summary.pool_loaded) != TYPE_BOOL:
+		return "legacy_hallucination_invalid_shape"
+	for event in summary.active_events as Array:
+		if not _valid_legacy_hallucination_event(event):
+			return "legacy_hallucination_invalid_event"
+	if summary.has("spawn_timers"):
+		if not summary.spawn_timers is Dictionary:
+			return "legacy_hallucination_invalid_timer"
+		for kind in (summary.spawn_timers as Dictionary):
+			if typeof(kind) != TYPE_STRING \
+					or not ["ambient", "hud", "phantom", "whisper"].has(kind as String) \
+					or not _finite_number((summary.spawn_timers as Dictionary)[kind]) \
+					or float((summary.spawn_timers as Dictionary)[kind]) < 0.0:
+				return "legacy_hallucination_invalid_timer"
+	return ""
+
+
+func _valid_legacy_hallucination_event(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	var event: Dictionary = value
+	var base_keys: Array[String] = ["id", "kind", "position", "ttl"]
+	var narrative_keys: Array[String] = base_keys.duplicate()
+	narrative_keys.append_array(["entry_id", "caption", "audio_event"])
+	var forced_keys: Array[String] = narrative_keys.duplicate()
+	forced_keys.append("forced")
+	if not (_has_exact_keys(event, base_keys) \
+			or _has_exact_keys(event, narrative_keys) \
+			or _has_exact_keys(event, forced_keys)):
+		return false
+	if not _valid_integer_number(event.id) or int(event.id) <= 0 \
+			or typeof(event.kind) != TYPE_STRING \
+			or not ["ambient", "hud", "phantom", "whisper"].has(event.kind as String) \
+			or not _valid_finite_array(event.position, 3) \
+			or not _finite_number(event.ttl) or float(event.ttl) <= 0.0:
+		return false
+	if event.has("entry_id") and (
+			typeof(event.entry_id) != TYPE_STRING \
+			or typeof(event.caption) != TYPE_STRING \
+			or typeof(event.audio_event) != TYPE_STRING):
+		return false
+	return not event.has("forced") \
+		or (typeof(event.forced) == TYPE_BOOL and bool(event.forced))
+
+
+func _has_exact_keys(value: Dictionary, expected: Array[String]) -> bool:
+	if value.size() != expected.size():
+		return false
+	for key in value:
+		if typeof(key) != TYPE_STRING or not expected.has(key as String):
+			return false
+	return true
+
+
+func _valid_finite_array(value: Variant, expected_size: int) -> bool:
+	if not value is Array or (value as Array).size() != expected_size:
+		return false
+	for component in value as Array:
+		if not _finite_number(component):
+			return false
+	return true
+
+
+func _valid_integer_number(value: Variant) -> bool:
+	return (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT) \
+		and is_finite(float(value)) and float(value) == floor(float(value))
 
 
 func _migrate_crafting_boundary(summary: Dictionary, source_version: String) -> Dictionary:

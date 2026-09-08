@@ -12,7 +12,6 @@ const PlayerProgressionStateScript := preload("res://scripts/systems/player_prog
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
-const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
 const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
@@ -86,7 +85,6 @@ func _initialize() -> void:
 	original.layout_path = "res://data/procgen/smoke/seed_000017/layout.json"
 	original.kit_path = "res://data/kits/ship_structural_v0.json"
 	original.gameplay_slice_path = "res://data/procgen/smoke/seed_000017/gameplay_slice.json"
-	original.player_position = [1.25, 2.5, 3.75]
 	original.current_objective_sequence = 2
 	original.ship_systems_summary = ship.get_summary()
 	original.route_control_summary = route.get_summary()
@@ -132,20 +130,6 @@ func _initialize() -> void:
 	# Item lots are the current quality authority; the candidate intentionally
 	# retires the former parallel material-quality projection.
 	original.material_summary = {}
-	# Session 3 B3 (audit): HallucinationDirector state (active events, rng
-	# step, tier teeth) was never persisted. Build a director in a real
-	# mid-hallucination state (tier 3, active events with Vector3 anchors)
-	# and prove the summary survives the DISK round-trip — JSON does not
-	# preserve Vector3, so the model must serialize event positions.
-	var hallu := HallucinationDirectorScript.new()
-	hallu.configure({"seed": 17})
-	var hallu_anchors: Array = [Vector3(1.0, 0.0, 2.0), Vector3(4.0, 0.0, 6.0)]
-	for i in range(24):
-		hallu.tick(0.5, {"sanity": 12.0, "in_safe_zone": false, "anchor_positions": hallu_anchors})
-	if hallu.get_active_events().is_empty():
-		_fail("hallucination fixture produced no active events (fixture bug)")
-		return
-	original.set("hallucination_summary", hallu.get_summary())
 	# Session 3 B7 (audit): the survival-vitals set (vitals, sanity,
 	# radiation, temperature, status_effects) was counted in SUMMARY_FIELDS
 	# but never populated here — the "round-trip" passed {} == {}. Seed each
@@ -176,6 +160,10 @@ func _initialize() -> void:
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
+	var encoded_current: Dictionary = original.to_dict()
+	if encoded_current.has("player_position") or encoded_current.has("hallucination_summary"):
+		_fail("run-7 encoder emitted forbidden pose or hallucination key")
+		return
 	if not service.save_current_run(original):
 		_fail("save_current_run returned false")
 		return
@@ -197,14 +185,11 @@ func _initialize() -> void:
 	if loaded.gameplay_slice_path != original.gameplay_slice_path:
 		_fail("gameplay_slice_path mismatch")
 		return
-	if loaded.player_position != original.player_position:
-		_fail("player_position mismatch")
-		return
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 32:
-		_fail("summary_count=%d expected 32" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 31:
+		_fail("summary_count=%d expected 31" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -271,33 +256,6 @@ func _initialize() -> void:
 		return
 	if not _dicts_equal(loaded.water_recycler_summary, original.water_recycler_summary):
 		_fail("water_recycler_summary mismatch")
-		return
-	# B3: hallucination_summary must round-trip the disk write AND remain
-	# usable — a fresh director applying the loaded summary must yield
-	# Vector3 event positions (JSON turns naive Vector3s into strings,
-	# which would crash HallucinationManager.render's typed assignment).
-	var loaded_hallu: Variant = loaded.get("hallucination_summary")
-	if loaded_hallu == null or not (loaded_hallu is Dictionary) or (loaded_hallu as Dictionary).is_empty():
-		_fail("hallucination_summary missing/empty after round-trip: %s" % str(loaded_hallu))
-		return
-	var hallu2 := HallucinationDirectorScript.new()
-	if not hallu2.apply_summary(loaded_hallu as Dictionary):
-		_fail("hallucination apply_summary rejected the loaded summary")
-		return
-	if hallu2.get_tier() != hallu.get_tier():
-		_fail("hallucination tier=%d did not round-trip (expected %d)" % [hallu2.get_tier(), hallu.get_tier()])
-		return
-	var hallu2_events: Array = hallu2.get_active_events()
-	if hallu2_events.size() != hallu.get_active_events().size():
-		_fail("hallucination active_events count=%d did not round-trip (expected %d)" % [hallu2_events.size(), hallu.get_active_events().size()])
-		return
-	if not (hallu2_events[0].get("position") is Vector3):
-		_fail("hallucination event position not a Vector3 after disk round-trip (got %s)" % str(hallu2_events[0].get("position")))
-		return
-	var original_hallu_timers: Dictionary = original.hallucination_summary.get("spawn_timers", {}) as Dictionary
-	var loaded_hallu_timers: Dictionary = hallu2.get_summary().get("spawn_timers", {}) as Dictionary
-	if not _dicts_equal(loaded_hallu_timers, original_hallu_timers):
-		_fail("hallucination spawn_timers did not round-trip: got=%s expected=%s" % [str(loaded_hallu_timers), str(original_hallu_timers)])
 		return
 	# B7: field-level round-trip of the survival set, plus spot asserts on
 	# the non-default values so an accidental {} == {} can never pass again.
@@ -554,7 +512,7 @@ func _initialize() -> void:
 
 
 func _finish_success() -> void:
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=31 survival_roundtrip=true")
 	quit(0)
 
 

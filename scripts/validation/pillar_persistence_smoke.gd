@@ -34,12 +34,20 @@ func _initialize() -> void:
 		"rooms": [{
 			"id": "eng_1",
 			"room_role": "engineering",
-			"wall_slots": [{"against_wall": true, "cell": "(0,0)"}],
+			"wall_slots": [{
+				"cell": [0, 0],
+				"component_slot_profile_id": "wall_console_mount_v1",
+			}],
 			"center_slots": [],
 		}],
 	}, cat, 11)
 	if place.placed.is_empty():
 		_fail("need placements"); return
+	var condition_authority: Dictionary = place.prepare_condition_authority(
+		"home", cat, ComponentPlacementStateScript.CONDITION_MODE_GENERATED)
+	if not bool(condition_authority.get("ok", false)) \
+			or not place.commit_condition_authority(condition_authority):
+		_fail("condition authority"); return
 	var first_id: String = str(place.placed[0].get("component_instance_id", ""))
 	place.dismount(first_id)
 	var cp_pack: Dictionary = PillarPersistenceScript.pack_component_placement(place)
@@ -98,8 +106,8 @@ func _initialize() -> void:
 	var loaded = RunSnapshotScript.from_dict(d, "gate2-current-run-4", "4.6.2")
 	if loaded == null:
 		_fail("from_dict failed"); return
-	if loaded.get_summary_count() < 32:
-		_fail("SUMMARY_FIELDS should include pillar+shipmod (got %d)" % loaded.get_summary_count()); return
+	if loaded.get_summary_count() != 31:
+		_fail("SUMMARY_FIELDS count should be 31 (got %d)" % loaded.get_summary_count()); return
 	var unp: Dictionary = PillarPersistenceScript.unpack_all({
 		"module_integrity": loaded.module_integrity_summary,
 		"component_placement": loaded.component_placement_summary,

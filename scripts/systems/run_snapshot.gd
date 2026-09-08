@@ -30,7 +30,6 @@ const MAX_SAFE_JSON_INTEGER: float = 9007199254740991.0
 var layout_path: String = ""
 var kit_path: String = ""
 var gameplay_slice_path: String = ""
-var player_position: Array = [0.0, 0.0, 0.0]
 var current_objective_sequence: int = 1
 var ship_systems_summary: Dictionary = {}
 var route_control_summary: Dictionary = {}
@@ -90,11 +89,6 @@ var sanity_summary: Dictionary = {}
 var radiation_summary: Dictionary = {}
 var temperature_summary: Dictionary = {}
 var status_effects_summary: Dictionary = {}
-# Session 3 B3 (audit, rides ADR-0046's gate2-current-run-4 bump):
-# HallucinationDirector state (ADR-0042) — active events, rng step, tier
-# teeth — was never persisted, so saving mid-hallucination silently reset
-# the director on load.
-var hallucination_summary: Dictionary = {}
 # PKG-D8: pre-polish pillar models (empty defaults for historical fixtures).
 var module_integrity_summary: Dictionary = {}
 var component_placement_summary: Dictionary = {
@@ -173,7 +167,6 @@ const SUMMARY_FIELDS: Array = [
 	"radiation_summary",
 	"temperature_summary",
 	"status_effects_summary",
-	"hallucination_summary",
 	"module_integrity_summary",
 	"component_placement_summary",
 	"work_action_summary",
@@ -191,7 +184,6 @@ func to_dict() -> Dictionary:
 		"layout_path": layout_path,
 		"kit_path": kit_path,
 		"gameplay_slice_path": gameplay_slice_path,
-		"player_position": player_position.duplicate(),
 		"current_objective_sequence": current_objective_sequence,
 		"ship_systems_summary": ship_systems_summary.duplicate(true),
 		"route_control_summary": route_control_summary.duplicate(true),
@@ -221,7 +213,6 @@ func to_dict() -> Dictionary:
 		"radiation_summary": radiation_summary.duplicate(true),
 		"temperature_summary": temperature_summary.duplicate(true),
 		"status_effects_summary": status_effects_summary.duplicate(true),
-		"hallucination_summary": hallucination_summary.duplicate(true),
 		"module_integrity_summary": module_integrity_summary.duplicate(true),
 		"component_placement_summary": component_placement_summary.duplicate(true),
 		"work_action_summary": work_action_summary.duplicate(true),
@@ -255,7 +246,12 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 		return null
 	if str(dict.get("godot_version", "")) != expected_godot_version:
 		return null
-	if expected_slice_version in ["gate2-current-run-5", "gate2-current-run-6"]:
+	if expected_slice_version == "gate2-current-run-7" \
+			and (dict.has("player_position") or dict.has("hallucination_summary")):
+		return null
+	if expected_slice_version in [
+		"gate2-current-run-5", "gate2-current-run-6", "gate2-current-run-7",
+	]:
 		# Modern v5 never turns an omitted transaction into an empty one. Empty
 		# state is represented by the complete schema envelopes emitted above.
 		for required_summary in [
@@ -270,7 +266,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 				or not _is_structural_v5_component(dict.component_placement_summary as Dictionary) \
 				or not _is_structural_v5_oxygen(dict.get("oxygen_summary", {})):
 			return null
-	if expected_slice_version == "gate2-current-run-6":
+	if expected_slice_version in ["gate2-current-run-6", "gate2-current-run-7"]:
 		var inventory: Dictionary = dict.inventory_summary as Dictionary
 		if not inventory.has("threat_summary"):
 			return null
@@ -285,10 +281,6 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.layout_path = str(dict.get("layout_path", ""))
 	snapshot.kit_path = str(dict.get("kit_path", ""))
 	snapshot.gameplay_slice_path = str(dict.get("gameplay_slice_path", ""))
-	var pos = dict.get("player_position", [0.0, 0.0, 0.0])
-	if typeof(pos) == TYPE_ARRAY and (pos as Array).size() >= 3:
-		var pos_array: Array = pos as Array
-		snapshot.player_position = [float(pos_array[0]), float(pos_array[1]), float(pos_array[2])]
 	snapshot.current_objective_sequence = int(dict.get("current_objective_sequence", 1))
 	snapshot.ship_systems_summary = _deep_copy_dict(dict.get("ship_systems_summary", {}))
 	snapshot.route_control_summary = _deep_copy_dict(dict.get("route_control_summary", {}))
@@ -318,7 +310,6 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.radiation_summary = _deep_copy_dict(dict.get("radiation_summary", {}))
 	snapshot.temperature_summary = _deep_copy_dict(dict.get("temperature_summary", {}))
 	snapshot.status_effects_summary = _deep_copy_dict(dict.get("status_effects_summary", {}))
-	snapshot.hallucination_summary = _deep_copy_dict(dict.get("hallucination_summary", {}))
 	snapshot.module_integrity_summary = _deep_copy_dict(dict.get("module_integrity_summary", {}))
 	snapshot.component_placement_summary = _deep_copy_dict(dict.get("component_placement_summary", {}))
 	snapshot.work_action_summary = _deep_copy_dict(dict.get("work_action_summary", {}))

@@ -55,14 +55,16 @@ func _initialize() -> void:
 	service.delete_current_run()
 	var migrator = SaveMigrationServiceScript.new()
 
-	# 1. Pure migration walk v1 -> v2 -> v3.
+	# 1. Pure pre-v6 migration reaches the literal run-6 closure boundary.
+	# Run 7 erases pose only after a world owner graph exists.
 	var v1_dict := _make_v1_dict()
-	var result_v12: Dictionary = migrator.migrate_run(v1_dict)
+	var result_v12: Dictionary = migrator.migrate_run_to_closed_run6(v1_dict)
 	if not bool(result_v12.get("migrated", false)):
 		_fail("v1 dict did not migrate (migrated=false)")
 		return
-	if str((result_v12["dict"] as Dictionary).get("slice_version", "")) != SaveMigrationServiceScript.TARGET_VERSION:
-		_fail("v1 dict did not migrate to TARGET_VERSION")
+	if str((result_v12["dict"] as Dictionary).get("slice_version", "")) \
+			!= SaveLoadServiceScript.LEGACY_CLOSED_RUN_VERSION:
+		_fail("v1 dict did not migrate to literal run-6 closure boundary")
 		return
 	if not (result_v12["dict"] as Dictionary).has("player_progression_summary"):
 		_fail("v1 dict did not gain player_progression_summary after v2 step")
@@ -111,7 +113,6 @@ func _initialize() -> void:
 	legacy.godot_version = Engine.get_version_info()["string"]
 	legacy.layout_path = "res://data/procgen/smoke/seed_000017/layout.json"
 	legacy.current_objective_sequence = 4
-	legacy.player_position = [1.0, 0.0, 2.0]
 	legacy.ship_systems_summary = {"systems": {"power": {"health": 0.5}}}
 	legacy.route_control_summary = {"active_blockers": 0}
 	legacy.oxygen_summary = {"oxygen": 75.0}

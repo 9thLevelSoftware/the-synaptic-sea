@@ -12,7 +12,7 @@ const PillarPersistenceScript := preload("res://scripts/systems/pillar_persisten
 
 
 func _initialize() -> void:
-	if RunSnapshotScript.SUMMARY_FIELDS.size() < 32:
+	if RunSnapshotScript.SUMMARY_FIELDS.size() != 32:
 		_fail("expected 32 SUMMARY_FIELDS got %d" % RunSnapshotScript.SUMMARY_FIELDS.size()); return
 	if not RunSnapshotScript.SUMMARY_FIELDS.has("ship_modification_summary"):
 		_fail("missing ship_modification_summary field"); return
@@ -59,7 +59,6 @@ func _initialize() -> void:
 	snap.layout_path = "res://data/procgen/golden/coherent_ship_001/layout.json"
 	snap.kit_path = "res://data/kits/ship_structural_v0.json"
 	snap.gameplay_slice_path = "res://data/gameplay/coherent_ship_001_slice.json"
-	snap.player_position = [1.0, 0.0, 2.0]
 	snap.ship_modification_summary = mod.get_summary()
 	snap.module_integrity_summary = map.get_summary()
 	snap.component_placement_summary = placement.get_summary()
@@ -71,7 +70,7 @@ func _initialize() -> void:
 	var loaded = RunSnapshotScript.from_dict(d, "gate2-current-run-4", "4.6.2")
 	if loaded == null:
 		_fail("from_dict"); return
-	if loaded.get_summary_count() != 32:
+	if loaded.get_summary_count() != 31:
 		_fail("count %d" % loaded.get_summary_count()); return
 	var mod2 = ShipModificationStateScript.new()
 	mod2.apply_summary(loaded.ship_modification_summary)

@@ -22,7 +22,8 @@ class_name SaveLoadService
 ## and a migrated inspection copy is written only from an accepted prepared load.
 
 const SAVE_PATH: String = "user://saves/current_run.json"
-const CURRENT_SLICE_VERSION: String = "gate2-current-run-6"
+const CURRENT_SLICE_VERSION: String = "gate2-current-run-7"
+const LEGACY_CLOSED_RUN_VERSION: String = "gate2-current-run-6"
 const SAVES_DIR: String = "user://saves"
 const INDEX_PATH: String = "user://saves/index.json"
 const CORRUPT_DIR: String = "user://saves/.corrupt"
@@ -175,6 +176,7 @@ func _prepare_slot_path(slot_id: String, path: String, fallback_run_id: String) 
 	var migration: Dictionary = {}
 	var world_dict: Dictionary = {}
 	var effective_run_id: String = ""
+	var closed_pre_v6_run: bool = false
 	if source_version.begins_with("world-") or slot_id == "world":
 		migration = SaveMigrationServiceScript.new().migrate_world(source)
 		if not migration.get("dict", null) is Dictionary \
@@ -191,11 +193,12 @@ func _prepare_slot_path(slot_id: String, path: String, fallback_run_id: String) 
 			if world_dict.get("home_ship", null) is Dictionary:
 				world_dict.home_ship["run_id"] = effective_run_id
 	else:
-		# A standalone current v5 payload cannot recover away stores or a field
-		# receipt pin. Only recognized historical run schemas receive closure.
-		if source_version == CURRENT_SLICE_VERSION:
+		# A standalone run-6 or current run-7 payload cannot recover its world
+		# owner graph. Only recognized pre-v6 schemas receive literal run-6
+		# closure while their global pose still exists.
+		if source_version in [LEGACY_CLOSED_RUN_VERSION, CURRENT_SLICE_VERSION]:
 			return {"ok": false, "reason": "unclosed_owner_graph", "source_path": path, "source_sha256": read.sha256}
-		migration = SaveMigrationServiceScript.new().migrate_run(source)
+		migration = SaveMigrationServiceScript.new().migrate_run_to_closed_run6(source)
 		if not migration.get("dict", null) is Dictionary \
 				or not bool(migration.get("migrated", false)):
 			return _prepare_failure(path, read.sha256, migration)
@@ -205,6 +208,7 @@ func _prepare_slot_path(slot_id: String, path: String, fallback_run_id: String) 
 		var migrated_run: Dictionary = (migration.dict as Dictionary).duplicate(true)
 		migrated_run["run_id"] = effective_run_id
 		world_dict = _closed_world_dict_from_run(migrated_run, effective_run_id)
+		closed_pre_v6_run = true
 		migration["dict"] = world_dict
 		migration["to_version"] = WorldSnapshotScript.WORLD_SLICE_VERSION
 	if source_version != CURRENT_SLICE_VERSION \
@@ -219,6 +223,20 @@ func _prepare_slot_path(slot_id: String, path: String, fallback_run_id: String) 
 			}
 		world_dict = (bootstrap.world as Dictionary).duplicate(true)
 		migration["dict"] = world_dict
+	# The pre-v6 adapter deliberately closes a literal world-6/run-6 pair
+	# before the world migration owns pose removal. While world 6 remains
+	# current this is a no-op; once world 7 lands it engages only the explicit
+	# world-6-to-world-7 step.
+	if closed_pre_v6_run:
+		var closed_migration: Dictionary = SaveMigrationServiceScript.new().migrate_world(
+			world_dict)
+		if not closed_migration.get("dict", null) is Dictionary \
+				or bool(closed_migration.get("newer_than_current", false)):
+			return _prepare_failure(path, read.sha256, closed_migration)
+		world_dict = (closed_migration.dict as Dictionary).duplicate(true)
+		migration["dict"] = world_dict
+		migration["to_version"] = str(closed_migration.get(
+			"to_version", WorldSnapshotScript.WORLD_SLICE_VERSION))
 	var expected_godot: String = Engine.get_version_info()["string"]
 	var snapshot = WorldSnapshotScript.from_dict(
 		world_dict, WorldSnapshotScript.WORLD_SLICE_VERSION, expected_godot)
@@ -483,7 +501,7 @@ func _closed_world_dict_from_run(run_dict: Dictionary, run_id: String) -> Dictio
 		"aboard_ship_id": "ship_start",
 		"opened_ports": [],
 		"run_id": run_id,
-		"slice_version": WorldSnapshotScript.WORLD_SLICE_VERSION,
+		"slice_version": "world-6",
 		"godot_version": str(run_dict.get("godot_version", Engine.get_version_info()["string"])),
 		"saved_at": str(run_dict.get("saved_at", "")),
 	}
