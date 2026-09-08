@@ -1,0 +1,21 @@
+{
+  "protected_files_checked": 2792,
+  "protected_file_changes": [],
+  "original_checkouts": {
+    "main": {
+      "path": "/Users/christopherwilloughby/Code/the-synaptic-sea",
+      "head_unchanged": true,
+      "status_unchanged": true,
+      "before_entries": 2241,
+      "after_entries": 2241
+    },
+    "base": {
+      "path": "/Users/christopherwilloughby/Code/the-synaptic-sea-room-assets",
+      "head_unchanged": true,
+      "status_unchanged": true,
+      "before_entries": 2247,
+      "after_entries": 2247
+    }
+  },
+  "runtime_promotion": false
+}

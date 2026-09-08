@@ -1,0 +1,46 @@
+{
+  "phase": "pilot implementation; structural gate held",
+  "asset_count": 3,
+  "improved_count": 1,
+  "new_count": 2,
+  "remaining_full_plan_asset_count": 28,
+  "structural_candidate_count": 0,
+  "assets": [
+    {
+      "asset_id": "fabrication_station_derelict_v1",
+      "kind": "improved_existing",
+      "blend": "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/fabrication_station_derelict_v1/fabrication_station_derelict_v1.blend",
+      "blend_sha256": "d47685c934515d1a2a785fd6a9eb9869eb11dbf09aad4962d0956d8b12cb0ddf",
+      "blend_bytes": 120110,
+      "staged_glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/assets/_staging/room_kit_v2/props/fabrication_station_derelict_v1.glb",
+      "glb_sha256": "f157a11d964fa79f3c41f32ee036638233ad35a505426cd8815901cc0d9027de",
+      "glb_bytes": 296376,
+      "runtime_promoted": false
+    },
+    {
+      "asset_id": "coolant_pump_skid_derelict_v1",
+      "kind": "new",
+      "blend": "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/coolant_pump_skid_derelict_v1/coolant_pump_skid_derelict_v1.blend",
+      "blend_sha256": "a0f70007f51b7faea5b924584f02df3072bd8a0858a0b06c7553c07548244d26",
+      "blend_bytes": 124023,
+      "staged_glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/assets/_staging/room_kit_v2/props/coolant_pump_skid_derelict_v1.glb",
+      "glb_sha256": "3304e721d8ad023c725ef6038367a12347a19e5989cdebd8d9fbd0b2fea4ae88",
+      "glb_bytes": 276360,
+      "runtime_promoted": false
+    },
+    {
+      "asset_id": "suit_service_stand_derelict_v1",
+      "kind": "new",
+      "blend": "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/suit_service_stand_derelict_v1/suit_service_stand_derelict_v1.blend",
+      "blend_sha256": "2b449b8e36ef5da2ddc4fc84d68ee9eee7f3290b1c33e6743745bd053545ceff",
+      "blend_bytes": 115363,
+      "staged_glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/assets/_staging/room_kit_v2/props/suit_service_stand_derelict_v1.glb",
+      "glb_sha256": "71f5ed5c77c5cf63d2a9a32df3fd087452e971707940794ba5fc59eb7ade7b39",
+      "glb_bytes": 223736,
+      "runtime_promoted": false
+    }
+  ],
+  "full_pilot_approved": false,
+  "procedural_consumer_integration": "not implemented; held behind full pilot gate",
+  "follow_up_card": "t_5dbc3f3a"
+}
