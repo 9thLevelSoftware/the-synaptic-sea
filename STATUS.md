@@ -2,52 +2,45 @@
 
 **Last updated:** 2026-09-08
 
-**Execution resumed at the user's explicit request on 2026-09-07.** Continue from the
-[2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md).
-The checkpoint preserves integrated WIP and portable task evidence; it is not
-feature-complete or independently approved as a whole. R10-A's fresh combined
-baseline qualification passed all 15 cases with clean diagnostics and isolated
-profile probes. Independent review identified four blocking gaps: post-validation
-plan mutation, ineffective join-overlap enforcement, incomplete endpoint/spawn
-identity validation, and an initial double placement of the player. Corrections
-and requalification are underway before paired run7/world7 migration. PR #548 was
-merged as `2f9c6913`; resumed work starts from that merged base on
-`codex/feature-completion-resume` in the existing isolated execution worktree.
+**Execution resumed at the user's explicit request on 2026-09-07.** PR #548 was
+merged as `2f9c6913`; continuing work uses `codex/feature-completion-resume` in
+`D:/the-synaptic-sea-feature-completion`. The full program remains incomplete.
+The [2026-09-06 handoff](docs/superpowers/handoffs/2026-09-06-feature-completion-handoff.md)
+retains the earlier checkpoint; the following evidence supersedes its R10 status.
 
-Resume validation tooling: the reviewed registry repair keeps the planning-only
-UI proposal visible outside the frozen program, preserving all 668 rows and the
-622-criterion denominator. Its 25 focused tests pass. The reviewed canonical
-manifest repair preserves all 652 commands, fixes the static marker/count contract,
-and checks the runtime count before PASS (31 focused tests pass; commit `3a24cde9`).
-These tooling results do not constitute a fresh full canonical regression run.
+The geometry/docking baseline is accepted and committed as `925f3f5c`.
+Independent review closed the plan-mutation, overlap, endpoint/spawn authority,
+and double-placement findings. Final qualification passed 15 cases; 22 public
+loader rejection cases passed with only their individually accepted diagnostics.
+Rejected candidates publish no layout, ship signal, or roots. Evidence is under
+`artifacts/feature-completion/R10-A-fix2-final-qualification-01/` and
+`R10-A-fix2-public-loader-negative-qualified-01/`. The associated layout correction
+also passed all 60 stress cases. This is bounded baseline acceptance.
 
-R10-A correction checkpoint: the physical-placement integrity seeder has passed
-independent review and a fresh isolated runtime check (`R10-A-fix1-integrity-seed-attempt-03`).
-Vertex and residual half-span placements retain separate health, room ownership,
-and damage records; canonical full-edge placements retain their existing identity.
-The loader/controller identity and scaled-wall checks also pass in endpoint
-attempt 12. These focused results do not close R10-A: its remaining affected
-regressions, final combined qualification, and consequential review are pending.
-Historical damage migration is being assessed before run7/world7 implementation.
+The run-7 model and historical run-6 closure are independently approved and
+committed as `581aec07`, including the public literal-run6 migration entrypoint.
+Run-7 forbids both legacy pose and hallucination keys and emits 31 summaries.
+Focused transition, ship-mod snapshot, and pillar persistence checks passed with
+clean output and isolated profiles. Save migration/load integration still fails
+at `invalid_world_snapshot` while the paired world migration and live capture are
+unfinished; these failures remain open. Review packages are retained under
+`.superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-review-packages/`.
 
-The docking-space layout correction has also passed independent review. Its
-focused tests verify connector routing around reserved space, planned room area,
-and rejection of conflicting late docks; all 60 layout stress cases pass with
-clean output. This accepts the bounded layout correction, not the complete R10-A
-baseline. Current-geometry compiler, loader, and golden-parity checks now pass.
-The fresh combined baseline qualification passes all 15 cases with exact markers,
-clean output, contained user-data probes, and stable source hashes across 56 files
-(`artifacts/feature-completion/R10-A-fix1-final-qualification-02/summary.json`).
-The geometry/docking baseline is accepted after the additional three-file loader
-and parsing fix. Independent review approves both closed findings with no new
-issues. Fresh final qualification passes all 15 cases with clean logs; 22 public
-loader rejection cases pass on the same frozen sources with only their exact
-expected diagnostics. Rejection leaves no published layout, ship signal, or roots.
-Evidence: `R10-A-fix2-final-qualification-01/summary.json` and
-`R10-A-fix2-public-loader-negative-qualified-01/summary.json` under
-`artifacts/feature-completion/`. Run7/world7 implementation is now released,
-beginning with the version-pinned world-v5-to-v6 migration chain. This bounded
-baseline acceptance does not complete R10 persistence or the full program.
+The world-7 pure model passed its focused smoke, but independent review found two
+blocking authority gaps: movable home roots and an unresolved current visited
+location. Corrections and additional cardinal-transform, overflow, and duplicate
+root tests are underway. World-7 is not accepted yet. Historical attachment
+projection is being implemented from pinned c51 sources in parallel. Its shared
+compiled-placement integrity-ID prerequisite passed independent review and focused
+runtime validation and is committed as `c3bdf40b`.
+
+Validation governance preserves 668 recorded rows and the 622-criterion denominator;
+the current registry has 27 passing focused tests. Canonical regression still has
+652 commands with an exact runtime count guard. These focused results do not
+constitute a fresh full canonical regression or player acceptance. UI/accessibility,
+authored audio configuration, and threat flee-path work remain available to the
+external AI under the
+[parallel ownership handoff](docs/superpowers/handoffs/2026-09-08-parallel-ai-ownership.md).
 
 ## Current feature-completion program
 
