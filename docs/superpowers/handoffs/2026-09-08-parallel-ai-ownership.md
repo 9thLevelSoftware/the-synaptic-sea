@@ -6,14 +6,14 @@ This is an ownership handoff, not a completion report. The full feature-completi
 
 - Worktree: D:/the-synaptic-sea-feature-completion
 - Branch: codex/feature-completion-resume
-- Latest coordinator checkpoint: 586a46b4 (the branch may advance; inspect current HEAD before integration).
+- Latest coordinator checkpoint: 8dc8b08e (the branch may advance; inspect current HEAD before integration).
 - Significant uncommitted R10 work is present. A checkout of this commit alone does not include those changes.
 - Original D:/the-synaptic-sea checkout is not this execution worktree.
 
 ## Reserved to the current AI
 
 1. R10 physical docking: explicit exterior portal compilation; strict endpoint, placement, navigation and spawn identity; reject every positive cross-hull intersection; single validated fresh-player placement; focused runtime tests and independent review. The docking baseline is now reviewed, validated, and committed; retain ownership for dependent integration fixes.
-2. Run-7/world-7 transition: exact owner-local player pose; docking and hangar attachment records; persistent active/inactive door states; historical world-6 geometry/combat migration; hallucination reset; explicit launched free-root authority. Actively implementing run-7 migration/save models and the world-7 snapshot/restore-candidate model in two disjoint workers. Historical migration and live capture/restore integration follow.
+2. Run-7/world-7 transition: exact owner-local player pose; docking and hangar attachment records; persistent active/inactive door states; historical world-6 geometry/combat migration; hallucination reset; explicit launched free-root authority. The run-7 migration/save model and world-7 pure snapshot/restore-candidate model are reviewed and committed. Two workers currently own strict current-integrity admission and frozen historical world-6 attachment projection. Historical damage migration and live capture/restore integration follow; the full transition is not complete.
 3. Following that dependency chain: R04/R05 natural crafting/economy proof, R07 machinery condition, R08 paid repair, R09–R16 rebuild safety/timing/replacement/persistence/claim/pilot/travel/player journey. These are reserved, not all currently executing.
 4. Shared acceptance registry, generated Kanban cards, central feature-completion specification/ADR, canonical regression integration, commits and integration for this branch.
 
@@ -30,6 +30,14 @@ This is an ownership handoff, not a completion report. The full feature-completi
 - `tools/rebuild_vertex_span_modules.py`, the inner/outer corner and T-junction source/GLB/wrapper/contract families, their collision projection in `data/kits/ship_structural_v0.json`, and `assets/_source/recovered/ship_structural_v0/.gdignore`. These are being corrected to use vertex-owned rays and complete wall half-span coverage.
 
 ## Suitable independent assignments
+
+### Exact active implementation ownership
+
+- Current-integrity admission: `scripts/systems/module_integrity_map.gd`, `scripts/systems/module_integrity_state.gd`, `scripts/systems/run_snapshot.gd`, `scripts/systems/world_snapshot.gd`, and `scripts/validation/r10a_integrity_admission_smoke.gd`. Final focused six-smoke bundle reported green; independent review remains.
+- Historical attachment projection: `scripts/systems/world_v6_layout_projection.gd`, `data/migrations/world_v6_geometry_authority_v1.json`, and `scripts/validation/r10a_world6_layout_projection_smoke.gd`. Qualification against captured historical fallback/native outputs and independent review remain.
+- Coordinator: shared governance, evidence review, integration, and the reserved dependency chain above. Reserved follow-on work is not all actively executing.
+
+The three assignments below are held for the external AI; the current coordinator will not implement them while this ownership split is in effect.
 
 ### A. R17 UI/accessibility (recommended)
 

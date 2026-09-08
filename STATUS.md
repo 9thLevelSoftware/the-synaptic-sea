@@ -26,19 +26,23 @@ at `invalid_world_snapshot` while the paired world migration and live capture ar
 unfinished; these failures remain open. Review packages are retained under
 `.superpowers/sdd/2026-09-05-remaining-feature-completion/task-10a-review-packages/`.
 
-The world-7 pure model passed its focused smoke, but independent review found two
-blocking authority gaps: movable home roots and an unresolved current visited
-location. Corrections and additional cardinal-transform, overflow, and duplicate
-root tests are underway. World-7 is not accepted yet. Historical attachment
-projection is being implemented from pinned c51 sources in parallel. Its shared
-compiled-placement integrity-ID prerequisite passed independent review and focused
-runtime validation and is committed as `c3bdf40b`.
+The world-7 pure model is independently approved and committed as `14eb8071`.
+Review fixes enforce the fixed home root and resolve the current visited owner;
+focused tests cover all four cardinal transforms, overflow, duplicate roots, and
+cycles. This accepts the pure model only; live capture/restore remains unfinished.
+Strict current-integrity admission passed six focused checks with clean output and
+stable source hashes in `R10-A-integrity-admission-final-01` and is under independent
+review. Historical attachment projection passed its focused comparison against
+pinned c51 fallback and authenticated native reference outputs in
+`R10-A-world6-layout-projection-green-03`; independent review remains pending.
+Its shared compiled-placement integrity-ID prerequisite is independently approved
+and committed as `c3bdf40b`. Historical damage conversion is still unfinished.
 
 Validation governance preserves 668 recorded rows and the 622-criterion denominator;
 the current registry has 27 passing focused tests. Canonical regression still has
 652 commands with an exact runtime count guard. These focused results do not
 constitute a fresh full canonical regression or player acceptance. UI/accessibility,
-authored audio configuration, and threat flee-path work remain available to the
+authored audio configuration, and threat flee-path work remain reserved for the
 external AI under the
 [parallel ownership handoff](docs/superpowers/handoffs/2026-09-08-parallel-ai-ownership.md).
 
@@ -72,9 +76,10 @@ quick, auto and title load paths, and a fresh three-process exact-recapture proo
 The complete integrated regression and product acceptance still remain pending.
 R06 physical-work ownership has passed independent review after two fix rounds,
 including canonical live target range, fresh attendance, complete production
-denial side-effect checks, and the required direct snapshot regression. R04 natural crafting remains blocked by
-confirmed docking geometry and ceiling collision defects; R10-A scopes their
-correction before that journey resumes. The economy checker component has passed
+denial side-effect checks, and the required direct snapshot regression. R04 natural
+crafting still awaits the complete R10 save/restore dependency chain before its
+journey resumes; the bounded geometry/docking baseline above is accepted.
+The economy checker component has passed
 independent review, while its final production proof pin remains blocked until
 R05 qualification after reviewed rebuild integration.
 
