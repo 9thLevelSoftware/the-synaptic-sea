@@ -1688,6 +1688,26 @@ def test_r2b2_resume_reconciles_uncertain_succeeded_generation(
     assert json.loads(journal_path.read_text(encoding="utf-8"))["state"] == "COMPLETED"
 
 
+def test_r2b2_offline_verify_sanctions_tracked_reference_directory(
+    tmp_path: Path, valid_contract: AssetContract
+) -> None:
+    generation_kwargs = _generation_kwargs(tmp_path)
+    generated = generate_batch(
+        valid_contract, tmp_path, FakeMeshyClient(), 100, **generation_kwargs
+    )
+    asset_root = _stage_asset_root(tmp_path, valid_contract.asset_id)
+    # Task 12 of the biomass plan pins tracked project-owned reference images
+    # under <asset_id>/_references/; verify must not treat that sanctioned
+    # directory as an orphan task directory.
+    (asset_root / "_references").mkdir()
+    journal_path = asset_root / "_batches" / (generated["batch_id"] + ".json")
+
+    report = stage_module.verify_batch(tmp_path, valid_contract, journal_path)
+
+    assert report["pass"] is True
+    assert not any("not named" in error for error in report["errors"])
+
+
 def test_r2b2_offline_verify_rejects_orphan_task_directory(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:

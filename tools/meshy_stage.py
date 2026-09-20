@@ -3547,6 +3547,15 @@ def _visible_task_directories(
             elif not child.is_dir():
                 errors.append("Meshy batch journal root is not a regular directory")
             continue
+        if child.name == "_references":
+            # Project-owned tracked reference images (plan Task 12) live under
+            # <asset_id>/_references/; they are staged input evidence, not
+            # provider task directories.
+            if child.is_symlink():
+                errors.append("Meshy reference root contains a symlink")
+            elif not child.is_dir():
+                errors.append("Meshy reference root is not a regular directory")
+            continue
         if child.name.startswith("."):
             errors.append("Meshy task root contains a hidden entry")
             continue
