@@ -1837,8 +1837,19 @@ def _validate_provider_request(
             errors.append(label + " image_urls must be a list")
     else:
         request_values = [request_value]
-    if request_values and isinstance(request_values[0], dict) and request_values[0].get("view") != "front":
-        errors.append(label + " first image evidence must be front")
+    if (
+        request_values
+        and isinstance(request_values[0], dict)
+        and isinstance(references, list)
+        and references
+        and isinstance(references[0], dict)
+        and request_values[0].get("view") != references[0].get("view")
+    ):
+        errors.append(
+            label
+            + " first image evidence must be "
+            + str(references[0].get("view"))
+        )
     for index, item in enumerate(request_values):
         errors.extend(_validate_reference_item(item, "%s.%s[%d]" % (label, reference_field, index)))
     if isinstance(references, list) and not any("fields are not exact" in error for error in errors):

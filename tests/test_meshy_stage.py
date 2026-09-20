@@ -997,6 +997,47 @@ def test_pricing_document_has_exact_closed_fields_and_original_hash() -> None:
     assert set(schema["properties"]) == set(pricing.document)
 
 
+def test_single_three_quarter_biomass_journal_and_generation_validate(
+    tmp_path: Path, fake_client: FakeMeshyClient
+) -> None:
+    contract = load_contract(
+        ROOT / "data/asset_generation/contracts/biomass_human_arm_v1.json"
+    )
+    reference_root = tmp_path / "references"
+    reference_root.mkdir()
+    reference_name = "three-quarter.png"
+    (reference_root / reference_name).write_bytes(_valid_png_bytes(7))
+
+    result = generate_batch(
+        contract,
+        tmp_path,
+        fake_client,
+        100,
+        pricing_file=None,
+        reference_root=reference_root,
+        reference_specs={"three_quarter": reference_name},
+        output_license="paid-private",
+        today="2026-09-01",
+    )
+
+    assert result["batch_id"]
+    journal_path = next(
+        (_stage_asset_root(tmp_path, contract.asset_id) / "_batches").glob("*.json")
+    )
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["approval"]["references"][0]["view"] == "three_quarter"
+    assert stage_module.validate_batch_journal(journal) == []
+
+    generation_paths = sorted(
+        _stage_asset_root(tmp_path, contract.asset_id).glob("*/generation.json")
+    )
+    assert len(generation_paths) == contract.document["generation"]["candidate_count"]
+    for generation_path in generation_paths:
+        generation = json.loads(generation_path.read_text(encoding="utf-8"))
+        assert generation["references"][0]["view"] == "three_quarter"
+        assert stage_module.validate_generation_record(generation) == []
+
+
 def test_r2b1_journal_exists_before_first_provider_create(
     tmp_path: Path, valid_contract: AssetContract
 ) -> None:
