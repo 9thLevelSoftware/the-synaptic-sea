@@ -1,0 +1,19 @@
+{
+  "task_id": "01a0c0ae-f2f6-72b9-8855-b97e99f3969f",
+  "image_task_id": "01a0c0ae-6b4f-7300-95a1-6f247fbfde91",
+  "asset_id": "biomass_human_arm_v1",
+  "provider": "meshy",
+  "endpoint": "/openapi/v1/image-to-3d",
+  "ai_model": "meshy-5",
+  "model_type": "standard",
+  "should_texture": false,
+  "target_polycount": 1400,
+  "target_formats": [
+    "glb"
+  ],
+  "status": "SUCCEEDED",
+  "consumed_credits": 5,
+  "image_credits": 9,
+  "created_at": "2026-09-20T21:19:06.322112Z",
+  "image_prompt": "Three-quarter view of a stylized low-poly severed human arm made of biological horror biomass, broad readable planes and masses, grotesque flesh tones with exposed sinew and muscle, severed at shoulder with raw proximal root and hand at distal end, dark sci-fi aesthetic, studio lighting on neutral dark background, game asset reference, silhouette readable at distance"
+}

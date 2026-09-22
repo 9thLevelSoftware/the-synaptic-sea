@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "meshy_candidate_review",
+  "asset_id": "biomass_human_arm_v1",
+  "task_id": "01a0c0b1-97d0-756e-a3c6-d04d52edb173",
+  "state": "selected",
+  "decision": "select",
+  "checks": {
+    "silhouette_readable": true,
+    "proportions_match_contract": true,
+    "functional_volume_present": true,
+    "movable_parts_separable": true,
+    "cleanup_bounded": true,
+    "camera_readability": true
+  },
+  "rejection_reasons": [],
+  "reviewer": "christopherwilloughby",
+  "selected_at": "2026-09-20T21:30:14.827236Z"
+}

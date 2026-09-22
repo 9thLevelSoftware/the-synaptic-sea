@@ -1,0 +1,10 @@
+{
+  "task_id": "01a0c0b0-3bc8-77c5-8fdb-3de86a1488bc",
+  "image_task_id": "01a0c0ae-6b4f-7300-95a1-6f247fbfde91",
+  "asset_id": "biomass_human_arm_v1",
+  "provider": "meshy",
+  "endpoint": "/openapi/v1/image-to-3d",
+  "ai_model": "meshy-5",
+  "status": "SUCCEEDED",
+  "consumed_credits": 5
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "meshy_candidate_review",
+  "asset_id": "biomass_human_arm_v1",
+  "task_id": "01a0c0b0-e2aa-70a3-8aaa-7508c9cb0730",
+  "state": "rejected",
+  "decision": "reject",
+  "checks": {},
+  "rejection_reasons": [
+    "Not selected - user chose candidate 4"
+  ],
+  "reviewer": "christopherwilloughby"
+}
