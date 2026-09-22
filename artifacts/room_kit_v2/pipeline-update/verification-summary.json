@@ -1,0 +1,37 @@
+{
+  "commit": "bfbb12c6884659e4c5cd34a2a5aa852925f0ddaa",
+  "branch": "feat/blender-room-kit-v2",
+  "changed_file_count": 21,
+  "focused_tests": {
+    "total": 58,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "real_blender_cases": {
+    "total": 15,
+    "expected_outcomes_met": 15
+  },
+  "supported_profile_count": 7,
+  "held_modules": [
+    "wall_end_cap",
+    "wall_inner_corner",
+    "wall_outer_corner",
+    "wall_t_junction",
+    "bulkhead_portal_2x1",
+    "doorway_frame_blocked_1x1",
+    "ramp_up_1x2",
+    "ceiling_cap_1x1"
+  ],
+  "protected_files_checked": 3283,
+  "protected_files_changed": [],
+  "baseline_failure_count": 19,
+  "new_baseline_failure_ids": [],
+  "runtime_promotion": "HOLD: source authority unresolved",
+  "independent_reviews": [
+    "final-correction-review.json",
+    "door-clearance-review.json"
+  ],
+  "runtime_assets_promoted": false,
+  "production_assets_authored": false
+}

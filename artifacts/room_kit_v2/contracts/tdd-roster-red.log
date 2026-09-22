@@ -1,0 +1,291 @@
+FFFFFFFFFF                                                               [100%]
+=================================== FAILURES ===================================
+___________ test_roster_is_the_frozen_fourteen_plus_twelve_contract ____________
+
+    def test_roster_is_the_frozen_fourteen_plus_twelve_contract() -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+_________ test_roster_rows_preserve_exact_envelopes_roles_and_budgets __________
+
+    def test_roster_rows_preserve_exact_envelopes_roles_and_budgets() -> None:
+>       rows = {row["asset_id"]: row for row in load_rows()}
+                                                ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+___________________________ test_duplicate_id_fails ____________________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_duplicate_id_fails0')
+
+    def test_duplicate_id_fails(tmp_path) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:79: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+______________ test_invalid_row_contract_fails[max_size_m-value0] ______________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail0')
+field = 'max_size_m', value = [1.0, inf, 1.0]
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+______________ test_invalid_row_contract_fails[max_size_m-value1] ______________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail1')
+field = 'max_size_m', value = [0.0, 1.0, 1.0]
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+_______________ test_invalid_row_contract_fails[triangles_max-0] _______________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail2')
+field = 'triangles_max', value = 0
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+_______________ test_invalid_row_contract_fails[material_max-5] ________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail3')
+field = 'material_max', value = 5
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+________________ test_invalid_row_contract_fails[roles-value4] _________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail4')
+field = 'roles', value = ['Engineering']
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+___________ test_invalid_row_contract_fails[footprint_cells-value5] ____________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail5')
+field = 'footprint_cells', value = [2, 1]
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+___________ test_invalid_row_contract_fails[behavior-dynamic_system] ___________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-50/test_invalid_row_contract_fail6')
+field = 'behavior', value = 'dynamic_system'
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("max_size_m", [1.0, float("inf"), 1.0]),
+            ("max_size_m", [0.0, 1.0, 1.0]),
+            ("triangles_max", 0),
+            ("material_max", 5),
+            ("roles", ["Engineering"]),
+            ("footprint_cells", [2, 1]),
+            ("behavior", "dynamic_system"),
+        ],
+    )
+    def test_invalid_row_contract_fails(tmp_path, field, value) -> None:
+>       rows = load_rows()
+               ^^^^^^^^^^^
+
+tests/test_room_kit_v2_roster.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/data/procgen/dressing/room_kit_v2.json')
+
+    def load_rows(path=ROSTER):
+        if not Path(path).is_file():
+>           raise AssertionError("missing room-kit roster")
+E           AssertionError: missing room-kit roster
+
+tools/room_kit_contract.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_room_kit_v2_roster.py::test_roster_is_the_frozen_fourteen_plus_twelve_contract
+FAILED tests/test_room_kit_v2_roster.py::test_roster_rows_preserve_exact_envelopes_roles_and_budgets
+FAILED tests/test_room_kit_v2_roster.py::test_duplicate_id_fails - AssertionE...
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[max_size_m-value0]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[max_size_m-value1]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[triangles_max-0]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[material_max-5]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[roles-value4]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[footprint_cells-value5]
+FAILED tests/test_room_kit_v2_roster.py::test_invalid_row_contract_fails[behavior-dynamic_system]
+10 failed in 0.32s

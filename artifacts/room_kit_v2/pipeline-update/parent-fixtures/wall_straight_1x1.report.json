@@ -1,0 +1,29 @@
+{
+  "coordinate_conversion": "Blender [x,y,z] -> native glTF/runtime [x,z,-y]",
+  "errors": [],
+  "family": "wall",
+  "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/wall_straight_1x1.glb",
+  "legacy_helper_conversion_not_used": "[x,z,y]",
+  "measurements": {
+    "assembly_acceptance": false,
+    "bounds": {
+      "max": [
+        2.0,
+        3.200000047683716,
+        0.10000000149011612
+      ],
+      "min": [
+        -2.0,
+        0.0,
+        -0.10000000149011612
+      ]
+    },
+    "helper_objects_rejected": false,
+    "mesh_object_count": 1,
+    "object_count": 1,
+    "triangle_count": 12,
+    "validation_scope": "per_module_visual_interface"
+  },
+  "module_id": "wall_straight_1x1",
+  "status": "pass"
+}

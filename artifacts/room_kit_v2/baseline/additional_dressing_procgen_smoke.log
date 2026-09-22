@@ -1,0 +1,19 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.1.stable.official, safeguards balanced)
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+GameplaySliceBuilder slot_fallback room=arc_side_01 kind=loot
+GameplaySliceBuilder slot_fallback room=tool_storage_01 kind=loot
+GameplaySliceBuilder slot_fallback room=cargo_bay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=maintenance_bay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=medbay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=reactor_01 kind=loot
+GameplaySliceBuilder slot_fallback room=cargo_bay_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=maintenance_bay_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=medbay_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=reactor_01 kind=salvage
+GameplaySliceBuilder slot_fallback room=bridge_01 kind=loot
+GameplaySliceBuilder slot_fallback room=cargo_bay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=maintenance_bay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=medbay_01 kind=loot
+GameplaySliceBuilder slot_fallback room=reactor_01 kind=loot
+ADDITIONAL DRESSING PROCGEN PASS generated=4 materialized=4

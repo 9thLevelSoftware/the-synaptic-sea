@@ -1,0 +1,701 @@
+*   Godot Engine 4.7 documentation in English
+    
+    *   [](https://docs.godotengine.org/en/stable/index.html)
+        
+    *   [All classes](https://docs.godotengine.org/en/stable/classes/index.html)
+        
+    *   Camera3D
+
+* * *
+
+Camera3D[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#camera3d "Link to this heading")
+
+================================================================================================================
+
+**Inherits:** [Node3D](https://docs.godotengine.org/en/stable/classes/class_node3d.html#class-node3d)
+ **<** [Node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node)
+ **<** [Object](https://docs.godotengine.org/en/stable/classes/class_object.html#class-object)
+
+**Inherited By:** [XRCamera3D](https://docs.godotengine.org/en/stable/classes/class_xrcamera3d.html#class-xrcamera3d)
+
+Camera node, displays from a point of view.
+
+Description[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#description "Link to this heading")
+
+----------------------------------------------------------------------------------------------------------------------
+
+**Camera3D** is a special node that displays what is visible from its current location. Cameras register themselves in the nearest [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ node (when ascending the tree). Only one camera can be active per viewport. If no viewport is available ascending the tree, the camera will register in the global viewport. In other words, a camera just provides 3D display capabilities to a [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+, and, without one, a scene registered in that [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ (or higher viewports) can't be displayed.
+
+Tutorials[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#tutorials "Link to this heading")
+
+------------------------------------------------------------------------------------------------------------------
+
+*   [Third Person Shooter (TPS) Demo](https://godotengine.org/asset-library/asset/2710)
+    
+
+Properties[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#properties "Link to this heading")
+
+--------------------------------------------------------------------------------------------------------------------
+
+|     |     |     |
+| --- | --- | --- |
+| [CameraAttributes](https://docs.godotengine.org/en/stable/classes/class_cameraattributes.html#class-cameraattributes) | [attributes](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-attributes) |     |
+| [Compositor](https://docs.godotengine.org/en/stable/classes/class_compositor.html#class-compositor) | [compositor](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-compositor) |     |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask) | `1048575` |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [current](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-current) | `false` |
+| [DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking) | [doppler\_tracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-doppler-tracking) | `0` |
+| [Environment](https://docs.godotengine.org/en/stable/classes/class_environment.html#class-environment) | [environment](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-environment) |     |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [far](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-far) | `4000.0` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [fov](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-fov) | `75.0` |
+| [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2) | [frustum\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-frustum-offset) | `Vector2(0, 0)` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [h\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-h-offset) | `0.0` |
+| [KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect) | [keep\_aspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-keep-aspect) | `1` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [near](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-near) | `0.05` |
+| [ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype) | [projection](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-projection) | `0` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [size](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-size) | `1.0` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [v\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-v-offset) | `0.0` |
+
+Methods[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#methods "Link to this heading")
+
+--------------------------------------------------------------------------------------------------------------
+
+|     |     |
+| --- | --- |
+| void | [clear\_current](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-clear-current)<br>(enable\_next: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)<br> = true) |
+| [Projection](https://docs.godotengine.org/en/stable/classes/class_projection.html#class-projection) | [get\_camera\_projection](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-projection)<br>() const |
+| [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid) | [get\_camera\_rid](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-rid)<br>() const |
+| [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d) | [get\_camera\_transform](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-transform)<br>() const |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [get\_cull\_mask\_value](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-cull-mask-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Plane](https://docs.godotengine.org/en/stable/classes/class_plane.html#class-plane)<br>\] | [get\_frustum](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-frustum)<br>() const |
+| [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid) | [get\_pyramid\_shape\_rid](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-pyramid-shape-rid)<br>() |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [is\_position\_behind](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-is-position-behind)<br>(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)<br>) const |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [is\_position\_in\_frustum](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-is-position-in-frustum)<br>(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)<br>) const |
+| void | [make\_current](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-make-current)<br>() |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [project\_local\_ray\_normal](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-local-ray-normal)<br>(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)<br>) const |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [project\_position](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-position)<br>(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)<br>, z\_depth: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>) const |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [project\_ray\_normal](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-ray-normal)<br>(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)<br>) const |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [project\_ray\_origin](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-ray-origin)<br>(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)<br>) const |
+| void | [set\_cull\_mask\_value](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-cull-mask-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)<br>) |
+| void | [set\_frustum](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-frustum)<br>(size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, offset: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)<br>, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>) |
+| void | [set\_orthogonal](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-orthogonal)<br>(size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>) |
+| void | [set\_perspective](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-perspective)<br>(fov: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br>) |
+| [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2) | [unproject\_position](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-unproject-position)<br>(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)<br>) const |
+
+* * *
+
+Enumerations[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enumerations "Link to this heading")
+
+------------------------------------------------------------------------------------------------------------------------
+
+enum **ProjectionType**: [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+
+[ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+ **PROJECTION\_PERSPECTIVE** = `0`
+
+Perspective projection. Objects on the screen becomes smaller when they are far away.
+
+[ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+ **PROJECTION\_ORTHOGONAL** = `1`
+
+Orthogonal projection, also known as orthographic projection. Objects remain the same size on the screen no matter how far away they are.
+
+[ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+ **PROJECTION\_FRUSTUM** = `2`
+
+Frustum projection. This mode allows adjusting [frustum\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-frustum-offset)
+ to create "tilted frustum" effects.
+
+* * *
+
+enum **KeepAspect**: [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+
+[KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+ **KEEP\_WIDTH** = `0`
+
+Preserves the horizontal aspect ratio; also known as Vert- scaling. This is usually the best option for projects running in portrait mode, as taller aspect ratios will benefit from a wider vertical FOV.
+
+[KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+ **KEEP\_HEIGHT** = `1`
+
+Preserves the vertical aspect ratio; also known as Hor+ scaling. This is usually the best option for projects running in landscape mode, as wider aspect ratios will automatically benefit from a wider horizontal FOV.
+
+* * *
+
+enum **DopplerTracking**: [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+
+[DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+ **DOPPLER\_TRACKING\_DISABLED** = `0`
+
+Disables [Doppler effect](https://en.wikipedia.org/wiki/Doppler_effect)
+ simulation (default).
+
+[DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+ **DOPPLER\_TRACKING\_IDLE\_STEP** = `1`
+
+Simulate [Doppler effect](https://en.wikipedia.org/wiki/Doppler_effect)
+ by tracking positions of objects that are changed in `_process`. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's [AudioStreamPlayer3D.pitch\_scale](https://docs.godotengine.org/en/stable/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d-property-pitch-scale)
+).
+
+[DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+ **DOPPLER\_TRACKING\_PHYSICS\_STEP** = `2`
+
+Simulate [Doppler effect](https://en.wikipedia.org/wiki/Doppler_effect)
+ by tracking positions of objects that are changed in `_physics_process`. Changes in the relative velocity of this camera compared to those objects affect how audio is perceived (changing the audio's [AudioStreamPlayer3D.pitch\_scale](https://docs.godotengine.org/en/stable/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d-property-pitch-scale)
+).
+
+* * *
+
+Property Descriptions[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#property-descriptions "Link to this heading")
+
+------------------------------------------------------------------------------------------------------------------------------------------
+
+[CameraAttributes](https://docs.godotengine.org/en/stable/classes/class_cameraattributes.html#class-cameraattributes)
+ **attributes** [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-attributes)
+
+*   void **set\_attributes**(value: [CameraAttributes](https://docs.godotengine.org/en/stable/classes/class_cameraattributes.html#class-cameraattributes)
+    )
+    
+*   [CameraAttributes](https://docs.godotengine.org/en/stable/classes/class_cameraattributes.html#class-cameraattributes)
+     **get\_attributes**()
+    
+
+The [CameraAttributes](https://docs.godotengine.org/en/stable/classes/class_cameraattributes.html#class-cameraattributes)
+ to use for this camera.
+
+* * *
+
+[Compositor](https://docs.godotengine.org/en/stable/classes/class_compositor.html#class-compositor)
+ **compositor** [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-compositor)
+
+*   void **set\_compositor**(value: [Compositor](https://docs.godotengine.org/en/stable/classes/class_compositor.html#class-compositor)
+    )
+    
+*   [Compositor](https://docs.godotengine.org/en/stable/classes/class_compositor.html#class-compositor)
+     **get\_compositor**()
+    
+
+The [Compositor](https://docs.godotengine.org/en/stable/classes/class_compositor.html#class-compositor)
+ to use for this camera.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **cull\_mask** = `1048575` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+
+*   void **set\_cull\_mask**(value: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+    )
+    
+*   [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+     **get\_cull\_mask**()
+    
+
+The culling mask that describes which [VisualInstance3D.layers](https://docs.godotengine.org/en/stable/classes/class_visualinstance3d.html#class-visualinstance3d-property-layers)
+ are rendered by this camera. By default, all 20 user-visible layers are rendered.
+
+**Note:** Since the [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+ allows for 32 layers to be stored in total, there are an additional 12 layers that are only used internally by the engine and aren't exposed in the editor. Setting [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+ using a script allows you to toggle those reserved layers, which can be useful for editor plugins.
+
+To adjust [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+ more easily using a script, use [get\_cull\_mask\_value()](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-cull-mask-value)
+ and [set\_cull\_mask\_value()](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-cull-mask-value)
+.
+
+**Note:** [VoxelGI](https://docs.godotengine.org/en/stable/classes/class_voxelgi.html#class-voxelgi)
+, SDFGI and [LightmapGI](https://docs.godotengine.org/en/stable/classes/class_lightmapgi.html#class-lightmapgi)
+ will always take all layers into account to determine what contributes to global illumination. If this is an issue, set [GeometryInstance3D.gi\_mode](https://docs.godotengine.org/en/stable/classes/class_geometryinstance3d.html#class-geometryinstance3d-property-gi-mode)
+ to [GeometryInstance3D.GI\_MODE\_DISABLED](https://docs.godotengine.org/en/stable/classes/class_geometryinstance3d.html#class-geometryinstance3d-constant-gi-mode-disabled)
+ for meshes and [Light3D.light\_bake\_mode](https://docs.godotengine.org/en/stable/classes/class_light3d.html#class-light3d-property-light-bake-mode)
+ to [Light3D.BAKE\_DISABLED](https://docs.godotengine.org/en/stable/classes/class_light3d.html#class-light3d-constant-bake-disabled)
+ for lights to exclude them from global illumination.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **current** = `false` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-current)
+
+*   void **set\_current**(value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+    )
+    
+*   [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+     **is\_current**()
+    
+
+If `true`, the ancestor [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ is currently using this camera.
+
+If multiple cameras are in the scene, one will always be made current. For example, if two **Camera3D** nodes are present in the scene and only one is current, setting one camera's [current](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-current)
+ to `false` will cause the other camera to be made current.
+
+* * *
+
+[DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+ **doppler\_tracking** = `0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-doppler-tracking)
+
+*   void **set\_doppler\_tracking**(value: [DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+    )
+    
+*   [DopplerTracking](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-dopplertracking)
+     **get\_doppler\_tracking**()
+    
+
+If not [DOPPLER\_TRACKING\_DISABLED](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-doppler-tracking-disabled)
+, this camera will simulate the [Doppler effect](https://en.wikipedia.org/wiki/Doppler_effect)
+ for objects changed in particular `_process` methods.
+
+**Note:** The Doppler effect will only be heard on [AudioStreamPlayer3D](https://docs.godotengine.org/en/stable/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d)
+s if [AudioStreamPlayer3D.doppler\_tracking](https://docs.godotengine.org/en/stable/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d-property-doppler-tracking)
+ is not set to [AudioStreamPlayer3D.DOPPLER\_TRACKING\_DISABLED](https://docs.godotengine.org/en/stable/classes/class_audiostreamplayer3d.html#class-audiostreamplayer3d-constant-doppler-tracking-disabled)
+.
+
+* * *
+
+[Environment](https://docs.godotengine.org/en/stable/classes/class_environment.html#class-environment)
+ **environment** [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-environment)
+
+*   void **set\_environment**(value: [Environment](https://docs.godotengine.org/en/stable/classes/class_environment.html#class-environment)
+    )
+    
+*   [Environment](https://docs.godotengine.org/en/stable/classes/class_environment.html#class-environment)
+     **get\_environment**()
+    
+
+The [Environment](https://docs.godotengine.org/en/stable/classes/class_environment.html#class-environment)
+ to use for this camera.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **far** = `4000.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-far)
+
+*   void **set\_far**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_far**()
+    
+
+The distance to the far culling boundary for this camera relative to its local Z axis. Higher values allow the camera to see further away, while decreasing [far](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-far)
+ can improve performance if it results in objects being partially or fully culled.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **fov** = `75.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-fov)
+
+*   void **set\_fov**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_fov**()
+    
+
+The camera's field of view angle (in degrees). Only applicable in perspective mode. Since [keep\_aspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-keep-aspect)
+ locks one axis, [fov](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-fov)
+ sets the other axis' field of view angle.
+
+For reference, the default vertical field of view value (`75.0`) is equivalent to a horizontal FOV of:
+
+*   ~91.31 degrees in a 4:3 viewport
+    
+*   ~101.67 degrees in a 16:10 viewport
+    
+*   ~107.51 degrees in a 16:9 viewport
+    
+*   ~121.63 degrees in a 21:9 viewport
+    
+
+* * *
+
+[Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+ **frustum\_offset** = `Vector2(0, 0)` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-frustum-offset)
+
+*   void **set\_frustum\_offset**(value: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+    )
+    
+*   [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+     **get\_frustum\_offset**()
+    
+
+The camera's frustum offset. This can be changed from the default to create "tilted frustum" effects such as [Y-shearing](https://zdoom.org/wiki/Y-shearing)
+.
+
+**Note:** Only effective if [projection](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-projection)
+ is [PROJECTION\_FRUSTUM](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-projection-frustum)
+.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **h\_offset** = `0.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-h-offset)
+
+*   void **set\_h\_offset**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_h\_offset**()
+    
+
+The horizontal (X) offset of the camera viewport.
+
+* * *
+
+[KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+ **keep\_aspect** = `1` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-keep-aspect)
+
+*   void **set\_keep\_aspect\_mode**(value: [KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+    )
+    
+*   [KeepAspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-keepaspect)
+     **get\_keep\_aspect\_mode**()
+    
+
+The axis to lock during [fov](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-fov)
+/[size](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-size)
+ adjustments. Can be either [KEEP\_WIDTH](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-keep-width)
+ or [KEEP\_HEIGHT](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-keep-height)
+.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **near** = `0.05` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-near)
+
+*   void **set\_near**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_near**()
+    
+
+The distance to the near culling boundary for this camera relative to its local Z axis. Lower values allow the camera to see objects more up close to its origin, at the cost of lower precision across the _entire_ range. Values lower than the default can lead to increased Z-fighting.
+
+* * *
+
+[ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+ **projection** = `0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-projection)
+
+*   void **set\_projection**(value: [ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+    )
+    
+*   [ProjectionType](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#enum-camera3d-projectiontype)
+     **get\_projection**()
+    
+
+The camera's projection mode. In [PROJECTION\_PERSPECTIVE](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-projection-perspective)
+ mode, objects' Z distance from the camera's local space scales their perceived size.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **size** = `1.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-size)
+
+*   void **set\_size**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_size**()
+    
+
+The camera's size in meters measured as the diameter of the width or height, depending on [keep\_aspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-keep-aspect)
+. Only applicable in orthogonal and frustum modes.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **v\_offset** = `0.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-v-offset)
+
+*   void **set\_v\_offset**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_v\_offset**()
+    
+
+The vertical (Y) offset of the camera viewport.
+
+* * *
+
+Method Descriptions[](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#method-descriptions "Link to this heading")
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+void **clear\_current**(enable\_next: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ = true) [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-clear-current)
+
+If this is the current camera, remove it from being current. If `enable_next` is `true`, request to make the next camera current, if any.
+
+* * *
+
+[Projection](https://docs.godotengine.org/en/stable/classes/class_projection.html#class-projection)
+ **get\_camera\_projection**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-projection)
+
+Returns the projection matrix that this camera uses to render to its associated viewport. The camera must be part of the scene tree to function.
+
+* * *
+
+[RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ **get\_camera\_rid**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-rid)
+
+Returns the camera's RID from the [RenderingServer](https://docs.godotengine.org/en/stable/classes/class_renderingserver.html#class-renderingserver)
+.
+
+* * *
+
+[Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+ **get\_camera\_transform**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-camera-transform)
+
+Returns the transform of the camera plus the vertical ([v\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-v-offset)
+) and horizontal ([h\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-h-offset)
+) offsets; and any other adjustments made to the position and orientation of the camera by subclassed cameras such as [XRCamera3D](https://docs.godotengine.org/en/stable/classes/class_xrcamera3d.html#class-xrcamera3d)
+.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **get\_cull\_mask\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-cull-mask-value)
+
+Returns whether or not the specified layer of the [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+ is enabled, given a `layer_number` between 1 and 20.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Plane](https://docs.godotengine.org/en/stable/classes/class_plane.html#class-plane)\
+\] **get\_frustum**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-frustum)
+
+Returns the camera's frustum planes in world space units as an array of [Plane](https://docs.godotengine.org/en/stable/classes/class_plane.html#class-plane)
+s in the following order: near, far, left, top, right, bottom. Not to be confused with [frustum\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-frustum-offset)
+.
+
+* * *
+
+[RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ **get\_pyramid\_shape\_rid**() [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-get-pyramid-shape-rid)
+
+Returns the RID of a pyramid shape encompassing the camera's view frustum, ignoring the camera's near plane. The tip of the pyramid represents the position of the camera.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **is\_position\_behind**(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-is-position-behind)
+
+Returns `true` if the given position is behind the camera (the blue part of the linked diagram). [See this diagram](https://raw.githubusercontent.com/godotengine/godot-docs/master/img/camera3d_position_frustum.png)
+ for an overview of position query methods.
+
+**Note:** A position which returns `false` may still be outside the camera's field of view.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **is\_position\_in\_frustum**(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-is-position-in-frustum)
+
+Returns `true` if the given position is inside the camera's frustum (the green part of the linked diagram). [See this diagram](https://raw.githubusercontent.com/godotengine/godot-docs/master/img/camera3d_position_frustum.png)
+ for an overview of position query methods.
+
+* * *
+
+void **make\_current**() [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-make-current)
+
+Makes this camera the current camera for the [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ (see class description). If the camera node is outside the scene tree, it will attempt to become current once it's added.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **project\_local\_ray\_normal**(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-local-ray-normal)
+
+Returns a normal vector from the screen point location directed along the camera. Orthogonal cameras are normalized. Perspective cameras account for perspective, screen width/height, etc.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **project\_position**(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+, z\_depth: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-position)
+
+Returns the 3D point in world space that maps to the given 2D coordinate in the [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ rectangle on a plane that is the given `z_depth` distance into the scene away from the camera.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **project\_ray\_normal**(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-ray-normal)
+
+Returns a normal vector in world space, that is the result of projecting a point on the [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ rectangle by the inverse camera projection. This is useful for casting rays in the form of (origin, normal) for object intersection or picking.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **project\_ray\_origin**(screen\_point: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-project-ray-origin)
+
+Returns a 3D position in world space, that is the result of projecting a point on the [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ rectangle by the inverse camera projection. This is useful for casting rays in the form of (origin, normal) for object intersection or picking.
+
+* * *
+
+void **set\_cull\_mask\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-cull-mask-value)
+
+Based on `value`, enables or disables the specified layer in the [cull\_mask](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-cull-mask)
+, given a `layer_number` between 1 and 20.
+
+* * *
+
+void **set\_frustum**(size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, offset: [Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-frustum)
+
+Sets the camera projection to frustum mode (see [PROJECTION\_FRUSTUM](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-projection-frustum)
+), by specifying a `size`, an `offset`, and the `z_near` and `z_far` clip planes in world space units. The `size` parameter represents the size of the near plane, either its width or height depending on the value of [keep\_aspect](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-keep-aspect)
+. See also [frustum\_offset](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-property-frustum-offset)
+.
+
+* * *
+
+void **set\_orthogonal**(size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-orthogonal)
+
+Sets the camera projection to orthogonal mode (see [PROJECTION\_ORTHOGONAL](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-projection-orthogonal)
+), by specifying a `size`, and the `z_near` and `z_far` clip planes in world space units.
+
+As a hint, 3D games that look 2D often use this projection, with `size` specified in pixels.
+
+* * *
+
+void **set\_perspective**(fov: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, z\_near: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+, z\_far: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-set-perspective)
+
+Sets the camera projection to perspective mode (see [PROJECTION\_PERSPECTIVE](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-constant-projection-perspective)
+), by specifying a `fov` (field of view) angle in degrees, and the `z_near` and `z_far` clip planes in world space units.
+
+* * *
+
+[Vector2](https://docs.godotengine.org/en/stable/classes/class_vector2.html#class-vector2)
+ **unproject\_position**(world\_point: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-unproject-position)
+
+Returns the 2D coordinate in the [Viewport](https://docs.godotengine.org/en/stable/classes/class_viewport.html#class-viewport)
+ rectangle that maps to the given 3D point in world space.
+
+**Note:** When using this to position GUI elements over a 3D viewport, use [is\_position\_behind()](https://docs.godotengine.org/en/stable/classes/class_camera3d.html#class-camera3d-method-is-position-behind)
+ to prevent them from appearing if the 3D point is behind the camera:
+
+\# This code block is part of a script that inherits from Node3D.
+\# \`control\` is a reference to a node inheriting from Control.
+control.visible \= not get\_viewport().get\_camera\_3d().is\_position\_behind(global\_transform.origin)
+control.position \= get\_viewport().get\_camera\_3d().unproject\_position(global\_transform.origin)
+
+Copy to clipboard
+
+[Previous](https://docs.godotengine.org/en/stable/classes/class_camera2d.html "Camera2D")
+ [Next](https://docs.godotengine.org/en/stable/classes/class_canvasgroup.html "CanvasGroup")
+
+* * *
+
+User-contributed notes
+----------------------
+
+_Please read the [User-contributed notes policy](https://github.com/godotengine/godot-docs-user-notes/discussions/1)
+ before submitting a comment._
+
+Read the Docs v: stable
+
+Languages
+
+[pt-br](https://docs.godotengine.org/pt-br/stable/)
+
+[cs](https://docs.godotengine.org/cs/stable/)
+
+[en](https://docs.godotengine.org/en/stable/)
+
+[fr](https://docs.godotengine.org/fr/stable/)
+
+[de](https://docs.godotengine.org/de/stable/)
+
+[it](https://docs.godotengine.org/it/stable/)
+
+[ja](https://docs.godotengine.org/ja/stable/)
+
+[ko](https://docs.godotengine.org/ko/stable/)
+
+[pl](https://docs.godotengine.org/pl/stable/)
+
+[ru](https://docs.godotengine.org/ru/stable/)
+
+[zh-cn](https://docs.godotengine.org/zh-cn/stable/)
+
+[es](https://docs.godotengine.org/es/stable/)
+
+[zh-tw](https://docs.godotengine.org/zh-tw/stable/)
+
+[uk](https://docs.godotengine.org/uk/stable/)
+
+Versions
+
+[latest](https://docs.godotengine.org/en/latest/)
+
+[stable](https://docs.godotengine.org/en/stable/)
+
+[4.7](https://docs.godotengine.org/en/4.7/)
+
+[4.6](https://docs.godotengine.org/en/4.6/)
+
+[4.5](https://docs.godotengine.org/en/4.5/)
+
+[4.4](https://docs.godotengine.org/en/4.4/)
+
+[4.3](https://docs.godotengine.org/en/4.3/)
+
+[4.2](https://docs.godotengine.org/en/4.2/)
+
+[4.1](https://docs.godotengine.org/en/4.1/)
+
+[4.0](https://docs.godotengine.org/en/4.0/)
+
+[3.6](https://docs.godotengine.org/en/3.6/)
+
+[3.5](https://docs.godotengine.org/en/3.5/)
+
+[3.4](https://docs.godotengine.org/en/3.4/)
+
+[3.3](https://docs.godotengine.org/en/3.3/)
+
+[3.2](https://docs.godotengine.org/en/3.2/)
+
+[3.1](https://docs.godotengine.org/en/3.1/)
+
+[3.0](https://docs.godotengine.org/en/3.0/)
+
+[2.1](https://docs.godotengine.org/en/2.1/)
+
+On Read the Docs
+
+[Project Home](https://app.readthedocs.org/projects/godot/)
+
+[Builds](https://app.readthedocs.org/projects/godot/builds/)
+
+[Downloads](https://docs.godotengine.org/en/stable/classes/null)
+
+Search
+
+* * *
+
+Hosted by [Read the Docs](https://about.readthedocs.org/?utm_source=&utm_content=flyout)

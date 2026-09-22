@@ -1,0 +1,92 @@
+{
+  "assets": [
+    {
+      "asset_id": "fabrication_station_derelict_v1",
+      "helpers_excluded": true,
+      "identity_nodes": true,
+      "mesh_count": 34,
+      "node_count": 34,
+      "output_byte_size": 296376,
+      "output_sha256": "f157a11d964fa79f3c41f32ee036638233ad35a505426cd8815901cc0d9027de",
+      "size_m": [
+        1.7,
+        1.82,
+        1.0
+      ],
+      "source_sha256_after": "d47685c934515d1a2a785fd6a9eb9869eb11dbf09aad4962d0956d8b12cb0ddf",
+      "source_sha256_before": "d47685c934515d1a2a785fd6a9eb9869eb11dbf09aad4962d0956d8b12cb0ddf",
+      "source_unchanged": true,
+      "triangles": 4088,
+      "within_roster_envelope": true,
+      "world_max_y_up_m": [
+        0.85,
+        1.82,
+        0.5
+      ],
+      "world_min_y_up_m": [
+        -0.85,
+        0.0,
+        -0.5
+      ]
+    },
+    {
+      "asset_id": "coolant_pump_skid_derelict_v1",
+      "helpers_excluded": true,
+      "identity_nodes": true,
+      "mesh_count": 38,
+      "node_count": 38,
+      "output_byte_size": 276360,
+      "output_sha256": "d6845f525bb987b73305fbb8d581cd85e87740f7272e564fc6f7b5d350a6878f",
+      "size_m": [
+        1.52,
+        0.975,
+        0.955
+      ],
+      "source_sha256_after": "a0f70007f51b7faea5b924584f02df3072bd8a0858a0b06c7553c07548244d26",
+      "source_sha256_before": "a0f70007f51b7faea5b924584f02df3072bd8a0858a0b06c7553c07548244d26",
+      "source_unchanged": true,
+      "triangles": 3960,
+      "within_roster_envelope": true,
+      "world_max_y_up_m": [
+        0.76,
+        0.975,
+        0.4775
+      ],
+      "world_min_y_up_m": [
+        -0.76,
+        0.0,
+        -0.4775
+      ]
+    },
+    {
+      "asset_id": "suit_service_stand_derelict_v1",
+      "helpers_excluded": true,
+      "identity_nodes": true,
+      "mesh_count": 28,
+      "node_count": 28,
+      "output_byte_size": 223736,
+      "output_sha256": "71f5ed5c77c5cf63d2a9a32df3fd087452e971707940794ba5fc59eb7ade7b39",
+      "size_m": [
+        1.2719719999999999,
+        1.87,
+        0.774
+      ],
+      "source_sha256_after": "2b449b8e36ef5da2ddc4fc84d68ee9eee7f3290b1c33e6743745bd053545ceff",
+      "source_sha256_before": "2b449b8e36ef5da2ddc4fc84d68ee9eee7f3290b1c33e6743745bd053545ceff",
+      "source_unchanged": true,
+      "triangles": 2980,
+      "within_roster_envelope": true,
+      "world_max_y_up_m": [
+        0.63784,
+        1.87,
+        0.387
+      ],
+      "world_min_y_up_m": [
+        -0.634132,
+        0.0,
+        -0.387
+      ]
+    }
+  ],
+  "output_root": "/tmp/room-kit-v2-final-pilot-j7e0hpbn"
+}

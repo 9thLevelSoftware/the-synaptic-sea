@@ -1,0 +1,118 @@
+[
+  {
+    "label": "import-authenticated",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--editor",
+      "--quit"
+    ],
+    "exit": 124,
+    "marker_seen": true,
+    "diagnostics": [],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/import-authenticated.log"
+  },
+  {
+    "label": "additional_dressing_procgen_smoke",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--script",
+      "scripts/validation/additional_dressing_procgen_smoke.gd"
+    ],
+    "exit": 0,
+    "marker_seen": true,
+    "diagnostics": [],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/additional_dressing_procgen_smoke.log"
+  },
+  {
+    "label": "prop_visual_binding_smoke",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--script",
+      "scripts/validation/prop_visual_binding_smoke.gd"
+    ],
+    "exit": 0,
+    "marker_seen": true,
+    "diagnostics": [],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/prop_visual_binding_smoke.log"
+  },
+  {
+    "label": "gameplay_prop_imported_visual_smoke",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--script",
+      "scripts/validation/gameplay_prop_imported_visual_smoke.gd"
+    ],
+    "exit": 0,
+    "marker_seen": true,
+    "diagnostics": [],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/gameplay_prop_imported_visual_smoke.log"
+  },
+  {
+    "label": "builder_placed_props_smoke",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--script",
+      "scripts/validation/builder_placed_props_smoke.gd"
+    ],
+    "exit": 0,
+    "marker_seen": true,
+    "diagnostics": [],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/builder_placed_props_smoke.log"
+  },
+  {
+    "label": "start_scenario_smoke",
+    "command": [
+      "/opt/homebrew/bin/godot",
+      "--headless",
+      "--path",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--rendering-method",
+      "gl_compatibility",
+      "--rendering-driver",
+      "opengl3",
+      "--script",
+      "scripts/validation/start_scenario_smoke.gd"
+    ],
+    "exit": 0,
+    "marker_seen": false,
+    "diagnostics": [
+      "WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped"
+    ],
+    "log": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/baseline/start_scenario_smoke.log"
+  }
+]

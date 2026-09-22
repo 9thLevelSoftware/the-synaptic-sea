@@ -1,0 +1,107 @@
+[
+  {
+    "label": "floor_1x1",
+    "module_id": "floor_1x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/floor_1x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/floor_1x1.blend"
+  },
+  {
+    "label": "floor_2x1",
+    "module_id": "floor_2x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/floor_2x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/floor_2x1.blend"
+  },
+  {
+    "label": "corridor_floor_1x1",
+    "module_id": "corridor_floor_1x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/corridor_floor_1x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/corridor_floor_1x1.blend"
+  },
+  {
+    "label": "corridor_floor_1x2",
+    "module_id": "corridor_floor_1x2",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/corridor_floor_1x2.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/corridor_floor_1x2.blend"
+  },
+  {
+    "label": "wall_straight_1x1",
+    "module_id": "wall_straight_1x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/wall_straight_1x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/wall_straight_1x1.blend"
+  },
+  {
+    "label": "doorway_frame_open_1x1",
+    "module_id": "doorway_frame_open_1x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/doorway_frame_open_1x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/doorway_frame_open_1x1.blend"
+  },
+  {
+    "label": "pillar_support_1x1",
+    "module_id": "pillar_support_1x1",
+    "expected": "pass",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/pillar_support_1x1.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/pillar_support_1x1.blend"
+  },
+  {
+    "label": "raised_floor",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/raised_floor.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/raised_floor.blend"
+  },
+  {
+    "label": "wall_gap",
+    "module_id": "wall_straight_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/wall_gap.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/wall_gap.blend"
+  },
+  {
+    "label": "thick_wall",
+    "module_id": "wall_straight_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/thick_wall.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/thick_wall.blend"
+  },
+  {
+    "label": "leaked_helper",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/leaked_helper.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/leaked_helper.blend"
+  },
+  {
+    "label": "translated_floor",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/translated_floor.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/translated_floor.blend"
+  },
+  {
+    "label": "compensated_floor_origin",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/compensated_floor_origin.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/compensated_floor_origin.blend"
+  },
+  {
+    "label": "blocked_doorway",
+    "module_id": "doorway_frame_open_1x1",
+    "expected": "fail",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/blocked_doorway.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/blocked_doorway.blend"
+  },
+  {
+    "label": "unsupported_ramp",
+    "module_id": "ramp_up_1x2",
+    "expected": "hold",
+    "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/unsupported_ramp.glb",
+    "source": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/unsupported_ramp.blend"
+  }
+]

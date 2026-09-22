@@ -1,0 +1,26 @@
+TDD evidence for structural visual contract
+
+RED (before implementation):
+  python3 -c 'import pytest; raise SystemExit(pytest.main(["-q", "tests/test_structural_visual_contract.py"]))'
+  Result: collection failed with ModuleNotFoundError: tools.structural_visual_contract (8 tests not runnable).
+
+GREEN focused:
+  python3 -c 'import pytest; raise SystemExit(pytest.main(["-q", "tests/test_structural_visual_contract.py"]))'
+  Result: 8 passed in 0.03s.
+
+Additional verification:
+  python3 -m py_compile tools/structural_visual_contract.py tests/test_structural_visual_contract.py
+  Result: exit 0.
+  unzip -p .../structural-authority-v2.zip shared-structural-dimensions-v1.json | cmp -s - data/art/structural_visual_dimensions.v1.json
+  Result: exit 0 (canonical bytes exact).
+
+Additional TDD regression:
+  Added recessed terminal-face and beveled floor-boundary fixtures with identical outer AABB.
+  RED: recessed wall incorrectly returned pass before coplanar-plane filtering.
+  GREEN: focused adversarial test 1 passed; full focused file 9 passed.
+
+Final focused pass log: artifacts/room_kit_v2/pipeline-update/contract/focused-tests.log
+Final SHA-256:
+  data/art/structural_visual_dimensions.v1.json 5499c1921bc90492ba60015b8a046b41de047ac17892883821c41efb234ec43f
+  tools/structural_visual_contract.py 3a2b1364d17ddf340ba321573990b57f939d26089c63157f1eca7d224734d6d8
+  tests/test_structural_visual_contract.py a1a447ce2a39283f2882bfe1334c44f1cf43063aede33096faf1984a3c41febf

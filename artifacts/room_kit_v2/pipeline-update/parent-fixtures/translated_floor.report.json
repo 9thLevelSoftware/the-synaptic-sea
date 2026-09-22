@@ -1,0 +1,14 @@
+{
+  "errors": [
+    "mesh object 'Visual_translated_floor' has unbaked translation"
+  ],
+  "measurements": {
+    "assembly_acceptance": false,
+    "helper_objects_rejected": true,
+    "mesh_object_count": 1,
+    "object_count": 1,
+    "triangle_count": 12,
+    "validation_scope": "per_module_visual_interface"
+  },
+  "status": "fail"
+}

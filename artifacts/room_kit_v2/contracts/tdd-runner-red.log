@@ -1,0 +1,374 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+_____________________ test_runner[print("REAL")-REAL-10-0] _____________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_print__REAL___REAL0')
+program = 'print("REAL")', marker = 'REAL', timeout = 10, expected = 0
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+_ test_runner[print("SCRIPT ERROR: deliberate runner test"); print("REAL")-REAL-10-1] _
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_print__SCRIPT_ERRO0')
+program = 'print("SCRIPT ERROR: deliberate runner test"); print("REAL")'
+marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+_ test_runner[print("ERROR: deliberate runner test"); print("REAL")-REAL-10-1] _
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_print__ERROR__deli0')
+program = 'print("ERROR: deliberate runner test"); print("REAL")'
+marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+_ test_runner[print("WARNING: deliberate runner test"); print("REAL")-REAL-10-1] _
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_print__WARNING__de0')
+program = 'print("WARNING: deliberate runner test"); print("REAL")'
+marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+_________________ test_runner[print("wrong marker")-REAL-10-1] _________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_print__wrong_marke0')
+program = 'print("wrong marker")', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+__________________ test_runner[raise SystemExit(5)-REAL-10-1] __________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_raise_SystemExit_50')
+program = 'raise SystemExit(5)', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+________________ test_runner[import time; time.sleep(10)--1-1] _________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_import_time__time_0')
+program = 'import time; time.sleep(10)', marker = '', timeout = 1, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory
+E         
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:49: AssertionError
+______________ test_runner_preserves_raw_output_on_nonzero_child _______________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-51/test_runner_preserves_raw_outp0')
+
+    def test_runner_preserves_raw_output_on_nonzero_child(tmp_path) -> None:
+        log = tmp_path / "raw.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                "REAL",
+                "--",
+                sys.executable,
+                "-c",
+                'import sys; print("raw diagnostic"); sys.exit(7)',
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == 1
+E       assert 2 == 1
+E        +  where 2 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...s/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/run_room_kit_gate.py': [Errno 2] No such file or directory\n").returncode
+
+tests/test_run_room_kit_gate.py:78: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("REAL")-REAL-10-0]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("SCRIPT ERROR: deliberate runner test"); print("REAL")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("ERROR: deliberate runner test"); print("REAL")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("WARNING: deliberate runner test"); print("REAL")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("wrong marker")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[raise SystemExit(5)-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[import time; time.sleep(10)--1-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner_preserves_raw_output_on_nonzero_child
+8 failed in 0.51s

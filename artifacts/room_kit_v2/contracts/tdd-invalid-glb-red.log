@@ -1,0 +1,39 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_export_rejects_glb_without_binary_payload ________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-66/test_export_rejects_glb_withou0')
+
+    def test_export_rejects_glb_without_binary_payload(tmp_path) -> None:
+        source = create_master(tmp_path)
+        output = tmp_path / "missing-bin.glb"
+        script = tmp_path / "missing_bin_export.py"
+        script.write_text(
+            f"""
+    import json
+    import runpy
+    import struct
+    from pathlib import Path
+    module = runpy.run_path({str(EXPORTER)!r})
+    def invalid(**kwargs):
+        document = {{'asset': {{'version': '2.0'}}, 'nodes': [{{'mesh': 0}}], 'meshes': [{{'primitives': []}}]}}
+        payload = json.dumps(document, separators=(',', ':')).encode()
+        payload += b' ' * ((-len(payload)) % 4)
+        raw = struct.pack('<4sII', b'glTF', 2, 20 + len(payload)) + struct.pack('<I4s', len(payload), b'JSON') + payload
+        Path({str(output)!r}).write_bytes(raw)
+        return {{'FINISHED'}}
+    module['export_static'](Path({str(source)!r}), Path({str(output)!r}), export_operator=invalid)
+    """,
+            encoding="utf-8",
+        )
+        result = run_blender(script)
+        save_log("export-negative-missing-bin.log", result)
+    
+>       assert result.returncode != 0
+E       assert 0 != 0
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python-exit-code', '1', '-...b_withou0/valid.blend"}\nBlender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)\n\nBlender quit\n', stderr='').returncode
+
+tests/test_export_static_room_prop.py:340: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_export_static_room_prop.py::test_export_rejects_glb_without_binary_payload
+1 failed, 13 deselected in 1.03s

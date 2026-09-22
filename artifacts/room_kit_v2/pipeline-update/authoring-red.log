@@ -1,0 +1,256 @@
+FFFFFFF.                                                                 [100%]
+=================================== FAILURES ===================================
+_______ test_legacy_structural_authoring_holds_before_blender[floor_1x1] _______
+
+module_id = 'floor_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1060a78b0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori0'), 'floor_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+___ test_legacy_structural_authoring_holds_before_blender[wall_straight_1x1] ___
+
+module_id = 'wall_straight_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10607e4f0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori1'), 'wall_straight_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+_ test_legacy_structural_authoring_holds_before_blender[doorway_frame_open_1x1] _
+
+module_id = 'doorway_frame_open_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10624a9d0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori2'), 'doorway_frame_open_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+__ test_legacy_structural_authoring_holds_before_blender[pillar_support_1x1] ___
+
+module_id = 'pillar_support_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x105f7cdf0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori3'), 'pillar_support_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+______ test_legacy_structural_authoring_holds_before_blender[ramp_up_1x2] ______
+
+module_id = 'ramp_up_1x2'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10625cfd0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori4'), 'ramp_up_1x2')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+____ test_legacy_structural_authoring_holds_before_blender[ceiling_cap_1x1] ____
+
+module_id = 'ceiling_cap_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori5')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1060a8d60>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori5'), 'ceiling_cap_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+___ test_legacy_structural_authoring_holds_before_blender[pressure_door_1x1] ___
+
+module_id = 'pressure_door_1x1'
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x105f7c5b0>
+
+    @pytest.mark.parametrize("module_id", recipes.STRUCTURAL_ASSET_IDS)
+    def test_legacy_structural_authoring_holds_before_blender(module_id, tmp_path, monkeypatch):
+        source = tmp_path / "candidate.blend"
+        source.write_bytes(b"unchanged-source-sentinel")
+        monkeypatch.setattr(recipes, "resolve_source_path", lambda *args: source)
+    
+        def forbidden(*args):
+            pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+    
+        monkeypatch.setattr(recipes, "_structural_spec", forbidden)
+        monkeypatch.setattr(recipes, "_require_bpy", forbidden)
+        args = SimpleNamespace(asset_id=module_id, project_root=tmp_path,
+                               structural_source_root=tmp_path, props_source_root=tmp_path)
+        with pytest.raises(RuntimeError, match="visual-fit HOLD"):
+>           recipes._run(args)
+
+tests/test_focused_nine_visual_preflight.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/focused_nine_blender_recipes.py:2180: in _run
+    spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-9/test_legacy_structural_authori6'), 'pressure_door_1x1')
+
+    def forbidden(*args):
+>       pytest.fail("legacy structural authoring reached contract/Blender mutation path")
+E       Failed: legacy structural authoring reached contract/Blender mutation path
+
+tests/test_focused_nine_visual_preflight.py:17: Failed
+=========================== short test summary info ============================
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[floor_1x1]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[wall_straight_1x1]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[doorway_frame_open_1x1]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[pillar_support_1x1]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[ramp_up_1x2]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[ceiling_cap_1x1]
+FAILED tests/test_focused_nine_visual_preflight.py::test_legacy_structural_authoring_holds_before_blender[pressure_door_1x1]
+7 failed, 1 passed in 0.15s

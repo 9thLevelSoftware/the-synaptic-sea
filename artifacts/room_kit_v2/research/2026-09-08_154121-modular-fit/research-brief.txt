@@ -1,0 +1,99 @@
+Detailed isometric walls and floors without unintended tiers
+Research brief — 2026-09-08
+
+Conclusion
+
+Positive thickness is compatible with clean modular assembly. Bethesda’s Skyrim/Fallout kit-building transcript explicitly says to predetermine floor thickness, reserve space for walls inside the kit footprint, and stress-test assemblies before completing the art.[7] The Level Design Book likewise recommends floors with thickness in its modular-kit stack test.[1]
+
+My recommendation for The Synaptic Sea is a fixed structural shell and joining contract, with visual detail added without changing those interfaces. This is an adaptation of the sources, not a measurement or acceptance test of our current assets. No assets or runtime contracts were changed for this research.
+
+1. Isometric is the camera, not a different construction grid
+
+Godot’s orthographic projection preserves apparent object size regardless of distance.[3] Local inspection confirmed scripts/camera/iso_camera_rig.gd selects Camera3D.PROJECTION_ORTHOGONAL and data/kits/ship_structural_v0.json declares grid_step_m = 4.0.
+
+For this true-3D project, author ordinary aligned geometry in world coordinates. Do not shear floor meshes into screen-space diamonds or compensate for the camera by raising neighboring modules. Sprite anchoring and pixel-perfect rasterization are separate issues for pre-rendered 2D tile sets, not the geometry contract being researched here.
+
+2. Reserve physical space, rather than making everything infinitely thin
+
+Bethesda distinguishes the module footprint from its traversable space: the walls and alcoves must fit inside the allocated footprint instead of colliding with adjacent corridors.[7] Its authors specifically recommend predetermined floor thickness and ground-plane pivots for their typical kit pieces.[7]
+
+Recommended adaptation:
+  - Keep one declared finished walking-surface datum for each deck.
+  - Put the shared floor-slab thickness below that surface.
+  - Keep same-level door thresholds, floor grates and repair inserts flush or recessed.
+  - Reserve a common wall-depth envelope and doorway clearance shared by compatible walls, corners and doors.
+  - Preserve one agreed wall anchor convention across rotations and junctions.
+  - Do not enlarge a finished mesh, recenter it from its bounding box or move it by eye to compensate for added decoration.
+
+Conceptual floor section, not newly approved project coordinates:
+
+  common walking surface  -----------------------------
+                          | tile A | tile B | tile C |
+  common underside        -----------------------------
+
+Thickness is below the shared walking surface. Adding an extra plate above just one tile changes the visible height even if all base slabs are identical. Recessing the plate into the slab avoids that change.
+
+3. Lock origins and joining faces, not merely overall dimensions
+
+Epic explains that the mesh pivot controls translation, rotation and scaling, and recommends a corner-at-origin arrangement for its FBX grid-snapping workflow.[6] Bethesda typically uses a centered ground-plane pivot instead.[7] These are different valid conventions; the transferable requirement is that authoring, export and placement agree.
+
+Godot likewise documents that GridMap cell_size does not resize the meshes, while cell_scale changes the items rather than the cells.[2] This is an illustration of grid/mesh separation, not a recommendation to replace our existing procedural placement system with GridMap.
+
+Recommended adaptation: retain existing authoritative anchors and sockets; do not impose a universal corner pivot or automatic bounding-box normalization. A logical wall edge can have no cell depth while the visual wall has physical thickness, but that needs an explicit visual envelope and ownership rule for shared boundaries. Positive-thickness authorization is not permission to silently widen unrelated collision or navigation contracts.
+
+4. Use different techniques for different sizes of detail
+
+Godot states that normal mapping represents finer shape detail without modifying geometry; it changes the incident angle for lighting.[4] Frozenbyte recommends tiling textures or trim sheets for long surfaces such as walls and floors, and describes baking high-poly trim details onto a flat plane.[8] It also describes adding geometry when flat surfaces need actual shape.[8]
+
+Recommended salvage-industrial allocation:
+  - Paint wear, grime, hazard stripes and labels: color/roughness textures or supported overlays.
+  - Small grooves, screws, rivets and shallow seams: baked normal maps, often using a reusable trim sheet.
+  - Wall braces, service pipes, deep recesses and broken silhouettes: real geometry within the reserved envelope.
+  - Floor repair plates: flush inserts, rather than a raised slab on every tile.
+  - Door sill: same top datum as adjoining floors, not a decorative speed bump.
+  - Floor borders: flat shared mating edges; put panel-line detail inside the tile instead of rounding away the entire seam.
+
+A trim sheet is reusable surface artwork, not inherently an extra strip of raised geometry. Its UV mapping and supporting mesh determine how it is used. Normal detail cannot substitute for every silhouette-changing shape; the hybrid is deliberate.
+
+5. Treat joins and apparent seams separately
+
+Frozenbyte explicitly advises flat blending edges for trims and a neutral outward-pointing normal near those edges.[8] Thus matching mesh dimensions does not by itself guarantee matching surface shading.
+
+Recommended checks:
+  - Distinguish geometric steps/gaps from a texture seam, bevel trough or lighting discontinuity.
+  - Test corners, T-junctions, doorframes, floor/wall contacts and all supported rotations using designed connection rules; do not rely on arbitrary nudges or gap-covering props.
+  - Preserve matching edge profiles in damaged variants unless a break is explicitly intentional.
+  - Avoid duplicate coplanar visible surfaces; hidden, deliberately owned overlaps differ from accidental intersecting visible faces.
+  - Check unlit appearance, lit clay shading and final materials independently.
+
+Bethesda’s loopback example rejects a patch-up hallway piece and fixes the faulty corner footprint instead.[7] That is particularly relevant to procedural rooms: a workaround for one hand-arranged room does not establish kit-wide correctness.
+
+6. Verify assemblies in the target renderer
+
+Bethesda recommends loopback and vertical-stack stress tests.[7] Vuk Banovic’s modular-kit walkthrough also emphasizes testing in the engine and walking around rather than trusting the modeling viewport.[9]
+
+Recommended acceptance evidence for our kit:
+  - A mixed-floor patch sharing one top datum, without height accumulation.
+  - A room-to-corridor closed loop that returns to the correct socket.
+  - Walls, doors, inner/outer corners and junctions at every allowed quarter-turn.
+  - Intact/damaged/breached combinations preserving required mating surfaces.
+  - Measurements of transformed imported vertices at actual procedural placements, not only local GLB accessor bounds or whole-mesh AABBs.
+  - Separate checks for visible floor geometry, collision support and doorway navigation clearance.
+  - Final-camera renders at gameplay size, plus deliberate wrong-height and wrong-pivot rejection cases.
+
+Renderer caveat: Godot projected decals are supported in Forward+ and Mobile, not Compatibility; the docs suggest Sprite3D for mostly flat surfaces on Compatibility.[5] For any Compatibility validation path, prefer baked material detail or verified flat overlays, rather than making the kit depend on Decal nodes. This research did not re-diagnose the project’s actual runtime renderer.
+
+Decision boundary
+
+The research supports positive thickness with shared dimensions, not a particular universal numerical thickness. The existing 4 m grid is locally confirmed; exact wall depth, slab depth and the authoritative finished-floor datum still need consistent adoption and actual assembly verification. This brief is research, not evidence that the currently staged structural assets pass.
+
+Sources:
+[1] https://book.leveldesignbook.com/process/blockout/metrics/modular
+[2] https://docs.godotengine.org/en/stable/classes/class_gridmap.html
+[3] https://docs.godotengine.org/en/stable/classes/class_camera3d.html
+[4] https://docs.godotengine.org/en/stable/tutorials/3d/standard_material_3d.html
+[5] https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html
+[6] https://dev.epicgames.com/documentation/en-us/unreal-engine/fbx-static-mesh-pipeline-in-unreal-engine — Epic Games: FBX Static Mesh Pipeline
+[7] http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html — Joel Burgess and Nate Purkeypile: Skyrim Modular Level Design GDC 2013
+[8] https://wiki.frozenbyte.com/index.php/3D_Asset_Workflow:_Tile_Textures_and_Trimsheets — Frozenbyte: Tile Textures and Trimsheets
+[9] https://www.exp-points.com/vuk-single-material-modular-kit-environment-ue4 — Vuk Banovic: Single Material Modular Kit Q&A

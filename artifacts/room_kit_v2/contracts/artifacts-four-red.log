@@ -1,0 +1,104 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_________________ test_asset[fabrication_station_derelict_v1] __________________
+
+row = {'asset_id': 'fabrication_station_derelict_v1', 'new': False, 'max_size_m': [1.8, 1.85, 1.1], 'triangles_max': 5000, ...}
+
+    @pytest.mark.parametrize("row", ROWS, ids=[row["asset_id"] for row in ROWS])
+    def test_asset(row: dict) -> None:
+>       validate_static(ASSETS / f'{row["asset_id"]}.glb', row)
+
+tests/test_room_kit_v2_artifacts.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/room_kit_contract.py:192: in validate_static
+    _identity_values(node[key], expected, f"node {name} {key}")
+tools/room_kit_contract.py:146: in _identity_values
+    _assert(all(abs(float(value) - target) <= 1e-6 for value, target in zip(actual, expected)), f"{label} must be identity")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'node FabBase translation must be identity'
+
+    def _assert(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: node FabBase translation must be identity
+
+tools/room_kit_contract.py:73: AssertionError
+__________________ test_asset[medical_stasis_pod_derelict_v1] __________________
+
+row = {'asset_id': 'medical_stasis_pod_derelict_v1', 'new': False, 'max_size_m': [2.2, 1.25, 1.1], 'triangles_max': 5000, ...}
+
+    @pytest.mark.parametrize("row", ROWS, ids=[row["asset_id"] for row in ROWS])
+    def test_asset(row: dict) -> None:
+>       validate_static(ASSETS / f'{row["asset_id"]}.glb', row)
+
+tests/test_room_kit_v2_artifacts.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/room_kit_contract.py:192: in validate_static
+    _identity_values(node[key], expected, f"node {name} {key}")
+tools/room_kit_contract.py:146: in _identity_values
+    _assert(all(abs(float(value) - target) <= 1e-6 for value, target in zip(actual, expected)), f"{label} must be identity")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'node PodBase translation must be identity'
+
+    def _assert(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: node PodBase translation must be identity
+
+tools/room_kit_contract.py:73: AssertionError
+__________________ test_asset[power_cell_cradle_derelict_v1] ___________________
+
+row = {'asset_id': 'power_cell_cradle_derelict_v1', 'new': False, 'max_size_m': [1.4, 1.8, 1.0], 'triangles_max': 4500, ...}
+
+    @pytest.mark.parametrize("row", ROWS, ids=[row["asset_id"] for row in ROWS])
+    def test_asset(row: dict) -> None:
+>       validate_static(ASSETS / f'{row["asset_id"]}.glb', row)
+
+tests/test_room_kit_v2_artifacts.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/room_kit_contract.py:192: in validate_static
+    _identity_values(node[key], expected, f"node {name} {key}")
+tools/room_kit_contract.py:146: in _identity_values
+    _assert(all(abs(float(value) - target) <= 1e-6 for value, target in zip(actual, expected)), f"{label} must be identity")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'node CradleBack translation must be identity'
+
+    def _assert(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: node CradleBack translation must be identity
+
+tools/room_kit_contract.py:73: AssertionError
+____________________ test_asset[salvage_sorter_derelict_v1] ____________________
+
+row = {'asset_id': 'salvage_sorter_derelict_v1', 'new': False, 'max_size_m': [1.9, 1.5, 1.1], 'triangles_max': 5000, ...}
+
+    @pytest.mark.parametrize("row", ROWS, ids=[row["asset_id"] for row in ROWS])
+    def test_asset(row: dict) -> None:
+>       validate_static(ASSETS / f'{row["asset_id"]}.glb', row)
+
+tests/test_room_kit_v2_artifacts.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/room_kit_contract.py:192: in validate_static
+    _identity_values(node[key], expected, f"node {name} {key}")
+tools/room_kit_contract.py:146: in _identity_values
+    _assert(all(abs(float(value) - target) <= 1e-6 for value, target in zip(actual, expected)), f"{label} must be identity")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'node SorterBase translation must be identity'
+
+    def _assert(condition: bool, message: str) -> None:
+        if not condition:
+>           raise AssertionError(message)
+E           AssertionError: node SorterBase translation must be identity
+
+tools/room_kit_contract.py:73: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_room_kit_v2_artifacts.py::test_asset[fabrication_station_derelict_v1]
+FAILED tests/test_room_kit_v2_artifacts.py::test_asset[medical_stasis_pod_derelict_v1]
+FAILED tests/test_room_kit_v2_artifacts.py::test_asset[power_cell_cradle_derelict_v1]
+FAILED tests/test_room_kit_v2_artifacts.py::test_asset[salvage_sorter_derelict_v1]
+4 failed, 14 deselected in 0.04s

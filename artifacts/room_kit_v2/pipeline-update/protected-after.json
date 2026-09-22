@@ -1,0 +1,20 @@
+{
+  "count": 3283,
+  "changed": [],
+  "other_checkouts": [
+    {
+      "path": "/Users/christopherwilloughby/Code/the-synaptic-sea",
+      "head_unchanged": true,
+      "status_hash_unchanged": false,
+      "status_entries": 2208,
+      "command": "git status --porcelain=v1"
+    },
+    {
+      "path": "/Users/christopherwilloughby/Code/the-synaptic-sea-room-assets",
+      "head_unchanged": true,
+      "status_hash_unchanged": false,
+      "status_entries": 2240,
+      "command": "git status --porcelain=v1"
+    }
+  ]
+}

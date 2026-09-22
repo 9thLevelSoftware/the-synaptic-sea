@@ -1,0 +1,23 @@
+{
+  "data/art/structural_visual_dimensions.v1.json": "5499c1921bc90492ba60015b8a046b41de047ac17892883821c41efb234ec43f",
+  "tools/structural_visual_contract.py": "be6510b193622abbdc1c390ccb6f000447c8bd482488a7d36c9f0580d6fe956c",
+  "tools/validate_structural_visual_fit.py": "8af4cc5c06bdd529c73e10d1320864d00a595c8c6dd7d9b7d989b117354716cf",
+  "tools/structural_stage_publication.py": "add73eebf75591ce0684e9da7c1da974701297810f19600acc540ef452463c06",
+  "tools/export_structural_glb.py": "7e4c379400702858c26e9286a00d695e739a84790a42bc56685ff6727776e312",
+  "tools/promote_structural_sources.py": "5ca0f9d0a42b65736fd9c1de412fce3dcddcf61a43d69b66317b45e7746251cc",
+  "tools/blender_addons/structural_module_toolkit/export.py": "1f8ace08fb8a60608cdca6476691bff1a6839d49e0ec8a9151d139a6bdc49aeb",
+  "tools/blender_addons/structural_module_toolkit/operators.py": "3be1f50c4d7325741dd92b4821a2d8e17bc53201ff179a0c23589c20afaccebb",
+  "tests/test_structural_visual_contract.py": "c5793a4b5300ad79a76a03f618fcbecedbbcf8f7feaa3fbec24928e9fe5084e8",
+  "tests/test_validate_structural_visual_fit.py": "a84d6147270315d6b4e88916f46958d6ec0e9b80cba50ef25e6a3fdd2b33b95f",
+  "tests/test_structural_stage_publication.py": "1484129b8a266f875115d26a63c5cd9fe11ffca1cbf117b15098b893105cbe91",
+  "tests/test_export_structural_glb.py": "8a01a88a3efedf45707c79d6bf994acbabda90dffa4286c5d52123e7b35f80c6",
+  "tests/test_promote_structural_sources.py": "42e8c39a0cc5c8202a7180515d0527d5ccb3c301eab1574bf11d356e979f2dd7",
+  "tests/test_structural_module_toolkit_export.py": "21abbd6671a61af2136bd349fccbb11b0a9baada67d93f84e4e61f7f9b4a7b0d",
+  "tests/test_focused_nine_blender_recipes.py": "7397ae7efcecca2a3f856641b03a5ab6d053d48b7f82ce8914e536fdb831eafc",
+  "tests/test_modular_structural_fit_docs.py": "fd9a725c93558d5c7b1c19dead1f75214a3aacf7797a2a423b5d120fa7c1b203",
+  "docs/game/features/modular_structural_fit.md": "8bf16c88ae3c59c9f8d0765dfc551f8579045f582fc28116d4eac3dd1829c63c",
+  "docs/game/features/blender_room_kit_v2.md": "8a914a8f14732a19b478ce4f6340a57918db4536644c1530490046d60abc02fa",
+  "docs/game/features/blender_artist_workflow.md": "313a737d6d1133c4068f224ea7c11b6438368c3e31d5c454d85d747f457de193",
+  "docs/game/features/blender_structural_source_pipeline.md": "55f67456f6ff86096bee7ae26b62e2087bee545ca17080d2fe9d49f3083c587e",
+  "docs/game/adr/0061-blender-room-kit-v2.md": "5c2fd7faab64ae742b8c737dacea25089de7ece471f3ec83a7e441d69495b319"
+}

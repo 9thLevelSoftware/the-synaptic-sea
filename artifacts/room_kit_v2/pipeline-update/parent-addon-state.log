@@ -1,0 +1,18 @@
+00:00.275  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/floor_1x1.blend"
+INFO Draco is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_draco_bridge.dylib
+INFO MeshOptimizer is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_meshopt_bridge.dylib
+16:42:15 | INFO: Starting glTF 2.0 export
+16:42:15 | INFO: Extracting primitive: Visual_floor_1x1
+16:42:15 | INFO: Primitives created: 1
+16:42:15 | INFO: Finished glTF 2.0 export in 0.0030858516693115234 s
+
+STRUCTURAL_GLB_EXPORTED module=floor_1x1 variant=intact glb=/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-addon-staging/floor_1x1/floor_1x1.glb bytes=1712
+16:42:16 | INFO: Starting glTF 2.0 export
+16:42:16 | INFO: Extracting primitive: Visual_floor_1x1
+16:42:16 | INFO: Primitives created: 1
+16:42:16 | INFO: Finished glTF 2.0 export in 0.004209995269775391 s
+
+PARENT_ADDON_STATE_PASS {"status": "pass", "valid_export_count": 1, "invalid_export_rejected": true, "source_file_unchanged": true, "unsaved_scene_and_mesh_preserved": true, "previous_staging_preserved": true, "rejection": "one or more structural variants failed validation for floor_1x1: fresh Blender GLB validation failed for floor_1x1: bounds max.y 0.1 does not equal expected 0; floor front mating boundary/slab profile is incomplete; floor has positive relief above walking datum; isolated Blender exited with status 1: 00:00.011  color_management | Using OCIO=/Applications/Blender.app/Contents/Resources/5.2/datafiles/colormanagement/config.ocio\n16:42:16 | INFO: Data are loaded, start creating Blender stuff\n16:42:16 | INFO: Blender create Mesh node Visual_floor_1x1\n16:42:16 | INFO: glTF import finished in 0.00s\nBlender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)\n{\"coordinate_conversion\": \"Blender [x,y,z] -> native glTF/runtime [x,z,-y]\", \"errors\": [\"bounds max.y 0.1 does not equal expected 0\", \"floor front mating boundary/slab profile is incomplete\", \"floor has positive relief above walking datum\"], \"family\": \"floor\", \"glb\": \"/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-addon-staging/floor_1x1/.floor_1x1.tmp.glb\", \"legacy_helper_conversion_not_used\": \"[x,z,y]\", \"measurements\": {\"assembly_acceptance\": false, \"bounds\": {\"max\": [2.0, 0.10000000149011612, 2.0], \"min\": [-2.0, -0.25, -2.0]}, \"helper_objects_rejected\": false, \"mesh_object_count\": 1, \"object_count\": 1, \"triangle_count\": 12, \"validation_scope\": \"per_module_visual_interface\"}, \"module_id\": \"floor_1x1\", \"status\": \"fail\"}"}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

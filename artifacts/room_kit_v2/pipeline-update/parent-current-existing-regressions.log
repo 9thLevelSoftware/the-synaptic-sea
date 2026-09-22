@@ -1,0 +1,902 @@
+.F...................................................................... [ 57%]
+...F....FF.....................FFFF...FFFFFFFF..FFF..                    [100%]
+=================================== FAILURES ===================================
+____________ test_floor_contract_exposes_exact_socket_anchor_names _____________
+
+    def test_floor_contract_exposes_exact_socket_anchor_names() -> None:
+        spec = load_source_spec(PROJECT_ROOT, "floor_1x1")
+    
+>       assert [socket.anchor_name for socket in spec.sockets] == [
+            "Anchor_SOCK_floor_edge_north_01",
+            "Anchor_SOCK_floor_edge_south_01",
+            "Anchor_SOCK_floor_edge_east_01",
+            "Anchor_SOCK_floor_edge_west_01",
+        ]
+E       AssertionError: assert ['Anchor_SOCK...floor_top_01'] == ['Anchor_SOCK...edge_west_01']
+E         
+E         Left contains one more item: 'Anchor_SOCK_floor_top_01'
+E         Use -v to get more diff
+
+tests/test_structural_source_contract.py:48: AssertionError
+_ ValidateStructuralVariantBindingsTests.test_baseline_structural_fixture_is_accepted _
+
+self = <test_validate_structural_variant_bindings.ValidateStructuralVariantBindingsTests testMethod=test_baseline_structural_fixture_is_accepted>
+
+    def test_baseline_structural_fixture_is_accepted(self) -> None:
+        with copied_structural_fixture() as project_root:
+>           self.assertEqual([], run_structural_audit(project_root))
+E           AssertionError: Lists differ: [] != ['damaged wrapper path does not match dama[965 chars]1x2']
+E           
+E           Second list contains 14 additional elements.
+E           First extra element 0:
+E           'damaged wrapper path does not match damaged variant: floor_1x1'
+E           
+E           Diff is 1059 characters long. Set self.maxDiff to None to see it.
+
+tests/test_validate_structural_variant_bindings.py:138: AssertionError
+_ ValidateStructuralVariantBindingsTests.test_non_variant_wrapper_is_ignored_when_it_has_no_integrity_triplet _
+
+self = <test_validate_structural_variant_bindings.ValidateStructuralVariantBindingsTests testMethod=test_non_variant_wrapper_is_ignored_when_it_has_no_integrity_triplet>
+
+    def test_non_variant_wrapper_is_ignored_when_it_has_no_integrity_triplet(self) -> None:
+        with copied_non_variant_structural_fixture("wall_end_cap") as project_root:
+>           self.assertEqual([], run_structural_audit(project_root))
+E           AssertionError: Lists differ: [] != ['damaged wrapper path does not match dama[965 chars]1x2']
+E           
+E           Second list contains 14 additional elements.
+E           First extra element 0:
+E           'damaged wrapper path does not match damaged variant: floor_1x1'
+E           
+E           Diff is 1059 characters long. Set self.maxDiff to None to see it.
+
+tests/test_validate_structural_variant_bindings.py:162: AssertionError
+_ ValidateStructuralVariantBindingsTests.test_wrapper_path_that_differs_from_variant_path_is_rejected _
+
+self = <test_validate_structural_variant_bindings.ValidateStructuralVariantBindingsTests testMethod=test_wrapper_path_that_differs_from_variant_path_is_rejected>
+
+    def test_wrapper_path_that_differs_from_variant_path_is_rejected(self) -> None:
+>       with copied_structural_fixture_with_wrapper_ref(
+            "floor_1x1", "VisualInstance_Damaged", "floor_1x1.glb"
+        ) as project_root:
+
+tests/test_validate_structural_variant_bindings.py:145: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset_id = 'floor_1x1', node_name = 'VisualInstance_Damaged'
+ref_name = 'floor_1x1.glb'
+
+    @contextlib.contextmanager
+    def copied_structural_fixture_with_wrapper_ref(
+        asset_id: str, node_name: str, ref_name: str
+    ) -> Iterator[Path]:
+        with copied_structural_fixture() as root:
+            scene_path = root / WRAPPER_ROOT / f"{asset_id}.tscn"
+            scene = scene_path.read_text(encoding="utf-8")
+            damaged_path = (
+                f"res://{STRUCTURAL_ROOT.as_posix()}/{asset_id}/{asset_id}_damaged.glb"
+            )
+            replacement_path = (
+                f"res://{STRUCTURAL_ROOT.as_posix()}/{asset_id}/{ref_name}"
+            )
+            marker = f'parent="Visual" instance=ExtResource("2_visual_damaged")'
+            if node_name != "VisualInstance_Damaged":
+                raise AssertionError(f"unsupported fixture node: {node_name}")
+            if damaged_path not in scene or marker not in scene:
+>               raise AssertionError("canonical damaged wrapper reference not found")
+E               AssertionError: canonical damaged wrapper reference not found
+
+tests/test_validate_structural_variant_bindings.py:86: AssertionError
+_____ test_blender_owned_suffixed_library_remnant_is_repaired_canonically ______
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_owned_suffixed_li0')
+
+    def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
+        tmp_path: Path,
+    ) -> None:
+        for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        seed_expr = (
+            "import bpy; "
+            f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+            "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+            "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+            "bpy.data.materials.remove(canonical); "
+            f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+        )
+        seeded = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+        first = _recipe_with_external_material_library(command)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.292  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_owned_suffixed_li0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: canonical material 'MAT_WarningStripe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ipe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:834: AssertionError
+_____ test_blender_verified_remnant_with_wrong_module_context_is_rejected ______
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_verified_remnant_0')
+
+    def test_blender_verified_remnant_with_wrong_module_context_is_rejected(
+        tmp_path: Path,
+    ) -> None:
+        for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        seed_expr = (
+            "import bpy; "
+            f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+            "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+            "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+            "bpy.data.materials.remove(canonical); "
+            "wrong_root=bpy.data.objects.new('ModuleRoot_wall_straight_1x1', None); "
+            "bpy.context.scene.collection.objects.link(wrong_root); "
+            "generated=bpy.data.objects['FocusedNine_floor_1x1_floor_panel']; generated.parent=wrong_root; "
+            f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+        )
+        seeded = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+        before = source_blend.read_bytes()
+    
+        result = _recipe_with_external_material_library(
+            _recipe_command(
+                project_root=PROJECT_ROOT,
+                structural_root=structural_root,
+                props_root=props_root,
+                asset_id="floor_1x1",
+            )
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+>       assert "has an authored user" in result.stdout + result.stderr
+E       assert 'has an authored user' in ('00:00.284  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_k...ied_remnant_0/structural/floor_1x1/floor_1x1.blend"\nBlender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)\n' + "ERROR: canonical material 'MAT_WarningStripe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n")
+E        +  where '00:00.284  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_k...ied_remnant_0/structural/floor_1x1/floor_1x1.blend"\nBlender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)\n' = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ipe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n").stdout
+E        +  and   "ERROR: canonical material 'MAT_WarningStripe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n" = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ipe' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n").stderr
+
+tests/test_focused_nine_blender_recipes.py:934: AssertionError
+____ test_blender_owned_canonical_legacy_material_is_repaired_from_library _____
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_owned_canonical_l0')
+
+    def test_blender_owned_canonical_legacy_material_is_repaired_from_library(
+        tmp_path: Path,
+    ) -> None:
+        for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        seed_expr = (
+            "import bpy; "
+            f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+            "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+            "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+            "bpy.data.materials.remove(canonical); "
+            "legacy=bpy.data.materials['MAT_PaintedAlloyGray.001']; legacy.name='MAT_PaintedAlloyGray'; "
+            "[legacy.__delitem__(key) for key in ('focused_nine_source_library', 'focused_nine_source_name') if key in legacy]; "
+            f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+        )
+        seeded = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    
+        result = _recipe_with_external_material_library(
+            _recipe_command(
+                project_root=PROJECT_ROOT,
+                structural_root=structural_root,
+                props_root=props_root,
+                asset_id="floor_1x1",
+            )
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: 00:00.279  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_owned_canonical_l0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: canonical material 'MAT_PaintedAlloyGray' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ray' is occupied by a non-owned material; refusing to rename, delete, or use it; one-time manual migration required\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:983: AssertionError
+_______ test_blender_floor_recipe_emits_exact_material_names_and_exports _______
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_floor_recipe_emit0')
+
+    def test_blender_floor_recipe_emits_exact_material_names_and_exports(tmp_path: Path) -> None:
+        for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE, CONTRACT_FIXTURE):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        _prepare_material_free_source(source_blend)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.284  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_floor_recipe_emit0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...nerated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1043: AssertionError
+__________ test_blender_floor_recipe_is_idempotent_and_source_scoped ___________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_floor_recipe_is_i0')
+
+    def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) -> None:
+        if not BLENDER.is_file():
+            pytest.fail(f"Blender 5.2 executable missing: {BLENDER}")
+        if not SOURCE_FIXTURE.is_file():
+            pytest.fail(f"source fixture missing: {SOURCE_FIXTURE}")
+        if not MATERIAL_FIXTURE.is_file():
+            pytest.fail(f"material fixture missing: {MATERIAL_FIXTURE}")
+        source_fixture_bytes = SOURCE_FIXTURE.read_bytes()
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        _prepare_material_free_source(source_blend)
+        material_dir = structural_root.parent / "materials"
+        material_dir.mkdir(parents=True)
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+    
+        seed_expr = (
+            "import bpy; "
+            f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+            "geometry=bpy.data.collections.get('Geometry') or bpy.data.collections.new('Geometry'); "
+            "bpy.context.scene.collection.children.link(geometry) if geometry.name not in {child.name for child in bpy.context.scene.collection.children} else None; "
+            "authored=bpy.data.objects.new('FocusedNine_floor_1x1_authored_panel', None); geometry.objects.link(authored); "
+            "authored['authored_marker']='preserve'; "
+            "stale=bpy.data.objects.new('FocusedNine_floor_1x1_stale_generated', None); geometry.objects.link(stale); "
+            "stale['focused_nine_generated']=True; stale['focused_nine_asset_id']='floor_1x1'; "
+            f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+        )
+        prepared = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+    
+        command = [
+            str(BLENDER),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(PROJECT_ROOT / "tools/focused_nine_blender_recipes.py"),
+            "--",
+            "--project-root",
+            str(PROJECT_ROOT),
+            "--structural-source-root",
+            str(structural_root),
+            "--props-source-root",
+            str(props_root),
+            "--asset-id",
+            "floor_1x1",
+            "--overwrite-generated-only",
+        ]
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.291  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_floor_recipe_is_i0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...nerated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1589: AssertionError
+_______ test_blender_compatibility_wrapper_normalizes_blender_arguments ________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_compatibility_wra0')
+
+    def test_blender_compatibility_wrapper_normalizes_blender_arguments(tmp_path: Path) -> None:
+        if not BLENDER.is_file():
+            pytest.fail(f"Blender 5.2 executable missing: {BLENDER}")
+        if not SOURCE_FIXTURE.is_file():
+            pytest.fail(f"source fixture missing: {SOURCE_FIXTURE}")
+        if not MATERIAL_FIXTURE.is_file():
+            pytest.fail(f"material fixture missing: {MATERIAL_FIXTURE}")
+        if not CONTRACT_FIXTURE.is_file():
+            pytest.fail(f"contract fixture missing: {CONTRACT_FIXTURE}")
+        if not SOURCE_GLB_FIXTURE.is_file():
+            pytest.fail(f"source GLB fixture missing: {SOURCE_GLB_FIXTURE}")
+    
+        project_root = tmp_path / "project"
+        contract_copy = project_root / (
+            "data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.json"
+        )
+        glb_copy = project_root / (
+            "assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb"
+        )
+        contract_copy.parent.mkdir(parents=True)
+        glb_copy.parent.mkdir(parents=True)
+        shutil.copy2(CONTRACT_FIXTURE, contract_copy)
+        shutil.copy2(SOURCE_GLB_FIXTURE, glb_copy)
+        contract_fixture_bytes = CONTRACT_FIXTURE.read_bytes()
+        source_glb_fixture_bytes = SOURCE_GLB_FIXTURE.read_bytes()
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "floor_1x1"
+        source_dir.mkdir(parents=True)
+        source_blend = source_dir / "floor_1x1.blend"
+        shutil.copy2(SOURCE_FIXTURE, source_blend)
+        _prepare_material_free_source(source_blend)
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        material_copy = material_dir / "salvage_industrial.blend"
+        shutil.copy2(MATERIAL_FIXTURE, material_copy)
+    
+        source_fixture_bytes = SOURCE_FIXTURE.read_bytes()
+        material_fixture_bytes = MATERIAL_FIXTURE.read_bytes()
+        command = [
+            str(BLENDER),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(PROJECT_ROOT / "tools/improve_floor_geometry.py"),
+            "--",
+            "--project-root",
+            str(project_root),
+            "--source-root",
+            str(structural_root),
+            "--module",
+            "floor_1x1",
+            "--overwrite",
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+    
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: 00:00.249  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_compatibility_wra0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...nerated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1696: AssertionError
+_______ test_blender_under_budget_recipes_meet_gameplay_evidence_minima ________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_under_budget_reci0')
+
+    def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Path) -> None:
+        from tools import focused_nine_evidence
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, *(item[1] for item in UNDER_BUDGET_FIXTURES.values())):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        props_root = tmp_path / "props"
+        material_dir = tmp_path / "materials"
+        props_root.mkdir(parents=True)
+        material_dir.mkdir(parents=True)
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        fixture_bytes = {asset_id: fixture.read_bytes() for asset_id, (_, fixture, _) in UNDER_BUDGET_FIXTURES.items()}
+    
+        measured: dict[str, int] = {}
+        for asset_id, (kind, fixture, minimum) in UNDER_BUDGET_FIXTURES.items():
+            if kind == "structural":
+                source_dir = structural_root / asset_id
+                source_dir.mkdir(parents=True)
+                source = source_dir / f"{asset_id}.blend"
+            else:
+                props_root.mkdir(parents=True, exist_ok=True)
+                source = props_root / f"{asset_id}.blend"
+            shutil.copy2(fixture, source)
+            _prepare_material_free_source(source)
+    
+            command = _recipe_command(
+                project_root=PROJECT_ROOT,
+                structural_root=structural_root,
+                props_root=props_root,
+                asset_id=asset_id,
+            )
+            recipe = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>           assert recipe.returncode == 0, recipe.stdout + recipe.stderr
+E           AssertionError: 00:00.293  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_under_budget_reci0/structural/wall_straight_1x1/wall_straight_1x1.blend"
+E             Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E             ERROR: generated object name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object
+E             
+E           assert 1 == 0
+E            +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ect name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1852: AssertionError
+_ test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[floor_1x1] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar0')
+asset_id = 'floor_1x1'
+
+    @pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+    def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+        tmp_path: Path, asset_id: str
+    ) -> None:
+        from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+        shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        before_identity = _structural_contract_identity(source, asset_id)
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.281  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar0/structural/floor_1x1/floor_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...nerated object name 'FocusedNine_floor_1x1_floor_panel' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1976: AssertionError
+_ test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[wall_straight_1x1] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar1')
+asset_id = 'wall_straight_1x1'
+
+    @pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+    def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+        tmp_path: Path, asset_id: str
+    ) -> None:
+        from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+        shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        before_identity = _structural_contract_identity(source, asset_id)
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.311  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar1/structural/wall_straight_1x1/wall_straight_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ect name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1976: AssertionError
+_ test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[ramp_up_1x2] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar2')
+asset_id = 'ramp_up_1x2'
+
+    @pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+    def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+        tmp_path: Path, asset_id: str
+    ) -> None:
+        from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+        shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        before_identity = _structural_contract_identity(source, asset_id)
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.289  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar2/structural/ramp_up_1x2/ramp_up_1x2.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_ramp_up_1x2_tread_00' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...enerated object name 'FocusedNine_ramp_up_1x2_tread_00' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1976: AssertionError
+_ test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[pillar_support_1x1] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar3')
+asset_id = 'pillar_support_1x1'
+
+    @pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+    def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+        tmp_path: Path, asset_id: str
+    ) -> None:
+        from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+        shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        before_identity = _structural_contract_identity(source, asset_id)
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.285  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar3/structural/pillar_support_1x1/pillar_support_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_pillar_support_1x1_pillar_body' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...bject name 'FocusedNine_pillar_support_1x1_pillar_body' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1976: AssertionError
+_ test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[ceiling_cap_1x1] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar4')
+asset_id = 'ceiling_cap_1x1'
+
+    @pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+    def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+        tmp_path: Path, asset_id: str
+    ) -> None:
+        from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+    
+        for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+            if not fixture.is_file():
+                pytest.fail(f"fixture missing: {fixture}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+        shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+        before_identity = _structural_contract_identity(source, asset_id)
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.301  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_salvage_detail_recipes_ar4/structural/ceiling_cap_1x1/ceiling_cap_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_ceiling_cap_1x1_ceiling_cap' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...d object name 'FocusedNine_ceiling_cap_1x1_ceiling_cap' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:1976: AssertionError
+_________ test_blender_pillar_details_overlap_body_by_real_world_aabb __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_pillar_details_ov0')
+
+    def test_blender_pillar_details_overlap_body_by_real_world_aabb(tmp_path: Path) -> None:
+        fixture = SALVAGE_DETAIL_FIXTURES["pillar_support_1x1"]
+        for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+            if not candidate.is_file():
+                pytest.fail(f"fixture missing: {candidate}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "pillar_support_1x1"
+        source_dir.mkdir(parents=True)
+        source = source_dir / "pillar_support_1x1.blend"
+        shutil.copy2(fixture, source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        result = _recipe_with_external_material_library(
+            _recipe_command(
+                project_root=PROJECT_ROOT,
+                structural_root=structural_root,
+                props_root=props_root,
+                asset_id="pillar_support_1x1",
+            )
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: 00:00.295  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_pillar_details_ov0/structural/pillar_support_1x1/pillar_support_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_pillar_support_1x1_pillar_body' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...bject name 'FocusedNine_pillar_support_1x1_pillar_body' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:2126: AssertionError
+______ test_blender_wall_frame_is_four_rails_without_panel_face_occlusion ______
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_wall_frame_is_fou0')
+
+    def test_blender_wall_frame_is_four_rails_without_panel_face_occlusion(
+        tmp_path: Path,
+    ) -> None:
+        fixture = SALVAGE_DETAIL_FIXTURES["wall_straight_1x1"]
+        for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+            if not candidate.is_file():
+                pytest.fail(f"fixture missing: {candidate}")
+    
+        structural_root = tmp_path / "structural"
+        source_dir = structural_root / "wall_straight_1x1"
+        source_dir.mkdir(parents=True)
+        source = source_dir / "wall_straight_1x1.blend"
+        shutil.copy2(fixture, source)
+        _prepare_material_free_source(source)
+        props_root = tmp_path / "props"
+        props_root.mkdir()
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        result = _recipe_with_external_material_library(
+            _recipe_command(
+                project_root=PROJECT_ROOT,
+                structural_root=structural_root,
+                props_root=props_root,
+                asset_id="wall_straight_1x1",
+            )
+        )
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: 00:00.283  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_blender_wall_frame_is_fou0/structural/wall_straight_1x1/wall_straight_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ect name 'FocusedNine_wall_straight_1x1_perimeter_left' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:2190: AssertionError
+_ test_landmark_recipes_emit_deterministic_role_inventories_and_canonical_materials[doorway_frame_open_1x1-fixture0-structural-tokens0] _
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_landmark_recipes_emit_det0')
+asset_id = 'doorway_frame_open_1x1'
+fixture = PosixPath('/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1.blend')
+kind = 'structural'
+tokens = ('frame_inner_left', 'frame_inner_right', 'mechanical_rail_left', 'mechanical_rail_right', 'seal_left', 'seal_right', ...)
+
+    @pytest.mark.parametrize(
+        ("asset_id", "fixture", "kind", "tokens"),
+        [
+            (
+                "doorway_frame_open_1x1",
+                Path(
+                    "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+                    "doorway_frame_open_1x1/doorway_frame_open_1x1.blend"
+                ),
+                "structural",
+                (
+                    "frame_inner_left",
+                    "frame_inner_right",
+                    "mechanical_rail_left",
+                    "mechanical_rail_right",
+                    "seal_left",
+                    "seal_right",
+                    "threshold_rail",
+                    "threshold_seal",
+                ),
+            ),
+            (
+                "hull_breach_seal_point",
+                Path(
+                    "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+                    "hull_breach_seal_point.blend"
+                ),
+                "prop",
+                ("mounting_plate", "hose", "cable", "status"),
+            ),
+            (
+                "fire_suppression_station",
+                Path(
+                    "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+                    "fire_suppression_station.blend"
+                ),
+                "prop",
+                ("mounting_plate", "handle", "hose", "cable", "indicator"),
+            ),
+        ],
+    )
+    def test_landmark_recipes_emit_deterministic_role_inventories_and_canonical_materials(
+        tmp_path: Path,
+        asset_id: str,
+        fixture: Path,
+        kind: str,
+        tokens: tuple[str, ...],
+    ) -> None:
+        for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+            if not candidate.is_file():
+                pytest.fail(f"fixture missing: {candidate}")
+    
+        structural_root = tmp_path / "structural"
+        props_root = tmp_path / "props"
+        if kind == "structural":
+            source_dir = structural_root / asset_id
+            source_dir.mkdir(parents=True)
+            source = source_dir / f"{asset_id}.blend"
+        else:
+            structural_root.mkdir(parents=True)
+            props_root.mkdir(parents=True)
+            source = props_root / f"{asset_id}.blend"
+        shutil.copy2(fixture, source)
+        _prepare_material_free_source(source)
+        material_dir = tmp_path / "materials"
+        material_dir.mkdir()
+        shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        first = _recipe_with_external_material_library(command)
+        second = _recipe_with_external_material_library(command)
+>       assert first.returncode == 0, first.stdout + first.stderr
+E       AssertionError: 00:00.294  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-47/test_landmark_recipes_emit_det0/structural/doorway_frame_open_1x1/doorway_frame_open_1x1.blend"
+E         Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         ERROR: generated object name 'FocusedNine_doorway_frame_open_1x1_jamb_left' is occupied; refusing to co-own an authored or stale object
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python', '/Volumes/Untitle...ect name 'FocusedNine_doorway_frame_open_1x1_jamb_left' is occupied; refusing to co-own an authored or stale object\n").returncode
+
+tests/test_focused_nine_blender_recipes.py:2312: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_structural_source_contract.py::test_floor_contract_exposes_exact_socket_anchor_names
+FAILED tests/test_validate_structural_variant_bindings.py::ValidateStructuralVariantBindingsTests::test_baseline_structural_fixture_is_accepted
+FAILED tests/test_validate_structural_variant_bindings.py::ValidateStructuralVariantBindingsTests::test_non_variant_wrapper_is_ignored_when_it_has_no_integrity_triplet
+FAILED tests/test_validate_structural_variant_bindings.py::ValidateStructuralVariantBindingsTests::test_wrapper_path_that_differs_from_variant_path_is_rejected
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_owned_suffixed_library_remnant_is_repaired_canonically
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_verified_remnant_with_wrong_module_context_is_rejected
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_owned_canonical_legacy_material_is_repaired_from_library
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_floor_recipe_emits_exact_material_names_and_exports
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_floor_recipe_is_idempotent_and_source_scoped
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_compatibility_wrapper_normalizes_blender_arguments
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_under_budget_recipes_meet_gameplay_evidence_minima
+FAILED tests/test_focused_nine_blender_recipes.py::test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[floor_1x1]
+FAILED tests/test_focused_nine_blender_recipes.py::test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[wall_straight_1x1]
+FAILED tests/test_focused_nine_blender_recipes.py::test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[ramp_up_1x2]
+FAILED tests/test_focused_nine_blender_recipes.py::test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[pillar_support_1x1]
+FAILED tests/test_focused_nine_blender_recipes.py::test_salvage_detail_recipes_are_named_canonical_and_contract_preserving[ceiling_cap_1x1]
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_pillar_details_overlap_body_by_real_world_aabb
+FAILED tests/test_focused_nine_blender_recipes.py::test_blender_wall_frame_is_four_rails_without_panel_face_occlusion
+FAILED tests/test_focused_nine_blender_recipes.py::test_landmark_recipes_emit_deterministic_role_inventories_and_canonical_materials[doorway_frame_open_1x1-fixture0-structural-tokens0]
+19 failed, 106 passed in 38.72s

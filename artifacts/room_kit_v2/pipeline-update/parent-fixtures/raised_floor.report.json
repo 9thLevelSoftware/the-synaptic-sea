@@ -1,0 +1,33 @@
+{
+  "coordinate_conversion": "Blender [x,y,z] -> native glTF/runtime [x,z,-y]",
+  "errors": [
+    "bounds max.y 0.03 does not equal expected 0",
+    "floor has positive relief above walking datum",
+    "floor top projected coverage has a hole or exceeds maximum recess"
+  ],
+  "family": "floor",
+  "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/raised_floor.glb",
+  "legacy_helper_conversion_not_used": "[x,z,y]",
+  "measurements": {
+    "assembly_acceptance": false,
+    "bounds": {
+      "max": [
+        2.0,
+        0.029999999329447746,
+        2.0
+      ],
+      "min": [
+        -2.0,
+        -0.25,
+        -2.0
+      ]
+    },
+    "helper_objects_rejected": false,
+    "mesh_object_count": 1,
+    "object_count": 1,
+    "triangle_count": 12,
+    "validation_scope": "per_module_visual_interface"
+  },
+  "module_id": "floor_1x1",
+  "status": "fail"
+}

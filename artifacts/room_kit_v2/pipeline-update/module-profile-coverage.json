@@ -1,0 +1,227 @@
+[
+  {
+    "module_id": "floor_1x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "floor",
+    "bounds": {
+      "min": [
+        -2.0,
+        -0.25,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        0.0,
+        2.0
+      ]
+    },
+    "cells": [
+      1,
+      1
+    ]
+  },
+  {
+    "module_id": "floor_2x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "floor",
+    "bounds": {
+      "min": [
+        -4.0,
+        -0.25,
+        -2.0
+      ],
+      "max": [
+        4.0,
+        0.0,
+        2.0
+      ]
+    },
+    "cells": [
+      2,
+      1
+    ]
+  },
+  {
+    "module_id": "corridor_floor_1x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "corridor_floor",
+    "bounds": {
+      "min": [
+        -2.0,
+        -0.25,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        0.0,
+        2.0
+      ]
+    },
+    "cells": [
+      1,
+      1
+    ]
+  },
+  {
+    "module_id": "corridor_floor_1x2",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "corridor_floor",
+    "bounds": {
+      "min": [
+        -2.0,
+        -0.25,
+        -4.0
+      ],
+      "max": [
+        2.0,
+        0.0,
+        4.0
+      ]
+    },
+    "cells": [
+      1,
+      2
+    ]
+  },
+  {
+    "module_id": "wall_straight_1x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "wall",
+    "bounds": {
+      "min": [
+        -2.0,
+        0.0,
+        -0.1
+      ],
+      "max": [
+        2.0,
+        3.2,
+        0.1
+      ]
+    },
+    "cells": [
+      1,
+      1
+    ]
+  },
+  {
+    "module_id": "wall_end_cap",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: wall_end_cap",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "wall_inner_corner",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: wall_inner_corner",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "wall_outer_corner",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: wall_outer_corner",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "wall_t_junction",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: wall_t_junction",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "doorway_frame_open_1x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "doorway",
+    "bounds": {
+      "min": [
+        -2.0,
+        0.0,
+        -0.1
+      ],
+      "max": [
+        2.0,
+        3.2,
+        0.1
+      ]
+    },
+    "cells": [
+      1,
+      1
+    ]
+  },
+  {
+    "module_id": "bulkhead_portal_2x1",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: bulkhead_portal_2x1",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "doorway_frame_blocked_1x1",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: doorway_frame_blocked_1x1",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "ramp_up_1x2",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: ramp_up_1x2",
+    "family": "unsupported",
+    "bounds": null
+  },
+  {
+    "module_id": "pillar_support_1x1",
+    "status": "pass",
+    "held": false,
+    "reason": null,
+    "family": "pillar",
+    "bounds": {
+      "min": [
+        -2.0,
+        0.0,
+        -2.0
+      ],
+      "max": [
+        2.0,
+        3.2,
+        2.0
+      ]
+    },
+    "cells": [
+      1,
+      1
+    ]
+  },
+  {
+    "module_id": "ceiling_cap_1x1",
+    "status": "hold",
+    "held": true,
+    "reason": "unsupported geometry profile: ceiling_cap_1x1",
+    "family": "unsupported",
+    "bounds": null
+  }
+]

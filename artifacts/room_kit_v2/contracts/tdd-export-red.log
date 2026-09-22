@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_transformed_master_exports_y_up_identity_and_preserves_source ______
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-55/test_transformed_master_export0')
+
+    def test_transformed_master_exports_y_up_identity_and_preserves_source(tmp_path) -> None:
+        source = create_master(tmp_path)
+        output = tmp_path / "translated-pair.glb"
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+    
+        result = run_export(source, output, "export-positive.log")
+    
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+E         
+E         Blender quit
+E         OSError: Python file "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py" could not be opened: No such file or directory
+E         
+E         Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py', exiting.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python-exit-code', '1', '-...led, file: \'/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py\', exiting.\n').returncode
+
+tests/test_export_static_room_prop.py:161: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_export_static_room_prop.py::test_transformed_master_exports_y_up_identity_and_preserves_source
+1 failed, 10 deselected in 1.03s

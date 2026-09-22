@@ -1,0 +1,66 @@
+00:00.271  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/suit_service_stand_derelict_v1/suit_service_stand_derelict_v1.blend"
+INFO Draco is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_draco_bridge.dylib
+INFO MeshOptimizer is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_meshopt_bridge.dylib
+13:28:45 | INFO: Starting glTF 2.0 export
+13:28:45 | INFO: Extracting primitive: Cube.021
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.020
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.029
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.031
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.028
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.030
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.032
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.034
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.033
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.035
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.027
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.022
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.010
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.011
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Sphere.005
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Sphere.006
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Sphere.007
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Sphere.008
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Sphere.009
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.006
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.007
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.008
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cylinder.009
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.036
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.026
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.023
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.024
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Extracting primitive: Cube.025
+13:28:45 | INFO: Primitives created: 1
+13:28:45 | INFO: Finished glTF 2.0 export in 0.01885390281677246 s
+
+ROOM_KIT_STATIC_EXPORT_PASS {"meshes": 28, "nodes": 28, "output": "/tmp/room-kit-v2-final-pilot-j7e0hpbn/suit_service_stand_derelict_v1.glb", "source": "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/suit_service_stand_derelict_v1/suit_service_stand_derelict_v1.blend"}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

@@ -1,0 +1,19 @@
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 256, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 252, in main
+    export_static(args.source, args.output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 169, in export_static
+    output = _output_path(output)
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 40, in _output_path
+    raise RuntimeError("output exists; choose a fresh revision")
+RuntimeError: output exists; choose a fresh revision
+
+Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py', exiting.

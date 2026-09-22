@@ -1,0 +1,160 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys0] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_0')
+keys = ('floor_interface', 'max_recess_depth_m')
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys1] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_1')
+keys = ('edge_interface', 'terminal_mating_band_m')
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys2] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_2')
+keys = ('global', 'float_roundtrip_epsilon_m')
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys3] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_3')
+keys = ('global', 'required_object_scale', 0)
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys4] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_4')
+keys = ('global', 'required_mesh_origin_offset_m', 0)
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+_________ test_roundtrip_epsilon_cannot_relax_canonical_policy[keys5] __________
+
+tmp_path = PosixPath('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-35/test_roundtrip_epsilon_cannot_5')
+keys = ('coordinate_system', 'allowed_yaw_degrees', 1)
+
+    @pytest.mark.parametrize("keys", [
+        ("floor_interface", "max_recess_depth_m"),
+        ("edge_interface", "terminal_mating_band_m"),
+        ("global", "float_roundtrip_epsilon_m"),
+        ("global", "required_object_scale", 0),
+        ("global", "required_mesh_origin_offset_m", 0),
+        ("coordinate_system", "allowed_yaw_degrees", 1),
+    ])
+    def test_roundtrip_epsilon_cannot_relax_canonical_policy(tmp_path: Path, keys) -> None:
+        policy = load_dimensions()
+        parent = policy
+        for key in keys[:-1]:
+            parent = parent[key]
+        parent[keys[-1]] += 0.00005
+        path = tmp_path / "drifted-policy.json"
+        path.write_text(json.dumps(policy))
+>       with pytest.raises(VisualContractError, match="must equal"):
+E       Failed: DID NOT RAISE VisualContractError
+
+tests/test_structural_visual_contract.py:115: Failed
+=========================== short test summary info ============================
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys0]
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys1]
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys2]
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys3]
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys4]
+FAILED tests/test_structural_visual_contract.py::test_roundtrip_epsilon_cannot_relax_canonical_policy[keys5]
+6 failed, 9 deselected in 0.05s

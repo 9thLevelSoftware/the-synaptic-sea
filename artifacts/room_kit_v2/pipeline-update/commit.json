@@ -1,0 +1,27 @@
+{
+  "commit": "bfbb12c6884659e4c5cd34a2a5aa852925f0ddaa",
+  "branch": "feat/blender-room-kit-v2",
+  "files": [
+    "data/art/structural_visual_dimensions.v1.json",
+    "docs/game/adr/0061-blender-room-kit-v2.md",
+    "docs/game/features/blender_artist_workflow.md",
+    "docs/game/features/blender_room_kit_v2.md",
+    "docs/game/features/blender_structural_source_pipeline.md",
+    "docs/game/features/modular_structural_fit.md",
+    "tests/test_export_structural_glb.py",
+    "tests/test_focused_nine_blender_recipes.py",
+    "tests/test_modular_structural_fit_docs.py",
+    "tests/test_promote_structural_sources.py",
+    "tests/test_structural_module_toolkit_export.py",
+    "tests/test_structural_stage_publication.py",
+    "tests/test_structural_visual_contract.py",
+    "tests/test_validate_structural_visual_fit.py",
+    "tools/blender_addons/structural_module_toolkit/export.py",
+    "tools/blender_addons/structural_module_toolkit/operators.py",
+    "tools/export_structural_glb.py",
+    "tools/promote_structural_sources.py",
+    "tools/structural_stage_publication.py",
+    "tools/structural_visual_contract.py",
+    "tools/validate_structural_visual_fit.py"
+  ]
+}

@@ -1,0 +1,16 @@
+ERROR: damaged wrapper path does not match damaged variant: floor_1x1
+ERROR: breached wrapper path does not match breached variant: floor_1x1
+ERROR: damaged wrapper path does not match damaged variant: floor_2x1
+ERROR: breached wrapper path does not match breached variant: floor_2x1
+ERROR: damaged wrapper path does not match damaged variant: corridor_floor_1x1
+ERROR: breached wrapper path does not match breached variant: corridor_floor_1x1
+ERROR: damaged wrapper path does not match damaged variant: corridor_floor_1x2
+ERROR: breached wrapper path does not match breached variant: corridor_floor_1x2
+ERROR: damaged wrapper path does not match damaged variant: wall_straight_1x1
+ERROR: breached wrapper path does not match breached variant: wall_straight_1x1
+ERROR: damaged wrapper path does not match damaged variant: pillar_support_1x1
+ERROR: breached wrapper path does not match breached variant: pillar_support_1x1
+ERROR: damaged wrapper path does not match damaged variant: ramp_up_1x2
+ERROR: breached wrapper path does not match breached variant: ramp_up_1x2
+
+EXIT_CODE=1

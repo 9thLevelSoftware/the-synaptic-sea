@@ -1,0 +1,15 @@
+00:00.293  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_cancelled_0/valid.blend"
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_cancelled_0/cancel_export.py", line 7, in <module>
+    module['export_static'](Path('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_cancelled_0/valid.blend'), Path('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_cancelled_0/cancelled.glb'), export_operator=cancelled)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 218, in export_static
+    raise RuntimeError(f"static GLB export cancelled: {sorted(result or ())}")
+RuntimeError: static GLB export cancelled: ['CANCELLED']
+
+Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_cancelled_0/cancel_export.py', exiting.

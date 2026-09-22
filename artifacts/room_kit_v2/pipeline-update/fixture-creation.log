@@ -1,0 +1,98 @@
+Info: Saved as "floor_1x1.blend"
+INFO Draco is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_draco_bridge.dylib
+INFO MeshOptimizer is available, use library at /Applications/Blender.app/Contents/Resources/5.2/scripts/addons_core/io_scene_gltf2/libbf_intern_meshopt_bridge.dylib
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_floor_1x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.002717256546020508 s
+
+Info: Saved as "floor_2x1.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_floor_2x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0008037090301513672 s
+
+Info: Saved as "corridor_floor_1x1.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_corridor_floor_1x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0009100437164306641 s
+
+Info: Saved as "corridor_floor_1x2.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_corridor_floor_1x2
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0007920265197753906 s
+
+Info: Saved as "wall_straight_1x1.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_wall_straight_1x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0009660720825195312 s
+
+Info: Saved as "doorway_frame_open_1x1.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_doorway_frame_open_1x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0007221698760986328 s
+
+Info: Saved as "pillar_support_1x1.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_pillar_support_1x1
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0009169578552246094 s
+
+Info: Saved as "raised_floor.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_raised_floor
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0007050037384033203 s
+
+Info: Saved as "wall_gap.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_wall_gap
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0006840229034423828 s
+
+Info: Saved as "thick_wall.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_thick_wall
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0009107589721679688 s
+
+Info: Saved as "leaked_helper.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Collision_floor_1x1_Mesh
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Extracting primitive: Visual_leaked_helper
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0011630058288574219 s
+
+Info: Saved as "translated_floor.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_translated_floor
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0006918907165527344 s
+
+Info: Saved as "compensated_floor_origin.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_compensated_floor_origin
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0009059906005859375 s
+
+Info: Saved as "blocked_doorway.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_blocked_doorway
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.0008139610290527344 s
+
+Info: Saved as "unsupported_ramp.blend"
+17:34:36 | INFO: Starting glTF 2.0 export
+17:34:36 | INFO: Extracting primitive: Visual_unsupported_ramp
+17:34:36 | INFO: Primitives created: 1
+17:34:36 | INFO: Finished glTF 2.0 export in 0.001558065414428711 s
+
+PARENT_FIXTURES_CREATED 15
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

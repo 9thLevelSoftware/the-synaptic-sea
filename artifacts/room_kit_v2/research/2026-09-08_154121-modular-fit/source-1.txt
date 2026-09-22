@@ -1,0 +1,143 @@
+For the complete documentation index, see [llms.txt](https://book.leveldesignbook.com/llms.txt)
+. This page is also available as [Markdown](https://book.leveldesignbook.com/process/blockout/metrics/modular.md)
+.
+
+When doing a [blockout](https://book.leveldesignbook.com/process/blockout)
+ or [art pass](https://book.leveldesignbook.com/process/env-art)
+, you might use a **modular kit** -- a 3D tileset of **modules**, meshes designed to snap together. This comes from the real-life building practice of [prefabricated modular construction](https://en.wikipedia.org/wiki/Modular_building)
+.
+
+If you're new to 3D modeling or level design, then don't attempt to design your own kit yet. Many considerations go into designing a robust kit. Your first kit will probably be very hard to use, especially if you haven't learned from using other peoples' kits already. Instead, see our list of [Resources](https://book.leveldesignbook.com/appendix/resources)
+ to download a free pre-made modular kit suitable for prototyping.
+
+But if you have experience in level design and 3D tools, then you are ready. On this page we will detail the many considerations and best practices for designing your own modular kit.
+
+Most of the info on this page comes from Joel Burgess' excellent GDC talks on designing modular kits for big open world games: ["GDC 2013: Skyrim's Modular Approach to Level Design"](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+ ([slides](http://www.slideshare.net/JoelBurgess/gdc2013-kit-buildingfinal)
+) and ["GDC 2016: The Modular Level Design of Fallout 4"](https://www.youtube.com/watch?v=QBAM27YbKZg)
+ ([slides](https://www.slideshare.net/JoelBurgess/gdc-2016-modular-level-design-of-fallout-4)
+, [video](https://www.youtube.com/watch?v=QBAM27YbKZg)
+).
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbP95G-5HmMHoWYwCU_%252F-MbPCnRZ5hG8N-m7rBYW%252FLDB_ModularKitZoo_JoelBurgess_Skyrim.jpg%3Falt%3Dmedia%26token%3D33800a74-93d4-469c-b4eb-44c704fb609e&width=768&dpr=3&quality=100&sign=569cd8d6c95a0904c1b69ca86a84e1f7&sv=3)
+
+core architectural kit for the "Dwemer ruins" in Skyrim, image by Joel Burgess (http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPP-21y2wJpBDQmUla%252F-MbPRwQZBzjZOk5Wo6c7%252FLDB_DwemerRuin_JoelBurgess_SkyrimCompressed.jpg%3Falt%3Dmedia%26token%3Daba35fda-cd7f-4b08-8f72-f81aa13c5b64&width=768&dpr=3&quality=100&sign=1f8da7c52fa54f4ac77a234052f6992d&sv=3)
+
+example dungeon environment built with the Dwemer kit in Skyrim, image by Joel Burgess (http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+
+1\. Pre-production[](https://book.leveldesignbook.com/process/blockout/metrics/modular#id-1.-pre-production)
+
+-------------------------------------------------------------------------------------------------------------
+
+do you have a lot of level designer time, and need to reuse limited art assets many times?
+
+planning kit percentages, decide what is most important first
+
+how granular / chunky should the kit be? depends on what level designers need / want, more customization OR faster prototyping time?
+
+2\. Blockout the kit[](https://book.leveldesignbook.com/process/blockout/metrics/modular#id-2.-blockout-the-kit)
+
+-----------------------------------------------------------------------------------------------------------------
+
+DO NOT MAKE VARIANTS YET, just build basic pieces first
+
+### Prototype metrics[](https://book.leveldesignbook.com/process/blockout/metrics/modular#prototype-metrics)
+
+decide on your units... build to a human scale
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPKH6N-42OiV-DO9VZ%252F-MbPN_IgBzHktzYbUn_2%252FLDB_ModularMetrics_JoelBurgess_Skyrim.jpg%3Falt%3Dmedia%26token%3Dc380a2ee-77aa-43af-b162-a827f53db3bf&width=768&dpr=3&quality=100&sign=e560abe97bc6f97400d5a7cece942d2f&sv=3)
+
+player size vs environment metrics diagram, image by Joel Burgess (http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+
+### Common module types[](https://book.leveldesignbook.com/process/blockout/metrics/modular#common-module-types)
+
+*   floor, ceiling, wall, doorway (single), doorway (double), window, corner
+    
+*   platforms (landscape)
+    
+*   glue
+    
+*   flanges and arches (caves)
+    
+*   shells (caves)
+    
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbP02oa-qIyy5tjCgbG%252F-MbP6Rdo6HOddzlUrPo1%252FLDB_ModularGraybox_Transparent_JoelBurgess_Skyrim.png%3Falt%3Dmedia%26token%3D4a1cd17d-c36a-4edd-bb5f-2c457385153c&width=768&dpr=3&quality=100&sign=961aef10b21a45f4476359c86b2be8cf&sv=3)
+
+"graybox" modular kit used for level blockouts in Skyrim, image by Joel Burgess (http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+
+### Define a footprint[](https://book.leveldesignbook.com/process/blockout/metrics/modular#define-a-footprint)
+
+stay in footprint / bounding box
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPP-21y2wJpBDQmUla%252F-MbPQQLxVthRSRJr0Nci%252FLDB_ModularFootprint_JoelBurgess_Skyrim.jpg%3Falt%3Dmedia%26token%3D951a8c51-8f4a-4519-9e98-e543e5e7912f&width=768&dpr=3&quality=100&sign=6c0d5a4925124d3852c29c5e0fa29a95&sv=3)
+
+### Asset naming[](https://book.leveldesignbook.com/process/blockout/metrics/modular#asset-naming)
+
+pay attention to naming, level designers and kit artists need to agree on a pattern
+
+Epic's recommended naming scheme?
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPP-21y2wJpBDQmUla%252F-MbPPuNqAVxippxQETd3%252FwebNameBreakdown.jpg%3Falt%3Dmedia%26token%3D56500d47-5151-474f-946e-40a363e58749&width=768&dpr=3&quality=100&sign=49e3057dbcda5a9aa24764772f4b1564&sv=3)
+
+3\. Metrics: stress test the kit[](https://book.leveldesignbook.com/process/blockout/metrics/modular#id-3.-metrics-stress-test-the-kit)
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+do NOT just stop at an ideal case
+
+collision is one of the biggest issues, make sure you can't get stuck?
+
+### Loopback Test[](https://book.leveldesignbook.com/process/blockout/metrics/modular#loopback-test)
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPP-21y2wJpBDQmUla%252F-MbPPcm4lqsQ4Y9xdCXm%252FwebLoopbackStressTest.jpg%3Falt%3Dmedia%26token%3D6e4e6912-3604-4392-b39a-931922076e63&width=768&dpr=3&quality=100&sign=65b503d537cfb4d8adbdbd7f2001132f&sv=3)
+
+### Stack Test[](https://book.leveldesignbook.com/process/blockout/metrics/modular#stack-test)
+
+can you build multi-level environments? floors should NOT be paper thin, they have thickness and mass just like walls
+
+![](https://book.leveldesignbook.com/~gitbook/image?url=https%3A%2F%2F1666186240-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-legacy-files%2Fo%2Fassets%252F-LtVT8pJjInrrHVCovzy%252F-MbPP-21y2wJpBDQmUla%252F-MbPPgPOkQoF0rm9FBnr%252FwebVerticalFootprint.jpg%3Falt%3Dmedia%26token%3Dbcdd332c-8b15-4c3f-b5cc-2f4b610c12f3&width=768&dpr=3&quality=100&sign=cb708e375313db2e0af6e894a7d4eeaa&sv=3)
+
+### Gap Test[](https://book.leveldesignbook.com/process/blockout/metrics/modular#gap-test)
+
+do you have enough glue for interior kits with off-angle construction? essential for tunnel or cave kits
+
+4\. Art pass the kit, make variants[](https://book.leveldesignbook.com/process/blockout/metrics/modular#id-4.-art-pass-the-kit-make-variants)
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+texture variations go a long way, and are "cheap" -- you don't have to test and validate the module geometry again
+
+consider building a tool for easily swapping in module types, which will make art pass and remesh much faster
+
+Sources[](https://book.leveldesignbook.com/process/blockout/metrics/modular#sources)
+
+-------------------------------------------------------------------------------------
+
+As mentioned at the top of this page, much of the info here comes from two excellent GDC talks by Joel Burgess, which are a **must-read** for anyone doing modular construction:
+
+*   ["GDC 2013: Skyrim's Modular Approach to Level Design"](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html)
+     ([slides](http://www.slideshare.net/JoelBurgess/gdc2013-kit-buildingfinal)
+    ) is the "101" introductory talk to modular kit design considerations, and how they approached building out levels for Fallout 3 and Skyrim, while avoiding the worst of Oblivion's sins.
+    
+*   ["GDC 2016: The Modular Level Design of Fallout 4"](https://www.youtube.com/watch?v=QBAM27YbKZg)
+     ([slides](https://www.slideshare.net/JoelBurgess/gdc-2016-modular-level-design-of-fallout-4)
+    , [video](https://www.youtube.com/watch?v=QBAM27YbKZg)
+    ) is the "201" intermediate talk that elaborates on what they did for Skyrim's modular kits, and expanded when building Fallout 4.
+    
+
+Further reading[](https://book.leveldesignbook.com/process/blockout/metrics/modular#further-reading)
+
+-----------------------------------------------------------------------------------------------------
+
+*   ["Modular Level and Component Design" by Lee Perry](https://docs.unrealengine.com/udk/Three/ModularLevelDesign.html)
+     for Game Developer magazine, Nov 2002. A solid article by the lead level designer on Gears of War (2006), one of the first game dev writings to detail modular construction practices -- which only began emerging in the early 2000s when brush-based CSG construction began falling out of fashion. Included here mainly for historical interest; compare against [History of the level designer](https://book.leveldesignbook.com/culture/history-level-designer)
+    .
+    
+
+[PreviousMetrics](https://book.leveldesignbook.com/process/blockout/metrics)
+[NextDoom metrics](https://book.leveldesignbook.com/process/blockout/metrics/doom)
+
+Last updated 5 years ago

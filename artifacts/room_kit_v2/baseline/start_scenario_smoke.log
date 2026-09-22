@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.6.stable.official, runtime v4.7.1.stable.official, safeguards balanced)
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped
+     at: push_warning (core/variant/variant_utility.cpp:1033)
+     GDScript backtrace (most recent call first):
+         [0] _enforce_guaranteed_roles (res://scripts/procgen/room_assigner.gd:212)
+         [1] assign_with_selector (res://scripts/procgen/room_assigner.gd:161)
+         [2] assign (res://scripts/procgen/room_assigner.gd:59)
+         [3] _generate_once (res://scripts/procgen/ship_layout_generator.gd:121)
+         [4] generate_with_options (res://scripts/procgen/ship_layout_generator.gd:78)
+         [5] generate (res://scripts/procgen/ship_layout_generator.gd:44)
+         [6] _initialize (res://scripts/validation/start_scenario_smoke.gd:29)
+GameplaySliceBuilder slot_fallback room=crew_quarters_01 kind=salvage
+START_SCENARIO PASS derelict=11_rooms life_boat=3_rooms floor_cells=55 nav_polys=30 objectives=5

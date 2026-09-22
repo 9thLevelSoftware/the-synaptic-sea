@@ -1,0 +1,6 @@
+17:39:25 | INFO: Data are loaded, start creating Blender stuff
+17:39:25 | INFO: Blender create Mesh node Collision_floor_1x1_Mesh
+17:39:25 | INFO: Blender create Mesh node Visual_leaked_helper
+17:39:25 | INFO: glTF import finished in 0.00s
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+{"errors": ["authoring helper mesh was imported: Collision_floor_1x1_Mesh"], "measurements": {"assembly_acceptance": false, "helper_objects_rejected": true, "mesh_object_count": 1, "object_count": 2, "triangle_count": 12, "validation_scope": "per_module_visual_interface"}, "status": "fail"}

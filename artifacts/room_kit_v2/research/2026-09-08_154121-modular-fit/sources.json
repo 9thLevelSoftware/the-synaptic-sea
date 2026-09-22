@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": 1,
+      "url": "https://book.leveldesignbook.com/process/blockout/metrics/modular",
+      "title": "",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "floors should NOT be paper thin, they have thickness and mass just like walls",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "url": "https://docs.godotengine.org/en/stable/classes/class_gridmap.html",
+      "title": "",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "The dimensions of the grid's cells.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "This does not affect the size of the meshes.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "url": "https://docs.godotengine.org/en/stable/classes/class_camera3d.html",
+      "title": "",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "Orthogonal projection, also known as orthographic projection. Objects remain the same size on the screen no matter how far away they are.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "url": "https://docs.godotengine.org/en/stable/tutorials/3d/standard_material_3d.html",
+      "title": "",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "Normal mapping allows you to set a texture that represents finer shape detail. This does not modify geometry, only the incident angle for light.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "url": "https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html",
+      "title": "",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "Decals are only supported in the Forward+ and Mobile renderers, not the Compatibility renderer.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "If using the Compatibility renderer, consider using Sprite3D as an alternative for projecting decals onto (mostly) flat surfaces.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/fbx-static-mesh-pipeline-in-unreal-engine",
+      "title": "Epic Games: FBX Static Mesh Pipeline",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "The pivot point of the mesh in Unreal Engine determines the point around which any transformations (translation, rotation, scale) will be performed.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "The pivot point is always located at the origin (0,0,0) when exporting from a 3D modeling application. Because of this, it is best to create your meshes at the origin, with the origin generally being located at one corner of the mesh to allow for proper alignment when snapping to the grid inside of Unreal Editor.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "url": "http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html",
+      "title": "Joel Burgess and Nate Purkeypile: Skyrim Modular Level Design GDC 2013",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "Instead, predetermine how thick floors should be.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "Generally, the pivots of our kit pieces are at the ground plane of the kit and in the center.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "The only time a piece is at the edge of the footprint is when it is actually snapping together with another kit piece.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "The correct way to fix this problem is to rework that piece so it fits within the intended footprint.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "One of the big things to do is loop the kit back on itself, usually through various sub-kits.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "Something else to try is stacking kits on top of each other.",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "Pieces always exist within the footprint.",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "url": "https://wiki.frozenbyte.com/index.php/3D_Asset_Workflow:_Tile_Textures_and_Trimsheets",
+      "title": "Frozenbyte: Tile Textures and Trimsheets",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "If you have a big/long surface of something like wall/rope/floor/ground, it's probably best to make a tile texture or a trimsheet",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "The finished sculpt/hipoly will be baked to a flat plane, so the sculpt depth doesn't really matter",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "However, if you want to make a trim that blends with the underlying mesh, remember to keep its edges as flat as possible",
+          "added": "2026-09-08"
+        },
+        {
+          "text": "Cheap and easy way to combat this issue is to model out / extrude out shapes from the tiling texture",
+          "added": "2026-09-08"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "url": "https://www.exp-points.com/vuk-single-material-modular-kit-environment-ue4",
+      "title": "Vuk Banovic: Single Material Modular Kit Q&A",
+      "accessed": "2026-09-08",
+      "quotes": [
+        {
+          "text": "it’s important to test early in the engine (Unreal in my case), because sometimes an asset can look great in Maya, but not as good in the engine.",
+          "added": "2026-09-08"
+        }
+      ]
+    }
+  ]
+}

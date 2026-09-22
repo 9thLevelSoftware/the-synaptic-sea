@@ -1,0 +1,99 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/modular_structural_fit.md] _
+
+relative = 'docs/game/features/modular_structural_fit.md'
+
+    @pytest.mark.parametrize("relative", DOCS)
+    def test_guidance_does_not_invent_a_second_dimensional_policy(relative):
+        text = (ROOT / relative).read_text()
+        assert "structural_visual_dimensions.v1.json" in text
+        assert "HOLD" in text
+        for invented_value in ("`0.30`", "`0.05`", "`0.8 × 0.8`"):
+>           assert invented_value not in text, (relative, invented_value)
+E           AssertionError: ('docs/game/features/modular_structural_fit.md', '`0.30`')
+E           assert '`0.30`' not in '# Shared Mo... approval.\n'
+E             
+E             '`0.30`' is contained here:
+E               velope is `0.30` m deep: normal `[-0.15,+0.15]`. The outer envelope is an art/readability allowance, not a new placement, collision, or navigation depth.
+E             ?           ++++++
+E               - Reserve a `0.05` m protected joining strip at every mating face. The terminal mating band remains `0.20` m high/deep as defined by the policy. No bevel trough, greeble, trim overlap, damage displacement, or texture discontinuity may consume the protected strip.
+E               - Detail must recess away from mating faces. Keep joining faces flat and deliberately owned; do not round away a shared edge to c...
+E             
+E             ...Full output truncated (116 lines hidden), use '-vv' to show
+
+tests/test_modular_structural_fit_docs.py:20: AssertionError
+_ test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_room_kit_v2.md] _
+
+relative = 'docs/game/features/blender_room_kit_v2.md'
+
+    @pytest.mark.parametrize("relative", DOCS)
+    def test_guidance_does_not_invent_a_second_dimensional_policy(relative):
+        text = (ROOT / relative).read_text()
+>       assert "structural_visual_dimensions.v1.json" in text
+E       AssertionError: assert 'structural_visual_dimensions.v1.json' in '# Blender room kit v2\n\n> **Supersession notice — 2026-09-08:** The shared modular-fit policy and authoring/runbook ...nds use `--python-exit-code 1`. These replace inconsistent example aliases in the plan without changing asset scope.\n'
+
+tests/test_modular_structural_fit_docs.py:17: AssertionError
+_ test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_artist_workflow.md] _
+
+relative = 'docs/game/features/blender_artist_workflow.md'
+
+    @pytest.mark.parametrize("relative", DOCS)
+    def test_guidance_does_not_invent_a_second_dimensional_policy(relative):
+        text = (ROOT / relative).read_text()
+        assert "structural_visual_dimensions.v1.json" in text
+        assert "HOLD" in text
+        for invented_value in ("`0.30`", "`0.05`", "`0.8 × 0.8`"):
+>           assert invented_value not in text, (relative, invented_value)
+E           AssertionError: ('docs/game/features/blender_artist_workflow.md', '`0.30`')
+E           assert '`0.30`' not in '# Blender a... all pass.\n'
+E             
+E             '`0.30`' is contained here:
+E                depth is `0.30` m, normal `[-0.15,+0.15]`.
+E             ?           ++++++
+E               - Reserve `0.05` m protected joining strips. The terminal mating band is `0.20` m. Keep mating faces flat; detail recesses away from them.
+E               - `doorway_frame_open_1x1` has a `1.2 × 2.2` m clear opening: X `[-0.6,+0.6]`, Y `[0,2.2]`, Z `[-0.1,+0.1]`. It has no raised threshold.
+E               - `pillar_support_1x1` has a `0.8 × 0.8` m X/Z envelope and contacts the floor at `Y=0` and the shared top at `Y=3.2`. Ribs/open construction are allowed; the envelope is not a filled-cube requirement....
+E             
+E             ...Full output truncated (60 lines hidden), use '-vv' to show
+
+tests/test_modular_structural_fit_docs.py:20: AssertionError
+_ test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_structural_source_pipeline.md] _
+
+relative = 'docs/game/features/blender_structural_source_pipeline.md'
+
+    @pytest.mark.parametrize("relative", DOCS)
+    def test_guidance_does_not_invent_a_second_dimensional_policy(relative):
+        text = (ROOT / relative).read_text()
+>       assert "structural_visual_dimensions.v1.json" in text
+E       AssertionError: assert 'structural_visual_dimensions.v1.json' in '# Blender structural source pipeline\n\nThis document is the source/helper runbook. The shared visual policy is [`mod... to the source-authority status and full-assembly review gates before the policy can be treated as release approval.\n'
+
+tests/test_modular_structural_fit_docs.py:17: AssertionError
+_ test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/adr/0061-blender-room-kit-v2.md] _
+
+relative = 'docs/game/adr/0061-blender-room-kit-v2.md'
+
+    @pytest.mark.parametrize("relative", DOCS)
+    def test_guidance_does_not_invent_a_second_dimensional_policy(relative):
+        text = (ROOT / relative).read_text()
+>       assert "structural_visual_dimensions.v1.json" in text
+E       AssertionError: assert 'structural_visual_dimensions.v1.json' in '# ADR-0061: Procgen-safe Blender room kit v2\n\nStatus: Accepted for implementation; assets remain staged and runtime...y and ramp decisions remain HOLD. This documentation update authored no assets and approved no assets for promotion.\n'
+
+tests/test_modular_structural_fit_docs.py:17: AssertionError
+________ test_canonical_runbook_names_the_actual_cli_and_profile_limit _________
+
+    def test_canonical_runbook_names_the_actual_cli_and_profile_limit():
+        text = (ROOT / DOCS[0]).read_text()
+        for token in ("--python-exit-code 1", "--glb", "--report", "terminal_mating_band_m", "footprint_cells", "ramp_up_1x2"):
+>           assert token in text
+E           AssertionError: assert 'terminal_mating_band_m' in '# Shared Modular Structural Fit v1\n\nStatus: canonical art-authoring and validation runbook. The dimensions policy i...update. Keep A/B source authority and ramp decisions HOLD, and keep geometric PASS separate from promotion approval.\n'
+
+tests/test_modular_structural_fit_docs.py:26: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_modular_structural_fit_docs.py::test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/modular_structural_fit.md]
+FAILED tests/test_modular_structural_fit_docs.py::test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_room_kit_v2.md]
+FAILED tests/test_modular_structural_fit_docs.py::test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_artist_workflow.md]
+FAILED tests/test_modular_structural_fit_docs.py::test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/features/blender_structural_source_pipeline.md]
+FAILED tests/test_modular_structural_fit_docs.py::test_guidance_does_not_invent_a_second_dimensional_policy[docs/game/adr/0061-blender-room-kit-v2.md]
+FAILED tests/test_modular_structural_fit_docs.py::test_canonical_runbook_names_the_actual_cli_and_profile_limit
+6 failed in 0.02s

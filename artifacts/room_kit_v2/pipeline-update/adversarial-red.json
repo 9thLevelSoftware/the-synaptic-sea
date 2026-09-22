@@ -1,0 +1,71 @@
+{
+  "valid_floor": {
+    "status": "pass",
+    "errors": [],
+    "measurements": {
+      "triangle_count": 12,
+      "bounds": {
+        "min": [
+          -2.0,
+          -0.25,
+          -2.0
+        ],
+        "max": [
+          2.0,
+          0.0,
+          2.0
+        ]
+      }
+    },
+    "module_id": "floor_1x1",
+    "family": "floor"
+  },
+  "wall_recessed_terminal_face": {
+    "status": "pass",
+    "errors": [],
+    "measurements": {
+      "triangle_count": 24,
+      "bounds": {
+        "min": [
+          -2.0,
+          0.0,
+          -0.1
+        ],
+        "max": [
+          2.0,
+          3.2,
+          0.1
+        ]
+      }
+    },
+    "module_id": "wall_straight_1x1",
+    "family": "wall"
+  },
+  "floor_skirt_gap": {
+    "status": "fail",
+    "errors": [
+      "floor back mating boundary/slab profile is incomplete",
+      "floor front mating boundary/slab profile is incomplete",
+      "floor left mating boundary/slab profile is incomplete",
+      "floor right mating boundary/slab profile is incomplete",
+      "floor top projected coverage has a hole or exceeds maximum recess"
+    ],
+    "measurements": {
+      "triangle_count": 24,
+      "bounds": {
+        "min": [
+          -2.0,
+          -0.25,
+          -2.0
+        ],
+        "max": [
+          2.0,
+          0.0,
+          2.0
+        ]
+      }
+    },
+    "module_id": "floor_1x1",
+    "family": "floor"
+  }
+}

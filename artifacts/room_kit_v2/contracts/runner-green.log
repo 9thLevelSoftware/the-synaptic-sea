@@ -1,0 +1,55 @@
+.....F..                                                                 [100%]
+=================================== FAILURES ===================================
+__________________ test_runner[raise SystemExit(5)-REAL-10-1] __________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-53/test_runner_raise_SystemExit_50')
+program = 'raise SystemExit(5)', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+        assert result.returncode == expected, result.stdout + result.stderr
+        assert log.is_file()
+        assert ("GATE_PASS" if expected == 0 else "GATE_FAIL") in result.stdout
+        if expected:
+>           assert log.read_text(encoding="utf-8")
+E           AssertionError: assert ''
+E            +  where '' = read_text(encoding='utf-8')
+E            +    where read_text = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-53/test_runner_raise_SystemExit_50/output.txt').read_text
+
+tests/test_run_room_kit_gate.py:53: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_run_room_kit_gate.py::test_runner[raise SystemExit(5)-REAL-10-1]
+1 failed, 7 passed in 1.41s

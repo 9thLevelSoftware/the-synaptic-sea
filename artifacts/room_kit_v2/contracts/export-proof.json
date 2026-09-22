@@ -1,0 +1,18 @@
+{
+  "helpers_excluded": true,
+  "identity_nodes": true,
+  "output_sha256": "017dad5a63efdc5421ff3d7d63559fb46848392f72459c290570f45e8c513356",
+  "source_sha256_after": "9376d7c5c70eb93d996e673d87f95bd695ac30f5668e42ed08e9f68a1222f923",
+  "source_sha256_before": "9376d7c5c70eb93d996e673d87f95bd695ac30f5668e42ed08e9f68a1222f923",
+  "source_unchanged": true,
+  "world_max_y_up": [
+    1.5,
+    1.0,
+    0.5
+  ],
+  "world_min_y_up": [
+    -1.5,
+    0.0,
+    -0.5
+  ]
+}

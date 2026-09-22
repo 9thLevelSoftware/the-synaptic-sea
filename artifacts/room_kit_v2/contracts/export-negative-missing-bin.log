@@ -1,0 +1,17 @@
+00:00.268  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_glb_withou0/valid.blend"
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_glb_withou0/missing_bin_export.py", line 14, in <module>
+    module['export_static'](Path('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_glb_withou0/valid.blend'), Path('/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_glb_withou0/missing-bin.glb'), export_operator=invalid)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 219, in export_static
+    document = _read_exported_glb(output)
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 127, in _read_exported_glb
+    raise RuntimeError("exported GLB is missing its JSON or BIN chunk")
+RuntimeError: exported GLB is missing its JSON or BIN chunk
+
+Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_glb_withou0/missing_bin_export.py', exiting.

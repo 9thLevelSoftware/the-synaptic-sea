@@ -1,0 +1,14 @@
+{
+  "errors": [
+    "authoring helper mesh was imported: Collision_floor_1x1"
+  ],
+  "measurements": {
+    "assembly_acceptance": false,
+    "helper_objects_rejected": true,
+    "mesh_object_count": 22,
+    "object_count": 23,
+    "triangle_count": 728,
+    "validation_scope": "per_module_visual_interface"
+  },
+  "status": "fail"
+}

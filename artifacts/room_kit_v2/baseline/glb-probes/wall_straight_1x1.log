@@ -1,0 +1,26 @@
+13:02:10 | INFO: Data are loaded, start creating Blender stuff
+13:02:10 | INFO: Blender create Mesh node Collision_wall_straight_1x1_Mesh
+13:02:10 | INFO: Blender create Mesh node Cube.032
+13:02:10 | INFO: Blender create Mesh node Cube.031
+13:02:10 | INFO: Blender create Mesh node Cube.029
+13:02:10 | INFO: Blender create Mesh node Cube.030
+13:02:10 | INFO: Blender create Mesh node Cube.016
+13:02:10 | INFO: Blender create Mesh node Cube.014
+13:02:10 | INFO: Blender create Mesh node Cube.015
+13:02:10 | INFO: Blender create Mesh node Cube.017
+13:02:10 | INFO: Blender create Mesh node Cube.019
+13:02:10 | INFO: Blender create Mesh node Cube.018
+13:02:10 | INFO: Blender create Mesh node Cube.034
+13:02:10 | INFO: Blender create Mesh node Cube.035
+13:02:10 | INFO: Blender create Mesh node Cube.036
+13:02:10 | INFO: Blender create Mesh node Cube.038
+13:02:10 | INFO: Blender create Mesh node Cube.011
+13:02:10 | INFO: Blender create Mesh node Cube.012
+13:02:10 | INFO: Blender create Mesh node Cube.013
+13:02:10 | INFO: Blender create Mesh node Cube.033
+13:02:10 | INFO: Blender create Mesh node Cube.020
+13:02:10 | INFO: glTF import finished in 0.01s
+ROOM_GLB_PROBE {"materials":["MAT_Conduit","MAT_PaintedAlloyGray","MAT_WarningStripe","Material"],"mesh_count":21,"operator_result":"{'FINISHED'}","path":"/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1.glb","triangles":726}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

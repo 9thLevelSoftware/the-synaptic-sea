@@ -1,0 +1,64 @@
+{
+  "verdict": "PASS",
+  "review_scope": "Final tiny doorway front/back clearance correction only; no new broad audit.",
+  "blocking_findings": [],
+  "findings": [
+    {
+      "status": "PASS",
+      "area": "clearance correction",
+      "detail": "_validate_wall_or_door expands only the clear-prism normal bounds by 4*_EPS before the existing triangle/AABB SAT helper applies its 2*_EPS inset. This rejects sealing front/back faces while retaining the prior tangent/Y boundary-contact behavior for jambs, lintel, and floor."
+    },
+    {
+      "status": "PASS",
+      "area": "regressions",
+      "detail": "The three parameterized closed-wall/front-skin/back-skin cases fail as required, while the open doorway frame remains valid."
+    },
+    {
+      "status": "PASS",
+      "area": "real Blender evidence",
+      "detail": "final-real-blender.log records 15 expected outcomes with PARENT_REAL_BLENDER_RESULTS count=15 and passed=15, including valid open frame, blocked doorway, and compensated-mesh-origin cases."
+    },
+    {
+      "status": "PASS",
+      "area": "canonical policy",
+      "detail": "The canonical dimensions policy is unchanged and retains its reviewed SHA-256."
+    }
+  ],
+  "tests": [
+    {
+      "command": "PYTHONPATH=. TMPDIR=$PWD/artifacts/room_kit_v2/pipeline-update/tmp PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /opt/homebrew/bin/python3.11 -m pytest -q tests/test_structural_visual_contract.py",
+      "result": "18 passed in 0.05s",
+      "exit_code": 0
+    },
+    {
+      "artifact": "artifacts/room_kit_v2/pipeline-update/final-real-blender.log",
+      "result": "PARENT_REAL_BLENDER_RESULTS count=15 passed=15",
+      "expected_outcomes": 15
+    },
+    {
+      "command": "git diff --check",
+      "result": "clean",
+      "exit_code": 0
+    }
+  ],
+  "hashes": {
+    "hash_algorithm": "sha256",
+    "pure_code": {
+      "tools/structural_visual_contract.py": "be6510b193622abbdc1c390ccb6f000447c8bd482488a7d36c9f0580d6fe956c"
+    },
+    "tests": {
+      "tests/test_structural_visual_contract.py": "c5793a4b5300ad79a76a03f618fcbecedbbcf8f7feaa3fbec24928e9fe5084e8"
+    },
+    "policy": {
+      "data/art/structural_visual_dimensions.v1.json": "5499c1921bc90492ba60015b8a046b41de047ac17892883821c41efb234ec43f"
+    },
+    "evidence": {
+      "artifacts/room_kit_v2/pipeline-update/final-real-blender.log": "a9fc0c7700f646b784cf39254c6ceaee9339ccd86baa7976fc81f9914b314c7d"
+    }
+  },
+  "limitations": [
+    "Scoped correction review only; no new broad audit.",
+    "No code, tests, documentation, or canonical policy files were edited by this review."
+  ],
+  "report_path": "artifacts/room_kit_v2/pipeline-update/door-clearance-review.json"
+}

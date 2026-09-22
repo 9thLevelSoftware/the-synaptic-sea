@@ -1,0 +1,15 @@
+00:00.251  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/fabrication_station_derelict_v1/fabrication_station_derelict_v1.blend"
+ROOM_KIT_SOURCE_WORLD_BOUNDS {"asset_id": "fabrication_station_derelict_v1", "blender_max": [0.8499999642372131, 0.5, 1.8200000524520874], "blender_min": [-0.8499999642372131, -0.30000001192092896, 0.0], "objects": 2}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+00:00.252  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/coolant_pump_skid_derelict_v1/coolant_pump_skid_derelict_v1.blend"
+ROOM_KIT_SOURCE_WORLD_BOUNDS {"asset_id": "coolant_pump_skid_derelict_v1", "blender_max": [0.7599999904632568, 0.4375, 0.1599999964237213], "blender_min": [-0.7599999904632568, -0.4424999952316284, 0.0], "objects": 2}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+00:00.243  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/meshes/source/room_kit_v2/props/suit_service_stand_derelict_v1/suit_service_stand_derelict_v1.blend"
+ROOM_KIT_SOURCE_WORLD_BOUNDS {"asset_id": "suit_service_stand_derelict_v1", "blender_max": [0.40464016795158386, 0.35199999809265137, 1.8700000047683716], "blender_min": [-0.5753598213195801, -0.012999996542930603, 0.0], "objects": 2}
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit

@@ -1,0 +1,86 @@
+{
+  "verdict": "PASS",
+  "blocking_findings": [],
+  "review_scope": [
+    "source open must require FINISHED",
+    "mesh translation and compensated-root transform checks",
+    "transactional structural publication and rollback failure handling",
+    "shared rollback publisher call sites in structural CLI, promoter, and GUI add-on export",
+    "static-prop versus structural CLI documentation correction"
+  ],
+  "tests": [
+    {
+      "command": "PYTHONPATH=ROOT TMPDIR=ROOT/artifacts/room_kit_v2/pipeline-update/tmp PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /opt/homebrew/bin/python3.11 -m pytest tests/test_structural_stage_publication.py tests/test_export_structural_glb.py tests/test_promote_structural_sources.py tests/test_validate_structural_visual_fit.py tests/test_structural_module_toolkit_export.py -q",
+      "result": "34 passed in 3.42s",
+      "exit_code": 0
+    },
+    {
+      "command": "PYTHONPATH=ROOT TMPDIR=ROOT/artifacts/room_kit_v2/pipeline-update/tmp /opt/homebrew/bin/blender --background --factory-startup --python-exit-code 1 --python artifacts/room_kit_v2/pipeline-update/verify_parent_addon.py",
+      "result": "PARENT_ADDON_STATE_PASS; valid_export_count=1; invalid_export_rejected=true; source_file_unchanged=true; unsaved_scene_and_mesh_preserved=true; previous_staging_preserved=true",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "result": "clean",
+      "exit_code": 0
+    }
+  ],
+  "checks": {
+    "documentation": "PASS: blender_room_kit_v2.md explicitly distinguishes static prop --source/--output from structural --blend-path/--staging-dir; tools/export_static_room_prop.py defines the former parser flags.",
+    "source_open": "PASS: export_structural_glb.py rejects None or non-FINISHED open_mainfile results before scene use; focused cancellation regression passes.",
+    "mesh_transforms": "PASS: validator rejects non-zero mesh translation, scale, rotation, and non-identity non-mesh import roots; compensated-vertex translation regression passes.",
+    "publication": "PASS: structural_stage_publication.py uses sibling recovery renames before publication, records backup intent before rename, rolls back partial publication, retains recovery data when rollback fails, and keeps committed outputs when post-commit cleanup fails.",
+    "shared_call_sites": "PASS: export_structural_glb.py, promote_structural_sources.py, and blender_addons/structural_module_toolkit/export.py use publish_staged_files.",
+    "frozen_authority_policy": "EXPECTED_HOLD: source authority status remains unresolved as approved_dimensions_pending_source_authority; this intentional future-unblock limitation was not changed or treated as a correction blocker."
+  },
+  "hashes": {
+    "hash_algorithm": "sha256",
+    "review_start": {
+      "tools/export_structural_glb.py": "7e4c379400702858c26e9286a00d695e739a84790a42bc56685ff6727776e312",
+      "tools/promote_structural_sources.py": "5ca0f9d0a42b65736fd9c1de412fce3dcddcf61a43d69b66317b45e7746251cc",
+      "tools/validate_structural_visual_fit.py": "8af4cc5c06bdd529c73e10d1320864d00a595c8c6dd7d9b7d989b117354716cf",
+      "tools/structural_stage_publication.py": "add73eebf75591ce0684e9da7c1da974701297810f19600acc540ef452463c06",
+      "tools/blender_addons/structural_module_toolkit/export.py": "1f8ace08fb8a60608cdca6476691bff1a6839d49e0ec8a9151d139a6bdc49aeb",
+      "tools/blender_addons/structural_module_toolkit/operators.py": "3be1f50c4d7325741dd92b4821a2d8e17bc53201ff179a0c23589c20afaccebb",
+      "tests/test_structural_stage_publication.py": "e39a37fb12e24a69654294eaf2f1cf817d650fccca0de9fb942f33d0c148fc3b",
+      "tests/test_export_structural_glb.py": "8a01a88a3efedf45707c79d6bf994acbabda90dffa4286c5d52123e7b35f80c6",
+      "tests/test_promote_structural_sources.py": "42e8c39a0cc5c8202a7180515d0527d5ccb3c301eab1574bf11d356e979f2dd7",
+      "tests/test_validate_structural_visual_fit.py": "a84d6147270315d6b4e88916f46958d6ec0e9b80cba50ef25e6a3fdd2b33b95f",
+      "tests/test_structural_module_toolkit_export.py": "21abbd6671a61af2136bd349fccbb11b0a9baada67d93f84e4e61f7f9b4a7b0d",
+      "docs/game/features/blender_room_kit_v2.md": "8a914a8f14732a19b478ce4f6340a57918db4536644c1530490046d60abc02fa",
+      "docs/game/adr/0061-blender-room-kit-v2.md": "5c2fd7faab64ae742b8c737dacea25089de7ece471f3ec83a7e441d69495b319",
+      "docs/game/features/blender_structural_source_pipeline.md": "55f67456f6ff86096bee7ae26b62e2087bee545ca17080d2fe9d49f3083c587e",
+      "docs/game/features/blender_artist_workflow.md": "313a737d6d1133c4068f224ea7c11b6438368c3e31d5c454d85d747f457de193"
+    },
+    "review_end": {
+      "tools/export_structural_glb.py": "7e4c379400702858c26e9286a00d695e739a84790a42bc56685ff6727776e312",
+      "tools/promote_structural_sources.py": "5ca0f9d0a42b65736fd9c1de412fce3dcddcf61a43d69b66317b45e7746251cc",
+      "tools/validate_structural_visual_fit.py": "8af4cc5c06bdd529c73e10d1320864d00a595c8c6dd7d9b7d989b117354716cf",
+      "tools/structural_stage_publication.py": "add73eebf75591ce0684e9da7c1da974701297810f19600acc540ef452463c06",
+      "tools/blender_addons/structural_module_toolkit/export.py": "1f8ace08fb8a60608cdca6476691bff1a6839d49e0ec8a9151d139a6bdc49aeb",
+      "tools/blender_addons/structural_module_toolkit/operators.py": "3be1f50c4d7325741dd92b4821a2d8e17bc53201ff179a0c23589c20afaccebb",
+      "tests/test_structural_stage_publication.py": "1484129b8a266f875115d26a63c5cd9fe11ffca1cbf117b15098b893105cbe91",
+      "tests/test_export_structural_glb.py": "8a01a88a3efedf45707c79d6bf994acbabda90dffa4286c5d52123e7b35f80c6",
+      "tests/test_promote_structural_sources.py": "42e8c39a0cc5c8202a7180515d0527d5ccb3c301eab1574bf11d356e979f2dd7",
+      "tests/test_validate_structural_visual_fit.py": "a84d6147270315d6b4e88916f46958d6ec0e9b80cba50ef25e6a3fdd2b33b95f",
+      "tests/test_structural_module_toolkit_export.py": "21abbd6671a61af2136bd349fccbb11b0a9baada67d93f84e4e61f7f9b4a7b0d",
+      "docs/game/features/blender_room_kit_v2.md": "8a914a8f14732a19b478ce4f6340a57918db4536644c1530490046d60abc02fa",
+      "docs/game/adr/0061-blender-room-kit-v2.md": "5c2fd7faab64ae742b8c737dacea25089de7ece471f3ec83a7e441d69495b319",
+      "docs/game/features/blender_structural_source_pipeline.md": "55f67456f6ff86096bee7ae26b62e2087bee545ca17080d2fe9d49f3083c587e",
+      "docs/game/features/blender_artist_workflow.md": "313a737d6d1133c4068f224ea7c11b6438368c3e31d5c454d85d747f457de193"
+    },
+    "changed_during_review": {
+      "tests/test_structural_stage_publication.py": {
+        "before": "e39a37fb12e24a69654294eaf2f1cf817d650fccca0de9fb942f33d0c148fc3b",
+        "after": "1484129b8a266f875115d26a63c5cd9fe11ffca1cbf117b15098b893105cbe91",
+        "interpretation": "Concurrent worker added an additional missing-backup-after-rename regression; the required suite was rerun after the change and passed 34 tests."
+      }
+    }
+  },
+  "limitations": [
+    "Bounded correction review only; no new broad audit.",
+    "The frozen source-authority HOLD remains intentionally unresolved and was not revised.",
+    "No source, helper implementation, production asset, or documentation file was edited by this review."
+  ],
+  "report_path": "artifacts/room_kit_v2/pipeline-update/final-correction-review.json"
+}

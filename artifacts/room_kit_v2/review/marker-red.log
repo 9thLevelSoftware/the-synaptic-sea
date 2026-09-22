@@ -1,0 +1,229 @@
+.FFFF...........                                                         [100%]
+=================================== FAILURES ===================================
+_____________ test_runner[print("unrelated REAL text")-REAL-10-1] ______________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__unrelated_R0')
+program = 'print("unrelated REAL text")', marker = 'REAL', timeout = 10
+expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("unrelated REAL text")', "REAL", 10, 1),
+            ('print("REAL_IMPOSTOR")', "REAL", 10, 1),
+            ('print("REALISTIC")', "REAL", 10, 1),
+            ('print("xREAL")', "REAL", 10, 1),
+            ('print("REAL rows=16")', "REAL", 10, 0),
+            ('print("REAL[42]")', "REAL[42]", 10, 0),
+            ('print("REAL4")', "REAL[42]", 10, 1),
+            ('print("REAL")', "", 10, 1),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: GATE_PASS /private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__unrelated_R0/output.txt
+E         
+E       assert 0 == 1
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__unrelated_R0/output.txt\n', stderr='').returncode
+
+tests/test_run_room_kit_gate.py:57: AssertionError
+________________ test_runner[print("REAL_IMPOSTOR")-REAL-10-1] _________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REAL_IMPOST0')
+program = 'print("REAL_IMPOSTOR")', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("unrelated REAL text")', "REAL", 10, 1),
+            ('print("REAL_IMPOSTOR")', "REAL", 10, 1),
+            ('print("REALISTIC")', "REAL", 10, 1),
+            ('print("xREAL")', "REAL", 10, 1),
+            ('print("REAL rows=16")', "REAL", 10, 0),
+            ('print("REAL[42]")', "REAL[42]", 10, 0),
+            ('print("REAL4")', "REAL[42]", 10, 1),
+            ('print("REAL")', "", 10, 1),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: GATE_PASS /private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REAL_IMPOST0/output.txt
+E         
+E       assert 0 == 1
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REAL_IMPOST0/output.txt\n', stderr='').returncode
+
+tests/test_run_room_kit_gate.py:57: AssertionError
+__________________ test_runner[print("REALISTIC")-REAL-10-1] ___________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REALISTIC__0')
+program = 'print("REALISTIC")', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("unrelated REAL text")', "REAL", 10, 1),
+            ('print("REAL_IMPOSTOR")', "REAL", 10, 1),
+            ('print("REALISTIC")', "REAL", 10, 1),
+            ('print("xREAL")', "REAL", 10, 1),
+            ('print("REAL rows=16")', "REAL", 10, 0),
+            ('print("REAL[42]")', "REAL[42]", 10, 0),
+            ('print("REAL4")', "REAL[42]", 10, 1),
+            ('print("REAL")', "", 10, 1),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: GATE_PASS /private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REALISTIC__0/output.txt
+E         
+E       assert 0 == 1
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__REALISTIC__0/output.txt\n', stderr='').returncode
+
+tests/test_run_room_kit_gate.py:57: AssertionError
+____________________ test_runner[print("xREAL")-REAL-10-1] _____________________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__xREAL___REA0')
+program = 'print("xREAL")', marker = 'REAL', timeout = 10, expected = 1
+
+    @pytest.mark.parametrize(
+        "program,marker,timeout,expected",
+        [
+            ('print("REAL")', "REAL", 10, 0),
+            ('print("unrelated REAL text")', "REAL", 10, 1),
+            ('print("REAL_IMPOSTOR")', "REAL", 10, 1),
+            ('print("REALISTIC")', "REAL", 10, 1),
+            ('print("xREAL")', "REAL", 10, 1),
+            ('print("REAL rows=16")', "REAL", 10, 0),
+            ('print("REAL[42]")', "REAL[42]", 10, 0),
+            ('print("REAL4")', "REAL[42]", 10, 1),
+            ('print("REAL")', "", 10, 1),
+            ('print("SCRIPT ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("ERROR: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("WARNING: deliberate runner test"); print("REAL")', "REAL", 10, 1),
+            ('print("wrong marker")', "REAL", 10, 1),
+            ('raise SystemExit(5)', "REAL", 10, 1),
+            ('import time; time.sleep(10)', "", 1, 1),
+        ],
+    )
+    def test_runner(tmp_path, program, marker, timeout, expected) -> None:
+        log = tmp_path / "output.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--log",
+                str(log),
+                "--marker",
+                marker,
+                "--timeout",
+                str(timeout),
+                "--",
+                sys.executable,
+                "-c",
+                program,
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            cwd=ROOT,
+        )
+    
+>       assert result.returncode == expected, result.stdout + result.stderr
+E       AssertionError: GATE_PASS /private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__xREAL___REA0/output.txt
+E         
+E       assert 0 == 1
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/opt/python@3.11/bin/python3.11', '/Volumes/Untitled/SynapticSeaAssets/worktrees/...ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-83/test_runner_print__xREAL___REA0/output.txt\n', stderr='').returncode
+
+tests/test_run_room_kit_gate.py:57: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("unrelated REAL text")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("REAL_IMPOSTOR")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("REALISTIC")-REAL-10-1]
+FAILED tests/test_run_room_kit_gate.py::test_runner[print("xREAL")-REAL-10-1]
+4 failed, 12 passed in 1.86s

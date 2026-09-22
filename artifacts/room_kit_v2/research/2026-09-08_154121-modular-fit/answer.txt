@@ -1,0 +1,62 @@
+Yes. The central idea is: keep the joining surfaces exact, while adding detail away from those surfaces or through materials.
+
+The clearest production source I found is Bethesda’s Skyrim/Fallout modular-kit breakdown. It explicitly says, “predetermine how thick floors should be,” and demonstrates tests for gaps, overlaps and incorrect corners.[7] Thickness is not inherently the problem.
+
+How this applies to our isometric game
+
+Our game uses real 3D geometry viewed through an orthographic camera. Orthographic projection changes how objects appear, not how their physical edges connect.[3] We should build an accurately fitting 3D kit—not distort or offset pieces to make one camera view look right.
+
+1. Put floor thickness below a common walking surface.
+
+My recommendation is one finished floor height and one slab thickness across compatible floor pieces:
+
+  walking surface   -------------------------
+                    | floor A | floor B |
+  underside         -------------------------
+
+Both slabs have depth, but their tops remain level. A repair plate should be recessed into that surface, not stacked above it. Door thresholds and grates should meet the same surface.
+
+That is the crucial distinction: a thick floor is fine; a different finished height on each tile is not.
+
+2. Use textures for detail that does not need actual depth.
+
+Godot’s normal maps change how light reacts to a surface without changing its geometry.[4] Frozenbyte’s production guide recommends tiling textures and trim sheets for walls and floors, including baking detailed shapes onto flat surfaces.[8]
+
+For our salvage-industrial style, I recommend:
+  - Scratches, paint wear and hazard markings: color/roughness textures.
+  - Small grooves, rivets and shallow panel seams: normal maps.
+  - Repeated metal borders: a trim sheet—reusable surface artwork, not necessarily raised geometry.
+  - Large braces, pipes and deep recesses: actual geometry, within allocated space.
+
+This does not mean making everything flat. It means choosing which details genuinely need to change the shape.
+
+3. Reserve space for wall thickness and decoration.
+
+Bethesda distinguishes a module’s footprint from its usable interior space: walls and alcoves must fit inside the allocated footprint rather than intrude into adjacent modules.[7]
+
+For our kit, wall panels, conduits and brackets should occupy a shared depth allowance. Wall ends, doorframes and corner pieces must share matching connection profiles. Simply thickening each asset independently is not sufficient.
+
+Likewise, I would keep floor mating edges flat rather than beveling every tile into a separate raised-looking island.
+
+4. Keep anchors fixed and test complete assemblies.
+
+Bethesda establishes pivot conventions early and tests corridors that loop back into rooms. When a corner causes misalignment, its recommendation is to fix that corner’s footprint—not add a special patch-up piece.[7]
+
+For us, that means preserving the existing 4 m grid and authoritative anchors, then testing mixed floors, doors, corners, rotations and damage variants together. No automatic recentering around decorative geometry; no per-piece nudges to disguise bad fit.
+
+I would also check plain geometry and final materials separately, so a shading seam is not mistaken for an actual height mismatch.
+
+One Godot caveat
+
+Projected decals work in Forward+ and Mobile, but not Compatibility. For a Compatibility target, Godot suggests Sprite3D for mostly flat surfaces; baked material details are another option.[5] We should not make the kit depend on unsupported decal rendering.
+
+Bottom line: the research supports your condition. Use a shared, precisely fitting structural shell; give it consistent thickness; then add recessed, material-based or envelope-limited detail. Zero thickness is not necessary to achieve clean joins.
+
+These are research-backed recommendations, not a claim that our current assets have passed those assembly tests.
+
+Sources:
+[3] https://docs.godotengine.org/en/stable/classes/class_camera3d.html
+[4] https://docs.godotengine.org/en/stable/tutorials/3d/standard_material_3d.html
+[5] https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html
+[7] http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html — Joel Burgess and Nate Purkeypile: Skyrim Modular Level Design GDC 2013
+[8] https://wiki.frozenbyte.com/index.php/3D_Asset_Workflow:_Tile_Textures_and_Trimsheets — Frozenbyte: Tile Textures and Trimsheets

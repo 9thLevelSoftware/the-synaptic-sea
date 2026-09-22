@@ -1,0 +1,64 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces0] _
+
+blocking_faces = [((-2, 0, -0.1), (2, 0, -0.1), (2, 3.2, -0.1)), ((-2, 0, -0.1), (2, 3.2, -0.1), (-2, 3.2, -0.1)), ((-2, 0, 0.1), (-2, ..., 3.2, 0.1), (2, 0, 0.1)), ((-2, 0, -0.1), (-2, 0, 0.1), (2, 0, 0.1)), ((-2, 0, -0.1), (2, 0, 0.1), (2, 0, -0.1)), ...]
+
+    @pytest.mark.parametrize("blocking_faces", [
+        _box((-2, 0, -.1), (2, 3.2, .1)),
+        _door_frame() + _box((-.6, 0, -.1), (.6, 2.2, -.09999)),
+        _door_frame() + _box((-.6, 0, .09999), (.6, 2.2, .1)),
+    ])
+    def test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary(blocking_faces):
+        result = validate_geometry("doorway_frame_open_1x1", blocking_faces, load_dimensions())
+>       assert result["status"] == "fail", result
+E       AssertionError: {'status': 'pass', 'errors': [], 'measurements': {'triangle_count': 12, 'bounds': {'min': [-2.0, 0.0, -0.1], 'max': [2.0, 3.2, 0.1]}}, 'module_id': 'doorway_frame_open_1x1', ...}
+E       assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_structural_visual_contract.py:130: AssertionError
+_ test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces1] _
+
+blocking_faces = [((-2.0, 0.0, -0.1), (-0.6, 0.0, -0.1), (-0.6, 3.2, -0.1)), ((-2.0, 0.0, -0.1), (-0.6, 3.2, -0.1), (-2.0, 3.2, -0.1)),...((-2.0, 0.0, -0.1), (-2.0, 0.0, 0.1), (-0.6, 0.0, 0.1)), ((-2.0, 0.0, -0.1), (-0.6, 0.0, 0.1), (-0.6, 0.0, -0.1)), ...]
+
+    @pytest.mark.parametrize("blocking_faces", [
+        _box((-2, 0, -.1), (2, 3.2, .1)),
+        _door_frame() + _box((-.6, 0, -.1), (.6, 2.2, -.09999)),
+        _door_frame() + _box((-.6, 0, .09999), (.6, 2.2, .1)),
+    ])
+    def test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary(blocking_faces):
+        result = validate_geometry("doorway_frame_open_1x1", blocking_faces, load_dimensions())
+>       assert result["status"] == "fail", result
+E       AssertionError: {'status': 'pass', 'errors': [], 'measurements': {'triangle_count': 48, 'bounds': {'min': [-2.0, 0.0, -0.1], 'max': [2.0, 3.2, 0.1]}}, 'module_id': 'doorway_frame_open_1x1', ...}
+E       assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_structural_visual_contract.py:130: AssertionError
+_ test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces2] _
+
+blocking_faces = [((-2.0, 0.0, -0.1), (-0.6, 0.0, -0.1), (-0.6, 3.2, -0.1)), ((-2.0, 0.0, -0.1), (-0.6, 3.2, -0.1), (-2.0, 3.2, -0.1)),...((-2.0, 0.0, -0.1), (-2.0, 0.0, 0.1), (-0.6, 0.0, 0.1)), ((-2.0, 0.0, -0.1), (-0.6, 0.0, 0.1), (-0.6, 0.0, -0.1)), ...]
+
+    @pytest.mark.parametrize("blocking_faces", [
+        _box((-2, 0, -.1), (2, 3.2, .1)),
+        _door_frame() + _box((-.6, 0, -.1), (.6, 2.2, -.09999)),
+        _door_frame() + _box((-.6, 0, .09999), (.6, 2.2, .1)),
+    ])
+    def test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary(blocking_faces):
+        result = validate_geometry("doorway_frame_open_1x1", blocking_faces, load_dimensions())
+>       assert result["status"] == "fail", result
+E       AssertionError: {'status': 'pass', 'errors': [], 'measurements': {'triangle_count': 48, 'bounds': {'min': [-2.0, 0.0, -0.1], 'max': [2.0, 3.2, 0.1]}}, 'module_id': 'doorway_frame_open_1x1', ...}
+E       assert 'pass' == 'fail'
+E         
+E         - fail
+E         + pass
+
+tests/test_structural_visual_contract.py:130: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_structural_visual_contract.py::test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces0]
+FAILED tests/test_structural_visual_contract.py::test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces1]
+FAILED tests/test_structural_visual_contract.py::test_door_opening_cannot_be_sealed_at_its_front_or_back_boundary[blocking_faces2]
+3 failed, 15 deselected in 0.03s

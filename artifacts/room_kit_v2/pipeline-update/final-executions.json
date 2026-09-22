@@ -1,0 +1,46 @@
+[
+  {
+    "name": "final-focused-tests",
+    "exit_code": 0,
+    "log": "final-focused-tests.log"
+  },
+  {
+    "name": "final-existing-regressions",
+    "exit_code": 1,
+    "log": "final-existing-regressions.log"
+  },
+  {
+    "name": "final-addon-state",
+    "exit_code": 0,
+    "log": "final-addon-state.log"
+  },
+  {
+    "name": "final-publication-rollback",
+    "exit_code": 0,
+    "log": "final-publication-rollback.log"
+  },
+  {
+    "name": "forced-promotion-remains-held",
+    "exit_code": 1,
+    "expected_rejection": true,
+    "no_backup_or_staging_created": true,
+    "log": "final-promotion-hold.log",
+    "argv": [
+      "/opt/homebrew/bin/python3.11",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/promote_structural_sources.py",
+      "--project-root",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2",
+      "--source-root",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures",
+      "--staging-root",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/force-guard-staging",
+      "--module",
+      "floor_1x1",
+      "--force",
+      "--skip-godot",
+      "--backup",
+      "--backup-target",
+      "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/force-guard-backup"
+    ]
+  }
+]

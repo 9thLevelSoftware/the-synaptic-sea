@@ -1,0 +1,34 @@
+{
+  "coordinate_conversion": "Blender [x,y,z] -> native glTF/runtime [x,z,-y]",
+  "errors": [
+    "bounds max.z 0.15 does not equal expected 0.1",
+    "bounds min.z -0.15 does not equal expected -0.1",
+    "terminal left mating band does not cover the full shared profile",
+    "terminal right mating band does not cover the full shared profile"
+  ],
+  "family": "wall",
+  "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/parent-fixtures/thick_wall.glb",
+  "legacy_helper_conversion_not_used": "[x,z,y]",
+  "measurements": {
+    "assembly_acceptance": false,
+    "bounds": {
+      "max": [
+        2.0,
+        3.200000047683716,
+        0.15000000596046448
+      ],
+      "min": [
+        -2.0,
+        0.0,
+        -0.15000000596046448
+      ]
+    },
+    "helper_objects_rejected": false,
+    "mesh_object_count": 1,
+    "object_count": 1,
+    "triangle_count": 12,
+    "validation_scope": "per_module_visual_interface"
+  },
+  "module_id": "wall_straight_1x1",
+  "status": "fail"
+}

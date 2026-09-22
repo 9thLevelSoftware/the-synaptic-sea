@@ -1,0 +1,896 @@
+[Joel Burgess](http://blog.joelburgess.com/)
+
+=============================================
+
+Pages
+-----
+
+*   [Appearances,Talks & Articles](http://blog.joelburgess.com/p/design-talks.html)
+    
+*   [About & Contact](http://blog.joelburgess.com/p/contact.html)
+    
+*   [Resume](http://blog.joelburgess.com/p/resume.html)
+    
+
+Friday, April 19, 2013
+----------------------
+
+### Skyrim's Modular Level Design - GDC 2013 Transcript
+
+  
+
+Skyrim’s Modular Approach to Level Design
+-----------------------------------------
+
+**_Originally presented @ Level Design in a Day, GDC 2013  
+Co-Authored and Co-Presented w/Nate Purkeypile  
+[Slides available here.](http://www.slideshare.net/JoelBurgess/gdc2013-kit-buildingfinal)
+_**  
+
+####   
+
+#### While many developers understand the basic concepts behind a modular system, and some have dabbled in it for a project or two, very few have made a career out of it.  That’s exactly what Nate and I have done, however.  Our current project will be our fifth together in the near-decade we have known and worked with each other.  Every one of these projects has taken this kit-based approach, including those we worked on before joining Bethesda.
+
+  
+
+We recently realized that there are many unspoken understandings we and our colleagues share; expectations and assumptions taken for granted as part of our process. We've struggled to explain ourselves in detail for new artists and designers who had joined our team.  This talk was a way for us to explore and articulate this accumulated knowledge.  
+  
+To understand our approach, it’s useful to know where we’re coming from as developers, and where Bethesda Game Studios is coming from as a whole.  
+  
+Let's begin with a pretty simple observation: our games are big.  If you've played or read about Skyrim, Fallout 3 or any of our other open-world games, scope is a big part of them.  It’s an _integral_ part of our games and our DNA as a studio.  You couldn't boil Skyrim down to a six-hour game and expect to provide the same experience.  Scope isn't a random attribute of our games; it’s a major feature.  
+  
+When you play a Bethesda game (or when you work on one) you know this going in.  The games are big!  This influences everything we do at the studio.  Production methodologies, tech and tools, workflow, pipeline - it’s all informed by a need for efficiency.  We need high bang-for-buck on everything we do.  Games like Skyrim take a few years to make, even moving as efficiently as possible.  With a game that big, missteps aren’t measured in hours or days, but scale to weeks and months.  
+  
+These core values, along with the circumstances of team size, and our collective experience making games together all adds up to what you’d commonly refer to as studio culture.  Even if your team or your game isn’t driven by the same forces as ours, chances are you could take a lesson from us, just as we could probably take a lesson from you.  
+  
+With that in mind, consider this a case study.  The modular approach to level design we’re analyzing here is just one manifestation of the BGS studio culture.  
+  
+Before getting too far into things, let's me define what a “kit” is.  Kits, first and foremost, are systems.  A basic pipe kit, like the one from Fallout 3, may only be four simple pieces of art which can be used together.  This kit, as most, snaps together using a grid system.  The most important attribute of a kit is that it adds up to far more than the sum of its parts.  This artist hasn't just given us four pieces, but a system with which we can create infinite configurations of pipes, all on the editor side.  
+
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiMbA_DNOg_yP6_9fTHsed0-lQL7VEtvS94Y42FQ1veAa4pvM4zm9xdvum3UPOIa7J6IVEjwBvTu9I1otMe65iHUesFfy-27xxcNIQs-DfCS9rWYn6hczhrED-D0GlTdOkUZrFZ/s320/gdc2013pipes.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiMbA_DNOg_yP6_9fTHsed0-lQL7VEtvS94Y42FQ1veAa4pvM4zm9xdvum3UPOIa7J6IVEjwBvTu9I1otMe65iHUesFfy-27xxcNIQs-DfCS9rWYn6hczhrED-D0GlTdOkUZrFZ/s1600/gdc2013pipes.png)
+
+While the pipe kit is a good example of a simple art kit, our primary topic here is architectural kit creation.  Examples of architectural kits would include the Nord Crypts in Skyrim, or the Vaults from Fallout 3.  This is important to topic for gameplay, because kits are the primary building blocks of level design at Bethesda Game Studios.  
+  
+Kits aren't a new idea.  They aren’t unique to Bethesda or to the types of games we make.  Consider the board game [Carcassone](http://en.wikipedia.org/wiki/Carcassonne_(board_game))
+.  Unlike Monopoly or Scrabble, the board changes every time you play Carcassone.  The tiles are arranged so that roads meet roads, rivers meet rivers, and so on, creating an effectively randomized yet visually cohesive whole.  It’s easy to see the grid when looking at a Carcassone table, and how this system of art works together to make a unique play field.  The board tiles are themselves an excellent example of an environmental art kit.
+
+  
+Many sprite-based, 2D games make heavy use of similar ideas and techniques to those we’ll be discussing today.  Sprite sheet or texture atlas technology lies at the heart of many 2D game systems, so it’s easy to see how those games lend themselves to repeatable tiles of a uniform size.  Thanks to this, it’s not necessary to paint the entire world by hand. Designers and artists can use art systems of repeated tiles to draw out the map quickly and with less of memory footprint.  
+  
+Back in November of 2002, Lee Perry (then of Epic, now [BitMonster](http://bitmonstergames.com/)
+) authored an [article in Game Developer magazine](http://udn.epicgames.com/Three/rsrc/Three/ModularLevelDesign/ModularLevelDesign.pdf)
+ which explored a modular approach to level design and world building, specifically as a way to help cope with the increased fidelity of games at that time.  
+  
+Bethesda has been at this for quite some time - 18 year as of this writing. Terminator: Future Shock and the Elder Scrolls 2: Daggerfall, both games which far pre-date our (_Nate and Joel's_) tenure at the studio, embraced a modular approach to world-building, which would become the foundation upon which much of our current thinking and technology are built.  
+  
+So remember - the concepts discussed today are far more than the product of our work together over the past decade.  Many influences and ideas have contributed to our current workflow, and there are many lessons yet to be learned.  
+  
+
+### [![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi0b51o9hNLvXiT9jgdvjJuoe1-Igyl9brkxkKNaonpJheMFjF-4OIOjxrqa9pm0Cn0jvtddEvv_mcpzqodjBLL2tTG1yBweHSPpmSse57JbaeLbcGzcwRWIFqQq4sMpEix-ymg/s640/webVaultAntFarm.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi0b51o9hNLvXiT9jgdvjJuoe1-Igyl9brkxkKNaonpJheMFjF-4OIOjxrqa9pm0Cn0jvtddEvv_mcpzqodjBLL2tTG1yBweHSPpmSse57JbaeLbcGzcwRWIFqQq4sMpEix-ymg/s1600/webVaultAntFarm.png)
+
+###   
+
+###   
+
+###   
+
+###   
+
+### Going Modular: Pros and Cons
+
+As mentioned earlier, many developers understand the principles behind modular level design, but we hope to offer insights gained from our extensive exploration of this topic. To do this, we’ll go over the various benefits and drawbacks we've found over the years, with an emphasis on how to get the most out of the workflow.  
+  
+The first, most self-evident benefit of working with modular art is that it’s reusable.  Reusing art helps us mitigate the huge scope of our games.  There’s a massive amount of world-building to be done in Skyrim, and not having to specifically create and export every fence post and doorway becomes very important to us.  We try to be smart about where we spend our time and attention, reusing art where it makes sense, and investing time where we want something more unique.  
+  
+Consider this list of features, which together make up the rough measure of Skyrim’s world-building needs:  
+  
+
+*   16 sq. mile Overworld
+*   5 Major Cities
+*   2 Hidden Worldspaces
+*   300+ Dungeons
+*   140+ Points of Interest
+*   37 Towns, Farms & Villages
+
+  
+Now consider that alongside this photograph of the Skyrim development team.  There are 90 people in the photograph below.  With the exception of a small number of outsourced assets, you’re looking at the entirety of the dev team across all disciplines.  We've resisted the temptation to grow into a multi-studio team of hundreds, such as you often find behind games of similar scope to those we make.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjHyxmCHwaRQLTsuifgQezuaiHed_qFxal57pwioReaYNVXYk1LsHKvXFmN4CFaX-ukF0zXRf2aVSBZ3Dipo4qDsf5tNsnDDyeusq4Q2MBKzbi54ymj4xjengrovFh2OUi45Qc8/s640/SkyrimTeamPhoto.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjHyxmCHwaRQLTsuifgQezuaiHed_qFxal57pwioReaYNVXYk1LsHKvXFmN4CFaX-ukF0zXRf2aVSBZ3Dipo4qDsf5tNsnDDyeusq4Q2MBKzbi54ymj4xjengrovFh2OUi45Qc8/s1600/SkyrimTeamPhoto.png)
+
+  
+Today we're focused on what you’d most typically associate with traditional level design at Bethesda; the dungeons component of that world-building work.  Only ten people out of the 90 in that photograph are directly responsible for those dungeons.  The rest of the team is focused on the myriad other features, content, systems and support needed to build a game like Skyrim.  You can begin to appreciate how small our dev team really is when you consider how much responsibility each person needs to shoulder.  
+  
+Sooner or later while reading this, you may think that the scope of the game is a restriction that limits our ability in some way, that it’s a burden we wish we could shrug off.  The thing is - even if our circumstances were different, and we had infinite time, resources, or talent - I don’t think the way we make games would look all that different  We've found a way that works for us.  
+  
+Consider the Dutch artist Piet Mondrian, famous in particular for his work in Paris during the 1920’s.  You may not know Mondrian by name, but you’re likely to recognize his work, such as the piece seen below.  Mondrian had access to more than four colors of paint, and was certainly capable of more technically complex work.  Yet he chose to self-impose restrictions which led him to pioneer a style he may not have otherwise discovered.  The influence of that style is still felt today in art and fashion.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgnUuJ8M2ADFO5R1PvkXe872SpTHBYXbrfxkVMMvPOubGezMmvQrmaPlNXR4S9Ifox_cO3hphWPMqsdU5h4uroIuV8vuEdOP3bX1pP-segiHnER-BwjPwjGE28hBdK-Fx17fBiu/s320/Mondria.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgnUuJ8M2ADFO5R1PvkXe872SpTHBYXbrfxkVMMvPOubGezMmvQrmaPlNXR4S9Ifox_cO3hphWPMqsdU5h4uroIuV8vuEdOP3bX1pP-segiHnER-BwjPwjGE28hBdK-Fx17fBiu/s1600/Mondria.png)
+
+  
+Look throughout the history of science, technology, music, anywhere people are creating, and you’ll find examples of restrictions not limiting creativity, but focusing it and leading people toward new discoveries and innovations.  I think our workflow is like that.  To change it because of a shift in circumstance would be ignoring the belief systems and experience that led us to that conclusion.  
+  
+Getting back to the topic at hand, we should also acknowledge the most self-evident drawback of using modular art: the fact that resused art can become repetitive.  This leads to what we commonly refer to as “art fatigue”.  The median play time of Skyrim on Steam has peaked at well over 100 hours, which is a huge compliment .  With that kind of time spent, however, players are bound to notice the same rock or farmhouse or tapestry used again and again.  And another two dozen times after.  Art fatigue sets in where this repetition becomes obvious and erodes the authenticity of the world.  
+  
+We've found some ways to delay the onset of Art Fatigue.  One of the big ones is simply doing away with copy and paste design as much as possible.  When I first joined Bethesda, Oblivion was poised for the home stretch of its development cycle.  Oblivion was of similar scope to Skyrim, yet built by a team of about half the size.  One of the ways the dungeon art team coped with this disparity was to create a number of “warehouse” cells in the editor.  These warehouses contained fully lit and cluttered rooms to copy, paste, and then arrange to create "new" dungeons.  While efficient, this method left much to be desired, and many players rightfully called Oblivion dungeons out as being “cookie-cutter”.  
+  
+One thing we noticed was that players were quicker to react negatively to repeated detail elements, as opposed to broad architectural repetition.  Consider the following three screenshots, each taken from a separate Oblivion Dungeon.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhvQvqOo7Dzb7K5epZjgBXVg4QDZJyDQDIqzRMSnoDg7wyKcMXcA5VFlXDkL7yI0QBYjeKu_XPE1HDEiedtxxcS-Rl1gPA9lKbnGCRdnKmjWC4gb2Ytg49OOB-b91HaHT4aHe6b/s640/Obliv02.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhvQvqOo7Dzb7K5epZjgBXVg4QDZJyDQDIqzRMSnoDg7wyKcMXcA5VFlXDkL7yI0QBYjeKu_XPE1HDEiedtxxcS-Rl1gPA9lKbnGCRdnKmjWC4gb2Ytg49OOB-b91HaHT4aHe6b/s1600/Obliv02.png)
+
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhTfD8fjeLlqV6h6iFKfk4EIIXxMhCuMvrYybWrtbFsrr7g0PNLXdFrHX7Fm7YrHXgVchEde0OjnuDK15epeUUDCZwsgSHLWdmDkhUJQZYDvOBTM0jTmSPhCEYwwOe0ge9pkP1M/s640/Obliv01.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhTfD8fjeLlqV6h6iFKfk4EIIXxMhCuMvrYybWrtbFsrr7g0PNLXdFrHX7Fm7YrHXgVchEde0OjnuDK15epeUUDCZwsgSHLWdmDkhUJQZYDvOBTM0jTmSPhCEYwwOe0ge9pkP1M/s1600/Obliv01.png)
+
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh0FBAN4lvHPoeEqx_O0yynt4k6BiBGhu_W424Vn4QyJZuqCTvwdptf30utmwZboTXnqgjsk8XOuJxb1aGXvhGfEJB52DYlJdRCevFeXScHphEkvfmM0wlxDU_MyWKxbQRJGzNa/s640/Obliv03.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh0FBAN4lvHPoeEqx_O0yynt4k6BiBGhu_W424Vn4QyJZuqCTvwdptf30utmwZboTXnqgjsk8XOuJxb1aGXvhGfEJB52DYlJdRCevFeXScHphEkvfmM0wlxDU_MyWKxbQRJGzNa/s1600/Obliv03.png)
+
+  
+In each, you’re more likely to pick up on repeated clutter first, then the repeated architecture.  This is especially true in actual gameplay from a first-person perspective.  To minimize needless repetition, we abolished the use of warehouse cells as they existed in Oblivion. Beginning with Fallout 3, we staffed up a group of level designers and got tool support to make sure we were able to build spaces more quickly, and with the most granular art available, reducing the amount of repetition as much as we possibly could.  
+  
+You can also fight art fatigue at a more fundamental level.  It’s common at the start of a project to strongly associate a particular setting with specific types of inhabitants or gameplay.  You may want to only see soldiers in military bases, and zombies in crypts, for example.  Resist this. Think of your kits as the architectural identity of the space, and allow other elements to establish the specific identity of any given space in which it’s used.  The more you’re able to divorce these things, the more you’ll be able to mix elements up and keep the settings fresh.  
+  
+This also applies to the kits themselves - try to actively encourage the notion of mix-and-matching your kits. This is sometimes called [kit-bashing](http://en.wikipedia.org/wiki/Kitbashing)
+, kit-jamming, or a kit mashup.  
+  
+Look the following examples of Dwarven dungeons from Skyrim.  The first delivers on the expectation of any Dwemer dungeon in an Elder Scrolls game.   There’s a chunkiness of proportion, an emphasis on brass highlights and clockwork elements which are all hallmarks of that style. Skyrim features around ten of these dungeons, however, and they’re all pretty big.  If they were all the same, it’d be a dull, one-note experience, and take the thrill out of discovering one.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEidfYtIOpmzol1yG-a5VNtaDpcbqlrwhfg_ZZZhRzTekb0dt-6TVfMqQhKDpUzajM36sdXdBD4A9DImNNayk12MWFwoQTSA3yPMrdkuDwPw4iRt1rRam2aSn_nrqKBRGW8nv0iG/s400/Dwem01.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEidfYtIOpmzol1yG-a5VNtaDpcbqlrwhfg_ZZZhRzTekb0dt-6TVfMqQhKDpUzajM36sdXdBD4A9DImNNayk12MWFwoQTSA3yPMrdkuDwPw4iRt1rRam2aSn_nrqKBRGW8nv0iG/s1600/Dwem01.png)
+
+To try and mix things up, we started playing around with ideas like combining exterior elements.  In the second example we've introduced some lightweight unique assets and enemies you’ll only encounter in this particular Dwarven dungeon.  This twist on visual and gameplay expectation helps keep the setting fresh and combats art fatigue.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhNjRGFSE6RtdBVSyzrRs_THoaprOd2X_gyaco3v21y9fbMWBvAZJPqrOfBbFLgN9__Kz6uATBKdLp3Zirg5MksI_xSHYVJbdrlRyw46PbQp33c5Th0ob26h7lyXO2tQ3ftYQop/s400/Dwem02.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhNjRGFSE6RtdBVSyzrRs_THoaprOd2X_gyaco3v21y9fbMWBvAZJPqrOfBbFLgN9__Kz6uATBKdLp3Zirg5MksI_xSHYVJbdrlRyw46PbQp33c5Th0ob26h7lyXO2tQ3ftYQop/s1600/Dwem02.png)
+
+In the third example, the level designer simply tried bashing Dwarven hallways with ice caves.  What he achieved was an instant shift in tone and atmosphere.  Some artists will be uncomfortable with this idea.  The notion of your art being used in unforeseen ways could lead to bad intersections or lighting issues, for example.  To work on this kind of game, however, you need to take a couple of steps back and be open to this.  Allow for this kind of experimentation and have it in mind when you’re creating the art to begin with.  Not every combination will look good or make sense, but you can be part of a conversation about what works, what doesn't - and most importantly, what _almost_ works, but could work great - with a little tweak from you.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEicvM6xWydDeucjcQReHexCLDF942RGF4XwG4HxwzpsgzBXwR6im0lUAWTBbFuO81Fy7isauJX0cpYF66gsXm-JVE8Jn_i4n-ehsZiHkLWYoPvxmBm91s9jHD_aECAhqBeWpfiA/s400/Dwem03.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEicvM6xWydDeucjcQReHexCLDF942RGF4XwG4HxwzpsgzBXwR6im0lUAWTBbFuO81Fy7isauJX0cpYF66gsXm-JVE8Jn_i4n-ehsZiHkLWYoPvxmBm91s9jHD_aECAhqBeWpfiA/s1600/Dwem03.png)
+
+  
+Looking again towards the benefits of working modular, one of the big bonuses (_especially from a production viewpoint)_ is that a modular approach helps if your team has a low ratio of artists to designers.  Remember the ten people responsible for the dungeon content in Skyrim?  Eight of them are the level designers, and only two represent the entirety of our full-time kit art team.  They generated seven kits, which the level design team used to create well over 400 cells, or unique loaded interiors, of dungeon content.  And those dungeons were built in about two and a half years, from start to finish.  
+  
+To put this into proportion, the infographic shown here represents the kit art team as yellow, level design as orange, and the blue-gray area as a conservative estimate of the dungeon content created by that collective group.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjENqrgoEqv1QyaSgY9U9udCTPKiv-ZlE7MEiKXkwFPyQ_bVelhqt7ifYJLu7tmPPAo8dPCtjk3lYmZB6viEi6B5S_1PLE1YBGnNsSrTI3tawSjE9fZ-hBYzYzsHBIuggpTJ2Db/s320/GDC2013Infographic.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjENqrgoEqv1QyaSgY9U9udCTPKiv-ZlE7MEiKXkwFPyQ_bVelhqt7ifYJLu7tmPPAo8dPCtjk3lYmZB6viEi6B5S_1PLE1YBGnNsSrTI3tawSjE9fZ-hBYzYzsHBIuggpTJ2Db/s1600/GDC2013Infographic.png)
+
+  
+There are two points to make here.  The first and most obvious: this approach allows a small number of artists to support a much larger team of designers, who can in turn generate a lot more content than those two artists otherwise could.  The example provided by Skyrim shows just how effective this approach can be, when only two artists were required to provide the core art behind so much content.  
+  
+The second, less-obvious point is the more important one, however.  Think of the other 80 people in that team photograph.  Because such a relatively small group was able to handle the dungeon component of the game, it allowed the rest to focus on the myriad other needs of the game, whether it was landscaping the massive world, writing and scripting the many quests, contributing to character art and animation, working in the guts of our game code.  
+  
+Of course, there’s another reason that Skyrim had only two full-time kit artists; kits are really complicated things to work on.  Kits require not only the artistic ability to produce high quality visuals, but also a technical competency in their art tool, a deep understanding of the editor and design workflow, and so on.  This unique blend of left and right brain is somewhat at odds with what many art professionals value.  I've worked with great artists who make excellent kits but hate working on them - so they don't.  
+  
+So when you’re trying to identify somebody with the the aptitude and interest to be a great kit artist, you’re basically looking for a unicorn.  They're rare.  
+  
+Another example of the problematic complexity of kits is the process of identifying and fixing bugs with them.  Kits aren't like other art assets, for which you might be asked to fix a bad pivot point or texture seam, but are otherwise fire-and-forget.  It’s important and necessary that a kit artist can keep the entire system of rules in her head throughout the entire project.  Kit pieces are instantiated dozens or even hundreds of times throughout the game.  Making an obvious fix to something like a bad pivot point may address a specific bug but create new problems in those hundreds of instances elsewhere that you may not have thought to check.  
+  
+This does bring us to one of the other benefits or our approach, however, which is the very fact that kit pieces are heavily instantiated.  When a change goes into a kit, those changes are instantly viewable across the whole game.  As an artist, performing an export is like a fly-by deployment of new art, whether the level designers were waiting with bated breath or don’t really care.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEirh5ETZwfFzMJkSevwlv04aUfXX1eIR0C-nkZA3vJbSFm6Vz6dpmUDtZSpsL8ES0BtdfEy9I-5Edu_w_dLvqqZzisSxUPdh1NuBJ4l59joqLPhCqFOFxxhGc6tIMs4CElUU-ep/s400/gdc2013Airdrop.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEirh5ETZwfFzMJkSevwlv04aUfXX1eIR0C-nkZA3vJbSFm6Vz6dpmUDtZSpsL8ES0BtdfEy9I-5Edu_w_dLvqqZzisSxUPdh1NuBJ4l59joqLPhCqFOFxxhGc6tIMs4CElUU-ep/s1600/gdc2013Airdrop.png)
+
+For artists this allows you to see your art in real-world use cases right away.  There's no need to construct a test area.  Just load up any level making use of your art and check it out.  See how it really appears in game instantly.  
+  
+This deployment process also has minimal impact on the design workflow, which is not free, but something we work very hard towards.  We’ll go into more detail later, but consider this.  It’s often been the case that early in a project, art is trying to answer a lot of questions about how the game should look, and kits are no exception.  This aesthetic process can be unstructured and time-consuming.  The trouble is - design is often twiddling their thumbs at this stage, waiting for something to work with.  This can result in art rushing through their process too quickly, sometimes making decisions they’ll change later, in ways that can drastically effect level design and force work to be thrown out or heavily revised.  
+  
+To avoid this, we get our kits to a "functional-but-ugly" state as soon as possible.  This is discussed in more detail later, but the high-level idea is that we figure out as much as we can about how kits work first, which allows design to get working while art then can focus on their visual direction without being rushed.  
+  
+This is one of the contributing factors to another perk we enjoy; Bethesda level designers are quite fast.  Because we’re working editor-side with pre-established kits, our level designers are able to iterate on layout extremely quickly.  We can sketch with kits right in the editor and push those to the game,  playing the results immediately.  
+  
+In fact, we’d go so far as to suggest that a level designer working with a good kit that she understands is able to iterate faster and truer to final gameplay than any other designer with any other editor or workflow in the industry.  This is because she's using the actual, final art and playing it almost as fast as she can work.  We don’t have turnaround with art, we don’t have to bake textures or compile geometry, and our markup is fairly minimal.  
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+[](http://www.blogger.com/blogger.g?blogID=30579660)
+  
+Ah, but there’s a catch, and it’s one of the major downsides of our approach.  When we say that a Bethesda level designer is the fastest, it’s with a big caveat.  We specify that she’s working with a good kit.  Without that, she’s not just the slowest LD in the industry - she’s a non-starter.  We’re totally dependent on the art we work with, which is why the relationship between art and design is so important.  
+  
+Consider an all-too-common tale from throughout the game industry.  There are many variations of this story, but it’s typical that early in a project, designers are figuring out how their levels should play out.  They may do this with editor BSP, external art and previs tools, or through paper maps and documentation.  Whatever the method, design works on this until they’re happy enough with it to hand it off to art.  
+  
+Hopefully this process has been well communicated - but in practice it often isn't  and the art team ends up in the difficult position of trying to polish something they weren't very involved with.  They’ll do an art pass, though, and make the level visually appealing   Once they’re at a place they’re happy with, they send it back to design for final markup and scripting. Once design has done that, the level should theoretically be done - right?  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiG6MBVTd0oPdXET3FpOGyZ3im4m3KQlj4vnLrRD3-TIZTl48qQEsvhEnCrKaK9uFCvx2mPilWpMV-metvK4cKyOwNnvLbkdHwIQe7E4WWWYOPAlMipv6AhAJj9k1stZR-riIgy/s640/webHandoff.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiG6MBVTd0oPdXET3FpOGyZ3im4m3KQlj4vnLrRD3-TIZTl48qQEsvhEnCrKaK9uFCvx2mPilWpMV-metvK4cKyOwNnvLbkdHwIQe7E4WWWYOPAlMipv6AhAJj9k1stZR-riIgy/s1600/webHandoff.png)
+
+  
+Not usually.  Level designers often inherit a litany of unforeseen problems when receiving final art for their levels.  Cover along a street has been converted into poles too thin to take cover behind.  A wall intended as a visual blocker is now a see-though chain-link fence.  A bridge now has support beams which occlude sight lines in a major gunfight you had planned.  
+  
+When work is handed off like this, it's often one of the main fault-lines of communication   This story plays out again and again across all manner of games and teams.  At best it’s non-optimal.  At worst it can be downright toxic and create an atmosphere of hostility between art and design.  
+  
+We’re no strangers to this.  We've had our share of communication problems and finger-pointing, and have sought out ways to avoid the whole mess.  This has come largely from seeking more open communication and collaboration.  
+  
+Some users who download our Creation Kit comment that kits seem impersonal.  To these people, our kit-based approach probably seems like anything except collaborative.  Kits can seem restrictive when you’re an end-user - and in many ways they are.  But this is one area in which the experience of a Bethesda developer differs greatly from that of a Bethesda modder.  
+  
+Kits don’t simply appear in the editor one day, fully formed from the mind of the artist and complete, with no further pieces coming along.  There’s a process we've worked out to establish any kit, and it takes place over a period of time during which a level designer and artist are in full collaboration.  
+  
+
+### Things To Know Before Beginning
+
+This begins the technical portion, and it's worth establishing a few items.  We’ll be referring to abstract units on occasion.  If you’re familiar with Unreal units, for example, these are much the same.  All you really need to know is that a character is usually about 128 units, or six feet, tall.  We are also accustomed to a Z-up environment.  If you’re used to Y as the vertical axis, keep this in mind.  
+  
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgY441pHDKRmPsyIZR6OCklq-W97aoYKdJ9-ITZmlP5snV_bsFzGwCjCTuy1dmM8shIHdpmdw_MGO1h0p3WsYAtXIyL1c4AUh0EDByaKytHQPTkLgqgRxlFE72WWaVqVOBEqu9T/s200/webDovahScale.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgY441pHDKRmPsyIZR6OCklq-W97aoYKdJ9-ITZmlP5snV_bsFzGwCjCTuy1dmM8shIHdpmdw_MGO1h0p3WsYAtXIyL1c4AUh0EDByaKytHQPTkLgqgRxlFE72WWaVqVOBEqu9T/s1600/webDovahScale.png)
+There are a number of things you want to establish at a game-wide level before you begin on kits.  As mentioned - you want to do this as early as possible.  One thing we've found very useful is to determine a uniform dimension for door frames.  This has a few benefits.  It allows us to transition from kit to kit without unique pieces, as well as allowing easy re-use of doors between kits.  More importantly, it gives AI and animation a fixed standard to work from, which can be reinforced throughout the game.  
+  
+It’s also worth figuring out the most narrow traversable space in the game.  We usually stick to a minimum of two character widths.  This allows us to avoid pathing problems by ensuring there’s at least enough space for two AI characters to path around each other in any given space.  You should also know how steep of an incline your AI can navigate.  In our case this has usually been 60 degrees, but you should also know what looks _good_.  The full incline often looks bad for animation, and you may want to embrace 30-45 degree slopes in your kits.  
+  
+Finally, if you’re making a game with environmentally contextual gameplay, like a cover shooter or platformer, figure out some important gameplay measurements early on.  If you’re making a platformer, figure out how far the player can jump.  How far can the player fall before dying or taking damage?  If a cover shooter, know what height of cover I can shoot out from.  
+  
+Keeping this kind of information in mind early will allow you to build kits that make the game look and play its best throughout.  
+  
+With that, we’re ready to get into what happens once we’re ready to actually start building a kit.  
+  
+
+### Where Kits Come From - Our Process
+
+When we're ready to begin any kit at Bethesda, a kit artist and a level designer are both assigned to that kit.  There are several stages they'll go through in the initial establishment of that kit.
+
+  
+
+**1) The Concept Phase**  
+The first stage of building a kit is what we call the **concept phase**. This doesn't literally mean "concept art", although that is often involved.  Rather, this is the stage at which we're first deciding upon the main ideas that will drive the kit.  
+  
+The main goal of this phase is to figure out the big picture ideas of the kit and how it fits in with the rest of the game.  This usually takes a relatively short period of time because it doesn't involve any actual content creation. Instead, you're mainly answering questions.  What is the visual theme of the kit? How is it different from other areas in the game? What kinds of spaces do you want to build with it?  How will be it be used?  How often will it be used? Some of these answers will be driven by design, others by art - it's important that both voices are being represented from the very beginning.  
+  
+Much of the visual process at this stage consists of gathering reference, working with concept art when applicable, and making sure we're all on the same page with the art direction for this kit.  There are workflow and logistical questions we start asking at this stage as well, however.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj_ori0ENMk5OqaOYZkB1MkOIdbpmFhLs2TkIUtdbTbrvI-8JwikbRtea5AaccA7ag0otCFHvwo8XHZN1YNpp4ouv7oD29fVX_G_PXZTCThVkWVm-3U7w-1dpI2AmmSF3_BRc-y/s400/webKitUsageBreakdown.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj_ori0ENMk5OqaOYZkB1MkOIdbpmFhLs2TkIUtdbTbrvI-8JwikbRtea5AaccA7ag0otCFHvwo8XHZN1YNpp4ouv7oD29fVX_G_PXZTCThVkWVm-3U7w-1dpI2AmmSF3_BRc-y/s1600/webKitUsageBreakdown.png)
+
+  
+Probably the most important question to answer is this: How widely-used will the kit be? This drives almost every decision when it comes to kit creation. For instance, the Cave Kit in Skyrim is used  over 200 times, but the Ratway kit is only used twice. Consequently, the scopes of these two kits are very different.  
+  
+This also influences the number of "Sub-Kits" that each kit has. A sub-kit is what we call each part of the kit that works with the rest of it. Common examples include a "small room" sub-kit, or a "large hallway" sub-kit. The cave kit has seven sub-kits, while the Ratway has only three. The number of pieces in each of these sub-kits also varies between kits. The "small hallway" cave sub-kit has around 50 pieces. The Ratway hall sub-kit has only seven pieces. Knowing the scope of a kit will help you make good decisions about how robust the kit will need to be, and how much time should be spent building it.  
+  
+**2) The Proof Phase**  
+  
+Once we're satisfied that we understand the big ideas driving the kit, we need to prove those ideas out.  This is called the "**Proof Phase**".  
+  
+The point of this phase is to start to test out the major concepts of the kit, and it's the first point at which we'll begin building actual assets to bring into the editor.  
+  
+We're still keeping everything fairly high-level and not getting too deeply involved with building the art, however. Proof pieces have almost no mesh detail and usually no textures at all. Instead, we'll be playing with proportions, kit logic, naming conventions, and other basic needs. Because of that, this stage of the process is also relatively quick, often only 1-3 weeks, depending on the scope of the kit, and how many failed iterations of the proof pieces end up being created and disposed of.  
+  
+Before we can create the first mesh, however, there are several important details you have to know about kit-building.  
+  
+First, we have to agree upon one of the most important details for any kit - its **footprint**. The footprint is the foundation of the entire kit. The most common footprints for kits are equilateral, but other proportions can lead to kits with their own distinct feel.  These fundamental decisions are very important, as it will influence the visual identity of the final kit.  In this image, the green grid represents the footprint of several pieces used to build a simple room from Skyrim's completed cave kit.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdlqj_v-kBJZVKjweWTxZVy5hvSYKg9B92sBJStf42uoDhIsknu3TLH7s1szeEbeHmCvJrx_7lnV4n6i-fV2X2AJu5PocfZ76fGCDg-DY0WulPsGwqu8UVG_UvOsRvSLWAbSzQ/s320/GridChop.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdlqj_v-kBJZVKjweWTxZVy5hvSYKg9B92sBJStf42uoDhIsknu3TLH7s1szeEbeHmCvJrx_7lnV4n6i-fV2X2AJu5PocfZ76fGCDg-DY0WulPsGwqu8UVG_UvOsRvSLWAbSzQ/s1600/GridChop.jpg)
+
+  
+It's important to note that although the various sub-kits of one kit do not have to share the same footprint, those footprints should be multiples of each other.  Otherwise, even if the kit pieces initially snap together, as a kit loops back around on itself, it will no longer line up.  For example, a 512x512x512 room will always tile nicely with a 256x256x256 hallway, but a 384x384x384 room will eventually create gaps and/or overlaps.  
+  
+It is also very important to have your grid snap sizes as large as possible. Level designers tend to build on a grid snap setting of one-half the size of the footprint.  If the default snap size is large, it is very easy to work with a kit. Pieces line up quickly and easily, and large gaps make it obvious to spot where pieces aren't lined up.  
+  
+Avoid attempting to create a kit which tiles on all axes.  Hallways kits tend to tile on only one axis, while rooms typically tile on two.  An all-axis tiling kit is able to create spaces which stretch out not only horizontally, but also vertically stack and tile on themselves.  This kind of kit allows a great deal of building freedom, but is very complex to build and use.  When vertical tiling is desired, it's generally wiser to build a separate sub-kit with a fixed horizontal plane size.  _(See Skyrim's cave and Nordic "shaft" sub-kits for examples)_  
+  
+It's extremely important to note that the footprint is the _full_ bounds of the piece, and not the traversable space of the piece. It is the imaginary grid that things line up on. Pieces always exist within the footprint. The only time a piece is at the edge of the footprint is when it is actually snapping together with another kit piece. Avoid the temptation to build to the edge of the footprint, or even worse, outside of it.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgitxYDbYR71akW4W4evwka0QezuVHbtVxsSuGbDE4AiertzYo5CovXXUnjbS4XKHT3zcgL2gP1mSKLlFkjQ4_n5CeE0egV7ucPSE0365aeeYDCFZvQXxNxKVZI4km3upY8ePHT/s640/GDC2013footprintoverlap.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgitxYDbYR71akW4W4evwka0QezuVHbtVxsSuGbDE4AiertzYo5CovXXUnjbS4XKHT3zcgL2gP1mSKLlFkjQ4_n5CeE0egV7ucPSE0365aeeYDCFZvQXxNxKVZI4km3upY8ePHT/s1600/GDC2013footprintoverlap.png)
+
+  
+This is most evident in something like a hallway kit. If the walls of the hallway are along the edge of the footprint, there is no room for the walls themselves to exist; they will be co-planar.  In the example pieces shown here, a hallway is built using the full extents of the footprint.  The alcoves set into each wall extend outside the footprint area, creating an overlap which prohibits hallways running adjacent to each other.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi9QXCCsOury8qVvXPcX2Z0uKVNAuE8WBzdtDnQJcRK1V2IwaETyFjGlCrFTIY2ckvopeaQDhfBYFvi8mHL4OHRJaUlXIwwProallUEH8d-R0hzZCJWp3K9b76nwB_eIMDoT41A/s320/webFootprintAlcovesCorrected.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi9QXCCsOury8qVvXPcX2Z0uKVNAuE8WBzdtDnQJcRK1V2IwaETyFjGlCrFTIY2ckvopeaQDhfBYFvi8mHL4OHRJaUlXIwwProallUEH8d-R0hzZCJWp3K9b76nwB_eIMDoT41A/s1600/webFootprintAlcovesCorrected.png)
+
+  
+The second diagram shows a revised version of the same piece in which the hallway alcoves are planned and accounted for - they now exist within the footprint, allowing the hallways to run adjacent without incident.  Note that level designers could have worked around the overlapping version, but doing so would be placing arbitrary and sometimes-awkward restrictions on layout.  
+  
+The proof process will help you identify and solve these problems early - save art and design untold hours of work, bugs and frustration that may have come later if we dived too quickly into building visually-complete pieces.  
+  
+**Sidebar: The role of the Level Designer**  
+  
+Let's step away for a moment before continuing to the next phase of kit development. With all this emphasis on art, you may wonder what the role of the level designer is through these phases.  
+  
+Remember that this isn't something the artist does in isolation and hands off to design later.  The process is best when the kit artist and level designer are interfacing on a daily basis.  Each is an ambassador of a sort, representing different sets of needs and interests - the shared goal is to preemptively identify these differences and make them topics of conversation.  They can otherwise become points of confusion and contention later.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgQ5iIY9eAKnbNGjKUlzApQvJCNugV8tDALuj_iP2lZxtu_HptT514uk8JHWdzp__cLl6G2DklxoRDBTlXSH9ma_GpXC7nlX8dIsWEOW-OuRAv-fs7ezyRNWbtLpN7KQ7R_Ren6/s640/webFriendlyDebate.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgQ5iIY9eAKnbNGjKUlzApQvJCNugV8tDALuj_iP2lZxtu_HptT514uk8JHWdzp__cLl6G2DklxoRDBTlXSH9ma_GpXC7nlX8dIsWEOW-OuRAv-fs7ezyRNWbtLpN7KQ7R_Ren6/s1600/webFriendlyDebate.jpg)
+
+  
+The level designer should be constantly stress testing throughout these stages.  The artist should deliver pieces as soon as they are even rudimentarily functional, and the level designer should use them in non-ideal conditions. Only testing a kit as it was intended won’t teach us anything useful.  The  level designer should anticipate likely (and unlikely) use cases and attempt them, being sure to discuss the ramifications with the kit artist as these expose gaps in kit functionality.  
+  
+Ultimately, the kit will not be able to support every use case and eventuality.  The level designer must choose what the kit does and doesn't support in concert with the kit artist.  The idea here is that other designers will eventually discover these limitations first-hand, and the original designer and artist should have answers whenever possible.  
+  
+Here are a few specific things that the level designer can look for while stress-testing a kit.  
+  
+One of the big things to do is loop the kit back on itself, usually through various sub-kits.  In this example, we’re testing a room and hallway sub-kit.  Small hallways tile from the west end of the room and looped around to the south wall.  Notice that the southern door fails to line up.  It looks like it’s about a half-footprint away from where it should be.  A common reaction to this may be to request a half-length hallway.  This would fix the _specific_ instance, but it’s what we call a “patch-up” piece, which is really just a band-aid over a deeper problem.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEibZ0Ri2ob2rPVhfS6vVTn-2TBSPgxX1gjLBrDgMlLP14spvV44AukWWBA0Egb7oJrdqfXQ0Mc6IxANN5XdELNyfevmgRUqKHd6feFGkr2lCRdy6pzt2FS18tD51mIdm0ipPRnT/s640/webLoopbackStressTest.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEibZ0Ri2ob2rPVhfS6vVTn-2TBSPgxX1gjLBrDgMlLP14spvV44AukWWBA0Egb7oJrdqfXQ0Mc6IxANN5XdELNyfevmgRUqKHd6feFGkr2lCRdy6pzt2FS18tD51mIdm0ipPRnT/s1600/webLoopbackStressTest.jpg)
+
+  
+We don’t really care about fixing this specific case; we want to prevent this problem from recurring during normal workflow.  So if we look harder, it becomes apparent that we've got a footprint issue with the “2-way”, or hallway corner piece.  Notice how it’s longer on one side than the other?  That stub is what’s creating the problem.  The correct way to fix this problem is to rework that piece so it fits within the intended footprint.  It’s good to resist adding patch-up pieces, as they can bloat your kit, add arbitrary and non-obvious usage rules, are usually just symptoms of problems with your core kit.  
+  
+Something else to try is stacking kits on top of each other.  In this example we've placed to hallways right on top of each other.  Nate spoke earlier about footprint bounds, and it applies vertically as well as horizontally.  This kit uses the entire vertical footprint, creating a co-planar ceiling/floor.  This is problematic for a number of reasons: The lack of thickness will be a visual issue if you can ever see it, say from a stairwell or if there’s a hole.  It can also cause z-fighting flicker, make optimization and trigger placement very difficult, and generally create a confusing editor view for you.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj5qv8fDPMAqfja-UlnlP183x1SN6KedvaLqyB-xaWsmtQCVzFVPv2DOTotRRBpbY0IoXjWIf4IVuOYpqgr5RGbeBQC9Rq0kGTpAOQnTZx820c28zmOiP7XVr1ndmbJfr1-B_jP/s640/webVerticalFootprint.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj5qv8fDPMAqfja-UlnlP183x1SN6KedvaLqyB-xaWsmtQCVzFVPv2DOTotRRBpbY0IoXjWIf4IVuOYpqgr5RGbeBQC9Rq0kGTpAOQnTZx820c28zmOiP7XVr1ndmbJfr1-B_jP/s1600/webVerticalFootprint.jpg)
+
+  
+Instead, predetermine how thick floors should be.  This is especially useful with highly architectural kits - something we especially appreciated building the highly architectural, destroyed environments in Fallout 3.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiKcnUN0JCK3AOsX_swSnxvpKaQljGSZBmgWNLKbhz1dylVPBSPB949A2ZwMrPe3aonEBmWoIaSszGdTJS1gHcryRM3qlFiQSax5SIa_c2xhrBNggPdm37gYLwDkYeNjVBiGvAm/s320/webHallRoomPillars.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiKcnUN0JCK3AOsX_swSnxvpKaQljGSZBmgWNLKbhz1dylVPBSPB949A2ZwMrPe3aonEBmWoIaSszGdTJS1gHcryRM3qlFiQSax5SIa_c2xhrBNggPdm37gYLwDkYeNjVBiGvAm/s1600/webHallRoomPillars.png)
+
+One more common test is to create a pillared room from hall pieces.  If you’re a level designer with experience using kits, you probably know were this is going.  In this example we've placed a few hallway corners along with several 3-way intersections.  In doing so, we've created three "pillars", highlighted in green.  This is a classic example of level design using a kit in a way that wasn't intended.  These unintended pillars often look bad, but that doesn't mean somebody won’t try it.  Somebody always does.  This underscores the role of a level designer in the kit development process - the LD should raise these conversations early on and work with the artist to determine what the kit can and cannot support.  
+  
+The stress-testing process can at times seem combative, it’s important that parties both remember that the end goal is creating a great kit that will produce levels which look great and play great.  
+  
+**3) The Graybox Phase**  
+  
+The next stage is "Graybox". By now, we've figured out the big ideas of the kit and proven that the kit will function. The goal of the graybox phase is to flesh out a kit and to figure out what the most common pieces will be.  
+  
+Just like the proof phase, the artist is not doing final texture work, keeping piece iteration a relatively quick process. This typically takes 1-4 weeks, depending on the complexity of the kit.  
+  
+The first graybox should be of the primary sub-kit, or whichever sub-kit we expect to be used most frequently. This helps to figure out the problems early on and enables the kit's level designer to start stress-testing with "real" layout.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgw8QWxJQFC7sEgvwHSeoJ1K7ZZdi7dP32bKkrn5MRu0dbYwf1CUF1jRKHz_frVol_FEveB41BvquhDirpxNDoUruLLeFSliu83K4EsQ5wJqRhF31yMAX6v3Sc9ScvbQvRIAPcg/s320/webGrayboxSet.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgw8QWxJQFC7sEgvwHSeoJ1K7ZZdi7dP32bKkrn5MRu0dbYwf1CUF1jRKHz_frVol_FEveB41BvquhDirpxNDoUruLLeFSliu83K4EsQ5wJqRhF31yMAX6v3Sc9ScvbQvRIAPcg/s1600/webGrayboxSet.png)
+
+  
+Remember to focus on how the kit functions, not how it looks. However; certain visual elements will have an impact and should be roughed in at this stage - usually any visual component that needs to tile across multiple footprints. Each kit has different needs, and you'll have to rely upon your collective vision (_established during the concept phase_) to figure out which elements these are. If you are making a room kit that has a pipe running down the center, put that in. If you want to build an asymmetrical cave kit, start building obvious asymmetry into the graybox pieces. If you make your graybox too generic, you do not actually solve any problems.  
+  
+At this point, the level designer and the artist work together to figure out the naming convention. This can be a tedious exercise, but it's important to sort out early.  
+  
+The key to good naming is balancing brevity with readability.Try to choose naming conventions that will make sense to someone who has never seen it before. If you over-abbreviate, things can quickly become an encoded mess that require a decoder ring to decipher.  This can put stumbling blocks in creative process later, as level designers can stumble over looking for the piece they need.  
+  
+When you have naming conventions that you're happy with, be sure to consistently use them across all kits.  This builds a common studio language and makes it easier for level designers to learn and transition to new kits, even across multiple projects.  
+  
+As an example, let's analyze a piece from Fallout 3, named "UtlBayCorInMidPRTT01L01".  If we break the naming convention down, it consists of the following components:  
+  
+
+*   **Utl** \- This indicates that it's a piece of the Utility Kit.
+*   **Bay** \- Indicates it's a member of the Bay sub-kit.
+*   **Cor** \- Cor is our shorthand for "Corner", usually followed by "In" or "Out"
+*   **In** \- This tells us it's an "Inside" corner.  "Outside" corners bend the opposite way.
+*   **Mid** \- This is common shorthand for a tiling piece, usually a floor.  In this case the bay sub-kit tiles vertically.
+*   **PRTT01** \- No clue.
+*   **L** \- "Left" We often use L/R at the end of a name to indicate mirrored versions of a piece.
+*   **01** \- Indicates that this may have visual variants.  Discussed in detail later.
+
+  
+Most of the name is easily decoded and consistent with other kits.  The "PRTT01" component is indecipherable, however.  It was intended to help indicate what the piece will tile with above, below, and on each side - but because it was so difficult to internalize, the kit was underutilized.  Which is a real shame, because this kit had a great deal of potential that wasn't tapped for the core game, making some of the effort put into it a waste.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhRbLGxNz5Rofntk7_HgRFHwLQobpsnLGWabvk7h8c60z7YRMP2FyJFsi6ddSq1eZ0zNanOhySm9mDHhpe2ypRSCDzn4GM0bPjL4rqWBt7C2tSGKOVtIVaiV1x_UoJXkoxXxHS1/s640/webNameBreakdown.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhRbLGxNz5Rofntk7_HgRFHwLQobpsnLGWabvk7h8c60z7YRMP2FyJFsi6ddSq1eZ0zNanOhySm9mDHhpe2ypRSCDzn4GM0bPjL4rqWBt7C2tSGKOVtIVaiV1x_UoJXkoxXxHS1/s1600/webNameBreakdown.jpg)
+
+  
+The extreme case of UtlBayCorInMidPRTT01L01 is a useful cautionary tale, but some naming conventions won't fulfill the obvious-to-an-outsider rule.  For example, we call a straight hallway piece a "1Way", and a hallway turn/corner is usually called a "2way".  More obvious are "3way" and "4way" junctions.  We chose this convention because it groups these functionally-similar pieces together in the list, making them easy to get to.  Once you understand this name, you'll understand it across all hallway sub-kits because we use it consistently.  This is just one case where a slightly obtuse naming convention is justified by the iteration speed benefits and offset by consistent usage.  
+  
+As briefly mentioned above, It's wise to add 01 as a suffix to any piece which will feature visual variants but otherwise fill an identical role and occupy the same footprint. Even if you are only starting with one of each piece in the beginning, the 01/02/03 suffix format will become useful later, because those pieces will sort together in the list and be easy to find and swap for.  
+  
+At this point, pivot placement should also be decided upon. Generally, the pivots of our kit pieces are at the ground plane of the kit and in the center. Exceptions do exist however. For instance a pipe kit might have a pivot at the edge of the pipe so that it can hinge like an arm, which makes it easier to line up. A platform kit might have its pivot at the base of the platform instead of the "ground plane" so that it can snap to other areas easier. Changing pivots later can be a huge problem, requiring manual updates to hundreds of instances, especially if the pivot has changed before.  
+  
+**4) The Build-Out Phase**  
+  
+Next up is the "Build-Out" phase. This is when the kit starts to become real art, and can be introduced to the team at large.  
+  
+With the core pieces proven out and functionally capable of laying out basic levels, the artist can begin developing those pieces visually and adding less-critical pieces and variants in response to usage cases as they present themselves.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgqU0MDA5J2K9USfc0GbapyyktPnCT19Cg9fFwC8jJRw8noG9c45oNyCkIt7_m4ZnKAowm0_phfoBzljkamYu55avVCnstOy1K9XLGLXlAqQo3KDBP8NupsafEOtvfqj0GzCGUI/s640/DwarvenKitShot.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgqU0MDA5J2K9USfc0GbapyyktPnCT19Cg9fFwC8jJRw8noG9c45oNyCkIt7_m4ZnKAowm0_phfoBzljkamYu55avVCnstOy1K9XLGLXlAqQo3KDBP8NupsafEOtvfqj0GzCGUI/s1600/DwarvenKitShot.png)
+
+  
+This is also a good time for the level designer who has been working on the kit so far to introduce the kit to the rest of the level design team, and give an overview of the thinking behind the kit, its current status and future plans.  This is the first stage at which it's a good idea to have other level designers start using the kit for their own layouts, which will generate a lot of useful feedback.  
+  
+This stage can take much longer because actual textures and geometry are being made.  This can take a few months, especially if there are a lot of sub-kits. If the graybox phase was successful, however, level design shouldn't be held up very much: the art can be swapped out seamlessly once the final art exists. This isn't always the case though, so be aware that unforeseen problems can undermine layout being done during build-out.  
+  
+Even though this article won't go into this in much depth, one very important thing to note is to build out one visually-complete piece before beginning the variants. If adjustments must be made based on art direction feedback, it is much easier to adjust one piece (_or a small number of pieces_) instead of an entire kit. This can be a massive time savings. Kits will get a lot of polish over time - you're primarily trying to anticipate and avoid changes which will impact functional factors such as footprint, snap rules and pivot point.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiDRiKgQPD7Ruw0jTG7xoFoCQdTeaqoHkTYe7BmX6QXMsmPMQmz4-S9-cGQtfzqINhbHiJcnaXRkTGMXQvhBpnK3_2Oz8UrtCGCHPPZBnVUeUiK_qvpzjOClBRTkM5J-UCIPb5w/s320/webHeroPiecesAreLame.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiDRiKgQPD7Ruw0jTG7xoFoCQdTeaqoHkTYe7BmX6QXMsmPMQmz4-S9-cGQtfzqINhbHiJcnaXRkTGMXQvhBpnK3_2Oz8UrtCGCHPPZBnVUeUiK_qvpzjOClBRTkM5J-UCIPb5w/s1600/webHeroPiecesAreLame.jpg)
+
+  
+Something to watch out for is the temptation to start working on "Hero Pieces". This is a piece that has a lot of fancy unique art, such as a hallway piece with an embedded statue, or a one-off setpiece for a specific event. Even though these pieces seem important, can look really nice and impress everyone on the team, they are ultimately not what is important early on. The hero piece is only used a few times, your normal piece is used hundreds if not thousands of times. Focus on what is actually important;  the standard pieces. The hero piece can always come later, and will only be a bottleneck for the handful of specific instances in which they are needed.  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjDc6jZuzirBglAn6ahBsf61Z1MHkijzUfawUAsy6mGyYt9-jByrwa25svCd9XSwth_7FcJ1Cy5EkHnbGoxnoTBSGISeXD_b7zt3PxDZHSlSoV2xmtTuBy6LnZs5DxWJbNzvXEg/s320/web_Helpermarkers.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjDc6jZuzirBglAn6ahBsf61Z1MHkijzUfawUAsy6mGyYt9-jByrwa25svCd9XSwth_7FcJ1Cy5EkHnbGoxnoTBSGISeXD_b7zt3PxDZHSlSoV2xmtTuBy6LnZs5DxWJbNzvXEg/s1600/web_Helpermarkers.jpg)
+
+  
+Something we've only discovered on our current, unannounced work are what we call "Helper Markers". This is editor-only markup that can help convey meaningful information about the kit. Some examples of this are markers to show how a kit should snap together, where the doorways are or markers for the ceiling so that you don't have to flip the camera upside down to select those pieces.  It's good to think about these markers as the level design team starts using the kit, as they can help make usage more intuitive and straightforward.  
+  
+**5) The Polish Phase**  
+  
+Finally we are ready for the polish phase, which is really an ongoing process and that exists _(to some extent)_ throughout the rest of the project. Over the coming months, the kit artist can respond to real usage cases, fix bugs, and additional functionality. Additional art polish will go in as needed, and due to the way that kit art is deployed, this should be a seamless process.  
+  
+It is important for the level designer and the artist to talk critically about all the requests that come up throughout the process. It is very easy for an artist to say "yes" to every request that comes up. This can quickly lead to a kit that is bloated and unmanageable. Remember the reasons decisions were made while establishing the kit, and make sure that each additional piece is worth it. When adding pieces for a specific use case, see if there is a reasonable alternative, if something else exists already, if the use case is actually worth expanding the kit.  The answer won't always be "no", but it can't always be "yes", either.  Choose your battles.  
+  
+During the initial process the artist usually worked with one level designer on a limited set of areas. Throughout the course of the game lots of different level designers will make lots of different levels. No matter how thorough the initial phases were, this always brings up unexpected issues. Assume that this will be the case and plan for additional kit polish time for course-corrections down the road.  
+  
+
+### Going off the Grid: Advanced Techniques
+
+At this point you know how to make a rules-based kit on the grid which works as a system. Things snap together, there are corner pieces, straight pieces, doorways, rooms, etc. 
+
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiS3ue1NayKhJThbZ-psc5ylgGK4d6jCwj2FZ1qKq1nSE2MXX-xrdn4QQ_S5VL8CV3GoO-zDpNV-WnuUmMx8S53vGVZ9IBKG9QHX8bGvySzbWv7pTMLaAg0gKqb5vQVsnDCmoso/s320/webBR2kit.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiS3ue1NayKhJThbZ-psc5ylgGK4d6jCwj2FZ1qKq1nSE2MXX-xrdn4QQ_S5VL8CV3GoO-zDpNV-WnuUmMx8S53vGVZ9IBKG9QHX8bGvySzbWv7pTMLaAg0gKqb5vQVsnDCmoso/s1600/webBR2kit.jpg)
+
+The problem with this kind of kit is that it will always feel like a kit. Things are always at 90 degree angles, the player will sense the system and art fatigue can set in.  Modular levels often _feel_ like modular levels.
+
+  
+
+Starting with Fallout 3 we started to push kits beyond this to see how we could make a kit _not_ feel like a kit.  We had spent our careers thus far learning the rules; now we needed to break them.
+
+  
+
+When you start to bend the rules, always keep in mind the reason they were rules in the first place. These ideas exist for a reason, and it can be hard to appreciate why until you've made certain mistakes firsthand.  
+  
+If you find a way to bend kit logic, you shouldn't necessarily apply that to all kits you make in the future. It is best if you embrace one particular logic quirk for each kit, otherwise things will quickly spiral out of control. It is also extremely important to remember the cost of bending the rules. Art has to spend more time making more pieces and the art is a lot more complicated. The level design process is also usually more complicated and its easier to make mistakes.  Make sure these trade-offs are worth it on a case-by-case basis.  
+  
+One of the key technologies that let us start building more complicated kits was something called "Snap to Reference". With snap to reference the editor can treat any object as the origin for things to snap for. This way, things don't have to be aligned to rigid 90 degree angles. You can rotate a piece and then use that as the new grid, so new pieces will snap together with this rotated piece. This obviously creates gaps between pieces rotated at different angles, but we bridge those gaps in a lot of ways.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj_u-tiH0WuuSan1I7o5Tyj23fJMzUOT9tTcaehyphenhyphenzKE-W-un6DOaNs7qgk7XDqK_NKow0vupBTtT1DZxZ40Qi9Opqy0gwpy3twwQpqop12OWIBQNSGZcFZ5L8N2PY5ecCsXBaiC/s640/webSnapRefDiagram.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEj_u-tiH0WuuSan1I7o5Tyj23fJMzUOT9tTcaehyphenhyphenzKE-W-un6DOaNs7qgk7XDqK_NKow0vupBTtT1DZxZ40Qi9Opqy0gwpy3twwQpqop12OWIBQNSGZcFZ5L8N2PY5ecCsXBaiC/s1600/webSnapRefDiagram.jpg)
+
+  
+One of the new kit types introduced in Skyrim was the  "Pivot and Flange" system used for the Ratway. This is a hallway kit that acts almost like a pipe kit. All of the hallway pieces can be rotated at unique angles, allowing for a much more organic flow. Because these hallway pieces are all rotated at arbitrary angles, there is a gap created between each hallway piece.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhunNN-P4LczDJcgDOnl9UMd-X2FtyiBprgTG8GtlZLxqWlvTJukTXdT5pNalq7vurBiDo4fDAQ6SGXIW-u0Fuu7uAFKiZKP0V3hId-8Ir0nYzRjrtc65V6RQWEM3s8-1HMWkZQ/s640/webPivotFlange.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhunNN-P4LczDJcgDOnl9UMd-X2FtyiBprgTG8GtlZLxqWlvTJukTXdT5pNalq7vurBiDo4fDAQ6SGXIW-u0Fuu7uAFKiZKP0V3hId-8Ir0nYzRjrtc65V6RQWEM3s8-1HMWkZQ/s1600/webPivotFlange.jpg)
+
+  
+We covered up this gap using an archway that follows the full curvature of the walls, ceiling and floor. There are a few issues with that you should be aware of. For starters, the level design process is more linear. Instead of knowing exactly how many pieces would be between a set of rooms, since things are rotated at strange angles, all of the numbers/angles are thrown off, which can make it harder to make adjustments.  
+  
+It's also easy to create non-obvious errors. Because these archways can't snap to both halls, level designers may accidentally fail to align the gap-covering archway exactly right, which can lead to tiny holes that you might only see at just the right angle. (_This underscores the importance of playing your work frequently, rather than staying editor-side for too long)_  It is also a bad system for highly specific architecture. Since it is inherently organic and relies on jamming things together, the visuals break down if you want clean, specific intersections. If you want organic naturally curving hallways however, this system is fantastic and does not require many kit pieces.  Because the Ratway is supposed to feel like an ancient, decaying subterranean tunnel system,  it's perfect.  
+  
+We also found ourselves experimenting with our own rules when it came time to build the caves of Skyrim.  Caves have always been problematic for modular building, as modular kits are highly rules-based and orthogonal but caves are highly freeform and organic. Another system that we started using in Skyrim is the Shell-Based Building system.  
+  
+This is a system where we build all of the standard kit pieces in the traditional way, but then layer in freely placed walls, pillars and balconies to break up the play space in an organic way. The diagram below shows a simple example where shell pieces are used to establish a room, and free walls and pillars are used to quickly create a more organic shape than the corner allowed by the strictly grid-snapped shell.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiE7u3Cc9-OimimVij4Q2aHeBicWNMzRh7yFB1WNcuFcLXFdFEYDP05Sr2btUSB9reCDcAPvfmhWIS5Si6984v_RTAkXV8x9M0ZKu9ZxO0bcsX2QeR5XxAn7bxXriHG2x30daKT/s640/webCaveShellStages.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiE7u3Cc9-OimimVij4Q2aHeBicWNMzRh7yFB1WNcuFcLXFdFEYDP05Sr2btUSB9reCDcAPvfmhWIS5Si6984v_RTAkXV8x9M0ZKu9ZxO0bcsX2QeR5XxAn7bxXriHG2x30daKT/s1600/webCaveShellStages.jpg)
+
+  
+This allows level designers to build seamless levels with the exact shapes and flow that they want. Visually, it is very easy for things to never look the same. The amount of art that need is surprisingly minimal, due to the random, chaotic way the art can be combined. Some artists might worry about things like specific intersections not looking great.  Try using an art-review process to monitor specific usage and provide constructive feedback when things aren't working. Good lighting and rendering features like ambient occlusion also work out very well and go a long way to hide any awkward intersections.  The flexibility you can get from doing a level this way is astronomical. (_Plus, no one really notices those little intersections.)_  
+  
+Delving further into our history, Directionally restricted kits are a technique we began in Fallout 3. Traditional kits can be rotated in any direction and still snap together. Directional kits do not allow this, as they require certain pieces be used in relationship to each other. This allows art to do things like asymmetrical halls, specific width rooms (_such as a room spanned by a large arch_) or room kits that have unique pieces for all of the cardinal directions.  
+  
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEisoLZNEyQ_TcMAYJquQrXLYkVxYyXez9UUgE2CeJdG_zUbCQE1PhPR7yTs1AFeolDck64AiSDL1AhLOo4KfPhAhTY2pj5SSUocuuGxj87CRioaZc0rbFMXIq0W-UpDOmyO6PBR/s320/webAsymmHall.png)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEisoLZNEyQ_TcMAYJquQrXLYkVxYyXez9UUgE2CeJdG_zUbCQE1PhPR7yTs1AFeolDck64AiSDL1AhLOo4KfPhAhTY2pj5SSUocuuGxj87CRioaZc0rbFMXIq0W-UpDOmyO6PBR/s1600/webAsymmHall.png)
+This is a lot more work for both art and design, but it is extremely useful for organic kits, as it removes the need for surfaces and textures to tile in every direction. This can be a lot of extra work, and it changes some of the core logic of a kit.   While extremely useful for creating natural kits, directional restrictions usually aren't worth the extra effort for something highly architectural.  It can make the kit easier to understand if you start thinking of each unique surface differently, such as the A/B sides of the hallway pictured here.  
+  
+One thing to watch out for when doing this is the need for what we call a "De-Twist" piece in the hallway kits. When an asymmetrical hallway flows in just one direction, it tiles just fine. Sometimes, however, another hallway will meet up that happens to be flipped the other way. A de-twist piece bridges this gap over the course of a single piece by flipping which side meets up with the other. Hence the "de-twist".  The following diagram shows an example of an asymmetrical hallway looping back on itself, where it then requires a de-twist.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjmaPxfRdzXvpxpIwBrkneJBNiP49kxI_B-xkG6hIANSMvZrbRRGtghLv1HRZCtkFUBALSwQir1SWX0CJrigd4lyrvkqnxs3qmE0D-jnt6FJBvcDyjhHPphMwGxY2BNK4UNjAD4/s320/webDetwist.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjmaPxfRdzXvpxpIwBrkneJBNiP49kxI_B-xkG6hIANSMvZrbRRGtghLv1HRZCtkFUBALSwQir1SWX0CJrigd4lyrvkqnxs3qmE0D-jnt6FJBvcDyjhHPphMwGxY2BNK4UNjAD4/s1600/webDetwist.jpg)
+
+  
+Another simple kit concept that can add a lot of flexibility is a "platform" kit.  Platform kits are any that sit on _top_ of other surfaces, and allow level design to cut up the horizontal planes of play.  They can be very large or small, and both examples can be seen in Skyrim.  These empower level designers to create interesting playspaces without needing to add a great deal of complex vertical logic to the kits. The number of pieces needed to create a platform kit is minimal, and they tend to work with almost any other sub-kit with the same visuall theme. These platform kits were even used independently in the exterior as points of interest.  
+  
+Platform kits are a specific example of what we've started to call "Glue" kits.  Beginning with our current project, we are now creating a number of small-scope kits which exist primarily to create transitions between multiple kinds of kits and sub-kits.  Glue kits are essentially made with kit-bashing in mind, and could be just about anything from platforms to tunnels to ledges.  They are so far giving us a good deal of mileage, and show how discoveries and innovations made along the way can begin to influence your formal workflow.  Which is good, because an evolving workflow is proof that you're still learning.  
+  
+
+### **Conclusion**
+
+There’s an awful lot more that we could cover if we were to get into the deeper details of kit-building, and you’re encouraged to reach out to us with any questions you may have.  For now, however, let's wrap up.  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiekDhYM26bRSR8xRK9pWo6xMweFKrdhbLK46kyTe6v1cexnhX25LXtCD9diBT8h6K39z4SXy2rI1oUvGcwibf8_JXWmUQHcgYhBAHMqVls2eOQ6FC0McBnYtAqJ4pOWZFspyXi/s640/webSkyrimFanShot.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiekDhYM26bRSR8xRK9pWo6xMweFKrdhbLK46kyTe6v1cexnhX25LXtCD9diBT8h6K39z4SXy2rI1oUvGcwibf8_JXWmUQHcgYhBAHMqVls2eOQ6FC0McBnYtAqJ4pOWZFspyXi/s1600/webSkyrimFanShot.jpg)
+
+  
+When you get down to it, I do not believe our team could have built Skyrim except through our decision to explore and embrace workflows like the ones discussed here.  We’re driven by a desire to  explore our worlds via their creation, always aware that the time we spend polishing every edge off one idea takes away from what we could be doing with another, and the thing after that.  We've said before that the worlds of our games are their own main characters.  Those worlds come to life before our very eyes during development.  
+  
+Don’t mistake these workflows for a compromise into which we have been forced.  Rather, these are choices we have made in order to make the scope of our games possible while maintaining a working culture which keeps us happy and harmonious.  
+  
+Because while I don’t believe our team could have built Skyrim any other way, I also believe that no other team could have made Skyrim.  Other teams could have made a game _like_ Skyrim, and perhaps have spent more time or money, or worked with more people, or embraced different ideologies.  But any of those games would have been a different one than what we created, and we're proud of the games we've made.  
+  
+At the end of the day, the games you create - the art you put out into the world - is an expression of yourself.  If you’re working as part of a team, however, that art isn't just an expression of your own self, or even many individual selves.  It’s an outward expression of your relationships, and who you are as a _group_ of people.  And these relationships are perhaps the most rewarding thing you’ll develop in your lifetimes.  It's worth finding techniques that help grow those relationships and in turn improve the games you can make together.  
+  
+_Joel Burgess is a senior designer at Bethesda Game Studios, and Nathan Purkeypile is a senior environment artist.  Their shared gameography includes Skyrim, Fallout 3, Aeon Flux, Bloodrayne 2, and an unannounced project currently in development.  Nate and Joel were also co-leads on the Point Lookout DLC for Fallout 3.  They can be reached on twitter via [@JoelBurgess](https://twitter.com/JoelBurgess)
+ and [@NPurkeypile](https://twitter.com/NPurkeypile)
+, respectively._  
+  
+
+[![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiGUXhMPuYktkFa2nUvFqaW11kHRnSYkL0PKW47yM1GIjWN0-64U6tah0ZpGnfZ0jsf_AGmeJr1txZ1kzjbW0DDTr26SoMMMhwYUTRGff5QnKQdjniWXQVgDFBJYpCValK8tS5Z/s320/webhugginItout.jpg)](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiGUXhMPuYktkFa2nUvFqaW11kHRnSYkL0PKW47yM1GIjWN0-64U6tah0ZpGnfZ0jsf_AGmeJr1txZ1kzjbW0DDTr26SoMMMhwYUTRGff5QnKQdjniWXQVgDFBJYpCValK8tS5Z/s1600/webhugginItout.jpg)
+
+  
+
+ [![](https://resources.blogblog.com/img/icon18_email.gif)](https://www.blogger.com/email-post/30579660/2940270306362659268 "Email Post")[![](https://resources.blogblog.com/img/icon18_edit_allbkg.gif)](https://www.blogger.com/post-edit.g?blogID=30579660&postID=2940270306362659268&from=pencil "Edit Post")
+
+[Email This](https://www.blogger.com/share-post.g?blogID=30579660&postID=2940270306362659268&target=email "Email This")
+[BlogThis!](https://www.blogger.com/share-post.g?blogID=30579660&postID=2940270306362659268&target=blog "BlogThis!")
+[Share to X](https://www.blogger.com/share-post.g?blogID=30579660&postID=2940270306362659268&target=twitter "Share to X")
+[Share to Facebook](https://www.blogger.com/share-post.g?blogID=30579660&postID=2940270306362659268&target=facebook "Share to Facebook")
+[Share to Pinterest](https://www.blogger.com/share-post.g?blogID=30579660&postID=2940270306362659268&target=pinterest "Share to Pinterest")
+
+Labels: [#GameDev](http://blog.joelburgess.com/search/label/%23GameDev)
+, [#GDC](http://blog.joelburgess.com/search/label/%23GDC)
+, [#PublicSpeaking](http://blog.joelburgess.com/search/label/%23PublicSpeaking)
+, [#Skyrim](http://blog.joelburgess.com/search/label/%23Skyrim)
+, [Transcripts](http://blog.joelburgess.com/search/label/Transcripts)
+
+#### 33 comments:
+
+[![](http://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjXJ13Xrzm77xrESMaT5sXXzM1CtFrfPQngt73uPy3Y_rX9ohTz70xhct6irlhL6HGixkOZWBjH8B87DTqBZvVFj0yzi0GbYjEQcfcNU95eHCJQBBJcvwJteQ2913UEww/s45-c/Photo2.jpg "Paul Tozour")](https://www.blogger.com/profile/13606823413516289161)
+
+[Paul Tozour](https://www.blogger.com/profile/13606823413516289161)
+ said...
+
+Terrific article, Joel and Nate! Really looking forward to watching the whole thing when it goes up in the GDC Vault.
+
+[2:29 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366396196736#c1653378112418288776 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1653378112418288776 "Delete Comment") 
+
+[![](http://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg0mRoWkkInjQehDTloMkmtHn7RfPesDC9Hkb0wL_jtKlKqccxHXaQzfyJHbsoKO1rI_f0jhRvrhxcykzxUlhfiPyZMLfVcsSk0_HMeTbS64yaEJgALgoo6b82YVX5twA/s45-c/bobcat96.jpg "William")](https://www.blogger.com/profile/04830815127091799751)
+
+[William](https://www.blogger.com/profile/04830815127091799751)
+ said...
+
+"Helper Markers"  
+  
+This is something I hadn't seen before. Can you go into more detail on it, how you've used it, and how it helps?  
+  
+Thanks!
+
+[1:42 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366738945117#c5977235409335302019 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/5977235409335302019 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Joel")](https://www.blogger.com/profile/09816332769743524346)
+
+[Joel](https://www.blogger.com/profile/09816332769743524346)
+ said...
+
+We've started using helper markers in a few different ways. In the test image shown above, for example, the walls and doorways are outlined with marker geometry, giving the LD a clear representation of the level layout, even in top-down or cluttered views. Also in that example are ceiling "handle" squares which make it easy to grab one-sided art without needing to flip the camera to select it.  
+  
+There are some other ways of using them we've found, too. For example, we can show which direction a door will open, differentiate asymmetrical sides of a hall, or indicate the direction of flow on pieces that have to tile in a specific direction relative to each other. They're great for making the non-obvious obvious at-a-glance.  
+  
+Markers are an old concept, by the way. We've used them for years on things such as animation markers and furniture. But some of our kit-specific applications are simply new ideas, and an example of it's useful to be continually questioning and improving your workflow.
+
+[4:32 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366749145960#c8385889958542538066 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8385889958542538066 "Delete Comment") 
+
+[![](http://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg0mRoWkkInjQehDTloMkmtHn7RfPesDC9Hkb0wL_jtKlKqccxHXaQzfyJHbsoKO1rI_f0jhRvrhxcykzxUlhfiPyZMLfVcsSk0_HMeTbS64yaEJgALgoo6b82YVX5twA/s45-c/bobcat96.jpg "William")](https://www.blogger.com/profile/04830815127091799751)
+
+[William](https://www.blogger.com/profile/04830815127091799751)
+ said...
+
+Thanks!
+
+[4:35 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366749306669#c5350719318226320296 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/5350719318226320296 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "gauss")](https://www.blogger.com/profile/08643300899012415576)
+
+[gauss](https://www.blogger.com/profile/08643300899012415576)
+ said...
+
+Tremendously generous post to all other working artists and level designers out there that want to work smarter and get more content done without killing themselves. Can't thank you enough.
+
+[2:55 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366829723921#c2834528941802895202 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/2834528941802895202 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Unknown")](https://www.blogger.com/profile/12455227825673338029)
+
+[Unknown](https://www.blogger.com/profile/12455227825673338029)
+ said...
+
+As a student of game and level design, this information was invaluable to me. I really can't thank you guys enough for posting this.
+
+[8:18 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366935527187#c1078497167581365073 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1078497167581365073 "Delete Comment") 
+
+[![](http://3.bp.blogspot.com/-uhcDq-gAiyk/Zb1gI1z8TkI/AAAAAAAAAds/B6yktMSucvwK_UhcxpOX3iyC6IDCDWX2gCK4BGAYYCw/s35/profile%252520pic.jpg "Word Portals")](https://www.blogger.com/profile/15891905961487571889)
+
+[Word Portals](https://www.blogger.com/profile/15891905961487571889)
+ said...
+
+Thanks for one absolutely fantastic article! Your shared knowledge is invaluable.
+
+[8:47 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366937249648#c1697227523196660639 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1697227523196660639 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+Wonderful article... but I think the grid-based approach is fundamentally flawed when it comes to art fatigue. It makes all the proportions in the world identical.. every hallway, every door, every ledge, every street and every alley.  
+  
+Oblivion, Fallout 3, Skyrim... these never felt like real worlds to me. It seems like the work of a particularly unimaginative dungeon master trying to support a script that deserves more.  
+
+[9:02 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366938163366#c8101100869923445006 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8101100869923445006 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Walter Hunt")](https://www.blogger.com/profile/16977689221482478695)
+
+[Walter Hunt](https://www.blogger.com/profile/16977689221482478695)
+ said...
+
+What a wonderfully we'll written article. I am surprised at the amount of in-depth, complicated work involved in making things simple to design.  
+
+[9:25 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366939529889#c8967436778440633696 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8967436778440633696 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Sean Thompson")](https://www.blogger.com/profile/16267208036308466608)
+
+[Sean Thompson](https://www.blogger.com/profile/16267208036308466608)
+ said...
+
+Great, huge blog! But believe me, I IMMEDIATELY noticed how little variation there was in Skyrim, it often didn't feel much better than Oblivion.  
+  
+Better tools would help immeasurably. I played around with the Skyrim editor about a year ago, and it felt vastly outdated compared too Cryengine 3 and Unity (which I've played with, wouldn't doubt UE4 is the same way). Instant play and edit, being able to cover up seems by just painting textures onto things in the editor.  
+  
+The biggest help I could see to your kind of game are tint maps, so you can just change the color of whatever asset you want instantly, and the aforementioned in editor texture painting, along with decals, hopefully both linked to tessellation and displacement maps so the geometry itself changes. You could probably get a lot more mileage out of stuff with such tools, but even then I'd say you'd probably need to double you artist count for interiors at least. Coming to the same exact village again and again and again made parts of Skyrim get really boring really quick.
+
+[10:23 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366943018410#c1421099500824692003 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1421099500824692003 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+This is an AWESOME article in terms of explaining workflow! I wish so many studios did this too, it's a lot we can learn from as a really small studio!
+
+[2:05 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366956302034#c7141638328300846676 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/7141638328300846676 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+Square meshes and 'cubic' tile-blocks on naturalistic indoor environments (eg natural caves) can be a challenge - how about equilateral triangular meshes, or for 3d space rhombic-dodecahedrons?  
+  
+It might be a pain at first for the technical crew - as their graphics and physics tools are probably based around square and cuboid bounding shapes - but maybe the rewards are there?  
+  
+Use of rhombic dodecahedron packing has the helpful property that the repeat pattern is along the 3 normal axises (unlike say Truncated Octahedrons ..) - also allows code reuse for voxels...  
+  
+Well over 300+ hours of pure enjoy on Oblivion by the way - so many thanks, to you and all the Bethesda team.
+
+[5:32 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366968764410#c8627804368267039693 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8627804368267039693 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+.. Meant to say 'elongated dodecahedron' not 'truncated octahedron' .. but you knew that anyway..  
+  
+Just correcting my mistake above...
+
+[7:20 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366975225449#c1354287148916545887 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1354287148916545887 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+Very interesting read, By far the biggest improvement I have to say going from TES IV to V is the dungeon diversity, really made my 300+ hours much more enjoyable.  
+  
+I hope some day we have a solution to make things really diverse in terms of art assets, but you can't at the moment it seems, I know ID tried something with Rage and their Megatextures to make it not so much repeating assets, but honestly I can't say I was really struck by that when I played it.
+
+[11:18 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366989482864#c6027601494151795762 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/6027601494151795762 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Unknown")](https://www.blogger.com/profile/15655811728453018158)
+
+[Unknown](https://www.blogger.com/profile/15655811728453018158)
+ said...
+
+Did you guys try using such systems for your open world areas? If so, how did that work out?
+
+[11:34 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366990484043#c5811859918361468847 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/5811859918361468847 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Unknown")](https://www.blogger.com/profile/16769792477062961258)
+
+[Unknown](https://www.blogger.com/profile/16769792477062961258)
+ said...
+
+an AWESOME article!  
+More Skyrim tonight, probably no sleep.. :)
+
+[12:15 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1366992935944#c570567691499862400 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/570567691499862400 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "TheOutlander")
+
+TheOutlander said...
+
+"the median play time of Skyrim on Steam has peaked at well over 100 hours"...  
+  
+I'm clocked at 1,131 hours. PC Mods are the saving grace.
+
+[5:36 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367012217956#c7323560292548657801 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/7323560292548657801 "Delete Comment") 
+
+[![](http://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiUn4W556pc7vxmuHwoNOCjxGnRBBRje41qv_pMZfe0lYLZAxrzXRQjknY023qzkEuDnnA9WjCPcmzwqGICaEdxrkhGU8UU7hHX2eJ_G6-1JZD6uWFBnwEQ1yEnVlTxbhw/s45-c/Racter.png "9of9")](https://www.blogger.com/profile/02872251731902941045)
+
+[9of9](https://www.blogger.com/profile/02872251731902941045)
+ said...
+
+Fantastic post, it's really great to get an insight into the development process behind the kits. Some of the cave kit design was really stunning in particular - I've never seen organic forms done in a kit that well before.  
+  
+I'm really curious to see where you're going forward from this though. On our current project, we use tiled assets that are then deformed along a curve to get a more organic flow and contour to natural areas, such as cliffs and coastlines - and occasional careful use of world-space mapping to both help the tiling and to alleviate artefacts from deformation.  
+  
+This has led me to wonder whether other types of more procedural (but cheap) deformation wouldn't find use in kit-based systems as well - perhaps something like using blendshapes to create a range of variations on a single tile.  
+  
+Is this a direction you've explored at all?
+
+[6:13 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367014433959#c8168726431418907678 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8168726431418907678 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Noumenon")](https://www.blogger.com/profile/01597461989960782762)
+
+[Noumenon](https://www.blogger.com/profile/01597461989960782762)
+ said...
+
+I didn't know anyone from Skyrim was brave enough to put out articles where commenters could get at them, but just let me say you did an amazing job and the one unique thing about each dungeon means it still feels totally fresh to me after 200 hours.
+
+[9:27 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367069252912#c8639072037006986613 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8639072037006986613 "Delete Comment") 
+
+[![](https://resources.blogblog.com/img/blank.gif "Jeff")](https://www.blogger.com/profile/04330051896376910027)
+
+[Jeff](https://www.blogger.com/profile/04330051896376910027)
+ said...
+
+Thanks for the awesome write-up!  
+I'm curious if Bethesda has an area in the studio full of Lego bricks. Modular level designs always tend to remind me of building custom Lego blocks ^\_^ (I personally enjoy that kind of stuff, plus seeing those modular pieces tickled my senses)  
+  
+I would also love to hear about the process involved in creating the landmass of Skyrim.. how the decisions came through from identifying segregated areas, combining/unifying them, and massaging it to it's final epic form. I also wonder how artists and designers were assigned and what tasks they needed to take as I imagine the overlap/transition from one area to another could be quite a thing to handle.  
+  
+Great game btw, 300+ hours and counting. Best wishes for Bethesda's next endeavors!
+
+[11:25 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367076310324#c4416442160978390763 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/4416442160978390763 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+Good thing Skyrims naming conventions are simpler than Fallout 3s eh!  
+  
+I built this huge cave level in Skyrim one time and all the while I thought 'how the hell did they model these pieces to line up like this', well you've helped me understand how somewhat further so thankyou! Although I still think it's partly down to witchcraft and/or wizardry
+
+[4:27 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367267241536#c6420616553429428381 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/6420616553429428381 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+What a read! I notice you'd written at various points that you could go into more detail, but really this is so much more detail than I expected to find and it was absolutely fascinating, thanks for writing it up!  
+In a way the use of kits surprises me, at the same time having finished reading, it makes so much sense, too. This must work so well in areas like the vaults in Fallout 3, but each vault had something bizarre and surprising inside. In Skyrim, Dwemer ruins and ice caves in particular may have had a lot of similarities, but they had a unique identity, something bespoke that made such an area memorable and unique. Perhaps some unexpected architecture on a vast scale and often a character, enemy or event you'd encounter to associate with it. (I think this was why I found bandit hideouts a little weaker, after a while you generally knew what to expect when you entered one)  
+  
+Makes me want to play Skyrim again and have an even closer look :)
+
+[7:18 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367407112201#c1427784580271722079 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1427784580271722079 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Naima - Prometheus")](https://www.blogger.com/profile/17869256150864998686)
+
+[Naima - Prometheus](https://www.blogger.com/profile/17869256150864998686)
+ said...
+
+Awesome article , I have to read it several times to stick in mind some ideas :) , beeing modding skyrim both in level design and art making at the same time is really interesting read , thankyou ...
+
+[4:48 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367484522288#c4321948599957858464 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/4321948599957858464 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Gazius")
+
+Gazius said...
+
+Great post, thank you for sharing insight into one of the impressive game studios out there.
+
+[9:24 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367501048292#c8994478147593063418 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8994478147593063418 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+I'm curious to hear why things like pipes or caves aren't generated or altered procedurally. The screenshot with the pipes in particular looks like obvious kit-use that makes little logical sense in the world, and where you can see the grid right away.  
+  
+With techniques like triplanar texturing and some simple procedural rules, you could make true "kits".  
+  
+What is preventing games from adopting this? Do artists hate using it? Do programmers hate creating it? Does it require dev/design hybrid unicorns that teams don't have enough of? If you did a post on this, I imagine a lot of people would be interested.  
+  
+\- Signed, someone who has done a lot of demoscene-style work and doesn't quite get why Quake 3 Arena was the last time they saw a truly curved surface in a game.
+
+[3:51 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1367826696143#c3444856335653893963 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/3444856335653893963 "Delete Comment") 
+
+![](http://resources.blogblog.com/img/blank.gif "Anonymous")
+
+Anonymous said...
+
+Excellent article. This information will be of great use to me in the future!
+
+[1:45 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1386009901461#c1818266289435221719 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1818266289435221719 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Unknown")](https://www.blogger.com/profile/12140810641420207357)
+
+[Unknown](https://www.blogger.com/profile/12140810641420207357)
+ said...
+
+I'd be interested in hearing about applications of some other techniques of modular level design, like procedural generation with parameters. I could see it being particularly helpful in organic assets like trees and the likes.  
+  
+Then again, that'd require quite a bit of collaboration between some sort of programmer and artists.
+
+[1:33 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1395725634280#c8496654430922597080 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8496654430922597080 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Joel")](https://www.blogger.com/profile/09816332769743524346)
+
+[Joel](https://www.blogger.com/profile/09816332769743524346)
+ said...
+
+Lucien - there's quite a lot of interest and thinking out there about procedural generation today, and the techniques we use certainly share some common ground. Our technique isn't procedural at all, however. The kits are designed to empower us to hand-create spaces. Our objectives are very similar to those you'd have when thinking about a procedural system.
+
+[10:43 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1396147395172#c1186644142813667825 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/1186644142813667825 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Unknown")](https://www.blogger.com/profile/08526488809860492996)
+
+[Unknown](https://www.blogger.com/profile/08526488809860492996)
+ said...
+
+See also this level design tutorial  
+http://www.blend4web.com/en/article/43
+
+[11:53 AM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1404316432268#c8185206715342088138 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/8185206715342088138 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Vinnicius")](https://www.blogger.com/profile/09084696862509789777)
+
+[Vinnicius](https://www.blogger.com/profile/09084696862509789777)
+ said...
+
+This article will help me to create better sceneries. I use 3d Studio Max to create the 3d files. I love working with grid and modular pieces. The use of Modular method helps a lot because allows to make games with infinite possibilities. I use "Blitz3D" for my projects (open world adventure game) because i want to show to the companies what I can do as a programmer or designer in a pure way. Anyway I'm learning the creation kit and i have to say that the editor is awesome!
+
+[2:52 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1434135164546#c3519121483509037966 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/3519121483509037966 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "wndrr")](https://www.blogger.com/profile/01870968450476256682)
+
+[wndrr](https://www.blogger.com/profile/01870968450476256682)
+ said...
+
+I know you worked hard on this and had to use this system in order to finish the level design, and respect to all that but i have to say this: all i remember about skyrim dungeons is that they were very boring and repetitive.. after the first gameplay i just couldnt do it anymore, i knew everytime i would enter a dungeon/cave/etc i would see the exact same repeated walls, details, over and over, and over, the same useless items, even the same 3 year old puzzles.. which is weird cause in fallout 3 the world felt more complex and original. all im trying to say is that this modular system that you love and are so passionate about, FAILED , and to me, it just seems that you could just put more effort into creating more original fun content, and hire more level designers, instead of reusing the same pieces so much.. i mean bethesda got 500 million for skyrim or something like that, im sure you can do better than 10 people. Also i do believe a modular system is helpful especialy when designing big worlds, but i also know that modular = more boring, more dull, more lazyness, and that there has to be a balance. you can hate me, disregard this , i dont care, but i know im right on this one.
+
+[2:06 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1443204376313#c7424452673821941951 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/7424452673821941951 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Joel")](https://www.blogger.com/profile/09816332769743524346)
+
+[Joel](https://www.blogger.com/profile/09816332769743524346)
+ said...
+
+Thanks for the feedback, Andy.
+
+[4:54 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1443214483711#c6263279682318068278 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/6263279682318068278 "Delete Comment") 
+
+[![](http://www.blogger.com/img/blogger_logo_round_35.png "Joel")](https://www.blogger.com/profile/09816332769743524346)
+
+[Joel](https://www.blogger.com/profile/09816332769743524346)
+ said...
+
+For anyone following this post who would be interested, slides and video for our 2016 "sequel" talk have gone up on the GDC Vault. I'll also post slides and a transcript here when I can.  
+  
+http://gdcvault.com/play/1023202/-Fallout-4-s-Modular
+
+[1:30 PM](http://blog.joelburgess.com/2013/04/skyrims-modular-level-design-gdc-2013.html?showComment=1459963823141#c3130496330485324212 "comment permalink")
+ [![](https://resources.blogblog.com/img/icon_delete13.gif)](https://www.blogger.com/comment/delete/30579660/3130496330485324212 "Delete Comment") 
+
+[Post a Comment](https://www.blogger.com/comment/fullpage/post/30579660/2940270306362659268)
+
+[Newer Post](http://blog.joelburgess.com/2014/07/gdc-2014-transcript-iterative-level.html "Newer Post") [Older Post](http://blog.joelburgess.com/2013/03/gamasutra-feature-ldiad-roundtable.html "Older Post") [Home](http://blog.joelburgess.com/)
+
+Subscribe to: [Post Comments (Atom)](http://blog.joelburgess.com/feeds/2940270306362659268/comments/default)
+
+|     |     |
+| --- | --- |
+|     |     |
+
+Simple theme. Powered by [Blogger](https://www.blogger.com/)
+.
+
+Statcounter
+-----------

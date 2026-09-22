@@ -1,0 +1,749 @@
+*   Godot Engine 4.7 documentation in English
+    
+    *   [](https://docs.godotengine.org/en/stable/index.html)
+        
+    *   [All classes](https://docs.godotengine.org/en/stable/classes/index.html)
+        
+    *   GridMap
+
+* * *
+
+GridMap[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#gridmap "Link to this heading")
+
+=============================================================================================================
+
+**Inherits:** [Node3D](https://docs.godotengine.org/en/stable/classes/class_node3d.html#class-node3d)
+ **<** [Node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node)
+ **<** [Object](https://docs.godotengine.org/en/stable/classes/class_object.html#class-object)
+
+Node for 3D tile-based maps.
+
+Description[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#description "Link to this heading")
+
+---------------------------------------------------------------------------------------------------------------------
+
+GridMap lets you place meshes on a grid interactively. It works both from the editor and from scripts, which can help you create in-game level editors.
+
+GridMaps use a [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+ which contains a list of tiles. Each tile is a mesh with materials plus optional collision and navigation shapes.
+
+A GridMap contains a collection of cells. Each grid cell refers to a tile in the [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+. All cells in the map have the same dimensions.
+
+Internally, a GridMap is split into a sparse collection of octants for efficient rendering and physics processing. Every octant has the same dimensions and can contain several cells.
+
+**Note:** GridMap doesn't extend [VisualInstance3D](https://docs.godotengine.org/en/stable/classes/class_visualinstance3d.html#class-visualinstance3d)
+ and therefore can't be hidden or cull masked based on [VisualInstance3D.layers](https://docs.godotengine.org/en/stable/classes/class_visualinstance3d.html#class-visualinstance3d-property-layers)
+. If you make a light not affect the first layer, the whole GridMap won't be lit by the light in question.
+
+Tutorials[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#tutorials "Link to this heading")
+
+-----------------------------------------------------------------------------------------------------------------
+
+*   [Using gridmaps](https://docs.godotengine.org/en/stable/tutorials/3d/using_gridmaps.html)
+    
+*   [3D Platformer Demo](https://godotengine.org/asset-library/asset/2748)
+    
+*   [3D Kinematic Character Demo](https://godotengine.org/asset-library/asset/2739)
+    
+
+Properties[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#properties "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------------
+
+|     |     |     |
+| --- | --- | --- |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [bake\_navigation](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-bake-navigation) | `false` |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [cell\_center\_x](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-x) | `true` |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [cell\_center\_y](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-y) | `true` |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [cell\_center\_z](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-z) | `true` |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [cell\_octant\_size](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-octant-size) | `8` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [cell\_scale](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-scale) | `1.0` |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [cell\_size](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-size) | `Vector3(2, 2, 2)` |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [collision\_layer](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-layer) | `1` |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [collision\_mask](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-mask) | `1` |
+| [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float) | [collision\_priority](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-priority) | `1.0` |
+| [DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode) | [collision\_visibility\_mode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-visibility-mode) | `0` |
+| [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary) | [mesh\_library](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-mesh-library) |     |
+| [PhysicsMaterial](https://docs.godotengine.org/en/stable/classes/class_physicsmaterial.html#class-physicsmaterial) | [physics\_material](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-physics-material) |     |
+
+Methods[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#methods "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------
+
+|     |     |
+| --- | --- |
+| void | [clear](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-clear)<br>() |
+| void | [clear\_baked\_meshes](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-clear-baked-meshes)<br>() |
+| [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid) | [get\_bake\_mesh\_instance](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-bake-mesh-instance)<br>(idx: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array) | [get\_bake\_meshes](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-bake-meshes)<br>() |
+| [Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis) | [get\_basis\_with\_orthogonal\_index](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-basis-with-orthogonal-index)<br>(index: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [get\_cell\_item](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item)<br>(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| [Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis) | [get\_cell\_item\_basis](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item-basis)<br>(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [get\_cell\_item\_orientation](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item-orientation)<br>(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [get\_collision\_layer\_value](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-collision-layer-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool) | [get\_collision\_mask\_value](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-collision-mask-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array) | [get\_meshes](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-meshes)<br>() const |
+| [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid) | [get\_navigation\_map](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-navigation-map)<br>() const |
+| [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i) | [get\_octant\_coords\_from\_cell\_coords](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-octant-coords-from-cell-coords)<br>(cell\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_octants\_in\_bounds](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-octants-in-bounds)<br>(bounds: [AABB](https://docs.godotengine.org/en/stable/classes/class_aabb.html#class-aabb)<br>) const |
+| [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int) | [get\_orthogonal\_index\_from\_basis](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-orthogonal-index-from-basis)<br>(basis: [Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_cells](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells)<br>() const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_cells\_by\_item](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-by-item)<br>(item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_cells\_in\_octant](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-in-octant)<br>(octant\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_cells\_in\_octant\_by\_item](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-in-octant-by-item)<br>(octant\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>, item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_octants](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants)<br>() const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_octants\_by\_item](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants-by-item)<br>(item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>) const |
+| [Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)<br>\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>\] | [get\_used\_octants\_in\_bounds](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants-in-bounds)<br>(bounds: [AABB](https://docs.godotengine.org/en/stable/classes/class_aabb.html#class-aabb)<br>) const |
+| [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i) | [local\_to\_map](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-local-to-map)<br>(local\_position: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)<br>) const |
+| void | [make\_baked\_meshes](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-make-baked-meshes)<br>(gen\_lightmap\_uv: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)<br> = false, lightmap\_uv\_texel\_size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)<br> = 0.1) |
+| [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3) | [map\_to\_local](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-map-to-local)<br>(map\_position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>) const |
+| void | [resource\_changed](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-resource-changed)<br>(resource: [Resource](https://docs.godotengine.org/en/stable/classes/class_resource.html#class-resource)<br>) |
+| void | [set\_cell\_item](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-cell-item)<br>(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)<br>, item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>, orientation: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br> = 0) |
+| void | [set\_collision\_layer\_value](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-collision-layer-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)<br>) |
+| void | [set\_collision\_mask\_value](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-collision-mask-value)<br>(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)<br>, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)<br>) |
+| void | [set\_navigation\_map](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-navigation-map)<br>(navigation\_map: [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)<br>) |
+
+* * *
+
+Signals[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#signals "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------
+
+**cell\_size\_changed**(cell\_size: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-signal-cell-size-changed)
+
+Emitted when [cell\_size](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-size)
+ changes.
+
+* * *
+
+**changed**() [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-signal-changed)
+
+Emitted when the [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+ of this GridMap changes.
+
+* * *
+
+Enumerations[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enumerations "Link to this heading")
+
+-----------------------------------------------------------------------------------------------------------------------
+
+enum **DebugVisibilityMode**: [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+
+[DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+ **DEBUG\_VISIBILITY\_MODE\_DEFAULT** = `0`
+
+Hide the collisions debug shapes in the editor, and use the debug settings to determine their visibility in game (i.e. [SceneTree.debug\_collisions\_hint](https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree-property-debug-collisions-hint)
+ or [SceneTree.debug\_navigation\_hint](https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree-property-debug-navigation-hint)
+).
+
+[DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+ **DEBUG\_VISIBILITY\_MODE\_FORCE\_SHOW** = `1`
+
+Always show the collisions debug shapes.
+
+[DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+ **DEBUG\_VISIBILITY\_MODE\_FORCE\_HIDE** = `2`
+
+Always hide the collisions debug shapes.
+
+* * *
+
+Constants[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#constants "Link to this heading")
+
+-----------------------------------------------------------------------------------------------------------------
+
+**INVALID\_CELL\_ITEM** = `-1` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-constant-invalid-cell-item)
+
+Invalid cell item that can be used in [set\_cell\_item()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-cell-item)
+ to clear cells (or represent an empty cell in [get\_cell\_item()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item)
+).
+
+* * *
+
+Property Descriptions[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#property-descriptions "Link to this heading")
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **bake\_navigation** = `false` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-bake-navigation)
+
+*   void **set\_bake\_navigation**(value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+    )
+    
+*   [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+     **is\_baking\_navigation**()
+    
+
+If `true`, this GridMap creates a navigation region for each cell that uses a [mesh\_library](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-mesh-library)
+ item with a navigation mesh. The created navigation region will use the navigation layers bitmask assigned to the [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+'s item.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **cell\_center\_x** = `true` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-x)
+
+*   void **set\_center\_x**(value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+    )
+    
+*   [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+     **get\_center\_x**()
+    
+
+If `true`, grid items are centered on the X axis.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **cell\_center\_y** = `true` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-y)
+
+*   void **set\_center\_y**(value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+    )
+    
+*   [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+     **get\_center\_y**()
+    
+
+If `true`, grid items are centered on the Y axis.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **cell\_center\_z** = `true` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-center-z)
+
+*   void **set\_center\_z**(value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+    )
+    
+*   [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+     **get\_center\_z**()
+    
+
+If `true`, grid items are centered on the Z axis.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **cell\_octant\_size** = `8` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-octant-size)
+
+*   void **set\_octant\_size**(value: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+    )
+    
+*   [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+     **get\_octant\_size**()
+    
+
+The size of each octant measured in number of cells. This applies to all three axis.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **cell\_scale** = `1.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-scale)
+
+*   void **set\_cell\_scale**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_cell\_scale**()
+    
+
+The scale of the cell items.
+
+This does not affect the size of the grid cells themselves, only the items in them. This can be used to make cell items overlap their neighbors.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **cell\_size** = `Vector3(2, 2, 2)` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-size)
+
+*   void **set\_cell\_size**(value: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+    )
+    
+*   [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+     **get\_cell\_size**()
+    
+
+The dimensions of the grid's cells.
+
+This does not affect the size of the meshes. See [cell\_scale](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-cell-scale)
+.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **collision\_layer** = `1` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-layer)
+
+*   void **set\_collision\_layer**(value: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+    )
+    
+*   [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+     **get\_collision\_layer**()
+    
+
+The physics layers this GridMap is in.
+
+GridMaps act as static bodies, meaning they aren't affected by gravity or other forces. They only affect other physics bodies that collide with them.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **collision\_mask** = `1` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-mask)
+
+*   void **set\_collision\_mask**(value: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+    )
+    
+*   [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+     **get\_collision\_mask**()
+    
+
+The physics layers this GridMap detects collisions in. See [Collision layers and masks](https://docs.godotengine.org/en/stable/tutorials/physics/physics_introduction.html#collision-layers-and-masks)
+ in the documentation for more information.
+
+* * *
+
+[float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ **collision\_priority** = `1.0` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-priority)
+
+*   void **set\_collision\_priority**(value: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+    )
+    
+*   [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+     **get\_collision\_priority**()
+    
+
+The priority used to solve colliding when occurring penetration. The higher the priority is, the lower the penetration into the object will be. This can for example be used to prevent the player from breaking through the boundaries of a level.
+
+* * *
+
+[DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+ **collision\_visibility\_mode** = `0` [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-visibility-mode)
+
+*   void **set\_collision\_visibility\_mode**(value: [DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+    )
+    
+*   [DebugVisibilityMode](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#enum-gridmap-debugvisibilitymode)
+     **get\_collision\_visibility\_mode**()
+    
+
+Show or hide the **GridMap**'s collision shapes. If set to [DEBUG\_VISIBILITY\_MODE\_DEFAULT](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-constant-debug-visibility-mode-default)
+, this depends on the show collision debug settings.
+
+* * *
+
+[MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+ **mesh\_library** [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-mesh-library)
+
+*   void **set\_mesh\_library**(value: [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+    )
+    
+*   [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+     **get\_mesh\_library**()
+    
+
+The assigned [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+.
+
+* * *
+
+[PhysicsMaterial](https://docs.godotengine.org/en/stable/classes/class_physicsmaterial.html#class-physicsmaterial)
+ **physics\_material** [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-physics-material)
+
+*   void **set\_physics\_material**(value: [PhysicsMaterial](https://docs.godotengine.org/en/stable/classes/class_physicsmaterial.html#class-physicsmaterial)
+    )
+    
+*   [PhysicsMaterial](https://docs.godotengine.org/en/stable/classes/class_physicsmaterial.html#class-physicsmaterial)
+     **get\_physics\_material**()
+    
+
+Overrides the default friction and bounce physics properties for the whole **GridMap**.
+
+* * *
+
+Method Descriptions[](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#method-descriptions "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+void **clear**() [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-clear)
+
+Clear all cells.
+
+* * *
+
+void **clear\_baked\_meshes**() [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-clear-baked-meshes)
+
+Clears all baked meshes. See [make\_baked\_meshes()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-make-baked-meshes)
+.
+
+* * *
+
+[RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ **get\_bake\_mesh\_instance**(idx: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-bake-mesh-instance)
+
+Returns [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ of a baked mesh with the given `idx`.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+ **get\_bake\_meshes**() [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-bake-meshes)
+
+Returns an array of [ArrayMesh](https://docs.godotengine.org/en/stable/classes/class_arraymesh.html#class-arraymesh)
+es and [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+ references of all bake meshes that exist within the current GridMap. Even indices contain [ArrayMesh](https://docs.godotengine.org/en/stable/classes/class_arraymesh.html#class-arraymesh)
+es, while odd indices contain [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+s that are always equal to [Transform3D.IDENTITY](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d-constant-identity)
+.
+
+This method relies on the output of [make\_baked\_meshes()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-make-baked-meshes)
+, which will be called with `gen_lightmap_uv` set to `true` and `lightmap_uv_texel_size` set to `0.1` if it hasn't been called yet.
+
+* * *
+
+[Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis)
+ **get\_basis\_with\_orthogonal\_index**(index: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-basis-with-orthogonal-index)
+
+Returns one of 24 possible rotations that lie along the vectors (x,y,z) with each component being either -1, 0, or 1. For further details, refer to the Godot source code.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **get\_cell\_item**(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item)
+
+The [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+ item index located at the given grid coordinates. If the cell is empty, [INVALID\_CELL\_ITEM](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-constant-invalid-cell-item)
+ will be returned.
+
+* * *
+
+[Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis)
+ **get\_cell\_item\_basis**(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item-basis)
+
+Returns the basis that gives the specified cell its orientation.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **get\_cell\_item\_orientation**(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-cell-item-orientation)
+
+The orientation of the cell at the given grid coordinates. `-1` is returned if the cell is empty.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **get\_collision\_layer\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-collision-layer-value)
+
+Returns whether or not the specified layer of the [collision\_layer](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-layer)
+ is enabled, given a `layer_number` between 1 and 32.
+
+* * *
+
+[bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ **get\_collision\_mask\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-collision-mask-value)
+
+Returns whether or not the specified layer of the [collision\_mask](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-mask)
+ is enabled, given a `layer_number` between 1 and 32.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+ **get\_meshes**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-meshes)
+
+Returns an array of [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+ and [Mesh](https://docs.godotengine.org/en/stable/classes/class_mesh.html#class-mesh)
+ references corresponding to the non-empty cells in the grid. The transforms are specified in local space. Even indices contain [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+s, while odd indices contain [Mesh](https://docs.godotengine.org/en/stable/classes/class_mesh.html#class-mesh)
+es related to the [Transform3D](https://docs.godotengine.org/en/stable/classes/class_transform3d.html#class-transform3d)
+ in the index preceding it.
+
+* * *
+
+[RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ **get\_navigation\_map**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-navigation-map)
+
+Returns the [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ of the navigation map this GridMap node uses for its cell baked navigation meshes.
+
+This function returns always the map set on the GridMap node and not the map on the NavigationServer. If the map is changed directly with the NavigationServer API the GridMap node will not be aware of the map change.
+
+* * *
+
+[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+ **get\_octant\_coords\_from\_cell\_coords**(cell\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-octant-coords-from-cell-coords)
+
+Returns the [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+ octant coordinates of the octant that the cell at `cell_coords` belongs to.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_octants\_in\_bounds**(bounds: [AABB](https://docs.godotengine.org/en/stable/classes/class_aabb.html#class-aabb)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-octants-in-bounds)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+ octant coordinates that are inside the given `bounds`, including octants that have no cells in use.
+
+* * *
+
+[int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ **get\_orthogonal\_index\_from\_basis**(basis: [Basis](https://docs.godotengine.org/en/stable/classes/class_basis.html#class-basis)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-orthogonal-index-from-basis)
+
+This function considers a discretization of rotations into 24 points on unit sphere, lying along the vectors (x,y,z) with each component being either -1, 0, or 1, and returns the index (in the range from 0 to 23) of the point best representing the orientation of the object. For further details, refer to the Godot source code.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_cells**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells)
+
+Returns an array of [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ with the non-empty cell coordinates in the grid map.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_cells\_by\_item**(item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-by-item)
+
+Returns an array of all cells with the given item index specified in `item`.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_cells\_in\_octant**(octant\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-in-octant)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+s with the cell coordinates of non-empty cells inside the octant at `octant_coords`.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_cells\_in\_octant\_by\_item**(octant\_coords: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+, item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-cells-in-octant-by-item)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+s with the cell coordinates of cells inside the octant at `octant_coords` that use the specified cell `item`.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_octants**() const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+s with the octant coordinates of the non-empty octants in the grid map.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_octants\_by\_item**(item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants-by-item)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+s with the octant coordinates of the octants that use the specified `item` in the grid map.
+
+* * *
+
+[Array](https://docs.godotengine.org/en/stable/classes/class_array.html#class-array)
+\[[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)\
+\] **get\_used\_octants\_in\_bounds**(bounds: [AABB](https://docs.godotengine.org/en/stable/classes/class_aabb.html#class-aabb)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-used-octants-in-bounds)
+
+Returns an array of [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+s with the octant coordinates of non-empty octants that are inside the local `bounds`.
+
+* * *
+
+[Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+ **local\_to\_map**(local\_position: [Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-local-to-map)
+
+Returns the map coordinates of the cell containing the given `local_position`. If `local_position` is in global coordinates, consider using [Node3D.to\_local()](https://docs.godotengine.org/en/stable/classes/class_node3d.html#class-node3d-method-to-local)
+ before passing it to this method. See also [map\_to\_local()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-map-to-local)
+.
+
+* * *
+
+void **make\_baked\_meshes**(gen\_lightmap\_uv: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+ = false, lightmap\_uv\_texel\_size: [float](https://docs.godotengine.org/en/stable/classes/class_float.html#class-float)
+ = 0.1) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-make-baked-meshes)
+
+Generates a baked mesh that represents all meshes in the assigned [MeshLibrary](https://docs.godotengine.org/en/stable/classes/class_meshlibrary.html#class-meshlibrary)
+ for use with [LightmapGI](https://docs.godotengine.org/en/stable/classes/class_lightmapgi.html#class-lightmapgi)
+. If `gen_lightmap_uv` is `true`, UV2 data will be generated for each mesh currently used in the **GridMap**. Otherwise, only meshes that already have UV2 data present will be able to use baked lightmaps. When generating UV2, `lightmap_uv_texel_size` controls the texel density for lightmaps, with lower values resulting in more detailed lightmaps. `lightmap_uv_texel_size` is ignored if `gen_lightmap_uv` is `false`. See also [get\_bake\_meshes()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-bake-meshes)
+, which relies on the output of this method.
+
+**Note:** Calling this method will not actually bake lightmaps, as lightmap baking is performed using the [LightmapGI](https://docs.godotengine.org/en/stable/classes/class_lightmapgi.html#class-lightmapgi)
+ node.
+
+* * *
+
+[Vector3](https://docs.godotengine.org/en/stable/classes/class_vector3.html#class-vector3)
+ **map\_to\_local**(map\_position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+) const [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-map-to-local)
+
+Returns the position of a grid cell in the GridMap's local coordinate space. To convert the returned value into global coordinates, use [Node3D.to\_global()](https://docs.godotengine.org/en/stable/classes/class_node3d.html#class-node3d-method-to-global)
+. See also [local\_to\_map()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-local-to-map)
+.
+
+* * *
+
+void **resource\_changed**(resource: [Resource](https://docs.godotengine.org/en/stable/classes/class_resource.html#class-resource)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-resource-changed)
+
+**Deprecated:** Use [Resource.changed](https://docs.godotengine.org/en/stable/classes/class_resource.html#class-resource-signal-changed)
+ instead.
+
+This method does nothing.
+
+* * *
+
+void **set\_cell\_item**(position: [Vector3i](https://docs.godotengine.org/en/stable/classes/class_vector3i.html#class-vector3i)
+, item: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+, orientation: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+ = 0) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-cell-item)
+
+Sets the mesh index for the cell referenced by its grid coordinates.
+
+A negative item index such as [INVALID\_CELL\_ITEM](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-constant-invalid-cell-item)
+ will clear the cell.
+
+Optionally, the item's orientation can be passed. For valid orientation values, see [get\_orthogonal\_index\_from\_basis()](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-get-orthogonal-index-from-basis)
+.
+
+* * *
+
+void **set\_collision\_layer\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-collision-layer-value)
+
+Based on `value`, enables or disables the specified layer in the [collision\_layer](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-layer)
+, given a `layer_number` between 1 and 32.
+
+* * *
+
+void **set\_collision\_mask\_value**(layer\_number: [int](https://docs.godotengine.org/en/stable/classes/class_int.html#class-int)
+, value: [bool](https://docs.godotengine.org/en/stable/classes/class_bool.html#class-bool)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-collision-mask-value)
+
+Based on `value`, enables or disables the specified layer in the [collision\_mask](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-property-collision-mask)
+, given a `layer_number` between 1 and 32.
+
+* * *
+
+void **set\_navigation\_map**(navigation\_map: [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+) [🔗](https://docs.godotengine.org/en/stable/classes/class_gridmap.html#class-gridmap-method-set-navigation-map)
+
+Sets the [RID](https://docs.godotengine.org/en/stable/classes/class_rid.html#class-rid)
+ of the navigation map this GridMap node should use for its cell baked navigation meshes.
+
+[Previous](https://docs.godotengine.org/en/stable/classes/class_gridcontainer.html "GridContainer")
+ [Next](https://docs.godotengine.org/en/stable/classes/class_gridmapeditorplugin.html "GridMapEditorPlugin")
+
+* * *
+
+User-contributed notes
+----------------------
+
+_Please read the [User-contributed notes policy](https://github.com/godotengine/godot-docs-user-notes/discussions/1)
+ before submitting a comment._
+
+Read the Docs v: stable
+
+Languages
+
+[pt-br](https://docs.godotengine.org/pt-br/stable/)
+
+[cs](https://docs.godotengine.org/cs/stable/)
+
+[en](https://docs.godotengine.org/en/stable/)
+
+[fr](https://docs.godotengine.org/fr/stable/)
+
+[de](https://docs.godotengine.org/de/stable/)
+
+[it](https://docs.godotengine.org/it/stable/)
+
+[ja](https://docs.godotengine.org/ja/stable/)
+
+[ko](https://docs.godotengine.org/ko/stable/)
+
+[pl](https://docs.godotengine.org/pl/stable/)
+
+[ru](https://docs.godotengine.org/ru/stable/)
+
+[zh-cn](https://docs.godotengine.org/zh-cn/stable/)
+
+[es](https://docs.godotengine.org/es/stable/)
+
+[zh-tw](https://docs.godotengine.org/zh-tw/stable/)
+
+[uk](https://docs.godotengine.org/uk/stable/)
+
+Versions
+
+[latest](https://docs.godotengine.org/en/latest/)
+
+[stable](https://docs.godotengine.org/en/stable/)
+
+[4.7](https://docs.godotengine.org/en/4.7/)
+
+[4.6](https://docs.godotengine.org/en/4.6/)
+
+[4.5](https://docs.godotengine.org/en/4.5/)
+
+[4.4](https://docs.godotengine.org/en/4.4/)
+
+[4.3](https://docs.godotengine.org/en/4.3/)
+
+[4.2](https://docs.godotengine.org/en/4.2/)
+
+[4.1](https://docs.godotengine.org/en/4.1/)
+
+[4.0](https://docs.godotengine.org/en/4.0/)
+
+[3.6](https://docs.godotengine.org/en/3.6/)
+
+[3.5](https://docs.godotengine.org/en/3.5/)
+
+[3.4](https://docs.godotengine.org/en/3.4/)
+
+[3.3](https://docs.godotengine.org/en/3.3/)
+
+[3.2](https://docs.godotengine.org/en/3.2/)
+
+[3.1](https://docs.godotengine.org/en/3.1/)
+
+[3.0](https://docs.godotengine.org/en/3.0/)
+
+[2.1](https://docs.godotengine.org/en/2.1/)
+
+On Read the Docs
+
+[Project Home](https://app.readthedocs.org/projects/godot/)
+
+[Builds](https://app.readthedocs.org/projects/godot/builds/)
+
+[Downloads](https://docs.godotengine.org/en/stable/classes/null)
+
+Search
+
+* * *
+
+Hosted by [Read the Docs](https://about.readthedocs.org/?utm_source=&utm_content=flyout)

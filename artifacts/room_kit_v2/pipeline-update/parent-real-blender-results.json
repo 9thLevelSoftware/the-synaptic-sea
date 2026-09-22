@@ -1,0 +1,174 @@
+[
+  {
+    "label": "floor_1x1",
+    "module_id": "floor_1x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "floor_2x1",
+    "module_id": "floor_2x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "corridor_floor_1x1",
+    "module_id": "corridor_floor_1x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "corridor_floor_1x2",
+    "module_id": "corridor_floor_1x2",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "wall_straight_1x1",
+    "module_id": "wall_straight_1x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "doorway_frame_open_1x1",
+    "module_id": "doorway_frame_open_1x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "pillar_support_1x1",
+    "module_id": "pillar_support_1x1",
+    "expected": "pass",
+    "actual": "pass",
+    "exit_code": 0,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": []
+  },
+  {
+    "label": "raised_floor",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "bounds max.y 0.03 does not equal expected 0",
+      "floor has positive relief above walking datum",
+      "floor top projected coverage has a hole or exceeds maximum recess"
+    ]
+  },
+  {
+    "label": "wall_gap",
+    "module_id": "wall_straight_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "terminal left mating band does not cover the full shared profile",
+      "terminal right mating band does not cover the full shared profile"
+    ]
+  },
+  {
+    "label": "thick_wall",
+    "module_id": "wall_straight_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "bounds max.z 0.15 does not equal expected 0.1",
+      "bounds min.z -0.15 does not equal expected -0.1",
+      "terminal left mating band does not cover the full shared profile",
+      "terminal right mating band does not cover the full shared profile"
+    ]
+  },
+  {
+    "label": "leaked_helper",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "authoring helper mesh was imported: Collision_floor_1x1_Mesh"
+    ]
+  },
+  {
+    "label": "translated_floor",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "mesh object 'Visual_translated_floor' has unbaked translation"
+    ]
+  },
+  {
+    "label": "compensated_floor_origin",
+    "module_id": "floor_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "mesh object 'Visual_compensated_floor_origin' has unbaked translation"
+    ]
+  },
+  {
+    "label": "blocked_doorway",
+    "module_id": "doorway_frame_open_1x1",
+    "expected": "fail",
+    "actual": "fail",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "doorway clear prism is intersected by actual triangle geometry"
+    ]
+  },
+  {
+    "label": "unsupported_ramp",
+    "module_id": "ramp_up_1x2",
+    "expected": "hold",
+    "actual": "hold",
+    "exit_code": 1,
+    "source_and_glb_unchanged": true,
+    "passed": true,
+    "errors": [
+      "unsupported geometry profile: ramp_up_1x2"
+    ]
+  }
+]

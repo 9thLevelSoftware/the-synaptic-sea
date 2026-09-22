@@ -1,0 +1,164 @@
+Single Material Modular Kit Q&A
+-------------------------------
+
+Vuk Banovic returns for a Q&A article where we talk about his work on Insurgency Sandstorm. He shows us how he utilised a single trim material to create a whole set of environment structures and pieces as well as his tips, tricks and pitfalls from his experience working with trim sheets. Learn how you can create your own versatile trim sheet and reuse your trims to their maximum potential in this in-depth article.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995073497-YQR50I8XMAQM52JBNRDM/StoneKIt_V01.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**Intro**
+
+Since our [previous interview](https://www.exp-points.com/building-an-environment-with-one-material)
+, I haven’t changed my name and it’s still [Vuk Banovic](https://www.artstation.com/vukbanovic)
+ (hehe) and I was born in Belgrade, Serbia. I’m currently working as a Lead Environment Artist and World Builder on Insurgency Sandstorm, a first person tactical shooter by New World Interactive. Meanwhile, my own studio has grown from 8 to 12 amazing people and we help both AAA and indie studios build their projects by outsourcing our skills in world building, level design, environment art and prop creation. Also, as a studio we started co-developing a very fun and exciting project. Hopefully soon I’ll be able to make the official company reveal, but also the projects we’ve contributed to.
+
+The path that took me to where I am right now: Back in 2005, I entered the world of 3D when I enrolled at Chiron – School of Visual Arts. I met some precious people who still play a big role in my personal and professional life; of course, it is also where I picked up the fundamentals of 3D. We went through everything from modelling, texturing and animation to scripting, simulations and VFX, which helped when choosing which aspect of 3D production I liked the most and wanted to pursue in the future. At the same time, I attended the Faculty of Organizational Sciences where I gained valuable insight into management, optimization and overall production for the IT industry.
+
+After getting my degree in arts, I landed my first job as a Generalist Artist in a local studio [Spring Onion](http://www.springonionstudio.com/)
+ that did commercials and motion pictures. Although I learned amazing stuff there, I knew I belonged in the video game industry as video games were the reason why I wanted to do 3D.
+
+My breakthrough in the industry was Rekoil, a first person shooter developed by Plastic Piranha in Unreal Engine 3 and afterwards Alone in the Dark and the Farming Simulator franchise. I’ve had the pleasure of working on a VR title, The Solus Project, built by the amazing Sjoerd de Jong, also known as [Hourences](http://www.hourences.com/)
+. I also had the honor to contribute to Metro Exodus: Sam’s Story and several other mobile platform games and the WWII shooter Day of Infamy by New World Interactive built in Source Engine.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995109924-H10INRVPPNI2NS1TMO5V/image-asset.jpeg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**How Has Your Focus and Artistic Preference/Style Changed Through the Years?**
+
+My style and artistic preference has been changing and evolving with the projects I worked on. At the very beginning I really liked realistic-looking games and back in 2005 it was really hard to achieve a high level of realism compared to these days, so artistically/technically it was a challenge, but a lot of fun too. The first video game I ever worked on was a semi-realistic first person shooter, Rekoil, which was built in Unreal Engine 3 and that project sort of built my art style at that time. Not long after, I started working on the Farming Simulator franchise, which had a completely different visual identity, somewhere between realism and stylized with vibrant colors and day/night cycles. It required from me to adapt to a different art style that taught me a lot and kind of prepared me to quickly adjust my art style depending on the project needs, as the next project was The Solus Project. Artistically specific, futuristic and stylized, but mysterious and realistic, it had to look livable/real for different species; and it’s on another planet... It was a challenge at the start, but I became a new me regarding the art style because of the great art direction provided by Sjoerd de Jong. Even though I really loved working on stylized/sci-fi art, my next projects were all realistic or semi-realistic, which I also really love. However, I would not mind at all a futuristic, outlandish, creative type of project in the future.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995150696-QP2H01W2NM19VXHCWG34/StoneKIt_V04.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**Creating a Full Scene From One Material and One Texture is Quite a Task, How Did You Plan the Texture and Material?**
+
+For me, the most important step is to have a well-defined global picture of what you want to achieve/build. In this case, I wanted to create a stone kit that could be used not only for creating thematic structures like a temple, citadel or palace, but in any possible scenario where stone as a surface is one of the essential materials. With that in mind, I start to gather references of pretty much anything that has stone in it, from tiny houses to massive structures to bridges. Then I look at what all of those have in common and start creating the list of what kind of meshes I will need to build.
+
+Afterwards, the list of meshes is done on the paper, I build blockout meshes and start experimenting with the UVs of the most problematic shapes/meshes and plan in advance how am I going to unwrap them so they work nicely with the trim sheet. During this process, I also figure out what kind of details and how much texture space I need by creating a super basic diffuse texture directly in Maya by modeling a blockout high poly and rendering it from the top view. This blockout high poly usually goes through a few iterations while I experiment, and once I find what I was looking for, I use that high poly blockout as base pieces for the ZBrush sculpt.
+
+After that, it all comes down to fine tuning the texture inside Substance Painter until I’m completely satisfied with what I have. The images below represent an early high poly blockout in Maya and the finalized high poly sculpted in ZBrush. Even though I decided to keep both designs/textures in the end, I think it’s a good example to see how the design evolved during the creation process.
+
+![StoneKit_HPblockoutVsHP.jpg](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995170816-9PL7G6QSV9SO62GQUF2V/StoneKit_HPblockoutVsHP.jpg?format=2500w)
+
+**When Creating The Assets Did You Have to Ever Recreate Or Rethink To Make It Useable With The Material?**
+
+It happens, yes, but usually with the meshes that I decide to add afterwards and that I didn’t account/plan in advance. In order to avoid this, it’s important to test early in the engine (Unreal in my case), because sometimes an asset can look great in Maya, but not as good in the engine. Also, it’s important to spawn and walk around, not just free roam with camera.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995217204-3N48S1JF93AGEOXPPRCO/StoneKIt_V05.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**In Some Of The More Unique Details Such As The Last Of The Floors And The Second Last Of The Arches In Your Asset Breakdown How Did You Create Such Unique Looking Pieces? Would You Be Able To Show The UV’s For These and What They Correspond To?**
+
+Sure, here it is:
+
+![](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995262469-U1DR8TD46KW3ATLPLZ3U/image-asset.jpeg?format=2500w)
+
+![StoneKit_Floors_V01.jpg](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995290128-KZLT3ZVFKUI89F6OUS4U/StoneKit_Floors_V01.jpg?format=2500w)
+
+![StoneKit_Floors_V02.jpg](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995323507-PZ5PCROWEK4TN4ZJQO5P/StoneKit_Floors_V02.jpg?format=2500w)
+
+**Were The Same Assets As The Last Question Planned Or Did You Find Them Through Experimentation With The Material?**
+
+Those were planned, but some assets happen through experimentation too. I didn’t know the exact design though, that happened “accidentally”, but I knew that I wanted to have, for instance, a few oval and a few square-ish designs of floor pieces.
+
+**How Did You Setup Your UV’s For The Objects? Are There Any That Use The Material In A Unique Way? How Did You Accomplish This Look On The Domes? What’s Their UV Setup?**
+
+It pretty much comes down to splitting up UV islands and unfolding them so they fit the trim sheet, none of the meshes are using the material in a unique way. Here’s the UV setup of the domes:
+
+![](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995354356-HATOPS5NVOU9ADKWSPUF/image-asset.jpeg?format=2500w)
+
+**With Only One Material In Use What Are Some Ways To Keep The Scene From Feeling Too Repetitive? How Do You Make Each Piece Feel Like It Has A Unique Texture But Is Actually All The Same?**
+
+As shown in the image below, the texture itself has 11 unique pieces and limitless combinations you can do with those via UVs in order to kill the repetitive feel/look. On the other hand, it’s also the various unique shapes/meshes I’ve built that help a lot with making it look unique.
+
+**What Are Some Tips For Anyone Looking To Create A Scene From One Material Such As Yours?**
+
+As mentioned previously, I think good planning makes half of the work. Another very important step is to experiment, go crazy with it actually. You can’t know if something is going to work unless you test it out and while you are doing that, usually something great pops out.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995389962-VT6P5ZVN2V9N93KS1SGL/StoneKIt_V06.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**What Are Some Creative Ways You Found To Use Your UV’s and Trim Sheet To Make This Scene and Others?**
+
+The one I really liked, and that wasn’t planned in advance but came from experimenting, was to use 4 pieces of brick from the trim sheet to create a whole 400x400UU brick wall that does not look repetitive at all. No one even noticed the brick wall was actually just a tiny piece of a trim sheet, which made me really happy, hehe. Also, as a rule of thumb, whenever you have a piece that’s highly detailed, that piece never works fine visually if you place another piece next to it with the same amount of details. So, whenever I’m unwrapping, I always break a high detail piece with one that has little to no details, if that makes sense.
+
+![StoneKit_Wall_V01.jpg](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995418992-97DGMMNM6JVAXSGO9O9O/StoneKit_Wall_V01.jpg?format=2500w)
+
+**Would You Be Able To Show A GIF Of Your Material In Unreal, Changing The Parameters and Explaining How It Works?**
+
+I have 2 material setups and both are super simple as I wanted performant materials with minimal instructions. The main one has only a colour masked Albedo with RMA texture and Normal map. The second one is a bit more expensive, as in addition, it has world aligned blending that is used for the effects such as moss, dirt or snow and it’s the one that is presented in the image below:
+
+![Stone Master Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995462237-7C07EJWTBE93W3AXQ0TT/Stone_Material_V01.jpg?format=2500w)
+
+Stone Master Material
+
+![Stone Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995488443-NSGZWX798ERLZLEDHGWO/Stone_Material_V02.jpg?format=2500w)
+
+Stone Material
+
+![Material Variations](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995531633-G2B9OLQNWSYJIAJP4PKW/StoneKit_Material_Gif_V01.gif?format=2500w)
+
+Material Variations
+
+**What Are Some Things People Can Do To Get The Most Out Of Trims Such As This One?**
+
+Modular approach with trims (especially with only a single material) is more technical than artistic, in my humble opinion, but it’s a very creative process. So, when doing modular stuff for the first time, I would start with something basic; for instance, a simple building set utilizing tile-able materials. That’s a good exercise to learn about modularity and how to handle scale, pivot, etc. but also to practice modular modeling/UVing of roofs, corners, foundations and other pieces that could be tricky. Afterwards, build upon by adding trim sheets or vertex paint, etc. I’ve seen a lot of artists get stuck with doing everything at once without having previous experience with the modular approach, so starting with something basic and building upon would be my friendly advice.
+
+There are really a lot awesome tutorials covering modular approach and trim sheets, the one I like the most is [this one by the amazing Tim Simpson.](https://www.youtube.com/watch?v=IziIY674NAw)
+
+**Why Is It So Important To Get The Dimensions Right When Working With Trimsheets and Modular Assets? Where Are A Few Places You Broke Modularity Or Hid Seams With Other Pieces?**
+
+If the dimensions are off, the whole scene is going to be off visually, as will of course, the gameplay. I try not to break the modularity unless it’s absolutely impossible to keep it. The only assets that are okay to lose modularity are the decorative pieces, but they should still stick to the grid step size (in my case it’s 10UU). In the current scene, there’s no hiding seams or modularity. But it’s perfectly fine to place a pillar or any other asset if it’s going to save the day.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995645505-4H6NJC7JA5ZPODOPDYPL/StoneKIt_V08.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**Where Do You Find Inspiration?**
+
+Inspiration is everywhere for me if what I’m working on is motivational and something that I actually love doing. That’s 80% of my job, which is awesome and I can easily find inspiration in real-life stuff, but also in the amazing artwork by the insane artists on Artstation, and of course, by playing video games. Regarding the other 20%, if I don’t find the inspiration from the usual sources, I turn to colleagues and friends to help out. Sometimes a glass of whiskey or a beer helps too, hehe.
+
+![Walls / Doors / Windows](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995815750-3Q96BX3NB7BOFS04Y3CF/StoneKIt_Meshes_V03.jpg?format=2500w)
+
+Walls / Doors / Windows
+
+**Where Do You Seek Feedback?**
+
+I’m lucky that my partner [Maja Miskovic](https://www.artstation.com/majamiskovic)
+ is also an artist (an amazing one), so we do a lot of feedback cycles with everything we work on. I also ask for feedback from the colleagues I work with regularly. I have to give a shout out to fantastic Jeroen van Werkhoven (Level Design Director – New World Interactive) who is constantly under attack by me, hehe. Last but not least, Artstation is superb overall, but it’s also awesome for seeking feedback by a ton of amazingly skilled people from the industry.
+
+![Arches](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995838661-0ZOH2R5BQUVW8YKIVE36/StoneKIt_Meshes_V01.jpg?format=2500w)
+
+Arches
+
+**Any Additional Tips Or Advice You Would Like To Share With Our Readers?**
+
+Doing art is an extremely amazing thing to do and the video games industry has never been more exciting, but please don’t forget how important it is to stay social, do sports/hobbies and spend quality time outside with the ones you love! Guru Vuk Banovic, hehe.
+
+![Modular Stone Kit - Single Material](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995894559-R4PJJUQ56Q8UDBW5X6X2/StoneKIt_V07.jpg?format=2500w)
+
+[Modular Stone Kit - Single Material](https://www.artstation.com/artwork/xzaKbW)
+
+**What Can We Be On The Lookout For From You In The Future?**
+
+I’ve got a lot of things brewing, especially with my own studio. Unfortunately I’m not allowed to share much at the present time, but stay tuned; it’s going to be good… I hope, hehe!
+
+![Floors / Pillars](https://images.squarespace-cdn.com/content/v1/5d4b249616f93e000149aebd/1598995939137-MTIYRG32KTMK52H2TWBS/StoneKIt_Meshes_V04.jpg?format=2500w)
+
+Floors / Pillars
+
+**Outro**
+
+I sincerely hope readers have enjoyed reading this as much as I enjoyed writing it. For any questions, feel free to [DM me via Artstation](https://www.artstation.com/vukbanovic)
+, I’ll gladly answer any questions.
+
+Thank you and have a wonderful day!
+
+­
+
+­

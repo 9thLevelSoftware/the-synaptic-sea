@@ -1,0 +1,8 @@
+{
+  "baseline": "51f7cf2e9263abd8f9ddfeb9337d34d108c72d37",
+  "overrides": {
+    "tools/export_structural_glb.py": "501dd7cc31717334a8d6b4b821eb93db1424d33edb14ce7d8c545e0cab3f065c",
+    "tools/promote_structural_sources.py": "a8196d85cc96429b831d4bc0dfb299993b46f6330dd43b8620a78e29366ed7d6",
+    "tests/test_focused_nine_blender_recipes.py": "fe8e78377b8027302d48541218675e35f566e6c5ee8e690a8aa474d060d82220"
+  }
+}

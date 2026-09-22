@@ -1,0 +1,30 @@
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 27, in _source_path
+    resolved = value.resolve(strict=True)
+  File "/Applications/Blender.app/Contents/Resources/5.2/python/lib/python3.13/pathlib/_local.py", line 670, in resolve
+    return self.with_segments(os.path.realpath(self, strict=strict))
+                              ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen posixpath>", line 451, in realpath
+FileNotFoundError: [Errno 2] No such file or directory: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_missing_so0/missing.blend'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 256, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 252, in main
+    export_static(args.source, args.output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 168, in export_static
+    source = _source_path(source)
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 29, in _source_path
+    raise RuntimeError(f"missing source: {value}") from exc
+RuntimeError: missing source: /Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_missing_so0/missing.blend
+
+Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py', exiting.

@@ -1,0 +1,20 @@
+....F....                                                                [100%]
+=================================== FAILURES ===================================
+________ test_export_rejects_invalid_static_sources[armature_modifier] _________
+
+tmp_path = PosixPath('/private/var/folders/3h/0b2xvsws05g5_ddczh11v8n40000gn/T/pytest-of-christopherwilloughby/pytest-64/test_export_rejects_invalid_st4')
+case = 'armature_modifier'
+
+    @pytest.mark.parametrize("case", ["empty", "nonmesh", "helper", "armature", "armature_modifier", "animated_parent", "morph", "animation", "nonpositive"])
+    def test_export_rejects_invalid_static_sources(tmp_path, case) -> None:
+        source = create_master(tmp_path, case)
+        result = run_export(source, tmp_path / f"{case}.glb", f"export-negative-{case}.log")
+    
+>       assert result.returncode != 0
+E       assert 0 != 0
+E        +  where 0 = CompletedProcess(args=['/opt/homebrew/bin/blender', '--background', '--factory-startup', '--python-exit-code', '1', '-...mature_modifier.blend"}\nBlender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)\n\nBlender quit\n', stderr='').returncode
+
+tests/test_export_static_room_prop.py:239: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_export_static_room_prop.py::test_export_rejects_invalid_static_sources[armature_modifier]
+1 failed, 8 passed, 5 deselected in 10.33s

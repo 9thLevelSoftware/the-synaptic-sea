@@ -1,0 +1,16 @@
+floor_1x1 pass 0 OK
+floor_2x1 pass 0 OK
+corridor_floor_1x1 pass 0 OK
+corridor_floor_1x2 pass 0 OK
+wall_straight_1x1 pass 0 OK
+doorway_frame_open_1x1 pass 0 OK
+pillar_support_1x1 pass 0 OK
+raised_floor fail 1 OK
+wall_gap fail 1 OK
+thick_wall fail 1 OK
+leaked_helper fail 1 OK
+translated_floor fail 1 OK
+compensated_floor_origin fail 1 OK
+blocked_doorway fail 1 OK
+unsupported_ramp hold 1 OK
+PARENT_REAL_BLENDER_RESULTS {"count": 15, "passed": 15}

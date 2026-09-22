@@ -1,0 +1,76 @@
+{
+  "baseline": false,
+  "captures": [
+    {
+      "camera_size": 22.0,
+      "camera_transform": "[X: (0.707107, 0.0, -0.707107), Y: (-0.440204, 0.782586, -0.440204), Z: (0.553372, 0.622543, 0.553372), O: (16.0, 18.0, 16.0)]",
+      "height": 900,
+      "image": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pilot-room/candidate/pilot-room-iso.png",
+      "projection": "orthographic",
+      "sha256": "aba1d1a983bbdb87a9a99db57b0fd3539ea8bd131e082286a96fc0239dc1f227",
+      "width": 1600
+    },
+    {
+      "camera_size": 22.0,
+      "camera_transform": "[X: (1.0, 0.0, 0.0), Y: (0.0, -0.0, -1.0), Z: (0.0, 1.0, -0.0), O: (0.0, 30.0, 0.01)]",
+      "height": 900,
+      "image": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pilot-room/candidate/pilot-room-top.png",
+      "projection": "orthographic",
+      "sha256": "ed99790ac06a9fc56d79c8c06880c7fe455d8fd3a480e583a0ba51aec41c679c",
+      "width": 1600
+    },
+    {
+      "camera_size": 5.0,
+      "camera_transform": "[X: (0.707107, 0.0, -0.707107), Y: (-0.2563, 0.931998, -0.2563), Z: (0.659022, 0.362462, 0.659022), O: (1.0, 3.0, 1.0)]",
+      "height": 900,
+      "image": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pilot-room/candidate/pilot-station-detail.png",
+      "projection": "orthographic",
+      "sha256": "c58ba762b01b67ea76459bfa6f0f147f1cdbcc3f076a224794f0cd00f4e76ea9",
+      "width": 1600
+    },
+    {
+      "camera_size": 22.0,
+      "camera_transform": "[X: (0.707107, 0.0, -0.707107), Y: (-0.440204, 0.782586, -0.440204), Z: (0.553372, 0.622543, 0.553372), O: (16.0, 18.0, 16.0)]",
+      "height": 720,
+      "image": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pilot-room/candidate/pilot-room-iso-720.png",
+      "projection": "orthographic",
+      "sha256": "a8ab1c4da4923cf8079422f37298c576372a7e43eb1a69555fba6e6f7e837545",
+      "width": 1280
+    }
+  ],
+  "inputs": {
+    "coolant_pump_skid_derelict_v1": {
+      "path": "res://assets/_staging/room_kit_v2/props/coolant_pump_skid_derelict_v1.glb",
+      "sha256": "fd28123aafd406bbd95b21ac8ba363a58be95312848603420dcc1de4840660c6"
+    },
+    "doorway_frame_open_1x1": {
+      "path": "res://assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1.glb",
+      "sha256": "1e1ac3ae2794f66643e8cd3f56fb60974243715fab2a574696e8008bd594def2"
+    },
+    "fabrication_station_derelict_v1": {
+      "path": "res://assets/_staging/room_kit_v2/props/fabrication_station_derelict_v1.glb",
+      "sha256": "4d5e4ac203fa45219de58c577b80c22946ec6e38a33d70cdb1b6f859bdccd9fc"
+    },
+    "floor_1x1": {
+      "path": "res://assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb",
+      "sha256": "de166ea424207e2a3254c5914085a09d150d5054f846b94c08cb83e4b8de173f"
+    },
+    "pillar_support_1x1": {
+      "path": "res://assets/imported/structural/ship_structural_v0/pillar_support_1x1/pillar_support_1x1.glb",
+      "sha256": "f2d2ea32a02398afa2d804a0dbd29e2c583c20158bee2d2e61dd71aa6441d887"
+    },
+    "suit_service_stand_derelict_v1": {
+      "path": "res://assets/_staging/room_kit_v2/props/suit_service_stand_derelict_v1.glb",
+      "sha256": "01526479158d8b6672067921991d50653d1c5cb3672943418e01b188631636ce"
+    },
+    "wall_straight_1x1": {
+      "path": "res://assets/imported/structural/ship_structural_v0/wall_straight_1x1/wall_straight_1x1.glb",
+      "sha256": "6d188541203bc98c1bee4ba714cf0489b950662627adfc4578926f8db750f82a"
+    }
+  },
+  "instances": 18,
+  "kind": "manual_diagnostic_pilot_not_procgen_proof",
+  "runtime_promotion": false,
+  "structural_candidate_acceptance": false,
+  "unchanged_baseline_shell": true
+}

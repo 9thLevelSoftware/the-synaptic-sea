@@ -1,0 +1,23 @@
+00:00.242  blend            | Read blend: "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/artifacts/room_kit_v2/pipeline-update/tmp/pytest-of-christopherwilloughby/pytest-30/test_export_rejects_invalid_st5/animated_parent.blend"
+Blender 5.2.0 LTS (hash fbe6228777e7 built 2026-07-14 01:31:22)
+
+Blender quit
+
+--- STDERR ---
+Traceback (most recent call last):
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 256, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 252, in main
+    export_static(args.source, args.output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 180, in export_static
+    originals = _validate_source_objects(collection.all_objects)
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 71, in _validate_source_objects
+    _validate_parent_chain(obj)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py", line 54, in _validate_parent_chain
+    raise RuntimeError(f"animated/dynamic parent not supported: {obj.name}")
+RuntimeError: animated/dynamic parent not supported: AnimatedParentChild
+
+Error: script failed, file: '/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/tools/export_static_room_prop.py', exiting.

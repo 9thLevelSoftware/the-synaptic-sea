@@ -1,0 +1,279 @@
+*   Godot Engine 4.7 documentation in English
+    
+    *   [](https://docs.godotengine.org/en/stable/index.html)
+        
+    *   [3D](https://docs.godotengine.org/en/stable/tutorials/3d/index.html)
+        
+    *   Using decals
+*   *   [Edit on GitHub](https://github.com/godotengine/godot-docs/blob/master/tutorials/3d/using_decals.rst)
+        
+    
+    [Learn how to contribute!](https://contributing.godotengine.org/en/latest/organization/how_to_contribute.html)
+    
+
+* * *
+
+Using decals[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#using-decals "Link to this heading")
+
+===========================================================================================================================
+
+Note
+
+Decals are only supported in the Forward+ and Mobile renderers, not the Compatibility renderer.
+
+If using the Compatibility renderer, consider using Sprite3D as an alternative for projecting decals onto (mostly) flat surfaces.
+
+Decals are projected textures that apply on opaque or transparent surfaces in 3D. This projection happens in real-time and doesn't rely on mesh generation. This allows you to move decals every frame with only a small performance impact, even when applied on complex meshes.
+
+While decals cannot add actual geometry detail onto the projected surface, decals can still make use of physically-based rendering to provide similar properties to full-blown PBR materials.
+
+On this page, you'll learn:
+
+*   How to set up decals in the 3D editor.
+    
+*   How to create decals during gameplay in a 3D scene (such as bullet impacts).
+    
+*   How to balance decal configuration between performance and quality.
+    
+
+See also
+
+The Godot demo projects repository contains a [3D decals demo](https://github.com/godotengine/godot-demo-projects/tree/master/3d/decals)
+.
+
+If you're looking to write arbitrary 3D text on top of a surface, use [3D text](https://docs.godotengine.org/en/stable/tutorials/3d/3d_text.html#doc-3d-text)
+ placed close to a surface instead of a Decal node.
+
+Use cases[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#use-cases "Link to this heading")
+
+---------------------------------------------------------------------------------------------------------------------
+
+### Static decoration[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#static-decoration "Link to this heading")
+
+Sometimes, the fastest way to add texture detail to a scene is to use decals. This is especially the case for organic detail, such as patches of dirt or sand scattered on a large surface. Decals can help break up texture repetition in scenes and make patterns look more natural. On a smaller scale, decals can also be used to create detail variations for objects. For example, decals can be used to add nuts and bolts on top of hard-surface geometry.
+
+Since decals can inject their own PBR properties on top of the projected surfaces, they can also be used to create footprints or wet puddles.
+
+![Dirt added on top of level geometry using decals](https://docs.godotengine.org/en/stable/_images/decals_dirt.webp)
+
+Dirt added on top of level geometry using decals[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#id1 "Link to this image")
+
+### Dynamic gameplay elements[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#dynamic-gameplay-elements "Link to this heading")
+
+Decals can represent temporary or persistent gameplay effects such as bullet impacts and explosion scorches.
+
+Using an AnimationPlayer node or a script, decals can be made to fade over time (and then be removed using `queue_free()`) to improve performance.
+
+### Blob shadows[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#blob-shadows "Link to this heading")
+
+Blob shadows are frequently used in mobile projects (or to follow a retro art style), as real-time lighting tends to be too expensive on low-end mobile devices. However, when relying on baked lightmaps with fully baked lights, dynamic objects will not cast _any_ shadow from those lights. This makes dynamic objects in lightmapped scenes look flat in comparison to real-time lighting, with dynamic objects almost looking like they're floating.
+
+Thanks to blob shadows, dynamic objects can still cast an approximative shadow. Not only this helps with depth perception in the scene, but this can also be a gameplay element, especially in 3D platformers. The blob shadow's length can be extended to let the player know where they will land if they fall straight down.
+
+Even with real-time lighting, blob shadows can still be useful as a form of ambient occlusion for situations where SSAO is too expensive or too unstable due to its screen-space nature. For example, vehicles' underside shadows are well-represented using blob shadows.
+
+![Blob shadow under object comparison](https://docs.godotengine.org/en/stable/_images/decals_blob_shadow.webp)
+
+Blob shadow under object comparison[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#id2 "Link to this image")
+
+Quick start guide[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#quick-start-guide "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+### Creating decals in the editor[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#creating-decals-in-the-editor "Link to this heading")
+
+1.  Create a Decal node in the 3D editor.
+    
+2.  In the inspector, expand the **Textures** section and load a texture in **Textures > Albedo**.
+    
+3.  Move the Decal node towards an object, then rotate it so the decal is visible (and in the right orientation). If the decal appears mirrored, try to rotate it by 180 degrees. You can double-check whether it's in the right orientation by increasing **Parameters > Normal Fade** to 0.5. This will prevent the Decal from being projected on surfaces that are not facing the decal.
+    
+4.  If your decal is meant to affect static objects only, configure it to prevent affecting dynamic objects (or vice versa). To do so, change the decal's **Cull Mask** property to exclude certain layers. After doing this, modify your dynamic objects' MeshInstance3D nodes to change their visibility layers. For instance, you can move them from layer 1 to layer 2, then disable layer 2 in the decal's **Cull Mask** property.
+    
+
+Decal node properties[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#decal-node-properties "Link to this heading")
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+*   **Extents:** The size of the decal. The Y axis determines the length of the decal's projection. Keep the projection length as short as possible to improve culling opportunities, therefore improving performance.
+    
+
+### Textures[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#textures "Link to this heading")
+
+*   **Albedo:** The albedo (diffuse/color) map to use for the decal. In most situations, this is the texture you want to set first. If using a normal or ORM map, an albedo map _must_ be set to provide an alpha channel. This alpha channel will be used as a mask to determine how much the normal/ORM maps will affect the underlying surface.
+    
+*   **Normal:** The normal map to use for the decal. This can be used to increase perceived detail on the decal by modifying how light reacts to it. The impact of this texture is multiplied by the albedo texture's alpha channel (but not **Albedo Mix**).
+    
+*   **ORM:** The Occlusion/Roughness/Metallic map to use for the decal. This is an optimized format for storing PBR material maps. Ambient Occlusion map is stored in the red channel, roughness map in the green channel, metallic map in the blue channel. The impact of this texture is multiplied by the albedo texture's alpha channel (but not **Albedo Mix**).
+    
+*   **Emission:** The emission texture to use for the decal. Unlike **Albedo**, this texture will appear to glow in the dark.
+    
+
+### Parameters[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#parameters "Link to this heading")
+
+*   **Emission Energy:** The brightness of the emission texture.
+    
+*   **Modulate:** Multiplies the color of the albedo and emission textures. Use this to tint decals (e.g. for paint decals, or to increase variation by randomizing each decal's modulation).
+    
+*   **Albedo Mix:** The opacity of the albedo texture. Unlike using an albedo texture with a more transparent alpha channel, decreasing this value below `1.0` does _not_ reduce the impact of the normal/ORM texture on the underlying surface. Set this to `0.0` when creating normal/ORM-only decals such as footsteps or wet puddles.
+    
+*   **Normal Fade:** Fades the Decal if the angle between the Decal's AABB and the target surface becomes too large. A value of `0.0` projects the decal regardless of angle, while a value of `0.999` limits the decal to surfaces that are nearly perpendicular. Setting **Normal Fade** to a value greater than `0.0` has a small performance cost due to the added normal angle computations.
+    
+
+### Vertical Fade[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#vertical-fade "Link to this heading")
+
+*   **Upper Fade:** The curve over which the decal will fade as the surface gets further from the center of the AABB (towards the decal's projection angle). Only positive values are valid.
+    
+*   **Lower Fade:** The curve over which the decal will fade as the surface gets further from the center of the AABB (away from the decal's projection angle). Only positive values are valid.
+    
+
+### Distance Fade[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#distance-fade "Link to this heading")
+
+*   **Enabled:** Controls whether distance fade (a form of LOD) is enabled. The decal will fade out over **Begin + Length**, after which it will be culled and not sent to the shader at all. Use this to reduce the number of active decals in a scene and thus improve performance.
+    
+*   **Begin:** The distance from the camera at which the decal begins to fade away (in 3D units).
+    
+*   **Length:** The distance over which the decal fades (in 3D units). The decal becomes slowly more transparent over this distance and is completely invisible at the end. Higher values result in a smoother fade-out transition, which is more suited when the camera moves fast.
+    
+
+### Cull Mask[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#cull-mask "Link to this heading")
+
+*   **Cull Mask:** Specifies which VisualInstance3D layers this decal will project on. By default, decals affect all layers. This is used so you can specify which types of objects receive the decal and which do not. This is especially useful so you can ensure that dynamic objects don't accidentally receive a Decal intended for the terrain under them.
+    
+
+Decal rendering order[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#decal-rendering-order "Link to this heading")
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+By default, decals are ordered based on the size of their AABB and the distance to the camera. AABBs that are closer to the camera are rendered first, which means that decal rendering order can sometimes appear to change depending on camera position if some decals are positioned at the same location.
+
+To resolve this, you can adjust the **Sorting Offset** property in the VisualInstance3D section of the Decal node inspector. This offset is not a strict priority order, but a _guideline_ that the renderer will use as the AABB size still affects how decal sorting works. Therefore, higher values will _always_ result in the decal being drawn above other decals with a lower sorting offset.
+
+If you want to ensure a decal is always rendered on top of other decals, you need to set its **Sorting Offset** property to a positive value greater than the AABB length of the largest decal that may overlap it. To make this decal drawn behind other decals instead, set the **Sorting Offset** to the same negative value.
+
+![VisualInstance3D Sorting Offset comparison on Decals](https://docs.godotengine.org/en/stable/_images/decals_sorting_offset.webp)
+
+VisualInstance3D Sorting Offset comparison on Decals[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#id3 "Link to this image")
+
+Tweaking performance and quality[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#tweaking-performance-and-quality "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Decal rendering performance is mostly determined by their screen coverage, but also their number. In general, a few large decals that cover up most of the screen will be more expensive to render than many small decals that are scattered around.
+
+To improve rendering performance, you can enable the **Distance Fade** property as described above. This will make distant decals fade out when they are far away from the camera (and may have little to no impact on the final scene rendering). Using node groups, you can also prevent non-essential decorative decals from spawning based on user configuration.
+
+The way decals are rendered also has an impact on performance. The [Rendering > Textures > Decals > Filter](https://docs.godotengine.org/en/stable/classes/class_projectsettings.html#class-projectsettings-property-rendering-textures-decals-filter)
+ advanced project setting lets you control how decal textures should be filtered. **Nearest/Linear** does not use mipmaps. However, decals will look grainy at a distance. **Nearest/Linear Mipmaps** will look smoother at a distance, but decals will look blurry when viewed from oblique angles. This can be resolved by using **Nearest/Linear Mipmaps Anisotropic**, which provides the highest quality, but is also slower to render.
+
+If your project has a pixel art style, consider setting the filter to one of the **Nearest** values so that decals use nearest-neighbor filtering. Otherwise, stick to **Linear**.
+
+Limitations[](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#limitations "Link to this heading")
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Decals cannot affect material properties other than the ones listed above, such as height (for parallax mapping).
+
+For performance reasons, decals use purely fixed rendering logic. This means decals cannot use custom shaders. However, custom shaders on the projected surfaces are able to read the information that is overridden by decals on top of them, such as roughness and metallic.
+
+When using the Forward+ renderer, Godot uses a _clustering_ approach for decal rendering. As many decals as desired can be added (as long as performance allows). However, there's still a default limit of 512 _clustered elements_ that can be present in the current camera view. A clustered element is an omni light, a spot light, a [decal](https://docs.godotengine.org/en/stable/tutorials/3d/using_decals.html#doc-using-decals)
+ or a [reflection probe](https://docs.godotengine.org/en/stable/tutorials/3d/global_illumination/reflection_probes.html#doc-reflection-probes)
+. This limit can be increased by adjusting [Max Clustered Elements](https://docs.godotengine.org/en/stable/classes/class_projectsettings.html#class-projectsettings-property-rendering-limits-cluster-builder-max-clustered-elements)
+ in **Project Settings > Rendering > Limits > Cluster Builder**.
+
+When using the Mobile renderer, only 8 decals can be applied on each individual Mesh _resource_. If there are more decals affecting a single mesh, not all of them will be rendered on the mesh.
+
+[Previous](https://docs.godotengine.org/en/stable/tutorials/3d/lights_and_shadows.html "3D lights and shadows")
+ [Next](https://docs.godotengine.org/en/stable/tutorials/3d/physical_light_and_camera_units.html "Physical light and camera units")
+
+* * *
+
+User-contributed notes
+----------------------
+
+_Please read the [User-contributed notes policy](https://github.com/godotengine/godot-docs-user-notes/discussions/1)
+ before submitting a comment._
+
+Read the Docs v: stable
+
+Languages
+
+[pt-br](https://docs.godotengine.org/pt-br/stable/)
+
+[cs](https://docs.godotengine.org/cs/stable/)
+
+[en](https://docs.godotengine.org/en/stable/)
+
+[fr](https://docs.godotengine.org/fr/stable/)
+
+[de](https://docs.godotengine.org/de/stable/)
+
+[it](https://docs.godotengine.org/it/stable/)
+
+[ja](https://docs.godotengine.org/ja/stable/)
+
+[ko](https://docs.godotengine.org/ko/stable/)
+
+[pl](https://docs.godotengine.org/pl/stable/)
+
+[ru](https://docs.godotengine.org/ru/stable/)
+
+[zh-cn](https://docs.godotengine.org/zh-cn/stable/)
+
+[es](https://docs.godotengine.org/es/stable/)
+
+[zh-tw](https://docs.godotengine.org/zh-tw/stable/)
+
+[uk](https://docs.godotengine.org/uk/stable/)
+
+Versions
+
+[latest](https://docs.godotengine.org/en/latest/)
+
+[stable](https://docs.godotengine.org/en/stable/)
+
+[4.7](https://docs.godotengine.org/en/4.7/)
+
+[4.6](https://docs.godotengine.org/en/4.6/)
+
+[4.5](https://docs.godotengine.org/en/4.5/)
+
+[4.4](https://docs.godotengine.org/en/4.4/)
+
+[4.3](https://docs.godotengine.org/en/4.3/)
+
+[4.2](https://docs.godotengine.org/en/4.2/)
+
+[4.1](https://docs.godotengine.org/en/4.1/)
+
+[4.0](https://docs.godotengine.org/en/4.0/)
+
+[3.6](https://docs.godotengine.org/en/3.6/)
+
+[3.5](https://docs.godotengine.org/en/3.5/)
+
+[3.4](https://docs.godotengine.org/en/3.4/)
+
+[3.3](https://docs.godotengine.org/en/3.3/)
+
+[3.2](https://docs.godotengine.org/en/3.2/)
+
+[3.1](https://docs.godotengine.org/en/3.1/)
+
+[3.0](https://docs.godotengine.org/en/3.0/)
+
+[2.1](https://docs.godotengine.org/en/2.1/)
+
+On Read the Docs
+
+[Project Home](https://app.readthedocs.org/projects/godot/)
+
+[Builds](https://app.readthedocs.org/projects/godot/builds/)
+
+[Downloads](https://docs.godotengine.org/en/stable/tutorials/3d/null)
+
+Search
+
+* * *
+
+Hosted by [Read the Docs](https://about.readthedocs.org/?utm_source=&utm_content=flyout)

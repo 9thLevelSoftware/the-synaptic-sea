@@ -1,0 +1,35 @@
+{
+  "coordinate_conversion": "Blender [x,y,z] -> native glTF/runtime [x,z,-y]",
+  "errors": [
+    "bounds max.y 0.3395 does not equal expected 0",
+    "bounds min.y 0 does not equal expected -0.25",
+    "floor back mating boundary/slab profile is incomplete",
+    "floor front mating boundary/slab profile is incomplete",
+    "floor has positive relief above walking datum",
+    "floor left mating boundary/slab profile is incomplete",
+    "floor right mating boundary/slab profile is incomplete"
+  ],
+  "family": "floor",
+  "glb": "/Volumes/Untitled/SynapticSeaAssets/worktrees/room-kit-v2/assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb",
+  "legacy_helper_conversion_not_used": "[x,z,y]",
+  "measurements": {
+    "bounds": {
+      "max": [
+        2.0,
+        0.3395000100135803,
+        2.0
+      ],
+      "min": [
+        -2.0,
+        0.0,
+        -2.0
+      ]
+    },
+    "helper_objects_rejected": false,
+    "mesh_object_count": 23,
+    "object_count": 23,
+    "triangle_count": 740
+  },
+  "module_id": "floor_1x1",
+  "status": "fail"
+}

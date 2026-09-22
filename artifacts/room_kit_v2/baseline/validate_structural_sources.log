@@ -1,0 +1,140 @@
+ERROR: missing required helper Anchor_SOCK_ceiling_bottom_01: ceiling_cap_1x1
+ERROR: missing required helper Anchor_SOCK_ceiling_edge_east_01: ceiling_cap_1x1
+ERROR: missing required helper Anchor_SOCK_ceiling_edge_north_01: ceiling_cap_1x1
+ERROR: missing required helper Anchor_SOCK_ceiling_edge_south_01: ceiling_cap_1x1
+ERROR: missing required helper Anchor_SOCK_ceiling_edge_west_01: ceiling_cap_1x1
+ERROR: missing required helper Anchor_SOCK_floor_top_01: corridor_floor_1x1
+ERROR: missing required helper Anchor_SOCK_floor_top_01: corridor_floor_1x2
+ERROR: missing required helper Anchor_SOCK_floor_top_01: floor_1x1
+ERROR: missing required helper Anchor_SOCK_floor_top_01: floor_2x1
+ERROR: missing required helper Anchor_SOCK_wall_base_01: bulkhead_portal_2x1
+ERROR: missing required helper Anchor_SOCK_wall_base_01: doorway_frame_blocked_1x1
+ERROR: missing required helper Anchor_SOCK_wall_base_01: doorway_frame_open_1x1
+ERROR: missing required helper Anchor_SOCK_wall_base_01: wall_end_cap
+ERROR: missing required helper Anchor_SOCK_wall_base_01: wall_straight_1x1
+ERROR: missing socket record ceiling_bottom_01: ceiling_cap_1x1
+ERROR: missing socket record ceiling_edge_east_01: ceiling_cap_1x1
+ERROR: missing socket record ceiling_edge_north_01: ceiling_cap_1x1
+ERROR: missing socket record ceiling_edge_south_01: ceiling_cap_1x1
+ERROR: missing socket record ceiling_edge_west_01: ceiling_cap_1x1
+ERROR: missing socket record floor_top_01: corridor_floor_1x1
+ERROR: missing socket record floor_top_01: corridor_floor_1x2
+ERROR: missing socket record floor_top_01: floor_1x1
+ERROR: missing socket record floor_top_01: floor_2x1
+ERROR: missing socket record wall_base_01: bulkhead_portal_2x1
+ERROR: missing socket record wall_base_01: doorway_frame_blocked_1x1
+ERROR: missing socket record wall_base_01: doorway_frame_open_1x1
+ERROR: missing socket record wall_base_01: wall_end_cap
+ERROR: missing socket record wall_base_01: wall_straight_1x1
+ERROR: socket Blender location does not match floor_edge_north_01: corridor_floor_1x1
+ERROR: socket Blender location does not match floor_edge_north_01: corridor_floor_1x2
+ERROR: socket Blender location does not match floor_edge_north_01: floor_1x1
+ERROR: socket Blender location does not match floor_edge_north_01: floor_2x1
+ERROR: socket Blender location does not match floor_edge_north_01: ramp_up_1x2
+ERROR: socket Blender location does not match floor_edge_south_01: corridor_floor_1x1
+ERROR: socket Blender location does not match floor_edge_south_01: corridor_floor_1x2
+ERROR: socket Blender location does not match floor_edge_south_01: floor_1x1
+ERROR: socket Blender location does not match floor_edge_south_01: floor_2x1
+ERROR: socket Blender location does not match floor_edge_south_01: ramp_up_1x2
+ERROR: socket Blender location does not match inner_corner_vertex_south_01: wall_inner_corner
+ERROR: socket Blender location does not match inner_corner_vertex_south_01: wall_outer_corner
+ERROR: socket Blender location does not match outer_corner_vertex_north_01: wall_inner_corner
+ERROR: socket Blender location does not match outer_corner_vertex_north_01: wall_outer_corner
+ERROR: socket Blender location does not match wall_face_north_01: wall_t_junction
+ERROR: socket compatible_kinds does not match floor_edge_east_01: corridor_floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_east_01: corridor_floor_1x2
+ERROR: socket compatible_kinds does not match floor_edge_east_01: floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_east_01: floor_2x1
+ERROR: socket compatible_kinds does not match floor_edge_north_01: corridor_floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_north_01: corridor_floor_1x2
+ERROR: socket compatible_kinds does not match floor_edge_north_01: floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_north_01: floor_2x1
+ERROR: socket compatible_kinds does not match floor_edge_north_01: ramp_up_1x2
+ERROR: socket compatible_kinds does not match floor_edge_south_01: corridor_floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_south_01: corridor_floor_1x2
+ERROR: socket compatible_kinds does not match floor_edge_south_01: floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_south_01: floor_2x1
+ERROR: socket compatible_kinds does not match floor_edge_south_01: ramp_up_1x2
+ERROR: socket compatible_kinds does not match floor_edge_west_01: corridor_floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_west_01: corridor_floor_1x2
+ERROR: socket compatible_kinds does not match floor_edge_west_01: floor_1x1
+ERROR: socket compatible_kinds does not match floor_edge_west_01: floor_2x1
+ERROR: socket contract position does not match floor_edge_north_01: corridor_floor_1x1
+ERROR: socket contract position does not match floor_edge_north_01: corridor_floor_1x2
+ERROR: socket contract position does not match floor_edge_north_01: floor_1x1
+ERROR: socket contract position does not match floor_edge_north_01: floor_2x1
+ERROR: socket contract position does not match floor_edge_north_01: ramp_up_1x2
+ERROR: socket contract position does not match floor_edge_south_01: corridor_floor_1x1
+ERROR: socket contract position does not match floor_edge_south_01: corridor_floor_1x2
+ERROR: socket contract position does not match floor_edge_south_01: floor_1x1
+ERROR: socket contract position does not match floor_edge_south_01: floor_2x1
+ERROR: socket contract position does not match floor_edge_south_01: ramp_up_1x2
+ERROR: socket contract position does not match inner_corner_vertex_south_01: wall_inner_corner
+ERROR: socket contract position does not match inner_corner_vertex_south_01: wall_outer_corner
+ERROR: socket contract position does not match outer_corner_vertex_north_01: wall_inner_corner
+ERROR: socket contract position does not match outer_corner_vertex_north_01: wall_outer_corner
+ERROR: socket contract position does not match wall_face_north_01: wall_t_junction
+ERROR: source record contract.path does not match contract: bulkhead_portal_2x1
+ERROR: source record contract.path does not match contract: ceiling_cap_1x1
+ERROR: source record contract.path does not match contract: corridor_floor_1x1
+ERROR: source record contract.path does not match contract: corridor_floor_1x2
+ERROR: source record contract.path does not match contract: doorway_frame_blocked_1x1
+ERROR: source record contract.path does not match contract: doorway_frame_open_1x1
+ERROR: source record contract.path does not match contract: floor_1x1
+ERROR: source record contract.path does not match contract: floor_2x1
+ERROR: source record contract.path does not match contract: pillar_support_1x1
+ERROR: source record contract.path does not match contract: ramp_up_1x2
+ERROR: source record contract.path does not match contract: wall_end_cap
+ERROR: source record contract.path does not match contract: wall_inner_corner
+ERROR: source record contract.path does not match contract: wall_outer_corner
+ERROR: source record contract.path does not match contract: wall_straight_1x1
+ERROR: source record contract.path does not match contract: wall_t_junction
+ERROR: source record contract.sha256 does not match contract: bulkhead_portal_2x1
+ERROR: source record contract.sha256 does not match contract: ceiling_cap_1x1
+ERROR: source record contract.sha256 does not match contract: corridor_floor_1x1
+ERROR: source record contract.sha256 does not match contract: corridor_floor_1x2
+ERROR: source record contract.sha256 does not match contract: doorway_frame_blocked_1x1
+ERROR: source record contract.sha256 does not match contract: doorway_frame_open_1x1
+ERROR: source record contract.sha256 does not match contract: floor_1x1
+ERROR: source record contract.sha256 does not match contract: floor_2x1
+ERROR: source record contract.sha256 does not match contract: ramp_up_1x2
+ERROR: source record contract.sha256 does not match contract: wall_end_cap
+ERROR: source record contract.sha256 does not match contract: wall_inner_corner
+ERROR: source record contract.sha256 does not match contract: wall_outer_corner
+ERROR: source record contract.sha256 does not match contract: wall_straight_1x1
+ERROR: source record contract.sha256 does not match contract: wall_t_junction
+ERROR: source record socket metadata does not match contract: bulkhead_portal_2x1
+ERROR: source record socket metadata does not match contract: ceiling_cap_1x1
+ERROR: source record socket metadata does not match contract: corridor_floor_1x1
+ERROR: source record socket metadata does not match contract: corridor_floor_1x2
+ERROR: source record socket metadata does not match contract: doorway_frame_blocked_1x1
+ERROR: source record socket metadata does not match contract: doorway_frame_open_1x1
+ERROR: source record socket metadata does not match contract: floor_1x1
+ERROR: source record socket metadata does not match contract: floor_2x1
+ERROR: source record socket metadata does not match contract: ramp_up_1x2
+ERROR: source record socket metadata does not match contract: wall_end_cap
+ERROR: source record socket metadata does not match contract: wall_inner_corner
+ERROR: source record socket metadata does not match contract: wall_outer_corner
+ERROR: source record socket metadata does not match contract: wall_straight_1x1
+ERROR: source record socket metadata does not match contract: wall_t_junction
+ERROR: source record source_glb.path does not match contract: bulkhead_portal_2x1
+ERROR: source record source_glb.path does not match contract: ceiling_cap_1x1
+ERROR: source record source_glb.path does not match contract: corridor_floor_1x1
+ERROR: source record source_glb.path does not match contract: corridor_floor_1x2
+ERROR: source record source_glb.path does not match contract: doorway_frame_blocked_1x1
+ERROR: source record source_glb.path does not match contract: doorway_frame_open_1x1
+ERROR: source record source_glb.path does not match contract: floor_1x1
+ERROR: source record source_glb.path does not match contract: floor_2x1
+ERROR: source record source_glb.path does not match contract: pillar_support_1x1
+ERROR: source record source_glb.path does not match contract: ramp_up_1x2
+ERROR: source record source_glb.path does not match contract: wall_end_cap
+ERROR: source record source_glb.path does not match contract: wall_inner_corner
+ERROR: source record source_glb.path does not match contract: wall_outer_corner
+ERROR: source record source_glb.path does not match contract: wall_straight_1x1
+ERROR: source record source_glb.path does not match contract: wall_t_junction
+ERROR: source record source_glb.sha256 does not match contract: corridor_floor_1x1
+ERROR: source record source_glb.sha256 does not match contract: corridor_floor_1x2
+ERROR: source record source_glb.sha256 does not match contract: floor_1x1
+ERROR: source record source_glb.sha256 does not match contract: wall_straight_1x1
+
+EXIT_CODE=1
