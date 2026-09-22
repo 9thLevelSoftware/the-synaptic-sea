@@ -49,6 +49,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0066 | docs/game/adr/0066-durable-machinery-condition-and-effective-system-health.md | Accepted for implementation, runtime pending P10/P13: exact-lot machinery condition, effective system health, paid intrinsic/provider repair, and audited frozen-criterion supersession |
 | 0067 | docs/game/adr/0067-native-first-run-candidate-authority.md | Accepted for implementation: validate first-away standing route and hazards through the actual native generation path |
 | 0068 | docs/game/adr/0060-meshy-offline-evidence-rebind.md | Offline, fail-closed rebinding of protected Meshy evidence and resolved plan references |
+| 0069 | docs/game/adr/0069-procedural-biomass-assembly.md | Procedural biomass assembly: modular body-part threats replace singular creature models |
 
 ## Notes
 
