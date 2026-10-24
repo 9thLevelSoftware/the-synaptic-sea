@@ -24,7 +24,9 @@ var use_scripted_movement: bool = false
 var marker: MeshInstance3D
 var collision_shape: CollisionShape3D
 ## ADR-0070: mounted character visual (null = capsule marker fallback).
-var character_visual: CharacterVisual
+## Typed through the preloaded script, not the global class name, so headless
+## runs do not depend on a regenerated .godot global class cache.
+var character_visual: CharacterVisualScript
 ## Providers injected by the coordinator so the visual follows the LIVE
 ## EquipmentState / WorkActionDriver instances (both are replaced on load /
 ## rebuild, so references would go stale; Callables resolve each frame).
@@ -162,8 +164,10 @@ func get_visual_source() -> String:
 func _mount_character_visual() -> void:
 	if character_visual != null:
 		return
-	var visual: CharacterVisual = CharacterVisualScript.mount_from_catalog(CHARACTER_VISUAL_ID)
-	if visual == null:
+	var visual: CharacterVisualScript = CharacterVisualScript.new()
+	visual.name = "CharacterVisual"
+	if not visual.mount_catalog_entry(CHARACTER_VISUAL_ID):
+		visual.free()
 		return
 	character_visual = visual
 	add_child(character_visual)

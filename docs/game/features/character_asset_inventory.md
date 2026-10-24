@@ -134,7 +134,7 @@ sidecar consumer (ADR-0052), not a character seam.
 
 ## Core behavior (in-engine)
 
-1. `PlayerController._ready()` mounts `CharacterVisual.mount_from_catalog("player_survivor")`.
+1. `PlayerController._ready()` creates a `CharacterVisual` and calls `mount_catalog_entry("player_survivor")`.
    On success the capsule marker is hidden; on any failure the capsule stays and
    `get_visual_source()` reports `"fallback"`.
 2. Each physics tick the controller feeds `velocity`, crouch, the injected equipment-slots
@@ -200,7 +200,7 @@ sidecar consumer (ADR-0052), not a character seam.
   `walk` and the model yaw is `+90°`.
 - Given an attempted attack with the default crowbar, then `melee_swing` plays over locomotion.
 - Given `end_run("death")`, then `downed` plays and holds.
-- Given a catalog id with no asset, then `mount_from_catalog` returns null and the capsule stays.
+- Given a catalog id with no asset, then `mount_catalog_entry` returns false and the capsule stays.
 - Given a rebuild from source, then the validator passes with the same budgets, bone list, clip
   list, height, pivot and forward axis.
 

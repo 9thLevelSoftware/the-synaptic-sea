@@ -13,6 +13,7 @@ class_name CharacterVisual
 ## coordinator's `_process` (CLAUDE.md dual-branch rule) because it never
 ## depends on that tick at all.
 
+const CharacterVisualCatalogScript := preload("res://scripts/systems/character_visual_catalog.gd")
 const DEFAULT_TURN_RATE: float = 14.0
 const DEFAULT_MOVING_THRESHOLD: float = 0.05
 const DEFAULT_EQUIPMENT_PREFIX: String = "Equip_"
@@ -40,29 +41,26 @@ var _moving_threshold: float = DEFAULT_MOVING_THRESHOLD
 var _equipment_prefix: String = DEFAULT_EQUIPMENT_PREFIX
 
 
-## Factory used by PlayerController: resolves the catalog entry, loads the GLB
-## PackedScene and returns a mounted CharacterVisual, or null so the caller
-## keeps its capsule marker. Loading failures are reported as data (null),
-## never as push_warning/push_error, so a missing art drop never turns the
-## regression bundle red.
-static func mount_from_catalog(character_id: String, catalog_path: String = CharacterVisualCatalog.DEFAULT_CATALOG_PATH) -> CharacterVisual:
-	var catalog := CharacterVisualCatalog.new()
+## Entry point used by PlayerController: resolves the catalog entry, loads the
+## GLB PackedScene and mounts it on this node. Returns false (and leaves this
+## node unmounted) so the caller keeps its capsule marker. Loading failures
+## are reported as data, never as push_warning/push_error, so a missing art
+## drop never turns the regression bundle red. (An instance method rather
+## than a static factory so no script has to name this class globally: the
+## headless bundle must not depend on a regenerated .godot class cache.)
+func mount_catalog_entry(character_id: String, catalog_path: String = CharacterVisualCatalogScript.DEFAULT_CATALOG_PATH) -> bool:
+	var catalog := CharacterVisualCatalogScript.new()
 	catalog.load_from_path(catalog_path)
 	var catalog_entry: Dictionary = catalog.get_entry(character_id)
 	if catalog_entry.is_empty():
-		return null
+		return false
 	var scene_path: String = str(catalog_entry.get("scene_path", ""))
 	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
-		return null
+		return false
 	var packed: Resource = load(scene_path)
 	if not (packed is PackedScene):
-		return null
-	var visual := CharacterVisual.new()
-	visual.name = "CharacterVisual"
-	if not visual.mount(packed as PackedScene, catalog_entry):
-		visual.free()
-		return null
-	return visual
+		return false
+	return mount(packed as PackedScene, catalog_entry)
 
 
 func mount(packed: PackedScene, catalog_entry: Dictionary) -> bool:

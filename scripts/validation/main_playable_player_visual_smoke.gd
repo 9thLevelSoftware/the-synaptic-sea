@@ -11,6 +11,7 @@ extends SceneTree
 ##   MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
+const CharacterVisualScript := preload("res://scripts/player/character_visual.gd")
 ## Budgets are PHYSICS frames: movement, the walk logical and the facing lerp
 ## all advance in PlayerController._physics_process, so counting process
 ## frames would make the gate host-speed dependent.
@@ -106,7 +107,7 @@ func _stage_check_walk() -> void:
 	# physics ticks, so sample every frame and accept the first frame in which
 	# the body is actually moving and the visual reflects it.
 	var player: PlayerController = playable.player
-	var visual: CharacterVisual = player.character_visual
+	var visual: CharacterVisualScript = player.character_visual
 	var moving: bool = player.is_moving()
 	var walk_ok: bool = moving and visual.get_current_logical() == "walk" and visual.get_current_animation() == "walk"
 	var facing_ok: bool = absf(angle_difference(visual.get_facing_yaw(), _expected_yaw)) < 0.05

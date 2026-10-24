@@ -80,7 +80,7 @@ func _run() -> void:
 	var bone_count: int = 0
 	var clip_count: int = 0
 	if mounted:
-		var visual: CharacterVisual = player.character_visual
+		var visual: CharacterVisualScript = player.character_visual
 		var bones: Array[String] = visual.get_bone_names()
 		bone_count = bones.size()
 		bones_ok = bones.size() == manifest_bones.size()
@@ -168,10 +168,11 @@ func _run() -> void:
 		# Sockets exist as bone-attached nodes for handheld tools.
 		_expect(visual.get_socket("primary_hand") != null, "primary_hand socket present")
 
-	# Fallback: an unknown catalog id leaves the capsule marker in place.
-	var fallback_visual: CharacterVisual = CharacterVisualScript.mount_from_catalog("no_such_character")
-	var fallback_ok: bool = fallback_visual == null
-	_expect(fallback_ok, "unknown catalog id returns null (capsule fallback)")
+	# Fallback: an unknown catalog id refuses to mount (capsule marker stays).
+	var fallback_visual: CharacterVisualScript = CharacterVisualScript.new()
+	var fallback_ok: bool = not fallback_visual.mount_catalog_entry("no_such_character") and not fallback_visual.mounted
+	fallback_visual.free()
+	_expect(fallback_ok, "unknown catalog id does not mount (capsule fallback)")
 
 	player.queue_free()
 	if not _failures.is_empty():
