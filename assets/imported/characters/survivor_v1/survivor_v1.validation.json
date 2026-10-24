@@ -42,10 +42,10 @@
     0.0,
     -0.13
   ],
-  "byte_size": 656660,
+  "byte_size": 655968,
   "errors": [],
   "forward_axis_ok": true,
-  "glb": "/home/user/the-synaptic-sea/assets/imported/characters/survivor_v1/survivor_v1.glb",
+  "glb": "assets/imported/characters/survivor_v1/survivor_v1.glb",
   "height_m": 1.76,
   "kit_id": "survivor_v1",
   "kit_triangles": 3396,

@@ -107,13 +107,26 @@ def _node_by_name(document: dict) -> Dict[str, dict]:
     return {str(node.get("name", "")): node for node in document.get("nodes", [])}
 
 
-def validate(glb_path: Path, manifest_path: Path | None = None) -> dict:
+def project_relative(path: Path, project_root: Path | None) -> str:
+    """Project-relative POSIX path when ``path`` is under the root, else as given
+    (keeps tracked reports identical across machines)."""
+    try:
+        root = (project_root or Path.cwd()).resolve()
+        return path.resolve().relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def validate(glb_path: Path, manifest_path: Path | None = None, project_root: Path | None = None) -> dict:
     errors: List[str] = []
     document, binary = read_glb(glb_path)
-    manifest = spec.KitManifest().to_dict()
     if manifest_path is not None:
         disk = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if disk != manifest:
+        disk_glb = str(disk.get("glb_path", ""))
+        if not disk_glb.endswith(spec.GLB_LEAF):
+            errors.append(f"manifest glb_path must point at {spec.GLB_LEAF}: {disk_glb!r}")
+        expected = spec.KitManifest(glb_path=disk_glb or spec.KitManifest().glb_path).to_dict()
+        if disk != expected:
             errors.append("manifest on disk differs from character_kit_spec (rebuild the kit)")
 
     nodes = _node_by_name(document)
@@ -211,7 +224,7 @@ def validate(glb_path: Path, manifest_path: Path | None = None) -> dict:
             errors.append(f"boot does not point +Z: z-range [{b_min[2]:.3f}, {b_max[2]:.3f}]")
 
     report = {
-        "glb": str(glb_path),
+        "glb": project_relative(glb_path, project_root),
         "kit_id": spec.KIT_ID,
         "ok": not errors,
         "errors": errors,
@@ -234,10 +247,15 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--glb", required=True)
     parser.add_argument("--manifest", default=None)
     parser.add_argument("--report", default=None)
+    parser.add_argument("--project-root", default=None, help="root for project-relative report paths (default: cwd)")
     args = parser.parse_args(argv)
     glb_path = Path(args.glb)
     try:
-        report = validate(glb_path, Path(args.manifest) if args.manifest else None)
+        report = validate(
+            glb_path,
+            Path(args.manifest) if args.manifest else None,
+            Path(args.project_root) if args.project_root else None,
+        )
     except (GlbError, FileNotFoundError, KeyError, json.JSONDecodeError) as exc:
         print(f"{FAIL_PREFIX} reason={exc}")
         return 1

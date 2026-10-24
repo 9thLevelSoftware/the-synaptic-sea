@@ -2175,7 +2175,7 @@ transfer authority or weaker substitute.
     when `away_from_start = true` (CLAUDE.md dual-branch rule).
 - Verification:
   - `player_character_visual_smoke.gd` (`locomotion=true action=true downed=true facing=true`);
-    `main_playable_player_visual_smoke.gd` (`away_ticks=true walk=true facing=true attack_swing=true`).
+    `main_playable_player_visual_smoke.gd` (`away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true`).
 
 ## REQ-CHR-004: Character kit contract is machine-validated
 

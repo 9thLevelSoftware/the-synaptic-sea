@@ -252,7 +252,6 @@ def author_animations(bpy, armature, spec) -> None:
         for fcurve in action.fcurves:
             for keyframe in fcurve.keyframe_points:
                 keyframe.interpolation = "LINEAR" if not loop else "BEZIER"
-        action.frame_range = (1, frames + 1)
         track = anim.nla_tracks.new()
         track.name = clip_name
         strip = track.strips.new(clip_name, 1, action)

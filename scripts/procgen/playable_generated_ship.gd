@@ -10088,10 +10088,11 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		weapon_id = "crowbar"
 	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state, ammo_state)
 	# ADR-0070: swing/aim the character visual for any attempted attack (a
-	# dry-fire still swings), independent of the hit result.
-	if player != null and is_instance_valid(player) and player.has_method("play_visual_action"):
-		var weapon_def: Dictionary = _weapon_definition_for_visual(weapon_id)
-		player.play_visual_action("aim" if str(weapon_def.get("kind", "melee")) == "ranged" else "melee")
+	# dry-fire still swings) unless the attack was rejected outright because
+	# nothing is equipped — an unarmed body must not swing a crowbar.
+	if str(result.get("reason", "")) != "weapon_not_equipped" \
+			and is_instance_valid(player) and player.has_method("play_visual_action"):
+		player.play_visual_action("aim" if not _weapon_ammo_item_id(weapon_id).is_empty() else "melee")
 	if bool(result.get("ok", false)):
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
@@ -10772,26 +10773,15 @@ func _spawn_player() -> void:
 	)
 
 
+## Read-only view for the player's visual sync; the consumer copies on change.
 func _visual_equipment_slots() -> Dictionary:
 	if equipment_state == null:
 		return {}
-	return equipment_state.slots.duplicate(true)
+	return equipment_state.slots
 
 
 func _visual_is_working() -> bool:
 	return work_action_driver != null and work_action_driver.is_working()
-
-
-## Weapon definition plus a derived visual `kind` ("ranged" when the weapon
-## consumes ammo per data/combat/weapon_definitions.json, else "melee").
-func _weapon_definition_for_visual(weapon_id: String) -> Dictionary:
-	var weapon: Dictionary = {}
-	if threat_manager != null and threat_manager.weapon_definitions is Dictionary:
-		var raw: Variant = threat_manager.weapon_definitions.get(weapon_id, {})
-		if raw is Dictionary:
-			weapon = (raw as Dictionary).duplicate(true)
-	weapon["kind"] = "ranged" if not str(weapon.get("ammo_item_id", "")).is_empty() else "melee"
-	return weapon
 
 func _spawn_camera() -> void:
 	camera_rig = IsoCameraRigScript.new()

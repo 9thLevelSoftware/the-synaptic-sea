@@ -203,8 +203,11 @@ def canonical_json(document: dict) -> str:
     return json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
 
-def write_manifest(path: Path) -> dict:
-    document = KitManifest().to_dict()
+def write_manifest(path: Path, glb_path: str | None = None) -> dict:
+    """Write the manifest beside the GLB. ``glb_path`` is the project-relative
+    POSIX path of the GLB actually written (defaults to the runtime root)."""
+    manifest = KitManifest(glb_path=glb_path) if glb_path else KitManifest()
+    document = manifest.to_dict()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(canonical_json(document), encoding="utf-8")
     return document

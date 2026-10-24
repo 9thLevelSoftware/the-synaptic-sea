@@ -8,10 +8,14 @@ extends SceneTree
 ## physics tick rather than the coordinator's branched _process.
 ##
 ## Pass marker:
-##   MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true
+##   MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
-const TIMEOUT_FRAMES: int = 360
+## Budgets are PHYSICS frames: movement, the walk logical and the facing lerp
+## all advance in PlayerController._physics_process, so counting process
+## frames would make the gate host-speed dependent.
+const TIMEOUT_FRAMES: int = 600
+const WALK_BUDGET_FRAMES: int = 180
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -29,10 +33,10 @@ func _initialize() -> void:
 		_fail("could not instantiate main scene")
 		return
 	get_root().add_child(main_node)
-	process_frame.connect(_on_process_frame)
+	physics_frame.connect(_on_physics_frame)
 
 
-func _on_process_frame() -> void:
+func _on_physics_frame() -> void:
 	if finished:
 		return
 	frame_count += 1
@@ -107,20 +111,35 @@ func _stage_check_walk() -> void:
 	var walk_ok: bool = moving and visual.get_current_logical() == "walk" and visual.get_current_animation() == "walk"
 	var facing_ok: bool = absf(angle_difference(visual.get_facing_yaw(), _expected_yaw)) < 0.05
 	if not (walk_ok and facing_ok):
-		if frame_count > 90:
+		if frame_count > WALK_BUDGET_FRAMES:
 			player.clear_scripted_move_direction()
-			_fail("walk/facing not observed on the away branch within 90 frames (dir=%s moving=%s logical=%s anim=%s yaw=%.3f expected=%.3f before=%.3f)" % [
+			_fail("walk/facing not observed on the away branch within %d physics frames (dir=%s moving=%s logical=%s anim=%s yaw=%.3f expected=%.3f before=%.3f)" % [
+				WALK_BUDGET_FRAMES,
 				str(_move_direction), str(moving), visual.get_current_logical(), visual.get_current_animation(), visual.get_facing_yaw(), _expected_yaw, _facing_before])
 		return
 	player.clear_scripted_move_direction()
-	# Attack through the real coordinator path: any attempted swing animates.
+	# Attack through the real coordinator path. Unarmed (the live start has no
+	# hand-slot item) the attack is rejected with weapon_not_equipped and the
+	# body must NOT swing a weapon it is not holding; with a crowbar equipped
+	# through the real EquipmentState the swing clip plays.
+	var unarmed: Dictionary = playable._attack_with_equipped_weapon()
+	var unarmed_anim: String = visual.get_current_animation()
+	var unarmed_no_swing: bool = str(unarmed.get("reason", "")) == "weapon_not_equipped" \
+		and unarmed_anim != "melee_swing" and unarmed_anim != "aim_ranged"
+	if not unarmed_no_swing:
+		_fail("unarmed attack should be rejected without a swing (anim=%s result=%s)" % [unarmed_anim, str(unarmed)])
+		return
+	var equip_res: Dictionary = playable.equipment_state.equip("crowbar")
+	if not bool(equip_res.get("ok", false)):
+		_fail("could not equip crowbar through EquipmentState: %s" % str(equip_res))
+		return
 	var attack: Dictionary = playable._attack_with_equipped_weapon()
 	var attack_swing: bool = visual.get_current_animation() == "melee_swing" or visual.get_current_animation() == "aim_ranged"
 	if not attack_swing:
 		_fail("attack did not play a swing/aim clip (anim=%s result=%s)" % [visual.get_current_animation(), str(attack)])
 		return
 	finished = true
-	print("MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true")
+	print("MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true")
 	_cleanup_and_quit(0)
 
 

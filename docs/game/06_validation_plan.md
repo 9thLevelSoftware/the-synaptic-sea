@@ -210,17 +210,17 @@ Rebuild (requires Blender 4.2+ on PATH, `$BLENDER`, or `--blender`; writes the r
 manifest, validation report and the review previews):
 
 ```bash
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/build_kit.py \
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tools/character_kit/build_kit.py \
   --project-root . --previews
 ```
 
 Host validation (no Blender/Godot needed; part of the regression bundle below):
 
 ```bash
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/validate_character_glb.py \
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tools/character_kit/validate_character_glb.py \
   --glb assets/imported/characters/survivor_v1/survivor_v1.glb \
   --manifest assets/imported/characters/survivor_v1/survivor_v1.manifest.json
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q tests/test_character_kit.py
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_character_kit.py
 ```
 
 Expected: `CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8 body_tris=1540 kit_tris=3396 height=1.76 forward=+Z`
@@ -239,7 +239,7 @@ GODOT="${GODOT:?set Godot executable}"
 Expected markers:
 
 - `PLAYER CHARACTER VISUAL PASS mounted=true bones=20 clips=8 loops=true equipment=true facing=true locomotion=true action=true downed=true fallback=true`
-- `MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true`
+- `MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true`
 
 Visual evidence (art gate item 7): `artifacts/validation-previews/characters/survivor_v1/`
 (`turnaround_{base,hardsuit_eva,fieldpack_belt}.png`, `poses_contact_sheet.png`,
@@ -1179,10 +1179,10 @@ run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=tru
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
 # ADR-0070 / REQ-CHR: procedural character kit contract + runtime seam (home + away).
-run_clean 'Character kit GLB validator' 'CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$ROOT/tools/character_kit/validate_character_glb.py" --glb "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.glb" --manifest "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.manifest.json"
-run_clean 'Character kit pytest' '8 passed' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q "$ROOT/tests/test_character_kit.py"
+run_clean 'Character kit GLB validator' 'CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tools/character_kit/validate_character_glb.py" --glb "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.glb" --manifest "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.manifest.json"
+run_clean 'Character kit pytest' '8 passed' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q "$ROOT/tests/test_character_kit.py"
 run_clean 'Player character visual smoke' 'PLAYER CHARACTER VISUAL PASS mounted=true bones=20 clips=8 loops=true equipment=true facing=true locomotion=true action=true downed=true fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_character_visual_smoke.gd
-run_clean 'Main playable player visual smoke' 'MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
+run_clean 'Main playable player visual smoke' 'MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
 echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```

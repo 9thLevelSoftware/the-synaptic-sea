@@ -22,13 +22,13 @@ const REQUIRED_ANIMATION_KEYS: Array[String] = [
 
 var _entries: Dictionary = {}
 var _errors: Array[String] = []
-var _loaded_path: String = ""
 
 
+## Loads and validates the catalog. Entries are committed only when the whole
+## document is valid, so the return value and `get_entry()` always agree.
 func load_from_path(path: String = DEFAULT_CATALOG_PATH) -> bool:
 	_entries = {}
 	_errors = []
-	_loaded_path = path
 	if path.is_empty() or not FileAccess.file_exists(path):
 		_errors.append("catalog missing: %s" % path)
 		return false
@@ -49,6 +49,7 @@ func load_from_path(path: String = DEFAULT_CATALOG_PATH) -> bool:
 	if not (characters is Dictionary):
 		_errors.append("catalog characters must be an object")
 		return false
+	var validated: Dictionary = {}
 	for character_id in (characters as Dictionary).keys():
 		var entry: Variant = (characters as Dictionary)[character_id]
 		if not (entry is Dictionary):
@@ -59,8 +60,11 @@ func load_from_path(path: String = DEFAULT_CATALOG_PATH) -> bool:
 			for e in entry_errors:
 				_errors.append("entry %s: %s" % [character_id, e])
 			continue
-		_entries[str(character_id)] = (entry as Dictionary).duplicate(true)
-	return _errors.is_empty()
+		validated[str(character_id)] = (entry as Dictionary).duplicate(true)
+	if not _errors.is_empty():
+		return false
+	_entries = validated
+	return true
 
 
 static func validate_entry(entry: Dictionary) -> Array[String]:
@@ -87,10 +91,6 @@ static func validate_entry(entry: Dictionary) -> Array[String]:
 	return errors
 
 
-func has_entry(character_id: String) -> bool:
-	return _entries.has(character_id)
-
-
 ## Returns a deep copy of the entry, or an empty Dictionary when unknown.
 func get_entry(character_id: String) -> Dictionary:
 	if not _entries.has(character_id):
@@ -98,17 +98,5 @@ func get_entry(character_id: String) -> Dictionary:
 	return (_entries[character_id] as Dictionary).duplicate(true)
 
 
-func get_character_ids() -> Array[String]:
-	var ids: Array[String] = []
-	for key in _entries.keys():
-		ids.append(str(key))
-	ids.sort()
-	return ids
-
-
 func get_errors() -> Array[String]:
 	return _errors.duplicate()
-
-
-func get_loaded_path() -> String:
-	return _loaded_path

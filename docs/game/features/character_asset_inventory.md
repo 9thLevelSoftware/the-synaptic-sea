@@ -207,14 +207,14 @@ sidecar consumer (ADR-0052), not a character seam.
 ## Validation
 
 ```bash
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/validate_character_glb.py \
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tools/character_kit/validate_character_glb.py \
   --glb assets/imported/characters/survivor_v1/survivor_v1.glb \
   --manifest assets/imported/characters/survivor_v1/survivor_v1.manifest.json
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q tests/test_character_kit.py
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_character_kit.py
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_character_visual_smoke.gd
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
 # rebuild (Blender required):
-PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/build_kit.py --project-root . --previews
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tools/character_kit/build_kit.py --project-root . --previews
 ```
 
 Expected markers are registered in `docs/game/06_validation_plan.md` (§ "Procedural character

@@ -60,6 +60,9 @@ func _run() -> void:
 	# Mount on a bare player (no ship) — the seam must not need the coordinator.
 	var player: PlayerController = PlayerControllerScript.new()
 	get_root().add_child(player)
+	# This bare player has no floor; the engine must not tick it while the
+	# smoke drives the provider sync with one explicit tick below.
+	player.set_physics_process(false)
 	var mounted: bool = player.has_character_visual()
 	_expect(mounted, "character visual mounted from catalog")
 	_expect(player.marker != null and not player.marker.visible, "capsule marker hidden when mounted")

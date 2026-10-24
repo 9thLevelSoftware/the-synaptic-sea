@@ -74,7 +74,11 @@ def main() -> int:
 
     glb_path = out_dir / spec.GLB_LEAF
     _export_glb(bpy, glb_path)
-    spec.write_manifest(out_dir / spec.MANIFEST_LEAF)
+    try:
+        relative_glb = glb_path.resolve().relative_to(project_root).as_posix()
+    except ValueError:
+        relative_glb = glb_path.as_posix()
+    spec.write_manifest(out_dir / spec.MANIFEST_LEAF, glb_path=relative_glb)
 
     if args.blend:
         blend_path = Path(args.blend)

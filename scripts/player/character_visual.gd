@@ -27,7 +27,6 @@ var mounted: bool = false
 var visual_source: String = "fallback"
 
 var _mesh_nodes: Dictionary = {}       # node name -> MeshInstance3D
-var _equipment_slots: Dictionary = {}  # slot -> item_id (last applied)
 var _visible_equipment_nodes: Array[String] = []
 var _logical_to_clip: Dictionary = {}
 var _current_logical: String = ""
@@ -82,8 +81,10 @@ func mount(packed: PackedScene, catalog_entry: Dictionary) -> bool:
 	model_root = instance as Node3D
 	model_root.name = "Model"
 	add_child(model_root)
-	skeleton = _find_first(model_root, "Skeleton3D") as Skeleton3D
-	animation_player = _find_first(model_root, "AnimationPlayer") as AnimationPlayer
+	var skeletons: Array[Node] = model_root.find_children("*", "Skeleton3D", true, false)
+	var players: Array[Node] = model_root.find_children("*", "AnimationPlayer", true, false)
+	skeleton = skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
 	_mesh_nodes.clear()
 	for mesh in model_root.find_children("*", "MeshInstance3D", true, false):
 		_mesh_nodes[mesh.name] = mesh
@@ -91,19 +92,26 @@ func mount(packed: PackedScene, catalog_entry: Dictionary) -> bool:
 		model_root.queue_free()
 		model_root = null
 		return false
-	_configure_loops()
+	_localize_animation_library()
 	set_equipment_slots({})
 	mounted = true
 	visual_source = "catalog"
-	_play_logical("idle", true)
+	# The first clip starts from _ready(): mount() usually runs before the
+	# owner adds this node to the tree, and AnimationPlayer needs the tree.
+	if is_inside_tree():
+		_refresh_locomotion_clip()
 	return true
+
+
+func _ready() -> void:
+	if mounted and _current_logical.is_empty():
+		_refresh_locomotion_clip()
 
 
 ## Equipment truth comes from EquipmentState.slots ({slot -> item_id}). Any
 ## `Equip_*` node whose prefix is listed for an equipped item becomes visible;
 ## everything else under the equipment prefix is hidden.
 func set_equipment_slots(slots: Dictionary) -> void:
-	_equipment_slots = slots.duplicate(true)
 	var visuals: Dictionary = entry.get("equipment_visuals", {}) as Dictionary
 	var active_prefixes: Array[String] = []
 	for slot in slots.keys():
@@ -264,19 +272,28 @@ func _play_logical(logical: String, keep_if_playing: bool) -> bool:
 	return true
 
 
-func _configure_loops() -> void:
+func _localize_animation_library() -> void:
 	# Godot's scene importer strips a glTF "-loop" suffix and marks the clip
 	# looping. The catalog restates which LOGICAL clips loop so a hand-edited
-	# catalog or a re-exported kit cannot silently lose the loop flags.
+	# catalog or a re-exported kit cannot silently lose the loop flags. The
+	# imported Animation resources are shared by every instance of the GLB,
+	# so the flags are applied to per-instance duplicates in a local library,
+	# never to the shared asset.
 	var looping: Array = entry.get("looping_animations", DEFAULT_LOOPING_LOGICALS) as Array
 	var loop_clips: Dictionary = {}
 	for logical in looping:
 		loop_clips[str(_logical_to_clip.get(str(logical), ""))] = true
+	var local_library := AnimationLibrary.new()
 	for clip_name in animation_player.get_animation_list():
-		var anim: Animation = animation_player.get_animation(clip_name)
-		if anim == null:
+		var shared: Animation = animation_player.get_animation(clip_name)
+		if shared == null:
 			continue
-		anim.loop_mode = Animation.LOOP_LINEAR if loop_clips.has(str(clip_name)) else Animation.LOOP_NONE
+		var local: Animation = shared.duplicate() as Animation
+		local.loop_mode = Animation.LOOP_LINEAR if loop_clips.has(str(clip_name)) else Animation.LOOP_NONE
+		local_library.add_animation(str(clip_name), local)
+	for library_name in animation_player.get_animation_library_list():
+		animation_player.remove_animation_library(library_name)
+	animation_player.add_animation_library("", local_library)
 
 
 func is_looping_clip(clip_name: String) -> bool:
@@ -284,14 +301,3 @@ func is_looping_clip(clip_name: String) -> bool:
 		return false
 	return animation_player.get_animation(clip_name).loop_mode == Animation.LOOP_LINEAR
 
-
-static func _find_first(root: Node, type_name: String) -> Node:
-	if root == null:
-		return null
-	if root.is_class(type_name):
-		return root
-	for child in root.get_children():
-		var found: Node = _find_first(child, type_name)
-		if found != null:
-			return found
-	return null

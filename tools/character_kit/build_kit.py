@@ -83,7 +83,11 @@ def main(argv: list[str] | None = None) -> int:
 
     glb = (project_root / out_dir / spec.GLB_LEAF) if not Path(out_dir).is_absolute() else Path(out_dir) / spec.GLB_LEAF
     manifest = glb.with_name(spec.MANIFEST_LEAF)
-    code = validate_character_glb.main(["--glb", str(glb), "--manifest", str(manifest), "--report", str(glb.with_suffix(".validation.json"))])
+    code = validate_character_glb.main([
+        "--glb", str(glb), "--manifest", str(manifest),
+        "--report", str(glb.with_suffix(".validation.json")),
+        "--project-root", str(project_root),
+    ])
     if code != 0:
         return 1
 
