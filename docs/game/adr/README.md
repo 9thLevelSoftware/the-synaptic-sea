@@ -33,6 +33,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0046 | docs/game/adr/0046-run-snapshot-slot-metadata.md | Run snapshot slot metadata |
 | 0047 | docs/game/adr/0047-encounter-tables-authoritative.md | Encounter tables authoritative over role constants |
 | 0048 | docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md | Mermaid-first as-built architecture source, evidence schema, locked rendering, and SVG freshness policy |
+| 0048 (dup) | docs/game/adr/ADR-0048-top-down-pivot.md | Top-down 2D pivot — superseded in part by ADR-0070 (production path stays locked-iso 3D; topdown tree is non-production legacy); number collides with the mermaid ADR |
 | 0049 | docs/game/adr/0049-threat-pathfinding.md | Pure ShipNavGraph + A* threat pathfollowing; replaces lerp motion; navmesh remains tooling |
 | 0050 | docs/game/adr/0050-derelict-hazard-source-of-truth.md | Runtime seed authoritative for derelict fire/breach; layout arrays optional overlays |
 | 0051 | docs/game/adr/0051-module-integrity-not-voxels.md | Module integrity is the unit of destruction (not voxels); salvage pillar grain lock |
@@ -50,9 +51,9 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0067 | docs/game/adr/0067-native-first-run-candidate-authority.md | Accepted for implementation: validate first-away standing route and hazards through the actual native generation path |
 | 0068 | docs/game/adr/0060-meshy-offline-evidence-rebind.md | Offline, fail-closed rebinding of protected Meshy evidence and resolved plan references |
 | 0069 | docs/game/adr/0069-procedural-biomass-assembly.md | Procedural biomass assembly: modular body-part threats replace singular creature models |
+| 0070 | docs/game/adr/0070-pz-style-character-art-and-procedural-blender-authoring.md | Accepted: PZ-style low-poly character art, procedural headless-Blender authoring in-repo, character visual catalog seam; supersedes ADR-0048's 2D production path |
 
 ## Notes
 
 - Number reuse exists in historical Task 12/13/10 ADRs (`0029`, `0031`, `0033`, `0034`, `0037`). The index keeps the file path as the identity because these ADRs were authored by separate package workers in a no-git/shared-workspace wave.
 - ADR-0040 owns future currency checks for this index, requirements, systems map, validation plan, build plan, and Kanban manifests.
-| 0048 | docs/game/adr/ADR-0048-top-down-pivot.md | Top-down 2D pivot: supersedes ADR-0010/0017, replaces locked-iso 3D with TileMap-based presentation |

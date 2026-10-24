@@ -10,6 +10,10 @@ const DEFAULT_COLLISION_RADIUS: float = 0.35
 const DEFAULT_COLLISION_HEIGHT: float = 1.6
 const DEFAULT_FLOOR_SNAP_LENGTH: float = 0.5
 const DEFAULT_FLOOR_MAX_ANGLE_DEGREES: float = 60.0
+## ADR-0070: catalog id of the player's character visual. The capsule marker
+## stays the fallback when the catalog entry or its GLB cannot be loaded.
+const CHARACTER_VISUAL_ID: String = "player_survivor"
+const CharacterVisualScript := preload("res://scripts/player/character_visual.gd")
 
 var move_speed: float = DEFAULT_MOVE_SPEED
 var _speed_multiplier: float = 1.0
@@ -19,10 +23,22 @@ var scripted_move_direction: Vector3 = Vector3.ZERO
 var use_scripted_movement: bool = false
 var marker: MeshInstance3D
 var collision_shape: CollisionShape3D
+## ADR-0070: mounted character visual (null = capsule marker fallback).
+## Typed through the preloaded script, not the global class name, so headless
+## runs do not depend on a regenerated .godot global class cache.
+var character_visual: CharacterVisualScript
+## Providers injected by the coordinator so the visual follows the LIVE
+## EquipmentState / WorkActionDriver instances (both are replaced on load /
+## rebuild, so references would go stale; Callables resolve each frame).
+var equipment_slots_provider: Callable = Callable()
+var is_working_provider: Callable = Callable()
+var _last_visual_equipment_slots: Dictionary = {}
+var _visual_equipment_synced: bool = false
 
 
 func _ready() -> void:
 	_ensure_support_nodes()
+	_mount_character_visual()
 	floor_snap_length = DEFAULT_FLOOR_SNAP_LENGTH
 	floor_max_angle = deg_to_rad(DEFAULT_FLOOR_MAX_ANGLE_DEGREES)
 	set_physics_process(true)
@@ -68,6 +84,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= gravity * delta
 	move_and_slide()
+	_sync_character_visual(delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -112,6 +129,63 @@ func _action_strength_or_zero(action_name: String) -> float:
 	if not InputMap.has_action(action_name):
 		return 0.0
 	return Input.get_action_strength(action_name)
+
+
+## ADR-0070: bind the coordinator-owned truth sources the visual mirrors.
+## `equipment_slots` must return EquipmentState.slots ({slot -> item_id}) and
+## `is_working` must return WorkActionDriver.is_working(); either may be an
+## invalid Callable when that system is absent (validation harnesses).
+func bind_visual_providers(equipment_slots: Callable, is_working: Callable) -> void:
+	equipment_slots_provider = equipment_slots
+	is_working_provider = is_working
+	_visual_equipment_synced = false
+
+
+func has_character_visual() -> bool:
+	return character_visual != null and is_instance_valid(character_visual) and character_visual.mounted
+
+
+## One-shot visual action ("melee" / "aim"); no-op on the capsule fallback.
+func play_visual_action(logical: String) -> bool:
+	if not has_character_visual():
+		return false
+	return character_visual.play_action(logical)
+
+
+func set_visual_downed(downed: bool) -> void:
+	if has_character_visual():
+		character_visual.set_downed(downed)
+
+
+func get_visual_source() -> String:
+	return character_visual.visual_source if has_character_visual() else "fallback"
+
+
+func _mount_character_visual() -> void:
+	if character_visual != null:
+		return
+	var visual: CharacterVisualScript = CharacterVisualScript.new()
+	visual.name = "CharacterVisual"
+	if not visual.mount_catalog_entry(CHARACTER_VISUAL_ID):
+		visual.free()
+		return
+	character_visual = visual
+	add_child(character_visual)
+	marker.visible = false  # _ensure_support_nodes() always runs first
+
+
+func _sync_character_visual(delta: float) -> void:
+	if not has_character_visual():
+		return
+	if equipment_slots_provider.is_valid():
+		var slots: Variant = equipment_slots_provider.call()
+		if slots is Dictionary and (not _visual_equipment_synced or slots != _last_visual_equipment_slots):
+			_last_visual_equipment_slots = (slots as Dictionary).duplicate(true)
+			_visual_equipment_synced = true
+			character_visual.set_equipment_slots(_last_visual_equipment_slots)
+	if is_working_provider.is_valid():
+		character_visual.set_working(bool(is_working_provider.call()))
+	character_visual.update_locomotion(velocity, _crouching, delta)
 
 
 func _ensure_support_nodes() -> void:

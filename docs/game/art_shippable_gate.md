@@ -59,6 +59,7 @@ Forbidden as sole “done” proof:
 |---|---|
 | Structural module | Real geometry (not pure BoxMesh), walkable floor, kit wrapper if required |
 | Threat | Archetype-distinct silhouette + color/material; GLB preferred; identical grey capsules fail |
+| Player character | Rigged low-poly humanoid GLB (ADR-0070 kit contract: floor pivot, `+Z` forward, validated sockets) with a silhouette and palette distinct from every threat; worn equipment visible; readable at `IsoCameraRig` size 22 / 1280×720 (≈45 px tall); a capsule or an unrigged mesh fails |
 | Gameplay prop | Distinct prop mesh per interactable id; box-only fails for slice-critical list |
 | UI icon | Readable at HUD scale; no empty placeholder path |
 | Audio | Non-silent clip, licensed, path in catalog, coverage smoke |
