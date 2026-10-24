@@ -183,8 +183,10 @@ func play_action(logical: String) -> bool:
 		return false
 	if not _logical_to_clip.has(logical):
 		return false
+	if not _play_logical(logical, false):
+		return false
 	_action_logical = logical
-	return _play_logical(logical, false)
+	return true
 
 
 func get_current_animation() -> String:
@@ -206,7 +208,7 @@ func get_socket(socket_key: String) -> Node3D:
 	return found as Node3D
 
 
-func set_class_accent(color: Color) -> void:
+func set_class_accent(color: Color = CLASS_ACCENT_DEFAULT) -> void:
 	var accent_name: String = str(entry.get("class_accent_node", "Body_ClassAccent"))
 	var mesh: MeshInstance3D = _mesh_nodes.get(accent_name, null) as MeshInstance3D
 	if mesh == null:

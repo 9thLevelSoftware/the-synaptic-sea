@@ -48,6 +48,7 @@ def main() -> int:
     from tools.character_kit import character_kit_spec as spec
     from tools.character_kit.bpy_lowpoly import (
         MeshBuilder,
+        export_glb,
         make_materials,
         new_collection,
         reset_scene,
@@ -73,7 +74,7 @@ def main() -> int:
     author_animations(bpy, armature, spec)
 
     glb_path = out_dir / spec.GLB_LEAF
-    _export_glb(bpy, glb_path)
+    export_glb(str(glb_path), animated=True)
     try:
         relative_glb = glb_path.resolve().relative_to(project_root).as_posix()
     except ValueError:
@@ -341,39 +342,6 @@ def _build_equipment(spec, mats, armature, collection, MeshBuilder):
         b.box((0.08, 0.06, 0.10), (0.17 * sx, 0.10, 0.91), strap, bevel=0.012)
     b.cylinder(0.025, 0.025, 0.16, (0.0, 0.15, 0.90), metal, segments=6)  # wrench holster
     b.finish()
-
-
-# ------------------------------------------------------------------------ export
-
-
-def _export_glb(bpy, glb_path: Path) -> None:
-    bpy.ops.object.select_all(action="DESELECT")
-    bpy.ops.export_scene.gltf(
-        filepath=str(glb_path),
-        export_format="GLB",
-        use_selection=False,
-        export_yup=True,
-        export_apply=True,
-        export_texcoords=True,
-        export_normals=True,
-        export_materials="EXPORT",
-        export_image_format="NONE",
-        export_cameras=False,
-        export_lights=False,
-        export_extras=True,
-        export_skins=True,
-        export_all_influences=False,
-        export_def_bones=True,
-        export_rest_position_armature=True,
-        export_animations=True,
-        export_animation_mode="NLA_TRACKS",
-        export_force_sampling=True,
-        export_frame_range=False,
-        export_optimize_animation_size=False,
-        export_anim_single_armature=True,
-        export_reset_pose_bones=True,
-        export_current_frame=False,
-    )
 
 
 if __name__ == "__main__":

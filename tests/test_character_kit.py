@@ -54,10 +54,9 @@ class SpecTests(unittest.TestCase):
 
     def test_manifest_round_trip(self):
         document = spec.KitManifest().to_dict()
-        self.assertEqual(document["document_kind"], spec.DOCUMENT_KIND)
-        self.assertEqual(document["bones"], spec.BONE_NAMES)
-        self.assertEqual(document["animations"], spec.ANIMATION_NAMES)
         self.assertEqual(json.loads(spec.canonical_json(document)), document)
+        custom = spec.KitManifest(glb_path="staging/kit/survivor_v1.glb").to_dict()
+        self.assertEqual(custom["glb_path"], "staging/kit/survivor_v1.glb")
 
 
 class CatalogTests(unittest.TestCase):

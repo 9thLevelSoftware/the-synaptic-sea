@@ -171,8 +171,7 @@ func _mount_character_visual() -> void:
 		return
 	character_visual = visual
 	add_child(character_visual)
-	if marker != null:
-		marker.visible = false
+	marker.visible = false  # _ensure_support_nodes() always runs first
 
 
 func _sync_character_visual(delta: float) -> void:

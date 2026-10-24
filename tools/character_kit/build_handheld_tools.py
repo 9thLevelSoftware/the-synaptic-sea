@@ -28,7 +28,7 @@ TOOL_IDS = {
 
 
 def build_all_tools(bpy, project_root: Path, materials_spec) -> None:
-    from tools.character_kit.bpy_lowpoly import MeshBuilder, make_materials, new_collection, reset_scene
+    from tools.character_kit.bpy_lowpoly import MeshBuilder, export_glb, make_materials, new_collection, reset_scene
 
     out_dir = project_root / TOOL_RUNTIME_ROOT
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -39,20 +39,7 @@ def build_all_tools(bpy, project_root: Path, materials_spec) -> None:
         builder = MeshBuilder(f"Tool_{tool_id}", bone=None, armature=None, collection=collection)
         _BUILDERS[tool_id](builder, mats)
         builder.finish()
-        bpy.ops.object.select_all(action="DESELECT")
-        bpy.ops.export_scene.gltf(
-            filepath=str(out_dir / f"{tool_id}.glb"),
-            export_format="GLB",
-            use_selection=False,
-            export_yup=True,
-            export_apply=True,
-            export_materials="EXPORT",
-            export_image_format="NONE",
-            export_cameras=False,
-            export_lights=False,
-            export_animations=False,
-            export_skins=False,
-        )
+        export_glb(str(out_dir / f"{tool_id}.glb"), animated=False)
         print(f"HANDHELD TOOL BUILD OK id={tool_id}")
 
 

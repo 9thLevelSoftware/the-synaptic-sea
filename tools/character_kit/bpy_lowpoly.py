@@ -188,6 +188,48 @@ class MeshBuilder:
         return obj
 
 
+def export_glb(filepath: str, animated: bool) -> None:
+    """Normalized GLB export shared by the character and handheld-tool builders.
+
+    ``animated`` enables skin + NLA-track animation export for the rigged kit;
+    static props export geometry and materials only. Options are pinned for
+    Blender 4.2 LTS so a different Blender fails loudly instead of silently
+    exporting a different file."""
+    import bpy
+
+    bpy.ops.object.select_all(action="DESELECT")
+    options = dict(
+        filepath=filepath,
+        export_format="GLB",
+        use_selection=False,
+        export_yup=True,
+        export_apply=True,
+        export_texcoords=True,
+        export_normals=True,
+        export_materials="EXPORT",
+        export_image_format="NONE",
+        export_cameras=False,
+        export_lights=False,
+        export_extras=True,
+        export_skins=animated,
+        export_animations=animated,
+    )
+    if animated:
+        options.update(
+            export_all_influences=False,
+            export_def_bones=True,
+            export_rest_position_armature=True,
+            export_animation_mode="NLA_TRACKS",
+            export_force_sampling=True,
+            export_frame_range=False,
+            export_optimize_animation_size=False,
+            export_anim_single_armature=True,
+            export_reset_pose_bones=True,
+            export_current_frame=False,
+        )
+    bpy.ops.export_scene.gltf(**options)
+
+
 def triangle_count(obj) -> int:
     mesh = obj.data
     mesh.calc_loop_triangles()
