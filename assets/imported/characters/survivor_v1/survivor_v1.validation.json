@@ -42,14 +42,74 @@
     0.0,
     -0.13
   ],
-  "byte_size": 655968,
+  "byte_size": 657288,
   "errors": [],
   "forward_axis_ok": true,
   "glb": "assets/imported/characters/survivor_v1/survivor_v1.glb",
   "height_m": 1.76,
+  "kit_bounds_max": [
+    0.3282,
+    1.803,
+    0.21
+  ],
+  "kit_bounds_min": [
+    -0.3282,
+    0.0,
+    -0.37
+  ],
   "kit_id": "survivor_v1",
   "kit_triangles": 3396,
   "ok": true,
+  "sockets": {
+    "Socket_Back": {
+      "forward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        -0.0
+      ]
+    },
+    "Socket_HandL": {
+      "forward": [
+        -0.0,
+        0.0,
+        1.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        -0.0
+      ]
+    },
+    "Socket_HandR": {
+      "forward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "up": [
+        -0.0,
+        1.0,
+        -0.0
+      ]
+    },
+    "Socket_Head": {
+      "forward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        -0.0
+      ]
+    }
+  },
   "triangles_per_part": {
     "Body_Boot_L": 84,
     "Body_Boot_R": 84,

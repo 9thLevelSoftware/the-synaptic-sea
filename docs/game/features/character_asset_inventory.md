@@ -3,7 +3,10 @@
 ## Status
 
 In implementation (2026-10-24). Tranche 1 (player kit, runtime seam, validation) is landed by
-this feature; tranches 2–4 are scoped below and not yet built.
+this feature; tranches 2–4 are scoped below and not yet built. The asset review and inventory
+were cross-checked by a six-lane adversarial audit of the repository (art direction, asset
+audit of all 1,217 pre-existing GLBs, player requirements, threat/NPC seams, pipeline seams,
+history of prior attempts); corrections from that audit are folded in below.
 
 ## Requirement cross-reference
 
@@ -38,8 +41,9 @@ crowbar at something that used to be crew.
 | Budget (body) | 800–3 200 triangles (shipped `survivor_v1`: 1 540) | PZ bodies are ~1 k; "a bit more detailed" = bevels, joint caps, pockets, cuffs |
 | Budget (kit) | ≤ 7 000 triangles with every equipment node (shipped: 3 396) | Many bodies on screen stay cheap |
 | Scale | 1.75 m tall, pivot at floor centre, `+Z` forward, metres, Y-up | Matches capsule 0.35 r × 1.6 h, `CELL_SIZE = 4.0`, ADR-0058 conventions |
-| Camera budget | `IsoCameraRig` ortho `size = 22` at 1280×720 → 1 m ≈ 33 px → body ≈ 57 px tall | Detail below ~3 cm is invisible; silhouette + colour blocking carry everything |
-| Recommended | Evaluate `size = 12–14` (body ≈ 104–90 px) for readability; preview `gameplay_distance_iso_size12.png` | PZ renders bodies at ~100–150 px on 1080p |
+| Camera budget | `IsoCameraRig` ortho `size = 22` at 1280×720, offset (16, 18, 16) → 38.5° pitch → 1 m ≈ 33 px before foreshortening → a 1.76 m body is **≈45 px tall at 720p, ≈67 px at 1080p** | Detail below ~4 cm is invisible; silhouette + colour blocking carry everything |
+| Recommended | Evaluate `size = 12–14` (body ≈ 80–95 px at 720p) for readability; preview `gameplay_distance_iso_size12.png` | PZ renders bodies at ~100–150 px on 1080p |
+| Proof camera | Judge at the production rig, not the readability harness (`locked_iso_readability_harness.tscn` uses 35.3° / size 18 / 1600×900, ~50 px/m) | The harness over-states readability by ~65 % |
 | Materials | `MAT_SuitFabric`, `MAT_SuitPlate`, `MAT_Skin`, `MAT_Boot`, `MAT_Strap`, `MAT_Metal`, `MAT_Visor` (emissive), `MAT_ClassAccent` (runtime-recolourable), `MAT_Lamp` (emissive) | Nine named palette slots; Godot imports them as `StandardMaterial3D` by name |
 | Rig | 20 deform bones (`root, hips, spine, chest, neck, head, shoulder/upper_arm/forearm/hand ×2, thigh/shin/foot ×2`), rigid per-part skinning | PZ-style segmented bodies; cheap, deterministic, reusable for corpses/stalker |
 | Clips | `idle, walk, crouch_idle, crouch_walk, work` (looping) + `melee_swing, aim_ranged, downed` | One clip per live state the sim can put the player in today |
@@ -62,13 +66,13 @@ work, combat, or death, so the vertical slice's "feel the fantasy" bar is unreac
 |---|---|---|
 | Player visual | Blue unshaded capsule built in code | **Replaced** by `survivor_v1` (this feature); capsule remains the fallback |
 | Threat visuals | Six archetypes, all primitives (`mesh_path: ""`) | **Unusable as art**; keep the catalog seam, bind GLBs in tranche 3. `ThreatPlaceholderRenderer` mounts a `PackedScene` *beside* the primitive instead of replacing it — must hide the primitive before binding |
-| `assets/imported/structural/ship_structural_v0` | 15 modules, intact/damaged/breached + `_textured` variants (~700-tri class), placement contracts | **Usable** as the environment baseline; boxy but on-grid and validated; not character work |
+| `assets/imported/structural/ship_structural_v0` | 15 modules with placement contracts, but only 8 are real greybox modules (520–740 tris); the other 7 (`bulkhead_portal_2x1`, `doorway_frame_blocked_1x1`, `floor_2x1`, `wall_end_cap`, `wall_inner/outer_corner`, `wall_t_junction`) are 24-tri two-box placeholders, wall heights vary 2.0/3.0/3.2/3.5 m, and 7 of 8 wrappers bind `damaged`/`breached` to the intact GLB | **Salvageable baseline, not "usable"**: on-grid and validated, but a 1.76 m survivor will expose the box modules and height drift; tranche 4 lists the fixes |
 | `assets/imported/props/{components,dressing,objectives}` | 26 self-authored props with sidecars + generated index | **Usable** placeholders; visually weak, but every one is bound through ADR-0052 |
-| `assets/imported/props/ithappy/**` (+ structural/ithappy) | ~2 170 licensed sci-fi prop GLBs (2 materials each, 350–3 600 tris), catalog JSON | **Usable** for environment dressing; contains **no characters, no rigs, no animations** |
+| `assets/imported/props/ithappy/**` (+ structural/ithappy) | 1,084 textured prop GLBs + 45 re-skinned structural pieces (2 materials each, 2–5 400 tris, 2.3 GB with a duplicated atlas); `data/catalogs/ithappy_asset_catalog.json` points at 1,695 paths that do not exist; **nothing on the live path loads any of it**; no license file, receipt or `credits.json` row in the repo (a plan note cites a 5-seat purchase) | **Not usable as-is** for anything and **unusable for characters** (no humanoids, rigs or animations; "threats" are drones/turrets, "weapons" are ammo); keeping it requires a license record, a catalog rewrite and a decision ADR |
 | `assets/_staging/meshy/{loot_container,stalker}_v1` | 4 + 6 provider candidates (GLBs gitignored; review JSON tracked) | **Unusable** for final art (ADR-0048 records "terrible"); keep as pipeline evidence only |
 | `assets/_staging/focused_nine` | 9 staged structural/prop GLBs for a comparison batch | Evidence only; superseded by v0 kit for runtime |
 | `assets/tiles/synaptic_sea` | ComfyUI/LoRA PoC texture tiles (~2 MB each) | **Non-runtime by policy** (`art_shippable_gate.md`); not relevant to characters |
-| `assets/tilesets/{winlu,dithart}` | 2D top-down tilesets for the ADR-0048 pivot | **Dead path**: the boot chain never left 3D; no production script references `scenes/topdown` |
+| `assets/tilesets/{winlu,dithart}` | 2D top-down tilesets for the ADR-0048 pivot (Winlu: a manifest line "commercial (itch.io purchase)" only; DithArt: no license evidence) | **Dead path**: the boot chain never left 3D; no production script references `scenes/topdown`; licensing undocumented |
 | `assets/placeholder/*.png` | 69-byte empty PNG status icons | Placeholders; UI track, not this feature |
 | Blender/Meshy tooling (`tools/meshy_*`, `tools/blender_addons`, `tools/recover_modules.py`) | Heavy governance for provider candidates; masters on `/Volumes/Untitled` | **Not reusable for characters** as-is (provider + external-drive dependencies); contract/sidecar/validator ideas are reused by `tools/character_kit` |
 
@@ -91,22 +95,23 @@ Priority: **must** = needed for the vertical slice to show the fantasy; **should
 | CHR-P04 | `field_pack` (soft duffel, flap, side pockets) | equipment node | `slots["back"]` → `Equip_FieldPack` | must | ✅ |
 | CHR-P05 | `tool_belt` (belt, four pouches, holster) | equipment node | `slots["waist"]` → `Equip_ToolBelt` | must | ✅ |
 | CHR-P06 | Class accent patch (`Body_ClassAccent`, `MAT_ClassAccent`) | recolourable node | `CharacterVisual.set_class_accent()` | should | ✅ node + API; class→colour table wiring ⏳ |
-| CHR-P07 | Clip set: `idle, walk, crouch_idle, crouch_walk, work, melee_swing, aim_ranged, downed` | animation | `CharacterVisual` from velocity / crouch / `WorkActionDriver.is_working()` / attack / `end_run("death")` | must | ✅ |
-| CHR-P08 | Sockets `Socket_HandR/HandL/Back/Head` | bone-parented nodes | `CharacterVisual.get_socket()` | must | ✅ |
+| CHR-P07 | Clip set: `idle, walk, crouch_idle, crouch_walk, work, melee_swing, aim_ranged, downed`; walk clips scale with planar speed (`speed_scale = speed / 3 m/s`, clamped 0.5–2.0) | animation | `CharacterVisual` from velocity / crouch / `WorkActionDriver.is_working()` / attack / `end_run("death")` | must | ✅ |
+| CHR-P08 | Sockets `Socket_HandR/HandL/Back/Head`, validator-proven `+Z` forward / `+Y` up in rest pose | bone-parented nodes | `CharacterVisual.get_socket()` (no runtime caller until CHR-P11) | must | ✅ |
 | CHR-P09 | Handheld tools: `crowbar`, `welding_lance`, `flare_pistol`, `shock_probe`, `portable_oxygen_pump`, `junction_calibrator` | static props, grip at origin, `+Z` working end | hand-slot mount via `Socket_HandR/L` | should | ✅ assets; mount seam ⏳ (tranche 2) |
-| CHR-P10 | Review previews (turnarounds × 3 variants, pose sheet, gameplay-distance frames) | evidence | art gate item 7 | must | ✅ |
+| CHR-P10 | Review previews (turnarounds × 3 variants, pose sheet, gameplay-distance frames) rendered in Blender from the exported GLB | evidence | art gate item 7 (partial) | must | ✅ Blender; ⏳ in-engine captures at seeds 42/777 × normal/emergency/dark through `IsoCameraRig` are still owed |
 
 ### Tranche 2 — player states the sim already has but the body cannot show yet
 
 | ID | Asset | Driven by | Priority | Status |
 |---|---|---|---|---|
-| CHR-P11 | Hand-slot mounting seam (BoneAttachment3D on `Socket_HandR/L`, swap on `primary_hand`/`secondary_hand`) | `EquipmentState.slots` | must | ⏳ |
+| CHR-P11 | Hand-slot mounting seam (BoneAttachment3D on `Socket_HandR/L`, swap on `primary_hand`/`secondary_hand`); first reconcile `welding_lance`'s slot (`item_definitions.json` says `primary_hand`, `weapon_definitions.json` treats it as secondary) | `EquipmentState.slots` | must | ⏳ |
+| CHR-P11b | Default sealed-suit look when away: the sim drains suit O2 on every derelict (`_is_field_suit_pressure_active`) while the spawn loadout is empty and the base body is bare-headed. Either a default soft-suit hood/visor node shown whenever away, or a starting `suit` item, plus decoupling `Equip_Helmet` from the hardsuit prefix list so helmet on/off is a real signal | `away_from_start` / `EquipmentState.slots["suit"]` | must (promoted from CHR-P17) | ⏳ |
 | CHR-P12 | `reload` clip + `hurt_flinch` clip | `_reload_equipped_weapon`, `DamagePipeline` player hit | should | ⏳ |
 | CHR-P13 | `cart_push` clip (two hands forward) + cart grab pose | `CartState` grabbed | should | ⏳ |
 | CHR-P14 | `heavy_load` and `exhausted` idle/walk overlays (slumped shoulders) | `Encumbrance` tier, `VitalsState` stamina | should | ⏳ |
-| CHR-P15 | Wound dressings per body part (`Equip_Bandage_{Head,Torso,Arm_L/R,Leg_L/R}`) | `WoundState.body_part` | should | ⏳ |
+| CHR-P15 | Wound dressings per body part (`Equip_Bandage_{Head,Torso,Arm_L/R,Leg_L/R}`) — **gated**: `WoundState.apply_wound` has no runtime caller today (threat damage goes straight to `VitalsState.health`), so wire `DamagePipeline` → `WoundState` first or the art is dead on arrival | `WoundState.body_part` | should | ⏳ blocked |
 | CHR-P16 | Helmet lamp as a real `SpotLight3D` on `Socket_Head`, on only with `hardsuit` | equipment + ambient lighting mode | should | ⏳ |
-| CHR-P17 | Soft EVA suit (second suit item) and bare-head hair/cap variants | future `suit` items | could | ⏳ |
+| CHR-P17 | Soft EVA suit as a modelled second suit item (beyond the CHR-P11b default look) and bare-head hair/cap variants | future `suit` items | could | ⏳ |
 | CHR-P18 | Second body type (proportion preset in the builder) | class/start selection (vertical slice Phase 3) | could | ⏳ |
 | CHR-P19 | `interact_reach` and `pickup` one-shots | interact dispatch, tool pickup | could | ⏳ |
 
@@ -116,7 +121,7 @@ Priority: **must** = needed for the vertical slice to show the fantasy; **should
 |---|---|---|---|---|
 | CHR-N01 | `puppet_corpse` body: survivor rig, biomatter-crusted materials, lurch/idle/attack clips | `threat_visual_catalog.json` `mesh_path` → `ThreatPlaceholderRenderer` (after the primitive-hide fix) | must (vertical slice "distinct threat silhouette") | ⏳ |
 | CHR-N02 | `stalker` humanoid variant: elongated proportions preset, low stalking idle, lunge | same seam; replaces the rejected Meshy pilot | must | ⏳ |
-| CHR-N03 | Searchable corpse prop (downed survivor, static) | `ShipInstance.pending_corpse_loot` spawn | should | ⏳ |
+| CHR-N03 | Searchable corpse prop (downed survivor, static, floor pivot) replacing the upright 1 m `corpse_bag` capsule | `gameplay_prop_v0.json` `corpse_bag.mesh_path` → `GameplayPropFactory` | should | ⏳ |
 | CHR-N04 | Hallucination phantom (survivor silhouette, `MAT_Visor`-style translucent) | `HallucinationManager` → `build_placeholder(PHANTOM_ARCHETYPE)` | should | ⏳ |
 | CHR-N05 | Crew/NPC survivor (talkable) | none today (social suite is abstract) | could | ⏳ |
 
@@ -165,7 +170,11 @@ sidecar consumer (ADR-0052), not a character seam.
   branches.
 - A missing asset degrades to the capsule; it never borrows another visual.
 - Runtime GLBs are regenerated from `tools/character_kit/` source; hand edits to
-  `assets/imported/characters/**` are not accepted.
+  `assets/imported/characters/**` are not accepted. Rebuilds are content-identical but not
+  byte-identical (Blender's exporter reorders accessors), so the validator report, not a hash,
+  is the evidence; rebuild and recommit whenever the builder changes.
+- New runtime scripts are classified in `docs/game/inventory/runtime_file_classification.json`
+  and registered in `system_inventory.json` so the inventory remains the status source of truth.
 
 ## Non-goals
 
@@ -233,6 +242,16 @@ kit"). Visual evidence: `artifacts/validation-previews/characters/survivor_v1/`.
 - **Local tooling drift**: Blender 4.2 LTS exporter options are pinned in the builder; a newer
   Blender may rename options — the launcher fails loudly rather than silently exporting a
   different GLB.
+- **Fresh-clone validation**: the two Godot smokes need the project imported once
+  (`"$GODOT" --headless --import --path "$ROOT"`); without it the player silently falls back to
+  the capsule and `player_character_visual_smoke` goes red (by design, so the gap is visible).
+- **Scale incoherence around the body**: gameplay props sit at 0.4–0.6 m "dollhouse" scale and
+  7 structural modules are 24-tri boxes; a correct 1.76 m survivor makes that more obvious, so
+  tranche 4 includes a prop rescale pass and the box-module replacements.
+- **Licensing**: third-party packs in the repo (ithappy, Winlu, DithArt) have no license files
+  or `credits.json` rows; `survivor_v1` and `handheld_tools_v1` are self-authored
+  (provenance recorded in the manifest's spec). Decide the packs' fate in an ADR before any
+  export ships them.
 
 ## ADRs
 

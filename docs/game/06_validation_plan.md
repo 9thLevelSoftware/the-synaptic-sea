@@ -223,8 +223,10 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tools/character_kit/validate_char
 PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_character_kit.py
 ```
 
-Expected: `CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8 body_tris=1540 kit_tris=3396 height=1.76 forward=+Z`
-and `9 passed`.
+Expected: `CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8 body_tris=1540 kit_tris=3396 height=1.76 forward=+Z sockets=4`
+and `9 passed`. The validator also rejects any socket whose rest-pose local `+Z`/`+Y` is not
+the character's forward/up, and reports full-kit bounds (`kit_bounds_min/max`, 1.80 m tall
+with the helmet, 0.37 m behind the origin with the EVA pack).
 
 Godot smokes (the GLB must be imported first; a fresh clone runs
 `"$GODOT" --headless --import --path "$ROOT"` once before the bundle):

@@ -5969,6 +5969,99 @@
       "subsystems": []
     },
     {
+      "id": "character_visual_catalog",
+      "file": "scripts/systems/character_visual_catalog.gd",
+      "name": "Character Visual Catalog",
+      "domain": "player",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/player_character_visual_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "character_visual.gd:51",
+      "input": {
+        "live": true,
+        "desc": "load_from_path reads data/characters/character_visual_catalog.json (version character-visual-1) and validates every entry (scene_path, +Z forward, equipment_visuals, animations); entries commit only when the document is fully valid",
+        "at": "character_visual_catalog.gd:27-66"
+      },
+      "output": {
+        "live": true,
+        "desc": "get_entry(id) hands CharacterVisual.mount_catalog_entry the scene path, equipment prefix table, socket names and logical->clip map that drive the player's body on the main playable path",
+        "at": "character_visual_catalog.gd:69-72 -> character_visual.gd:51-63"
+      },
+      "confidence": "V",
+      "loops": [
+        "hud_feedback"
+      ],
+      "integrations": [
+        {
+          "to": "character_visual",
+          "via": "CharacterVisual.mount_catalog_entry -> load_from_path/get_entry",
+          "at": "character_visual.gd:51-55",
+          "health": "healthy"
+        }
+      ],
+      "content": "sufficient",
+      "content_note": "ADR-0070 (2026-10-24): pure RefCounted loader, no scene-tree access. One entry (player_survivor) bound to assets/imported/characters/survivor_v1/survivor_v1.glb. Proven by player_character_visual_smoke (catalog loads, unknown id empty, malformed entry rejected) in the regression bundle.",
+      "functional": null,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
+      "id": "character_visual",
+      "file": "scripts/player/character_visual.gd",
+      "name": "Character Visual",
+      "domain": "player",
+      "kind": "ui",
+      "model_exists": true,
+      "smoke": "scripts/validation/main_playable_player_visual_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "player_controller.gd:88",
+      "input": {
+        "live": true,
+        "desc": "PlayerController._physics_process -> _sync_character_visual feeds velocity + crouch every physics tick, EquipmentState.slots via the coordinator-injected provider, WorkActionDriver.is_working via provider; _attack_with_equipped_weapon -> play_visual_action(melee|aim); end_run(death) -> set_visual_downed",
+        "at": "player_controller.gd:85-88,175-186; playable_generated_ship.gd:10765-10780,10090-10094,2220-2222"
+      },
+      "output": {
+        "live": true,
+        "desc": "mounts the survivor_v1 GLB scene under the player (capsule marker hidden, collision untouched), toggles Equip_* nodes from the equipment slots, yaws the model to its planar travel direction, selects idle/walk/crouch/work clips with speed-scaled walking, plays melee/aim/downed one-shots on a per-instance AnimationLibrary",
+        "at": "character_visual.gd:66-100,104-128,133-150,171-185"
+      },
+      "confidence": "V",
+      "loops": [
+        "hud_feedback"
+      ],
+      "integrations": [
+        {
+          "to": "player_controller",
+          "via": "_mount_character_visual + _sync_character_visual (physics tick, branch independent)",
+          "at": "player_controller.gd:160-186",
+          "health": "healthy"
+        },
+        {
+          "to": "equipment_state",
+          "via": "coordinator provider _visual_equipment_slots -> set_equipment_slots",
+          "at": "playable_generated_ship.gd:10765-10774",
+          "health": "healthy"
+        },
+        {
+          "to": "unassessed_systems_work_action_driver",
+          "via": "coordinator provider _visual_is_working -> set_working",
+          "at": "playable_generated_ship.gd:10777-10778",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "ADR-0070 (2026-10-24): Node3D scene consumer; no gameplay state. Proven live by main_playable_player_visual_smoke (mounted, equip sync through the real EquipmentState, away-branch walk + facing, unarmed-no-swing then armed swing) and player_character_visual_smoke (bones/clips/loops/equipment/facing/locomotion/action/downed/fallback). Content partial: hand-slot mounting (sockets exported and validated, no runtime caller), sealed-suit default look, reload/hurt/cart clips are tranche 2 in docs/game/features/character_asset_inventory.md.",
+      "functional": null,
+      "gaps": [
+        "handheld tool mounting on Socket_HandR/HandL has no runtime caller (CHR-P11)",
+        "no in-engine locked-iso capture set yet (Blender previews only)"
+      ],
+      "subsystems": []
+    },
+    {
       "id": "iso_camera_rig",
       "file": "scripts/camera/iso_camera_rig.gd",
       "name": "Iso Camera Rig",

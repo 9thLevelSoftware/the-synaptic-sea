@@ -138,6 +138,9 @@ func _run() -> void:
 		var yaw_x: float = visual.get_facing_yaw()
 		facing_ok = absf(yaw_z) < 0.01 and absf(yaw_x - PI * 0.5) < 0.01
 		_expect(facing_ok, "faces +Z of travel (yaw_z=%.3f yaw_x=%.3f)" % [yaw_z, yaw_x])
+		# Walk clips scale with planar speed (6 m/s -> 2.0x at the 3 m/s reference).
+		visual.update_locomotion(Vector3(6.0, 0.0, 0.0), false, 1.0)
+		var speed_scale_ok: bool = absf(visual.get_speed_scale() - 2.0) < 0.01
 		visual.update_locomotion(Vector3(3.0, 0.0, 0.0), true, 1.0)
 		var crouch_walk_ok: bool = visual.get_current_logical() == "crouch_walk"
 		visual.update_locomotion(Vector3.ZERO, true, 1.0)
@@ -147,9 +150,10 @@ func _run() -> void:
 		visual.set_working(true)
 		var work_ok: bool = visual.get_current_logical() == "work"
 		visual.set_working(false)
+		var idle_speed_ok: bool = absf(visual.get_speed_scale() - 1.0) < 0.01
 		locomotion_ok = walk_clip_ok and crouch_walk_ok and crouch_idle_ok and idle_ok and work_ok \
-			and visual.get_current_logical() == "idle"
-		_expect(locomotion_ok, "locomotion clip selection (walk/crouch/idle/work)")
+			and visual.get_current_logical() == "idle" and speed_scale_ok and idle_speed_ok
+		_expect(locomotion_ok, "locomotion clip selection (walk/crouch/idle/work) + speed scale")
 
 		# One-shot action overrides locomotion while playing.
 		action_ok = player.play_visual_action("melee") and visual.get_current_animation() == "melee_swing"

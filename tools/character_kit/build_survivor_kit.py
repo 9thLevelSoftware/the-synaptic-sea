@@ -155,7 +155,13 @@ def _build_armature(bpy, spec, collection):
 def _build_sockets(bpy, spec, armature, collection):
     # Sockets are empties parented to bones. In bone-parent space the origin is
     # the bone TAIL and +Y points from head to tail, so offsets are expressed
-    # back along -Y toward the joint.
+    # back along -Y toward the joint. Bone-parenting also bakes the bone's
+    # orientation into the empty, so each socket is counter-rotated so that in
+    # REST POSE its local +Z is the character's forward (Blender -Y == glTF +Z)
+    # and local +Y is up; a handheld prop authored "grip at origin, working end
+    # +Z" then mounts with an identity transform. The validator checks this.
+    from mathutils import Matrix
+
     offsets = {
         "Socket_HandR": (0.0, -0.085, 0.0),
         "Socket_HandL": (0.0, -0.085, 0.0),
@@ -171,6 +177,17 @@ def _build_sockets(bpy, spec, armature, collection):
         empty.parent_type = "BONE"
         empty.parent_bone = bone
         empty.location = offsets.get(name, (0.0, 0.0, 0.0))
+        # Desired world basis: +X right, +Y up (Blender +Z), +Z forward (Blender -Y).
+        target_world = Matrix(((1.0, 0.0, 0.0, 0.0), (0.0, 0.0, -1.0, 0.0), (0.0, 1.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
+        bone_rest = armature.data.bones[bone].matrix_local  # armature space, rest pose
+        # Bone-parent space = bone rest basis with +Y along the bone; counter-rotate.
+        empty.rotation_mode = "XYZ"
+        # Blender's bone-parent frame is the bone's rest basis with +Y along
+        # the bone; after the exporter's Y-up conversion the empty still
+        # carries a -90 deg X offset, so pre-compensate it here. The validator
+        # proves the result (forward == glTF +Z, up == glTF +Y for every socket).
+        basis = bone_rest.to_3x3().inverted() @ target_world.to_3x3() @ Matrix.Rotation(math.radians(-90.0), 3, "X")
+        empty.rotation_euler = basis.to_euler("XYZ")
 
 
 # -------------------------------------------------------------------------- body

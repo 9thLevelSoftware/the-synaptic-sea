@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-10-24). Supersedes the production-path portion of ADR-0048 (top-down 2D pivot).
+Accepted (2026-10-24). Supersedes the production-path portion of ADR-0048 (top-down 2D pivot):
+ADR-0048's Status line and index row now say so, the `scenes/topdown` / `scripts/topdown` tree
+stays as non-production legacy (smoke-only), and no replacement "ADR-0060 restore-3D" file is
+needed because number 0060 is already taken twice.
 Complements ADR-0052 (visual-only runtime binding), ADR-0058 (Blender canonical master authority),
 and ADR-0069 (procedural biomass assembly for threats).
 
@@ -29,7 +32,8 @@ Three facts shape the decision:
    character pipeline cannot depend on a paid provider, an external drive master
    (`/Volumes/Untitled/...`), or a reviewer-only screenshot gallery.
 3. **The game's camera budget is small.** `IsoCameraRig` is orthographic with `size = 22.0`
-   (vertical metres at 1280×720), so a 1.75 m figure is ~57 px tall on screen. Detail beyond
+   (vertical metres at 1280×720, offset (16, 18, 16) → 38.5° pitch), so a 1.76 m figure is
+   ~45 px tall on screen at 720p (~67 px at 1080p) after foreshortening. Detail beyond
    silhouette, colour blocking, and a few readable accents is wasted; this is exactly the
    Project Zomboid register ("PZ, but a bit more detailed").
 
@@ -49,6 +53,13 @@ Three facts shape the decision:
   emissive), one class accent patch the runtime can recolour. No facial detail.
 - 1.75 m tall, pivot at the floor centre, `+Z` forward, metres, Y-up (ADR-0058 conventions).
   Blender authoring is Z-up facing `-Y`; the exporter's Y-up conversion yields `+Z` forward.
+  Full-kit rest bounds with every equipment node are 1.80 m tall (helmet) and extend 0.37 m
+  behind the origin (EVA pack), past the 0.35 m collision radius; that overhang is visual only
+  and is recorded by the validator (`kit_bounds_*`), not by collision.
+- Bone sockets (`Socket_HandR/HandL/Back/Head`) are counter-rotated at build time so that in
+  rest pose their local `+Z` is the character's forward and `+Y` is up; the validator composes
+  the exported rest transforms and fails any socket that is not, so a handheld prop authored
+  "grip at origin, working end `+Z`" mounts with an identity transform.
 
 ### Procedural Blender authoring (not Meshy, not hand-modelled masters)
 
@@ -63,7 +74,11 @@ Three facts shape the decision:
   review set with Cycles CPU. `build_kit.py` is the host launcher.
 - The Python source **is** the editable master. A `.blend` may be saved outside the repo for
   artists, but regeneration from source must always reproduce the runtime asset. This removes
-  the external-drive dependency that stalled ADR-0058's masters.
+  the external-drive dependency that stalled ADR-0058's masters. Reproduction is
+  content-level, not byte-level: Blender's glTF exporter does not order accessors
+  deterministically, so two builds of the same source differ in bytes while passing the same
+  validator with identical bones, clips, triangle counts, bounds and socket axes. Hash
+  sidecars are therefore not used for this kit; the validator report is the evidence.
 
 ### Runtime seam (Godot authority preserved)
 

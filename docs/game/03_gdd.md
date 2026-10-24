@@ -21,6 +21,13 @@ See `02_core_loop.md`.
 - Locked-isometric 3D.
 - Orthographic readability is a core requirement.
 - Spatial coherence and traversal clarity outrank visual spectacle.
+- Production rig (`scripts/camera/iso_camera_rig.gd`): orthographic, offset (16, 18, 16) from
+  the player (38.5° pitch, 45° yaw), size 22 m vertical at 1280×720 (~33 px/m, so a 1.76 m
+  body is ~45 px tall; ~67 px at 1080p). The readability harness uses a different camera
+  (size 18, 35.3° pitch) and is not the production view.
+- Characters follow ADR-0070: "Project Zomboid, but a bit more detailed" low-poly segmented
+  humanoids authored procedurally in Blender, judged at the production camera; see
+  `features/character_asset_inventory.md`.
 
 ## Player verbs, current and planned
 

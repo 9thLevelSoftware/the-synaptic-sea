@@ -2223,7 +2223,10 @@ transfer authority or weaker substitute.
     `shock_probe`) and per tool pickup (`portable_oxygen_pump`, `junction_calibrator`) under
     `assets/imported/characters/handheld_tools_v1/`, grip at the origin, working end along `+Z`.
   - The rig exports `Socket_HandR` / `Socket_HandL` / `Socket_Back` / `Socket_Head` as
-    bone-parented nodes so a later seam can mount them with an identity transform.
+    bone-parented nodes whose rest-pose local `+Z` is the character's forward and `+Y` is up
+    (the validator composes the exported transforms and fails otherwise), so a later seam can
+    mount them with an identity transform.
 - Verification:
   - `tools/character_kit/build_kit.py` prints `HANDHELD TOOL BUILD OK id=<id>` for each; the
-    kit smoke asserts `primary_hand socket present`.
+    validator prints `sockets=4` only when all four socket axes verify; the kit smoke asserts
+    `primary_hand socket present`.

@@ -1,7 +1,11 @@
 # ADR-0048: Top-Down Pivot — Supersedes ADR-0010/0017
 
 **Date:** 2026-08-18
-**Status:** Accepted
+**Status:** Superseded in part by ADR-0070 (2026-10-24). The production art path is
+locked-isometric 3D; the boot chain never adopted the 2D presentation and the operator abandoned
+top-down on 2026-08-22. The `scenes/topdown` / `scripts/topdown` tree is retained as
+non-production legacy (smoke-only). Note: this file reuses number 0048, which also belongs to
+`0048-mermaid-architecture-diagram-source-and-svg-exports.md`.
 **Deciders:** Christopher Willoughby, architect (MiMo-v2.5-pro)
 
 ## Context

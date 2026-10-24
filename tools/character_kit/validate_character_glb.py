@@ -107,6 +107,55 @@ def _node_by_name(document: dict) -> Dict[str, dict]:
     return {str(node.get("name", "")): node for node in document.get("nodes", [])}
 
 
+def _quat_to_matrix(q) -> List[List[float]]:
+    x, y, z, w = q
+    return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ]
+
+
+def _matmul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _node_world_rotation(document: dict, node_index: int) -> List[List[float]]:
+    """Compose rest-pose rotations from the scene root down to ``node_index``
+    (glTF node TRS; scale is ignored because the kit uses unit scale)."""
+    parents: Dict[int, int] = {}
+    for index, node in enumerate(document.get("nodes", [])):
+        for child in node.get("children", []):
+            parents[int(child)] = index
+    chain = []
+    current = node_index
+    while current is not None:
+        chain.append(current)
+        current = parents.get(current)
+    rotation = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    for index in reversed(chain):
+        node = document["nodes"][index]
+        if "matrix" in node:
+            m = node["matrix"]  # column-major 4x4
+            local = [[m[0], m[4], m[8]], [m[1], m[5], m[9]], [m[2], m[6], m[10]]]
+        else:
+            local = _quat_to_matrix(node.get("rotation", [0.0, 0.0, 0.0, 1.0]))
+        rotation = _matmul(rotation, local)
+    return rotation
+
+
+def socket_axes(document: dict, socket_name: str) -> Dict[str, Tuple[float, float, float]]:
+    """World-space direction of the socket's local +Z (forward) and +Y (up)."""
+    index = next((i for i, n in enumerate(document.get("nodes", [])) if str(n.get("name", "")) == socket_name), None)
+    if index is None:
+        return {}
+    r = _node_world_rotation(document, index)
+    return {
+        "forward": (r[0][2], r[1][2], r[2][2]),
+        "up": (r[0][1], r[1][1], r[2][1]),
+    }
+
+
 def project_relative(path: Path, project_root: Path | None) -> str:
     """Project-relative POSIX path when ``path`` is under the root, else as given
     (keeps tracked reports identical across machines)."""
@@ -224,6 +273,31 @@ def validate(glb_path: Path, manifest_path: Path | None = None, project_root: Pa
     if footprint[0] > spec.MAX_FOOTPRINT_M[0] or footprint[1] > spec.MAX_FOOTPRINT_M[1]:
         errors.append(f"footprint {footprint} exceeds {spec.MAX_FOOTPRINT_M}")
 
+    # Sockets must be +Z-forward / +Y-up in rest pose so handheld props
+    # (grip at origin, working end +Z) mount with an identity transform.
+    socket_report: Dict[str, dict] = {}
+    for socket in spec.SOCKETS:
+        axes = socket_axes(document, socket)
+        if not axes:
+            continue
+        fz = axes["forward"][2]
+        uy = axes["up"][1]
+        socket_report[socket] = {"forward": [round(v, 4) for v in axes["forward"]], "up": [round(v, 4) for v in axes["up"]]}
+        if fz < 0.95 or uy < 0.95:
+            errors.append(f"socket {socket} is not +Z forward / +Y up in rest pose: forward={socket_report[socket]['forward']} up={socket_report[socket]['up']}")
+
+    # Full-kit bounds (body + every equipment node) for the manifest/readers.
+    kit_min = [float("inf")] * 3
+    kit_max = [float("-inf")] * 3
+    for name in list(spec.BODY_PARTS) + list(spec.EQUIPMENT_PARTS):
+        node = nodes.get(name)
+        if node is None or "mesh" not in node:
+            continue
+        part_min, part_max = _mesh_bounds(document, node["mesh"])
+        for axis in range(3):
+            kit_min[axis] = min(kit_min[axis], part_min[axis])
+            kit_max[axis] = max(kit_max[axis], part_max[axis])
+
     # Forward axis: boot toes extend further toward +Z than the heel toward -Z.
     forward_ok = False
     boot = nodes.get("Body_Boot_L")
@@ -247,6 +321,9 @@ def validate(glb_path: Path, manifest_path: Path | None = None, project_root: Pa
         "bounds_min": [round(v, 4) for v in mins] if body_tris else None,
         "bounds_max": [round(v, 4) for v in maxs] if body_tris else None,
         "forward_axis_ok": forward_ok,
+        "sockets": socket_report,
+        "kit_bounds_min": [round(v, 4) for v in kit_min] if kit_tris else None,
+        "kit_bounds_max": [round(v, 4) for v in kit_max] if kit_tris else None,
         "byte_size": glb_path.stat().st_size,
     }
     return report
@@ -276,7 +353,7 @@ def main(argv: List[str] | None = None) -> int:
         print(
             f"{PASS_PREFIX} kit={report['kit_id']} bones={len(report['bones'])} "
             f"animations={len(report['animations'])} body_tris={report['body_triangles']} "
-            f"kit_tris={report['kit_triangles']} height={report['height_m']:.2f} forward=+Z"
+            f"kit_tris={report['kit_triangles']} height={report['height_m']:.2f} forward=+Z sockets={len(report['sockets'])}"
         )
         return 0
     for error in report["errors"]:

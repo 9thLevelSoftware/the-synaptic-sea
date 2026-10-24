@@ -6615,6 +6615,30 @@
       "classification": "active",
       "reason": "Runtime source; player reachability and completion have not been assessed.",
       "evidence": "Filesystem source exists at scripts/world/grid_coordinate.gd"
+    },
+    {
+      "path": "scripts/player/character_visual.gd",
+      "classification": "active",
+      "reason": "ADR-0070 character visual seam (Node3D) mounted by PlayerController on the main playable path; reachability proven by player_character_visual_smoke and main_playable_player_visual_smoke.",
+      "evidence": "Filesystem source exists at scripts/player/character_visual.gd"
+    },
+    {
+      "path": "scripts/systems/character_visual_catalog.gd",
+      "classification": "active",
+      "reason": "ADR-0070 pure loader for data/characters/character_visual_catalog.json; consumed by CharacterVisual.mount_catalog_entry on the main playable path.",
+      "evidence": "Filesystem source exists at scripts/systems/character_visual_catalog.gd"
+    },
+    {
+      "path": "scripts/validation/player_character_visual_smoke.gd",
+      "classification": "validation",
+      "reason": "ADR-0070 pure-node smoke for the character visual seam; registered in the regression bundle (PLAYER CHARACTER VISUAL PASS).",
+      "evidence": "Filesystem source exists at scripts/validation/player_character_visual_smoke.gd"
+    },
+    {
+      "path": "scripts/validation/main_playable_player_visual_smoke.gd",
+      "classification": "validation",
+      "reason": "ADR-0070 main-scene away-branch smoke for the character visual seam; registered in the regression bundle (MAIN PLAYABLE PLAYER VISUAL PASS).",
+      "evidence": "Filesystem source exists at scripts/validation/main_playable_player_visual_smoke.gd"
     }
   ]
 }

@@ -18,6 +18,11 @@ const DEFAULT_TURN_RATE: float = 14.0
 const DEFAULT_MOVING_THRESHOLD: float = 0.05
 const DEFAULT_EQUIPMENT_PREFIX: String = "Equip_"
 const DEFAULT_LOOPING_LOGICALS: Array = ["idle", "walk", "crouch_idle", "crouch_walk", "work"]
+## Planar speed at which the walk clips play at 1.0x; faster/slower travel
+## scales the clip so the stride roughly tracks the ground (less foot-slide).
+const WALK_REFERENCE_SPEED: float = 3.0
+const WALK_SPEED_SCALE_MIN: float = 0.5
+const WALK_SPEED_SCALE_MAX: float = 2.0
 const CLASS_ACCENT_DEFAULT: Color = Color(0.95, 0.45, 0.10, 1.0)
 
 var entry: Dictionary = {}
@@ -150,12 +155,16 @@ func update_locomotion(velocity: Vector3, crouching: bool, delta: float) -> void
 	if not mounted:
 		return
 	var planar: Vector2 = Vector2(velocity.x, velocity.z)
-	_moving = planar.length() > _moving_threshold
+	var planar_speed: float = planar.length()
+	_moving = planar_speed > _moving_threshold
 	_crouching = crouching
 	if _moving:
 		var target_yaw: float = atan2(planar.x, planar.y)
 		rotation.y = lerp_angle(rotation.y, target_yaw, clampf(delta * _turn_rate, 0.0, 1.0))
 	_refresh_locomotion_clip()
+	if animation_player != null:
+		var walking: bool = _moving and (_current_logical == "walk" or _current_logical == "crouch_walk")
+		animation_player.speed_scale = clampf(planar_speed / WALK_REFERENCE_SPEED, WALK_SPEED_SCALE_MIN, WALK_SPEED_SCALE_MAX) if walking else 1.0
 
 
 func set_working(working: bool) -> void:
@@ -239,6 +248,10 @@ func get_animation_names() -> Array[String]:
 
 func get_facing_yaw() -> float:
 	return rotation.y
+
+
+func get_speed_scale() -> float:
+	return animation_player.speed_scale if animation_player != null else 1.0
 
 
 # --- internals ---------------------------------------------------------------
