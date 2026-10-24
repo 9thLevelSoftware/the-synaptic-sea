@@ -147,7 +147,7 @@ Proven by `main_playable_reachability_smoke.gd` (bundle command count 208). See
   chart pass is polish, not reachability.
 - ~~**AI pathfinding**~~ — **CLOSED ADR-0049:** pure `ShipNavGraph` + A* pathfollow (no wall-lerp); regression +4 smokes.
 - **Cloud saves / Steamworks** — stub manifest only (ADR-0032).
-- **Bespoke enemy/boss content, explorable hub scene, final art** — content tracks.
+- **Bespoke enemy/boss content, explorable hub scene, final art** — content tracks. **Character art started 2026-10-24 (ADR-0070):** the player now mounts the procedurally authored `survivor_v1` kit (Blender headless → GLB → `CharacterVisual` seam) with equipment-driven visuals and clips; the must-have asset inventory lives in `docs/game/features/character_asset_inventory.md`.
 
 **~~Fire B2~~ CLOSED Stream F (2026-07-21):** deliberate vent (no extinguisher → vacuum
 vent with decompression/hull breach teeth), fire-consumes-oxygen (`fire_oxygen_drain` on

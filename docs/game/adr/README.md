@@ -50,6 +50,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0067 | docs/game/adr/0067-native-first-run-candidate-authority.md | Accepted for implementation: validate first-away standing route and hazards through the actual native generation path |
 | 0068 | docs/game/adr/0060-meshy-offline-evidence-rebind.md | Offline, fail-closed rebinding of protected Meshy evidence and resolved plan references |
 | 0069 | docs/game/adr/0069-procedural-biomass-assembly.md | Procedural biomass assembly: modular body-part threats replace singular creature models |
+| 0070 | docs/game/adr/0070-pz-style-character-art-and-procedural-blender-authoring.md | Accepted: PZ-style low-poly character art, procedural headless-Blender authoring in-repo, character visual catalog seam; supersedes ADR-0048's 2D production path |
 
 ## Notes
 

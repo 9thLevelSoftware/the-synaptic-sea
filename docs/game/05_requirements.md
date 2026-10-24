@@ -2121,3 +2121,109 @@ transfer authority or weaker substitute.
 - Verification:
   - `git diff -- assets/imported data/combat/biomass_part_catalog.json scenes/wrappers` is empty after test runs.
 
+
+## REQ-CHR-001: Player character visual is a real runtime asset, not a capsule
+
+- Source: `features/character_asset_inventory.md`, ADR-0070
+- Type: content / presentation
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - On the main playable path (title → main → playable ship) the player body mounts the
+    `player_survivor` entry of `data/characters/character_visual_catalog.json` (a skinned GLB
+    with a Skeleton3D and AnimationPlayer) and hides the capsule marker.
+  - The gameplay `CollisionShape3D` capsule (0.35 r × 1.6 h) is untouched; the visual carries
+    no collision, navigation or gameplay state (ADR-0052 §3).
+  - A missing catalog entry or GLB keeps the capsule marker and reports
+    `visual_source="fallback"`; no other visual is borrowed.
+- Verification:
+  - `player_character_visual_smoke.gd` → `PLAYER CHARACTER VISUAL PASS mounted=true ... fallback=true`.
+  - `main_playable_player_visual_smoke.gd` → `MAIN PLAYABLE PLAYER VISUAL PASS mounted=true ...`.
+
+## REQ-CHR-002: Equipment slots are visible on the body
+
+- Source: `features/character_asset_inventory.md`, ADR-0070
+- Type: content / presentation
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Every `data/items/equipment_definitions.json` item in the `suit`, `back`, and `waist` slots
+    maps to one or more `Equip_*` node prefixes in the catalog (`hardsuit` → plates + helmet,
+    `eva_backpack`, `field_pack`, `tool_belt`).
+  - Equipping through the real `EquipmentState` shows the matching nodes on the next physics
+    tick; unequipping hides them; nothing is visible with empty slots.
+  - The visual reads equipment through a coordinator-injected provider so it follows the live
+    `EquipmentState` instance across load/rebuild.
+- Verification:
+  - `player_character_visual_smoke.gd` (`equipment=true`) and
+    `main_playable_player_visual_smoke.gd` (`equip_sync=true`); `tests/test_character_kit.py`
+    (`CatalogTests.test_catalog_matches_spec`).
+
+## REQ-CHR-003: Locomotion, actions and death animate from live state on both branches
+
+- Source: `features/character_asset_inventory.md`, ADR-0070
+- Type: content / presentation
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Idle / walk / crouch idle / crouch walk / work clips are selected from `PlayerController`
+    velocity, crouch, and `WorkActionDriver.is_working()`; the model yaws so its `+Z` faces
+    the planar travel direction.
+  - Attack attempts play `melee_swing` (or `aim_ranged` for ammo-consuming weapons) over
+    locomotion until the clip ends; `end_run("death")` plays `downed` and holds.
+  - All of this is driven from `PlayerController._physics_process`, so it works identically
+    when `away_from_start = true` (CLAUDE.md dual-branch rule).
+- Verification:
+  - `player_character_visual_smoke.gd` (`locomotion=true action=true downed=true facing=true`);
+    `main_playable_player_visual_smoke.gd` (`away_ticks=true walk=true facing=true attack_swing=true`).
+
+## REQ-CHR-004: Character kit contract is machine-validated
+
+- Source: `features/character_asset_inventory.md`, ADR-0070
+- Type: process / content pipeline
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - `tools/character_kit/character_kit_spec.py` is the single contract (bones, parts, sockets,
+    clips, materials, budgets); the exported manifest beside the GLB equals the spec.
+  - The host validator proves: exactly one skin whose joints equal the bone list; every body,
+    equipment and socket node present and skinned/bone-parented; every clip present with
+    channels; body triangles within 800–3 200 and kit ≤ 7 000; height 1.75 ± 0.06 m; pivot at
+    the floor; centred; footprint ≤ 0.9 m; `+Z` forward (boot toe test).
+  - Rebuilding from source reproduces a GLB that passes the same validator.
+- Verification:
+  - `PYTHONPATH=. python3 tools/character_kit/validate_character_glb.py --glb assets/imported/characters/survivor_v1/survivor_v1.glb --manifest assets/imported/characters/survivor_v1/survivor_v1.manifest.json`
+    → `CHARACTER KIT VALIDATE PASS ...`; `python3 -m pytest -q tests/test_character_kit.py`.
+
+## REQ-CHR-005: Procedural Blender source is the editable master
+
+- Source: `features/character_asset_inventory.md`, ADR-0070, ADR-0058
+- Type: process / content pipeline
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - `tools/character_kit/build_kit.py` rebuilds every runtime character GLB headlessly from
+    repository Python with no provider call, no external drive, and no hand-edited binary.
+  - Runtime paths are versioned (`assets/imported/characters/<kit_id>/`); staging/scratch
+    output never lands under `assets/imported` unless the validator passed.
+  - Review previews (turnarounds per equipment variant, pose contact sheet, gameplay-distance
+    iso frame) are regenerated from the exported GLB round trip, not the authoring scene.
+- Verification:
+  - `PYTHONPATH=. python3 tools/character_kit/build_kit.py --project-root . --previews`
+    exits 0 and refreshes `artifacts/validation-previews/characters/survivor_v1/`.
+
+## REQ-CHR-006: Handheld tool props share the socket contract
+
+- Source: `features/character_asset_inventory.md`, ADR-0070
+- Type: content
+- Priority: should
+- Status: Implemented (assets); runtime mounting deferred
+- Acceptance criteria:
+  - One static GLB per hand-slot item (`crowbar`, `welding_lance`, `flare_pistol`,
+    `shock_probe`) and per tool pickup (`portable_oxygen_pump`, `junction_calibrator`) under
+    `assets/imported/characters/handheld_tools_v1/`, grip at the origin, working end along `+Z`.
+  - The rig exports `Socket_HandR` / `Socket_HandL` / `Socket_Back` / `Socket_Head` as
+    bone-parented nodes so a later seam can mount them with an identity transform.
+- Verification:
+  - `tools/character_kit/build_kit.py` prints `HANDHELD TOOL BUILD OK id=<id>` for each; the
+    kit smoke asserts `primary_hand socket present`.

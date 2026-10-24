@@ -1,0 +1,114 @@
+{
+  "animations": [
+    "idle-loop",
+    "walk-loop",
+    "crouch_idle-loop",
+    "crouch_walk-loop",
+    "work-loop",
+    "melee_swing",
+    "aim_ranged",
+    "downed"
+  ],
+  "body_parts": [
+    "Body_Head",
+    "Body_Neck",
+    "Body_Chest",
+    "Body_Spine",
+    "Body_Pelvis",
+    "Body_UpperArm_L",
+    "Body_Forearm_L",
+    "Body_Hand_L",
+    "Body_UpperArm_R",
+    "Body_Forearm_R",
+    "Body_Hand_R",
+    "Body_Thigh_L",
+    "Body_Shin_L",
+    "Body_Boot_L",
+    "Body_Thigh_R",
+    "Body_Shin_R",
+    "Body_Boot_R",
+    "Body_ClassAccent"
+  ],
+  "bones": [
+    "root",
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "head",
+    "shoulder_L",
+    "upper_arm_L",
+    "forearm_L",
+    "hand_L",
+    "shoulder_R",
+    "upper_arm_R",
+    "forearm_R",
+    "hand_R",
+    "thigh_L",
+    "shin_L",
+    "foot_L",
+    "thigh_R",
+    "shin_R",
+    "foot_R"
+  ],
+  "document_kind": "character_kit_manifest",
+  "equipment_parts": [
+    "Equip_Hardsuit_Chest",
+    "Equip_Hardsuit_Spine",
+    "Equip_Hardsuit_Pelvis",
+    "Equip_Hardsuit_Shoulder_L",
+    "Equip_Hardsuit_Shoulder_R",
+    "Equip_Hardsuit_Forearm_L",
+    "Equip_Hardsuit_Forearm_R",
+    "Equip_Hardsuit_Knee_L",
+    "Equip_Hardsuit_Knee_R",
+    "Equip_Helmet",
+    "Equip_EVABackpack",
+    "Equip_FieldPack",
+    "Equip_ToolBelt"
+  ],
+  "equipment_visuals": {
+    "eva_backpack": [
+      "Equip_EVABackpack"
+    ],
+    "field_pack": [
+      "Equip_FieldPack"
+    ],
+    "hardsuit": [
+      "Equip_Hardsuit_",
+      "Equip_Helmet"
+    ],
+    "tool_belt": [
+      "Equip_ToolBelt"
+    ]
+  },
+  "forward_axis": "+Z",
+  "glb_path": "assets/imported/characters/survivor_v1/survivor_v1.glb",
+  "height_m": 1.75,
+  "height_tolerance_m": 0.06,
+  "kit_id": "survivor_v1",
+  "materials": [
+    "MAT_SuitFabric",
+    "MAT_SuitPlate",
+    "MAT_Skin",
+    "MAT_Boot",
+    "MAT_Strap",
+    "MAT_Metal",
+    "MAT_Visor",
+    "MAT_ClassAccent",
+    "MAT_Lamp"
+  ],
+  "pivot": "bottom_center",
+  "schema_version": "1.0.0",
+  "sockets": {
+    "Socket_Back": "chest",
+    "Socket_HandL": "hand_L",
+    "Socket_HandR": "hand_R",
+    "Socket_Head": "head"
+  },
+  "triangle_budget": {
+    "body_max": 3200,
+    "body_min": 800,
+    "kit_max": 7000
+  }
+}

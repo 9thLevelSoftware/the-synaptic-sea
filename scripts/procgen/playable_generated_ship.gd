@@ -2217,6 +2217,9 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
+	# ADR-0070: a death lays the character visual down (capsule fallback no-op).
+	if reason == "death" and player != null and is_instance_valid(player) and player.has_method("set_visual_downed"):
+		player.set_visual_downed(true)
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("run_ended", reason)
 	# Terminal cue: death plays vitals-critical audio; successful ends use objective advance.
@@ -10084,6 +10087,11 @@ func _attack_with_equipped_weapon() -> Dictionary:
 	if weapon_id.is_empty():
 		weapon_id = "crowbar"
 	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state, ammo_state)
+	# ADR-0070: swing/aim the character visual for any attempted attack (a
+	# dry-fire still swings), independent of the hit result.
+	if player != null and is_instance_valid(player) and player.has_method("play_visual_action"):
+		var weapon_def: Dictionary = _weapon_definition_for_visual(weapon_id)
+		player.play_visual_action("aim" if str(weapon_def.get("kind", "melee")) == "ranged" else "melee")
 	if bool(result.get("ok", false)):
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
@@ -10754,6 +10762,36 @@ func _spawn_player() -> void:
 	player.teleport_to(loader.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
 	player.interact_requested.connect(_on_player_interact_requested)
 	player.field_craft_requested.connect(_on_player_field_craft_requested)
+	# ADR-0070: the character visual mirrors the LIVE equipment/work state via
+	# providers (both model instances are replaced on load/rebuild). The
+	# player polls them in _physics_process, so this works on the home AND
+	# away branches without touching the coordinator's _process split.
+	player.bind_visual_providers(
+		Callable(self, "_visual_equipment_slots"),
+		Callable(self, "_visual_is_working"),
+	)
+
+
+func _visual_equipment_slots() -> Dictionary:
+	if equipment_state == null:
+		return {}
+	return equipment_state.slots.duplicate(true)
+
+
+func _visual_is_working() -> bool:
+	return work_action_driver != null and work_action_driver.is_working()
+
+
+## Weapon definition plus a derived visual `kind` ("ranged" when the weapon
+## consumes ammo per data/combat/weapon_definitions.json, else "melee").
+func _weapon_definition_for_visual(weapon_id: String) -> Dictionary:
+	var weapon: Dictionary = {}
+	if threat_manager != null and threat_manager.weapon_definitions is Dictionary:
+		var raw: Variant = threat_manager.weapon_definitions.get(weapon_id, {})
+		if raw is Dictionary:
+			weapon = (raw as Dictionary).duplicate(true)
+	weapon["kind"] = "ranged" if not str(weapon.get("ammo_item_id", "")).is_empty() else "melee"
+	return weapon
 
 func _spawn_camera() -> void:
 	camera_rig = IsoCameraRigScript.new()

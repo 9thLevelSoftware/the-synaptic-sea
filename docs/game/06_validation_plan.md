@@ -199,6 +199,52 @@ and review must not write to `assets/imported`, `data/combat/threat_visual_catal
 - ADR-0058: `docs/game/adr/0058-meshy-candidates-blender-authority.md`.
 - ADR-0060 offline evidence rebinding: `docs/game/adr/0060-meshy-offline-evidence-rebind.md`.
 
+## Procedural character kit (ADR-0070, REQ-CHR-001..006) — GREEN
+
+Feature: `docs/game/features/character_asset_inventory.md`. The kit is authored headlessly
+in Blender from `tools/character_kit/` (no provider, no external master), validated host-side
+against `character_kit_spec.py`, and consumed at runtime through the character visual catalog
+seam (`CharacterVisualCatalog` → `CharacterVisual` on `PlayerController`).
+
+Rebuild (requires Blender 4.2+ on PATH, `$BLENDER`, or `--blender`; writes the runtime GLBs,
+manifest, validation report and the review previews):
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/build_kit.py \
+  --project-root . --previews
+```
+
+Host validation (no Blender/Godot needed; part of the regression bundle below):
+
+```bash
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 tools/character_kit/validate_character_glb.py \
+  --glb assets/imported/characters/survivor_v1/survivor_v1.glb \
+  --manifest assets/imported/characters/survivor_v1/survivor_v1.manifest.json
+PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q tests/test_character_kit.py
+```
+
+Expected: `CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8 body_tris=1540 kit_tris=3396 height=1.76 forward=+Z`
+and `8 passed`.
+
+Godot smokes (the GLB must be imported first; a fresh clone runs
+`"$GODOT" --headless --import --path "$ROOT"` once before the bundle):
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:?set Godot executable}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_character_visual_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
+```
+
+Expected markers:
+
+- `PLAYER CHARACTER VISUAL PASS mounted=true bones=20 clips=8 loops=true equipment=true facing=true locomotion=true action=true downed=true fallback=true`
+- `MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true`
+
+Visual evidence (art gate item 7): `artifacts/validation-previews/characters/survivor_v1/`
+(`turnaround_{base,hardsuit_eva,fieldpack_belt}.png`, `poses_contact_sheet.png`,
+`gameplay_distance_iso.png` at camera size 22, `gameplay_distance_iso_size12.png`).
+
 ## Godot binary
 
 `$GODOT` (the caller-supplied Godot 4.7.1 executable)
@@ -1132,6 +1178,11 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
+# ADR-0070 / REQ-CHR: procedural character kit contract + runtime seam (home + away).
+run_clean 'Character kit GLB validator' 'CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$ROOT/tools/character_kit/validate_character_glb.py" --glb "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.glb" --manifest "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.manifest.json"
+run_clean 'Character kit pytest' '8 passed' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q "$ROOT/tests/test_character_kit.py"
+run_clean 'Player character visual smoke' 'PLAYER CHARACTER VISUAL PASS mounted=true bones=20 clips=8 loops=true equipment=true facing=true locomotion=true action=true downed=true fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_character_visual_smoke.gd
+run_clean 'Main playable player visual smoke' 'MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
 echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
@@ -1264,6 +1315,7 @@ GODOT="${GODOT:?set Godot 4.7.1 executable}"
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.
 
 ## Future validation additions
+- [x] ADR-0070 character kit: host validator `tools/character_kit/validate_character_glb.py` (`CHARACTER KIT VALIDATE PASS ...`), `tests/test_character_kit.py` (8 tests), pure-node smoke `scripts/validation/player_character_visual_smoke.gd` (`PLAYER CHARACTER VISUAL PASS ...`) and main-scene away-branch smoke `scripts/validation/main_playable_player_visual_smoke.gd` (`MAIN PLAYABLE PLAYER VISUAL PASS ... away_ticks=true ...`). Added to regression bundle (+4 commands).
 - [x] Inventory/tool model smoke: `scripts/validation/inventory_state_smoke.gd` (expected marker `INVENTORY STATE PASS tools=1 pump=true drain_multiplier=0.5`) and main-scene smoke `scripts/validation/main_playable_slice_inventory_smoke.gd` (expected marker `MAIN PLAYABLE INVENTORY PASS tool=portable_oxygen_pump acquired=true drain_multiplier=0.5`) (REQ-007). Added to regression bundle.
 - [x] Fire hazard model smoke: ~~`scripts/validation/fire_state_smoke.gd`~~ **retired by M7-B (ADR-0041).** Fire left the ADR-0005 phase-timer cyclic contract and is now the authoritative persistent compartment hazard owned by `FireSuppressionState`. Replaced by: pure-model `scripts/validation/fire_suppression_state_smoke.gd` (marker `FIRE SUPPRESSION STATE PASS ignite=true persist=true extinguish=true auto_suppress=true vent=true spread=true reignite=true cascade=true round_trip=true`), `scripts/validation/extinguisher_state_smoke.gd` (`EXTINGUISHER STATE PASS consume=true recharge=true round_trip=true`), `scripts/validation/ship_systems_damage_smoke.gd` (`SHIP SYSTEMS DAMAGE PASS damaged=true unknown_rejected=true`), node smokes `scripts/validation/fire_suppression_point_smoke.gd` (`FIRE SUPPRESSION POINT PASS extinguished=true charge_spent=true gated=true`) and `scripts/validation/extinguisher_recharge_port_smoke.gd` (`EXTINGUISHER RECHARGE PORT PASS powered_refills=true unpowered_noop=true`), and main-scene `scripts/validation/main_playable_slice_fire_smoke.gd` (now `MAIN PLAYABLE FIRE PASS passable=true present=true vent=true vitals_drain=true system_damage=true`) plus the end-to-end `scripts/validation/main_playable_fire_loop_smoke.gd` (`MAIN PLAYABLE FIRE LOOP PASS ignite=true teeth=true extinguish=true reignite=true repair_stops=true recharge=true reachable=true`) (REQ-010 / ADR-0041). All added to regression bundle; `hazard_contract_smoke.gd` updated to `models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2` (fire out of the timer-hazard set).
 - [x] Golden fire-zone source marker smoke: `scripts/validation/golden_fire_zone_source_marker_smoke.gd` — pins the Gate 2 fire zone to a side link declared in BOTH `layout.json` and `gameplay_slice.json`, asserts target room is non-critical and not the obj3 → obj4 breach corridor, and verifies `FIRE_ZONE_FALLBACK_ROOM_ID` matches the marker. Added to regression bundle.

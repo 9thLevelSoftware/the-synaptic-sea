@@ -1,0 +1,54 @@
+{
+  "version": "character-visual-1",
+  "characters": {
+    "player_survivor": {
+      "kit_id": "survivor_v1",
+      "scene_path": "res://assets/imported/characters/survivor_v1/survivor_v1.glb",
+      "manifest_path": "res://assets/imported/characters/survivor_v1/survivor_v1.manifest.json",
+      "height_m": 1.75,
+      "forward_axis": "+Z",
+      "turn_rate_rad_per_s": 14.0,
+      "moving_speed_threshold": 0.05,
+      "equipment_visuals": {
+        "hardsuit": [
+          "Equip_Hardsuit_",
+          "Equip_Helmet"
+        ],
+        "eva_backpack": [
+          "Equip_EVABackpack"
+        ],
+        "field_pack": [
+          "Equip_FieldPack"
+        ],
+        "tool_belt": [
+          "Equip_ToolBelt"
+        ]
+      },
+      "equipment_node_prefix": "Equip_",
+      "class_accent_node": "Body_ClassAccent",
+      "sockets": {
+        "primary_hand": "Socket_HandR",
+        "secondary_hand": "Socket_HandL",
+        "back": "Socket_Back",
+        "head": "Socket_Head"
+      },
+      "animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "crouch_idle": "crouch_idle",
+        "crouch_walk": "crouch_walk",
+        "work": "work",
+        "melee": "melee_swing",
+        "aim": "aim_ranged",
+        "downed": "downed"
+      },
+      "looping_animations": [
+        "idle",
+        "walk",
+        "crouch_idle",
+        "crouch_walk",
+        "work"
+      ]
+    }
+  }
+}
