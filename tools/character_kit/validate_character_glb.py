@@ -123,9 +123,19 @@ def validate(glb_path: Path, manifest_path: Path | None = None, project_root: Pa
     if manifest_path is not None:
         disk = json.loads(manifest_path.read_text(encoding="utf-8"))
         disk_glb = str(disk.get("glb_path", ""))
-        if not disk_glb.endswith(spec.GLB_LEAF):
-            errors.append(f"manifest glb_path must point at {spec.GLB_LEAF}: {disk_glb!r}")
-        expected = spec.KitManifest(glb_path=disk_glb or spec.KitManifest().glb_path).to_dict()
+        # The manifest must name the GLB actually being validated. Inside the
+        # project root that is the project-relative path; for a GLB validated
+        # from outside the root only the leaf name can be checked.
+        actual_glb = project_relative(glb_path, project_root)
+        if Path(actual_glb).is_absolute():
+            if not disk_glb.endswith(spec.GLB_LEAF):
+                errors.append(f"manifest glb_path must point at {spec.GLB_LEAF}: {disk_glb!r}")
+            expected_glb = disk_glb
+        else:
+            if disk_glb != actual_glb:
+                errors.append(f"manifest glb_path {disk_glb!r} does not name the validated GLB {actual_glb!r}")
+            expected_glb = actual_glb
+        expected = spec.KitManifest(glb_path=expected_glb).to_dict()
         if disk != expected:
             errors.append("manifest on disk differs from character_kit_spec (rebuild the kit)")
 

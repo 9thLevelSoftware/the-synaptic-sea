@@ -224,7 +224,7 @@ PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_character
 ```
 
 Expected: `CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8 body_tris=1540 kit_tris=3396 height=1.76 forward=+Z`
-and `8 passed`.
+and `9 passed`.
 
 Godot smokes (the GLB must be imported first; a fresh clone runs
 `"$GODOT" --headless --import --path "$ROOT"` once before the bundle):
@@ -1180,7 +1180,7 @@ run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
 # ADR-0070 / REQ-CHR: procedural character kit contract + runtime seam (home + away).
 run_clean 'Character kit GLB validator' 'CHARACTER KIT VALIDATE PASS kit=survivor_v1 bones=20 animations=8' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tools/character_kit/validate_character_glb.py" --glb "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.glb" --manifest "$ROOT/assets/imported/characters/survivor_v1/survivor_v1.manifest.json"
-run_clean 'Character kit pytest' '8 passed' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q "$ROOT/tests/test_character_kit.py"
+run_clean 'Character kit pytest' '9 passed' env PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q "$ROOT/tests/test_character_kit.py"
 run_clean 'Player character visual smoke' 'PLAYER CHARACTER VISUAL PASS mounted=true bones=20 clips=8 loops=true equipment=true facing=true locomotion=true action=true downed=true fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_character_visual_smoke.gd
 run_clean 'Main playable player visual smoke' 'MAIN PLAYABLE PLAYER VISUAL PASS mounted=true equip_sync=true away_ticks=true walk=true facing=true attack_swing=true unarmed_no_swing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_player_visual_smoke.gd
 echo "SYNAPTIC_SEA REGRESSION PASS commands=${RUN_CLEAN_COUNT} clean_output=true"

@@ -99,8 +99,19 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("animations != spec", joined)
 
     @unittest.skipUnless(KIT_GLB.exists(), "survivor_v1 kit not built")
+    def test_manifest_path_drift_is_rejected(self):
+        stale = json.loads(KIT_MANIFEST.read_text(encoding="utf-8"))
+        stale["glb_path"] = "stale/dir/" + spec.GLB_LEAF
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / spec.MANIFEST_LEAF
+            path.write_text(json.dumps(stale), encoding="utf-8")
+            report = validate(KIT_GLB, path, PROJECT_ROOT)
+        self.assertFalse(report["ok"])
+        self.assertTrue(any("does not name the validated GLB" in e for e in report["errors"]), report["errors"])
+
+    @unittest.skipUnless(KIT_GLB.exists(), "survivor_v1 kit not built")
     def test_built_kit_passes(self):
-        report = validate(KIT_GLB, KIT_MANIFEST)
+        report = validate(KIT_GLB, KIT_MANIFEST, PROJECT_ROOT)
         self.assertTrue(report["ok"], report["errors"])
         self.assertEqual(set(report["bones"]), set(spec.BONE_NAMES))
         self.assertEqual(set(report["animations"]), set(spec.ANIMATION_NAMES))
